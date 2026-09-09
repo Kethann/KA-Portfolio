@@ -58,7 +58,7 @@ export const FolderScene=forwardRef<FolderHandle,Props>(function FolderScene({pr
       const loader=new THREE.TextureLoader();
       cards.forEach(card=>loader.load(imageUrl(card.project),texture=>{
         if(disposed){texture.dispose();return;}
-        texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
+        texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=Math.min(16,renderer.capabilities.getMaxAnisotropy());
         card.image.material.map=texture;card.image.material.color.set(0xffffff);card.image.material.needsUpdate=true;
         const ratio=texture.image.width/texture.image.height,w=Math.min(2.62,1.56*ratio);
         card.image.scale.set(w,w/ratio,1);
