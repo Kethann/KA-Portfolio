@@ -122,6 +122,12 @@ canvas{ display:block; width:100%; height:100%; }
   position:fixed; top:28px; left:50%; z-index:60;
   display:flex; align-items:center; gap:2px; padding:6px;
   border-radius:999px; overflow:visible;
+  /* [conveyor drag fix] only .nav-item had touch-action:none -- once an overshoot drag pushes
+     the pointer past the first/last item's edge (exactly when the FIFO shift needs to keep
+     tracking), it enters nav's own padding/blank area, which had no such protection. The browser
+     could then hijack it as a native scroll and fire pointercancel, snapping the drag back before
+     the shift ever committed -- on a real touchscreen, not reproducible with synthetic mouse events. */
+  touch-action:none;
   background:rgba(24, 10, 9, 0.52);
   border:1px solid rgba(255, 255, 255, 0.16);
   box-shadow:
@@ -189,12 +195,12 @@ canvas{ display:block; width:100%; height:100%; }
   width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;
   background:var(--glass-bg); border:1px solid rgba(255, 170, 120, 0.35);
   color:rgba(255, 220, 200, 0.95); cursor:pointer;
-  transition:color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+  transition:color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, opacity var(--dur-fast) ease;
 }
-/* [responsive nav] the class's own display:flex above otherwise beats the UA [hidden]{display:none}
-   rule (author styles win over UA defaults regardless of specificity), so the hidden attribute
-   set from JS when there's nothing to park would silently do nothing without this. */
-.expand-trigger[hidden]{ display:none; }
+/* [responsive nav] always present -- ready to hold a 5th+ item the moment one overflows -- but
+   visually quieter while there's nothing currently parked, rather than removed from the layout. */
+.expand-trigger.is-empty{ opacity:.45; }
+.expand-trigger.is-empty:hover{ opacity:.8; }
 .expand-trigger:hover{ color:var(--ink); box-shadow:0 0 16px 2px rgba(255, 110, 60, 0.3); }
 .expand-trigger:focus-visible{ outline:2px solid var(--amber); outline-offset:3px; }
 .expand-panel{
@@ -387,7 +393,14 @@ canvas{ display:block; width:100%; height:100%; }
 footer.site-footer{
   position:relative; z-index:10; padding:48px clamp(20px,5vw,64px) 56px;
   display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:14px;
-  border-top:0; background:linear-gradient(180deg,transparent,rgba(8,9,11,.72));
+  border-top:1px solid rgba(255,255,255,0.08);
+  /* [liquid-glass footer] dark-tinted translucent fill + backdrop blur, matching the same
+     material used for the 3-line menu panel and the chat panel -- was a plain gradient fade
+     before, no blur/frost at all. This is a single shared element outside every .site-section
+     (persistent across Contact/Portfolio/Gallery/About), so one rule covers every page. */
+  background:linear-gradient(180deg, rgba(8,8,10,0) 0%, rgba(8,8,10,0.6) 45%, rgba(8,8,10,0.86) 100%);
+  backdrop-filter:blur(22px) saturate(160%);
+  -webkit-backdrop-filter:blur(22px) saturate(160%);
 }
 .footer-link{
   display:inline-flex; align-items:center; gap:9px; text-decoration:none;
@@ -771,7 +784,7 @@ html{overflow-x:clip;scroll-padding-top:110px;}
   <div class="nav-pill" id="nav-pill" aria-hidden="true"></div>
   <div class="nav-items" id="nav-items"></div>
   <div class="expand-menu-wrap">
-    <button class="expand-trigger" id="expand-trigger" aria-expanded="false" aria-controls="expand-panel" aria-label="More options" title="More" hidden>
+    <button class="expand-trigger" id="expand-trigger" aria-expanded="false" aria-controls="expand-panel" aria-label="More options" title="More">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
     </button>
     <div class="expand-panel glass-panel" id="expand-panel" role="menu"></div>
@@ -5554,9 +5567,10 @@ function renderExpandMenu(){
     panel.appendChild(a);
   });
   expandLinks = Array.prototype.slice.call(panel.querySelectorAll("[data-expand-link]"));
-  // nothing parked (today's default 4 items exactly fill the desktop bar) -- no point showing a
-  // trigger for an empty menu; reappears automatically the moment a 5th item actually overflows.
-  document.getElementById("expand-trigger").hidden = parked.length === 0;
+  // [always present] the trigger itself never leaves the layout -- it just reads visually
+  // quieter while nothing is parked (today's default 4 items exactly fill the desktop bar),
+  // staying ready for a 5th+ item the moment one actually overflows.
+  document.getElementById("expand-trigger").classList.toggle("is-empty", parked.length === 0);
 }
 
 // ---- v22: pointer-tracked specular highlight -- a fixed top-centered highlight (the CSS
