@@ -1,6 +1,10 @@
 <!doctype html>
 <title>KA Crystal Reconstruction</title>
 <meta charset="utf-8">
+<!-- [mobile fix] without this, phones default to a ~980px desktop-width virtual viewport --
+     every @media(max-width:600px) rule in this file silently never applies on a real device,
+     and everything renders zoomed out (tiny nav/hamburger/chat bubble) until pinch-zoomed. -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -716,14 +720,20 @@ html{overflow-x:clip;scroll-padding-top:110px;}
 .lb-btn{min-width:44px;min-height:44px;}
 @media(max-width:600px){
   #site-nav{gap:0;padding:5px;}
-  .nav-item{padding:10px clamp(8px,2.8vw,16px);font-size:10px;letter-spacing:.035em;}
+  /* [mobile touch-target fix] the nav pills and hamburger/chat bubble were shrinking on phones
+     -- exactly backwards, since touch input is less precise than a mouse. Font/padding here now
+     matches or exceeds desktop instead of going smaller, and the hamburger/bubble/panda grow
+     rather than shrink. */
+  .nav-item{padding:12px clamp(10px,3.4vw,18px);font-size:12px;letter-spacing:.035em;}
   .expand-menu-wrap{margin-left:2px;}
+  .expand-trigger{width:48px;height:48px;}
+  .expand-trigger svg{width:18px;height:18px;}
   .coverflow-section{--card-w:min(65vw,300px);}
   #lightbox{padding:72px 18px 146px;}
   .lb-btn{top:auto;bottom:26px;transform:none;z-index:103;}
   #lightbox .lb-caption{width:calc(100vw - 124px);}
   .assistant-launcher{right:16px;bottom:max(16px,env(safe-area-inset-bottom));}
-  .assistant-panel{right:12px;width:calc(100vw - 24px);bottom:84px;max-height:calc(100svh - 110px);}
+  .assistant-panel{right:12px;width:calc(100vw - 24px);bottom:90px;max-height:calc(100svh - 110px);}
 }
 @media(max-height:540px) and (orientation:landscape){
   .coverflow-section{--card-w:min(28vw,220px);}
@@ -5679,6 +5689,13 @@ document.querySelectorAll(".footer-link").forEach(revealOnScroll);
 }
 .assistant-launcher:hover{ transform:scale(1.06); }
 .assistant-launcher:focus-visible{ outline:2px solid var(--amber); outline-offset:3px; }
+@media(max-width:600px){
+  /* placed here (after the base rule above) rather than in the earlier mobile block, so this
+     actually wins the cascade -- an equal-specificity rule appearing later in source always
+     beats an earlier one, media query or not. */
+  .assistant-launcher{ width:62px; height:62px; }
+  .assistant-launcher svg{ width:27px; height:27px; }
+}
 .assistant-panel{
   position:fixed; bottom:96px; right:28px; z-index:70;
   width:min(380px, calc(100vw - 40px)); max-height:min(560px, calc(100vh - 140px));
@@ -6070,8 +6087,10 @@ function sendMessage(text){
   .panda-glow{ animation:none !important; opacity:.7; }
 }
 @media (max-width:600px){
-  #panda-mascot{ right:10px; bottom:48px; width:52px; height:52px; }
-  .panda-glow{ right:10px; bottom:26px; width:52px; height:52px; }
+  /* scaled to match the enlarged mobile chat bubble (62px, up from 56px) above, so the panda
+     stays proportionally perched rather than shrinking relative to a now-bigger bubble */
+  #panda-mascot{ right:18px; bottom:50px; width:58px; height:58px; }
+  .panda-glow{ right:18px; bottom:28px; width:58px; height:58px; }
 }
 
 .panda-bubble{
@@ -6085,7 +6104,7 @@ function sendMessage(text){
 }
 .panda-bubble.show{ opacity:1; transform:translateY(0) scale(1); }
 @media (max-width:600px){
-  .panda-bubble{ right:12px; bottom:106px; max-width:180px; }
+  .panda-bubble{ right:14px; bottom:118px; max-width:180px; }
 }
 </style>
 
