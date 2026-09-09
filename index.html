@@ -732,8 +732,6 @@ html{overflow-x:clip;scroll-padding-top:110px;}
   #lightbox{padding:72px 18px 146px;}
   .lb-btn{top:auto;bottom:26px;transform:none;z-index:103;}
   #lightbox .lb-caption{width:calc(100vw - 124px);}
-  .assistant-launcher{right:16px;bottom:max(16px,env(safe-area-inset-bottom));}
-  .assistant-panel{right:12px;width:calc(100vw - 24px);bottom:90px;max-height:calc(100svh - 110px);}
 }
 @media(max-height:540px) and (orientation:landscape){
   .coverflow-section{--card-w:min(28vw,220px);}
@@ -5692,8 +5690,9 @@ document.querySelectorAll(".footer-link").forEach(revealOnScroll);
 @media(max-width:600px){
   /* placed here (after the base rule above) rather than in the earlier mobile block, so this
      actually wins the cascade -- an equal-specificity rule appearing later in source always
-     beats an earlier one, media query or not. */
-  .assistant-launcher{ width:62px; height:62px; }
+     beats an earlier one, media query or not. Position moved here too (was in the earlier block,
+     silently losing to the desktop right:28px/bottom:28px above for the same reason). */
+  .assistant-launcher{ right:16px; bottom:max(16px, env(safe-area-inset-bottom)); width:62px; height:62px; }
   .assistant-launcher svg{ width:27px; height:27px; }
 }
 .assistant-panel{
@@ -5722,6 +5721,17 @@ body:has(.assistant-panel.open) .site-section{ filter:brightness(0.7); transitio
 @media (prefers-reduced-motion: reduce){
   .assistant-panel.open{ transition:opacity .2s ease; transform:scale(1); filter:none; }
   .assistant-panel.closing{ transition:opacity .2s ease; transform:scale(1); filter:none; }
+}
+@media(max-width:600px){
+  /* [chat frame fix, mobile] near-fullscreen sheet instead of a small floating card that let
+     background nav/skill-bubble content bleed through around its edges -- the standard mobile
+     chat-app pattern, and gives the message list real room. Placed after the base rule above
+     (not in the earlier mobile block) so it actually wins the cascade. */
+  .assistant-panel{
+    top:max(12px, env(safe-area-inset-top)); left:12px; right:12px;
+    bottom:max(12px, env(safe-area-inset-bottom));
+    width:auto; height:auto; max-height:none; border-radius:22px;
+  }
 }
 .assistant-head{
   padding:16px 18px; border-bottom:1px solid rgba(255,255,255,0.08);
@@ -6088,9 +6098,13 @@ function sendMessage(text){
 }
 @media (max-width:600px){
   /* scaled to match the enlarged mobile chat bubble (62px, up from 56px) above, so the panda
-     stays proportionally perched rather than shrinking relative to a now-bigger bubble */
-  #panda-mascot{ right:18px; bottom:50px; width:58px; height:58px; }
-  .panda-glow{ right:18px; bottom:28px; width:58px; height:58px; }
+     stays proportionally perched rather than shrinking relative to a now-bigger bubble.
+     [sync fix] the bubble's mobile bottom offset is max(16px, env(safe-area-inset-bottom)) --
+     on a phone with a home-indicator safe area, that pushes the bubble UP. The panda/glow here
+     must add the same safe-area term or they stay put while the bubble moves, breaking the
+     "perched on top" alignment on exactly those devices. */
+  #panda-mascot{ right:18px; bottom:calc(max(16px, env(safe-area-inset-bottom)) + 34px); width:58px; height:58px; }
+  .panda-glow{ right:18px; bottom:calc(max(16px, env(safe-area-inset-bottom)) + 12px); width:58px; height:58px; }
 }
 
 .panda-bubble{
