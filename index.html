@@ -155,15 +155,29 @@ canvas{ display:block; width:100%; height:100%; }
     0 0 44px 10px rgba(255, 90, 40, 0.18);
   will-change:transform, width;
 }
+/* [responsive nav] plain wrapper, no box of its own -- keeps every .nav-item's offsetLeft
+   measured relative to #site-nav exactly as if they were still direct children, since the pill
+   drag math (movePill/pointermove) depends on those offsets staying nav-relative. */
+.nav-items{ display:contents; }
 .nav-item{
   position:relative; z-index:1; background:transparent; border:none; color:rgba(255,255,255,0.78);
   font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; letter-spacing:0.12em;
   text-transform:uppercase; padding:11px 20px; border-radius:999px; cursor:pointer; font-weight:500;
-  transition:color var(--dur-fast) ease;
+  transition:color var(--dur-fast) ease, opacity .3s ease, transform .3s ease;
 }
 .nav-item:hover{ color:var(--ink); }
 .nav-item[aria-current="page"]{ color:rgba(255, 250, 245, 1); }
 .nav-item:focus-visible{ outline:2px solid var(--amber); outline-offset:3px; }
+/* [FIFO conveyor, mobile] outgoing item slides/shrinks toward the hamburger icon; incoming item
+   starts faded/scaled down at its edge and settles to rest -- transform/opacity only. */
+.nav-item.nav-item-exiting{
+  transition:opacity .3s ease, transform .3s ease;
+  opacity:0; transform:scale(.55) translateX(var(--exit-x,24px)); pointer-events:none;
+}
+.nav-item.nav-item-entering{ opacity:0; transform:scale(.7) translateX(var(--enter-x,16px)); }
+@media (prefers-reduced-motion: reduce){
+  .nav-item, .nav-item.nav-item-exiting, .nav-item.nav-item-entering{ transition:opacity .15s ease; transform:none; }
+}
 @media (prefers-reduced-motion: reduce){
   #site-nav.revealed{ transition:opacity .2s ease; filter:none; transform:translateX(-50%) scale(1); }
   #site-nav::before{ transition:none; }
@@ -177,6 +191,10 @@ canvas{ display:block; width:100%; height:100%; }
   color:rgba(255, 220, 200, 0.95); cursor:pointer;
   transition:color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
 }
+/* [responsive nav] the class's own display:flex above otherwise beats the UA [hidden]{display:none}
+   rule (author styles win over UA defaults regardless of specificity), so the hidden attribute
+   set from JS when there's nothing to park would silently do nothing without this. */
+.expand-trigger[hidden]{ display:none; }
 .expand-trigger:hover{ color:var(--ink); box-shadow:0 0 16px 2px rgba(255, 110, 60, 0.3); }
 .expand-trigger:focus-visible{ outline:2px solid var(--amber); outline-offset:3px; }
 .expand-panel{
@@ -385,6 +403,7 @@ footer.site-footer{
   background:var(--accent-glass); font-family:'JetBrains Mono', ui-monospace, monospace; font-weight:600;
   font-size:11px; letter-spacing:-0.02em; color:var(--ink);
 }
+.footer-link .mono svg{ width:16px; height:16px; }
 .footer-link span.label{ font-size:12px; letter-spacing:0.04em; }
 @media (prefers-reduced-motion: reduce){
   .footer-link{ transition:color .15s ease; }
@@ -750,16 +769,12 @@ html{overflow-x:clip;scroll-padding-top:110px;}
 
 <nav id="site-nav" class="site-nav" aria-label="Section navigation">
   <div class="nav-pill" id="nav-pill" aria-hidden="true"></div>
-  <button class="nav-item" data-section="contact">Contact</button>
-  <button class="nav-item" data-section="portfolio" aria-current="page">Portfolio</button>
-  <button class="nav-item" data-section="gallery">Gallery</button>
+  <div class="nav-items" id="nav-items"></div>
   <div class="expand-menu-wrap">
-    <button class="expand-trigger" id="expand-trigger" aria-expanded="false" aria-controls="expand-panel" aria-label="More options" title="More">
+    <button class="expand-trigger" id="expand-trigger" aria-expanded="false" aria-controls="expand-panel" aria-label="More options" title="More" hidden>
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
     </button>
-    <div class="expand-panel glass-panel" id="expand-panel" role="menu">
-      <a href="#" id="about-link" data-expand-link data-section="about" role="menuitem">About</a>
-    </div>
+    <div class="expand-panel glass-panel" id="expand-panel" role="menu"></div>
   </div>
 </nav>
 
@@ -1059,13 +1074,13 @@ html{overflow-x:clip;scroll-padding-top:110px;}
 
 <footer class="site-footer">
   <a class="footer-link" href="https://www.behance.net/KethanArtzz" target="_blank" rel="noopener noreferrer">
-    <span class="mono" aria-hidden="true">Bē</span><span class="label">Behance</span>
+    <span class="mono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M0 7.06h9.192c1.848 0 3.157.37 4.13 1.185.976.816 1.464 2.02 1.464 3.512 0 .973-.246 1.79-.735 2.436-.325.435-.812.83-1.46 1.185.98.335 1.72.897 2.22 1.685.5.788.75 1.75.75 2.886 0 1.11-.28 2.1-.84 2.97a5.05 5.05 0 0 1-2.29 1.94c-.66.28-1.44.47-2.35.57-.57.06-1.95.1-4.14.11H0V7.06zm4.94 6.29h3.6c.71 0 1.28-.15 1.71-.45.43-.3.65-.79.65-1.47 0-.75-.24-1.26-.72-1.53-.48-.27-1.14-.4-1.99-.4H4.94v3.85zm0 6.54h4.06c.85 0 1.5-.17 1.95-.5.46-.34.68-.9.68-1.68 0-.83-.24-1.4-.72-1.72-.48-.31-1.16-.47-2.05-.47H4.94v4.37zm11.79-11.5h7.27V9.5h-7.27V8.39zM24 15.34h-8.19c.03 1.07.35 1.87.95 2.4.6.52 1.29.78 2.08.78.62 0 1.14-.15 1.58-.46.44-.31.72-.65.83-1.02h4.35c-.7 2.15-1.77 3.68-3.23 4.6-1.11.7-2.42 1.05-3.93 1.05-1.02 0-1.98-.16-2.85-.49a6.4 6.4 0 0 1-2.24-1.42 6.5 6.5 0 0 1-1.46-2.24c-.35-.87-.53-1.85-.53-2.92 0-1.05.18-2.02.53-2.9.36-.87.85-1.63 1.48-2.26a6.6 6.6 0 0 1 2.26-1.47 7.6 7.6 0 0 1 2.82-.51c1.09 0 2.08.21 2.96.63.88.42 1.6 1 2.16 1.75.56.75.96 1.62 1.2 2.6.14.55.22 1.35.23 2.38zm-8.15-2.5h4.32c-.06-.79-.32-1.4-.77-1.83a2.5 2.5 0 0 0-1.77-.66c-.75 0-1.32.23-1.72.68-.4.46-.65 1.06-.77 1.81z"/></svg></span><span class="label">Behance</span>
   </a>
   <a class="footer-link" href="https://www.instagram.com/kethan_artzz" target="_blank" rel="noopener noreferrer">
-    <span class="mono" aria-hidden="true">IG</span><span class="label">Instagram</span>
+    <span class="mono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="2.5" width="19" height="19" rx="5"/><circle cx="12" cy="12" r="4.6"/><circle cx="17.35" cy="6.65" r="1.15" fill="currentColor" stroke="none"/></svg></span><span class="label">Instagram</span>
   </a>
   <a class="footer-link" href="https://x.com/v_kethan" target="_blank" rel="noopener noreferrer" aria-label="Kethan on X (Twitter)">
-    <span class="mono" aria-hidden="true">X</span><span class="label">X / Twitter</span>
+    <span class="mono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.6 10.62 20.9 2h-1.73l-6.35 7.48L7.75 2H2l7.66 11.15L2 22h1.73l6.7-7.9 5.4 7.9h5.75l-7.98-11.38zm-2.37 2.8-.78-1.11L4.3 3.3h2.66l4.99 7.14.78 1.11 6.48 9.28h-2.66l-5.3-7.4z"/></svg></span><span class="label">X / Twitter</span>
   </a>
 </footer>
 
@@ -5487,7 +5502,62 @@ buildFolders();
 // ==================================================================== NAV + SECTIONS ==
 var nav = document.getElementById("site-nav");
 var navPill = document.getElementById("nav-pill");
-var navItems = Array.prototype.slice.call(nav.querySelectorAll(".nav-item"));
+var navItemsContainer = document.getElementById("nav-items");
+
+// ---- [responsive nav] single source of truth for every nav destination. A future 5th/6th
+// section is just one more entry here -- nothing else in this system needs touching.
+var NAV_ITEMS = [
+  { name:"contact", label:"Contact" },
+  { name:"portfolio", label:"Portfolio" },
+  { name:"gallery", label:"Gallery" },
+  { name:"about", label:"About" }
+];
+var navVisibleStart = 0; // index of the first item currently shown in the bar
+var mobileNavQuery = window.matchMedia("(max-width:600px)");
+function navSlotCount(){ return mobileNavQuery.matches ? 3 : 4; }
+function navVisibleSlice(){
+  var slotCount = navSlotCount();
+  navVisibleStart = Math.max(0, Math.min(navVisibleStart, NAV_ITEMS.length - slotCount));
+  return { slotCount:slotCount, start:navVisibleStart, items:NAV_ITEMS.slice(navVisibleStart, navVisibleStart + slotCount) };
+}
+var navItems = []; // re-queried after every render -- see refreshNavItemRefs()
+function refreshNavItemRefs(){
+  navItems = Array.prototype.slice.call(navItemsContainer.querySelectorAll(".nav-item"));
+}
+// Full, non-animated rebuild -- used on first load and whenever the mobile/desktop breakpoint
+// itself changes. The drag-triggered single-step shift (shiftConveyor, defined further down
+// near the drag handlers) animates instead of calling this.
+function renderNavItems(){
+  var v = navVisibleSlice();
+  navItemsContainer.innerHTML = "";
+  v.items.forEach(function(item){
+    var btn = document.createElement("button");
+    btn.className = "nav-item"; btn.type = "button";
+    btn.setAttribute("data-section", item.name);
+    if (item.name === activeSection) btn.setAttribute("aria-current", "page");
+    btn.textContent = item.label;
+    navItemsContainer.appendChild(btn);
+  });
+  refreshNavItemRefs();
+  renderExpandMenu();
+}
+function renderExpandMenu(){
+  var v = navVisibleSlice();
+  var visibleNames = v.items.map(function(i){ return i.name; });
+  var parked = NAV_ITEMS.filter(function(i){ return visibleNames.indexOf(i.name) === -1; });
+  var panel = document.getElementById("expand-panel");
+  panel.innerHTML = "";
+  parked.forEach(function(item){
+    var a = document.createElement("a");
+    a.href = "#"; a.setAttribute("data-expand-link", ""); a.setAttribute("data-section", item.name);
+    a.setAttribute("role", "menuitem"); a.textContent = item.label;
+    panel.appendChild(a);
+  });
+  expandLinks = Array.prototype.slice.call(panel.querySelectorAll("[data-expand-link]"));
+  // nothing parked (today's default 4 items exactly fill the desktop bar) -- no point showing a
+  // trigger for an empty menu; reappears automatically the moment a 5th item actually overflows.
+  document.getElementById("expand-trigger").hidden = parked.length === 0;
+}
 
 // ---- v22: pointer-tracked specular highlight -- a fixed top-centered highlight (the CSS
 // default) is correct and sufficient on touch/no-pointer devices, so this only wires up on
@@ -5506,7 +5576,7 @@ nav.addEventListener("pointerleave", function(){
 // ---- v22: expand "more" menu ----
 var expandTrigger = document.getElementById("expand-trigger");
 var expandPanel = document.getElementById("expand-panel");
-var expandLinks = Array.prototype.slice.call(expandPanel.querySelectorAll("[data-expand-link]"));
+var expandLinks = []; // populated by renderExpandMenu() -- see the responsive-nav block above
 var expandOpen = false;
 
 function openExpand(){
@@ -5530,13 +5600,15 @@ document.addEventListener("click", function(e){
   if (expandOpen && !expandPanel.contains(e.target) && !e.target.closest("#expand-trigger")) closeExpand(false);
 });
 expandPanel.addEventListener("click", function(e){
-  // closest(), not a direct attribute check -- the Image Upscaler item has an icon/label nested
-  // inside the [data-expand-link] button, so a click can land on a child rather than it directly
-  if (e.target.closest("[data-expand-link]")) closeExpand(false);
-});
-document.getElementById("about-link").addEventListener("click", function(e){
+  // closest(), not a direct attribute check -- every [data-expand-link] entry is generated by
+  // renderExpandMenu() from NAV_ITEMS now (there's no more one-off #about-link special case),
+  // and a click can land on a child rather than the link itself.
+  var link = e.target.closest("[data-expand-link]");
+  if (!link) return;
+  closeExpand(false);
   e.preventDefault();
-  switchSection("about");
+  var name = link.getAttribute("data-section");
+  if (name) switchSection(name);
 });
 document.addEventListener("keydown", function(e){
   if (!expandOpen) return;
@@ -5563,6 +5635,9 @@ var pillX = 0, pillW = 0, pillVX = 0, pillRAF = null, lastPillT = 0;
 
 function movePill(immediate){
   var target=navItems.find(function(el){return el.getAttribute('data-section')===activeSection;});
+  // [responsive nav] the active section's own item can now be parked in the menu (mobile, before
+  // it's dragged into view) -- hide the pill rather than leaving it stuck at a stale position.
+  navPill.style.opacity = target ? "" : "0";
   if(!target) return;
   var targetX=target.offsetLeft,targetW=target.offsetWidth;
   cancelAnimationFrame(pillRAF);
@@ -5601,6 +5676,38 @@ function endNavDrag(commit){
     drag.target.focus({preventScroll:true});
   } else movePill();
 }
+// ---- [FIFO conveyor, mobile-only] a single-step shift of the visible window, triggered when a
+// drag overshoots past the first/last visible item's edge (see pointermove below). Reuses the
+// existing nav-item enter/exit CSS classes -- transform/opacity only.
+var NAV_OVERSHOOT_TRIGGER = 36; // px past the edge to commit a shift
+var NAV_OVERSHOOT_FLICK = 0.9;  // px/ms release velocity that commits early (momentum)
+function shiftConveyor(dir){
+  var slotCount = navSlotCount();
+  var newStart = Math.max(0, Math.min(navVisibleStart + dir, NAV_ITEMS.length - slotCount));
+  if (newStart === navVisibleStart) return false;
+  var outgoingItem = NAV_ITEMS[dir > 0 ? navVisibleStart : navVisibleStart + slotCount - 1];
+  var incomingItem = NAV_ITEMS[dir > 0 ? newStart + slotCount - 1 : newStart];
+  navVisibleStart = newStart;
+
+  var outgoingEl = navItems.filter(function(el){ return el.getAttribute("data-section") === outgoingItem.name; })[0];
+  if (outgoingEl){
+    outgoingEl.style.setProperty("--exit-x", (dir > 0 ? "24px" : "-24px"));
+    outgoingEl.classList.add("nav-item-exiting");
+    setTimeout(function(){ if (outgoingEl.parentNode) outgoingEl.remove(); }, 320);
+  }
+  var incomingEl = document.createElement("button");
+  incomingEl.className = "nav-item nav-item-entering"; incomingEl.type = "button";
+  incomingEl.setAttribute("data-section", incomingItem.name);
+  if (incomingItem.name === activeSection) incomingEl.setAttribute("aria-current", "page");
+  incomingEl.textContent = incomingItem.label;
+  incomingEl.style.setProperty("--enter-x", dir > 0 ? "16px" : "-16px");
+  if (dir > 0) navItemsContainer.appendChild(incomingEl); else navItemsContainer.insertBefore(incomingEl, navItemsContainer.firstChild);
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ incomingEl.classList.remove("nav-item-entering"); }); });
+
+  renderExpandMenu();
+  refreshNavItemRefs();
+  return true;
+}
 nav.addEventListener('pointerdown',function(e){
   var button=e.target.closest('.nav-item');
   if (!button || navDrag || !e.isPrimary || e.button!==0) return;
@@ -5622,14 +5729,57 @@ nav.addEventListener('pointermove',function(e){
   drag.raf=requestAnimationFrame(function(){
     if(navDrag!==drag) return;
     drag.raf=0;
+
+    var now=performance.now(),velocity=(drag.x-drag.lastX)/Math.max(8,now-drag.lastT);
+    var firstB=drag.bounds[0], lastB=drag.bounds[drag.bounds.length-1];
+    var canConveyor = mobileNavQuery.matches && NAV_ITEMS.length > navSlotCount();
+    var overshoot=0, dir=0;
+    // dir here is "which edge got physically overshot" (-1 = pushed past the left edge, i.e. a
+    // leftward drag; +1 = pushed past the right edge, a rightward drag) -- used for the
+    // resistance stretch below, which should visually pull toward whichever edge is being
+    // pushed against. The CONVEYOR's advance/retreat direction is the opposite of this: per
+    // spec, dragging LEFT (overshooting the left edge) is what ADVANCES the queue (reveals the
+    // next item, oldest-visible exits) -- so shiftConveyor is called with -dir below, not dir.
+    if (drag.x < firstB.left){ overshoot=firstB.left-drag.x; dir=-1; }
+    else if (drag.x > lastB.left+lastB.width){ overshoot=drag.x-(lastB.left+lastB.width); dir=1; }
+
+    if (canConveyor && overshoot>0){
+      // logical advance (reveal next item) happens on a LEFT overshoot (dir===-1) per spec, so
+      // the availability check and the shiftConveyor call both use -dir, not dir.
+      var canShift = dir<0 ? (navVisibleStart+navSlotCount()<NAV_ITEMS.length) : (navVisibleStart>0);
+      var flick = Math.abs(velocity) > NAV_OVERSHOOT_FLICK;
+      if (canShift && (overshoot>NAV_OVERSHOOT_TRIGGER || (flick && overshoot>8)) && shiftConveyor(-dir)){
+        // committed -- rebuild bounds against the freshly rendered items (excluding the one
+        // still mid-exit, which is about to detach and shouldn't count as a real boundary) and
+        // re-base the drag's own rect so the in-progress gesture continues without a jump.
+        drag.rect = nav.getBoundingClientRect();
+        drag.bounds = navItems.filter(function(el){return !el.classList.contains('nav-item-exiting');})
+          .map(function(el){return {el:el,left:el.offsetLeft,width:el.offsetWidth};});
+        drag.lastX=drag.x; drag.lastT=now;
+      } else {
+        // resistance -- extra elastic stretch beyond the normal drag cap, pill pinned at the
+        // edge, no shift yet (snaps back on release via the existing endNavDrag/movePill path).
+        var pull=Math.min(1,overshoot/60);
+        pillW = dir>0? lastB.width : firstB.width;
+        pillX = dir>0? (lastB.left+lastB.width-pillW) : firstB.left;
+        var rStretch=reducedMotion?1:1.28+pull*0.5;
+        var rSqueeze=1/Math.pow(rStretch,.48);
+        navPill.style.width=pillW+'px';
+        navPill.style.borderRadius=reducedMotion?'999px':dir>0?'62% 38% 38% 62% / 48% 55% 45% 52%':'38% 62% 62% 38% / 55% 48% 52% 45%';
+        navPill.style.setProperty('--liquid-light',dir>0?'72%':'28%');
+        navPill.style.transform='translateX('+pillX+'px) scale('+rStretch+','+rSqueeze+')';
+        drag.lastX=drag.x; drag.lastT=now;
+        return;
+      }
+    }
+
     var nearest=drag.bounds.reduce(function(best,b){return Math.abs(drag.x-b.left-b.width/2)<Math.abs(drag.x-best.left-best.width/2)?b:best;});
     drag.target=nearest.el;
     navItems.forEach(function(el){el.toggleAttribute('data-preview',el===drag.target);});
     pillW=nearest.width;
-    pillX=clamp(drag.x-pillW/2,drag.bounds[0].left,drag.bounds[2].left+drag.bounds[2].width-pillW);
+    pillX=clamp(drag.x-pillW/2,drag.bounds[0].left,drag.bounds[drag.bounds.length-1].left+drag.bounds[drag.bounds.length-1].width-pillW);
     pillVX=0;
     navPill.style.width=pillW+'px';
-    var now=performance.now(),velocity=(drag.x-drag.lastX)/Math.max(8,now-drag.lastT);
     drag.lastX=drag.x;drag.lastT=now;
     var distance=Math.abs(drag.x-nearest.left-nearest.width/2);
     var stretch=reducedMotion?1:1+Math.min(.28,Math.abs(velocity)*.07+distance*.002);
@@ -5706,20 +5856,34 @@ function switchSection(name){
   }, outMs);
 }
 
-navItems.forEach(function(el){
-  el.addEventListener("click", function(){ switchSection(el.getAttribute("data-section")); });
+// [responsive nav] delegated, not per-button -- nav-items are recreated by renderNavItems()/
+// shiftConveyor() as the visible set changes, so individual per-button listeners would leak.
+navItemsContainer.addEventListener("click", function(e){
+  var btn = e.target.closest(".nav-item");
+  if (btn) switchSection(btn.getAttribute("data-section"));
 });
 nav.addEventListener("keydown", function(e){
   if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-  var order = ["contact", "portfolio", "gallery"];
+  // cycles among whichever items are CURRENTLY visible in the bar -- always reads live, so it
+  // naturally follows however many slots are showing (3 mobile / 4 desktop) without a hardcoded list.
+  var order = navItems.map(function(el){ return el.getAttribute("data-section"); });
   var i = order.indexOf(activeSection);
-  var next = order[(i + (e.key === "ArrowRight" ? 1 : -1) + order.length) % order.length];
+  var next = order[((i === -1 ? 0 : i) + (e.key === "ArrowRight" ? 1 : -1) + order.length) % order.length];
   switchSection(next);
   var btn = navItems.filter(function(el2){ return el2.getAttribute("data-section") === next; })[0];
   if (btn) btn.focus();
   e.preventDefault();
 });
+mobileNavQuery.addEventListener("change", function(){
+  // breakpoint crossed (3 <-> 4 slots) -- reset to the front of the list rather than trying to
+  // preserve an in-between conveyor position across a slot-count change, and re-run the pill's
+  // immediate (non-spring) positioning since the active item's box may have moved/resized.
+  navVisibleStart = 0;
+  renderNavItems();
+  movePill(true);
+});
 
+renderNavItems(); // build the initial bar + menu before the first pill placement below
 movePill(true); // navigation is usable while the hero is playing
 requestAnimationFrame(function(){nav.classList.add('revealed');});
 document.fonts?.ready.then(function(){movePill(true);});
@@ -6796,7 +6960,7 @@ window.matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change",
 .skill-line{stroke:url(#skill-line-light);stroke-width:1.1;stroke-linecap:round;stroke-dasharray:1;}
 .skill-line-halo{stroke:#e9be99;stroke-width:4;opacity:.09;}
 .skill-tip{fill:#ffe1bf;opacity:.8;}
-.nav-pill{transition:border-radius .24s ease,box-shadow .24s ease;overflow:visible;}
+.nav-pill{transition:border-radius .24s ease,box-shadow .24s ease,opacity .25s ease;overflow:visible;}
 .nav-pill::before{content:"";position:absolute;inset:-2px;border-radius:inherit;border:1px solid #ffe9d180;opacity:0;pointer-events:none;}
 .nav-pill.is-releasing::before{animation:liquid-release .58s ease-out;}
 @keyframes liquid-release{0%{opacity:.65;transform:scale(.94,.96);}100%{opacity:0;transform:scale(1.16,1.48);}}
