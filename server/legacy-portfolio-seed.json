@@ -1,0 +1,237 @@
+{
+  "revision": 0,
+  "details": {
+    "creatorName": "Kethan Artzz",
+    "tagline": "Visual stories. Crafted with intention.",
+    "portfolioTitle": "Portfolio",
+    "portfolioIntro": "Selected posters, key art, and visual experiments.",
+    "contactTitle": "Let’s make something worth seeing.",
+    "contactIntro": "Have a project, collaboration, or an idea in mind? Leave a note and I’ll get back to you."
+  },
+  "folders": [
+    "Film Posters",
+    "Key Art",
+    "Social"
+  ],
+  "images": [
+    {
+      "slug": "tiger-blue",
+      "title": "All Hail the Tiger",
+      "cat": "Film Posters",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400,
+        3840
+      ],
+      "full": 5413
+    },
+    {
+      "slug": "devara-11-days",
+      "title": "DEVARA — 11 Days to Go",
+      "cat": "Film Posters",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400
+      ],
+      "full": 3200
+    },
+    {
+      "slug": "devara-14-days",
+      "title": "DEVARA — 14 Days to Go",
+      "cat": "Film Posters",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400
+      ],
+      "full": 2700
+    },
+    {
+      "slug": "vara-23-days",
+      "title": "VARA — 23 Days to Go",
+      "cat": "Film Posters",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400
+      ],
+      "full": 2400
+    },
+    {
+      "slug": "wa-00-40-18",
+      "title": "United Tollywood",
+      "cat": "Key Art",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400
+      ],
+      "full": 3120
+    },
+    {
+      "slug": "wa-00-51-35",
+      "title": "Character Study I",
+      "cat": "Key Art",
+      "widths": [
+        480,
+        768,
+        1080
+      ],
+      "full": 1080
+    },
+    {
+      "slug": "wa-00-51-35-1",
+      "title": "Character Study II",
+      "cat": "Key Art",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400
+      ],
+      "full": 2707
+    },
+    {
+      "slug": "wa-00-51-36",
+      "title": "Character Study III",
+      "cat": "Key Art",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400
+      ],
+      "full": 2700
+    },
+    {
+      "slug": "wa-00-51-36-2",
+      "title": "Character Study IV",
+      "cat": "Key Art",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400
+      ],
+      "full": 2400
+    },
+    {
+      "slug": "wa-00-51-37",
+      "title": "Character Study V",
+      "cat": "Key Art",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400
+      ],
+      "full": 3200
+    },
+    {
+      "slug": "wa-00-51-37-1",
+      "title": "Character Study VI",
+      "cat": "Key Art",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600
+      ],
+      "full": 1600
+    },
+    {
+      "slug": "wa-01-03-45",
+      "title": "Social Promo I",
+      "cat": "Social",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400,
+        3840
+      ],
+      "full": 4160
+    },
+    {
+      "slug": "wa-01-03-46",
+      "title": "Social Promo II",
+      "cat": "Social",
+      "widths": [
+        480,
+        768
+      ],
+      "full": 1033
+    },
+    {
+      "slug": "wa-01-03-46-1",
+      "title": "Social Promo III",
+      "cat": "Social",
+      "widths": [
+        480,
+        768,
+        1080
+      ],
+      "full": 1599
+    },
+    {
+      "slug": "wa-01-03-47",
+      "title": "Social Promo IV",
+      "cat": "Social",
+      "widths": [
+        480,
+        768,
+        1080
+      ],
+      "full": 1080
+    },
+    {
+      "slug": "wa-01-14-05",
+      "title": "Social Promo V",
+      "cat": "Social",
+      "widths": [
+        480,
+        768
+      ],
+      "full": 1066
+    },
+    {
+      "slug": "wa-01-14-06",
+      "title": "Social Promo VI",
+      "cat": "Social",
+      "widths": [
+        480,
+        768,
+        1080
+      ],
+      "full": 1200
+    },
+    {
+      "slug": "wa-01-22-13",
+      "title": "Social Promo VII",
+      "cat": "Social",
+      "widths": [
+        480,
+        768,
+        1080
+      ],
+      "full": 1599
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+node_modules/
+.env
+server/data/
+server/upscale-venv/
+__pycache__/
+*.pyc
+
+# Python virtual envs + model weights -- multi-GB, regenerable, never belong in git
+server/gfpgan-venv/
+server/gfpgan/
+server/weights/
+
+# scratch/log output
+tmp/
+*.log
+

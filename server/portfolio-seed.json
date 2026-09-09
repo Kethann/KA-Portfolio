@@ -1,0 +1,127 @@
+{
+  "revision": 0,
+  "details": {
+    "creatorName": "Kethan Artzz",
+    "tagline": "Visual stories. Crafted with intention.",
+    "portfolioTitle": "Ideas, unfolded.",
+    "portfolioIntro": "Selected posters, key art, and visual experiments.",
+    "contactTitle": "Let’s make something worth seeing.",
+    "contactIntro": "Have a project, collaboration, or an idea in mind? Leave a note and I’ll get back to you.",
+    "openLabel": "Open folder",
+    "closeLabel": "Close folder",
+    "projectLabel": "View project",
+    "contactButton": "Send message"
+  },
+  "folders": [
+    "Selected work",
+    "Experiments"
+  ],
+  "images": [
+    {
+      "slug": "tiger-blue",
+      "title": "All Hail the Tiger",
+      "cat": "Selected work",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400,
+        3840
+      ],
+      "full": 5413,
+      "id": "tiger-blue",
+      "description": "A sample project entry for this visual study. Explore its composition, typography, and visual direction. Edit this description in the studio to tell the story behind the work.",
+      "technologies": [
+        "Art direction",
+        "Typography",
+        "Compositing"
+      ],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "devara-11-days",
+      "title": "DEVARA — 11 Days to Go",
+      "cat": "Selected work",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400
+      ],
+      "full": 3200,
+      "id": "devara-11-days",
+      "description": "A sample project entry for this visual study. Explore its composition, typography, and visual direction. Edit this description in the studio to tell the story behind the work.",
+      "technologies": [
+        "Art direction",
+        "Typography",
+        "Compositing"
+      ],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "devara-14-days",
+      "title": "DEVARA — 14 Days to Go",
+      "cat": "Selected work",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400
+      ],
+      "full": 2700,
+      "id": "devara-14-days",
+      "description": "A sample project entry for this visual study. Explore its composition, typography, and visual direction. Edit this description in the studio to tell the story behind the work.",
+      "technologies": [
+        "Art direction",
+        "Typography",
+        "Compositing"
+      ],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "vara-23-days",
+      "title": "VARA — 23 Days to Go",
+      "cat": "Selected work",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400
+      ],
+      "full": 2400,
+      "id": "vara-23-days",
+      "description": "A sample project entry for this visual study. Explore its composition, typography, and visual direction. Edit this description in the studio to tell the story behind the work.",
+      "technologies": [
+        "Art direction",
+        "Typography",
+        "Compositing"
+      ],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "wa-00-40-18",
+      "title": "United Tollywood",
+      "cat": "Selected work",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400
+      ],
+      "full": 3120,
+      "id": "wa-00-40-18",
+      "description": "A sample project entry for this visual study. Explore its composition, typography, and visual direction. Edit this description in the studio to tell the story behind the work.",
+      "technologies": [
+        "Art direction",
+        "Typography",
+        "Compositing"
+      ],
+      "link": "https://www.behance.net/KethanArtzz"
+    }
+  ]
+}

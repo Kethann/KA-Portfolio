@@ -1,0 +1,14 @@
+# Image Upscaler enhancement service (server/upscale_service.py). Install with:
+#   python -m venv server/upscale-venv
+#   server/upscale-venv/Scripts/python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   server/upscale-venv/Scripts/python.exe -m pip install -r server/requirements.txt
+# (torch is installed separately, above, so it resolves against the CPU-only wheel index --
+# installing everything from a single `pip install -r` would otherwise pull the much larger
+# CUDA build.) server/enhance.js spawns this service automatically when the Node server starts,
+# as long as server/upscale-venv exists.
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-multipart==0.0.32
+pillow==12.3.0
+numpy==2.2.6
+super-image==0.2.0

@@ -1,0 +1,42 @@
+# Image Upscaler enhancement service -- Real-ESRGAN + CodeFormer
+# (server/upscale_service_codeformer.py, run from server/gfpgan-venv).
+#
+# This exact version combination is load-bearing, not arbitrary -- see the two hazards below.
+# Reproduce with:
+#   python -m venv server/gfpgan-venv
+#   server/gfpgan-venv/Scripts/python.exe -m pip install torch==2.0.1+cu118 torchvision==0.15.2+cu118 torchaudio==2.0.2+cu118 --index-url https://download.pytorch.org/whl/cu118
+#   server/gfpgan-venv/Scripts/python.exe -m pip install -r server/requirements-gfpgan-venv.txt -c server/constraints.txt
+#
+# HAZARD 1 -- torchvision pin: basicsr (a realesrgan/gfpgan/codeformer dependency) imports
+# `torchvision.transforms.functional_tensor`, a module torchvision removed in 0.17. Pinning
+# torchvision to 0.15.2 (still emits a deprecation warning, not an error) is what keeps that
+# import working; anything >=0.17 breaks basicsr's import outright.
+#
+# HAZARD 2 -- numpy pin: basicsr/gfpgan/codeformer all require numpy<2, but opencv-python's
+# newest releases (5.x) *require* numpy>=2, and several transitive deps re-resolve numpy on
+# their own if left unconstrained. Two things enforce this: pinning opencv-python itself to a
+# 4.x release built against numpy 1.x, and installing everything else with
+# `-c server/constraints.txt` (contents: `numpy<2`) so no transitive dependency silently
+# upgrades it back to 2.x mid-install.
+#
+# HAZARD 3 -- fp16 on this host's GPU: a GTX 1650 (Turing, no Tensor Cores) silently produces
+# corrupted all-black output under Real-ESRGAN's tiled fp16 (half=True) inference -- confirmed by
+# direct testing, not assumed; CodeFormer's own upstream reference code independently hard-codes
+# the same finding as a GPU-name check (`no_half_gpu_list = ["1650", "1660"]`). This is a runtime
+# code fix (see upscale_service_codeformer.py's `_pick_half`), not a pip version -- noted here so
+# it isn't "fixed" back to half=True by someone reproducing this env without the context.
+
+torch==2.0.1+cu118
+torchvision==0.15.2+cu118
+torchaudio==2.0.2+cu118
+numpy==1.26.4
+opencv-python==4.9.0.80
+pillow
+fastapi
+uvicorn[standard]
+python-multipart
+basicsr==1.4.2
+facexlib==0.3.0
+gfpgan==1.3.8
+realesrgan==0.3.0
+codeformer-pip==0.0.4

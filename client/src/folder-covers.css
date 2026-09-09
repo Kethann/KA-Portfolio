@@ -1,0 +1,11 @@
+.collection-cover{display:block;position:relative;width:174px;height:204px;margin:14px auto 28px;transform:perspective(750px) rotateY(-19deg) rotateX(5deg);transform-style:preserve-3d;transition:transform .55s cubic-bezier(.2,.7,.2,1);filter:drop-shadow(12px 22px 15px #0006)}
+.collection-front{position:absolute;inset:0 12px 0 0;border:1px solid #ffffff25;border-radius:7px 5px 4px 5px;background:linear-gradient(120deg,#34363b,#17191e 55%,#24262b);box-shadow:inset 2px 1px 3px #ffffff0d;transform:translateZ(13px)}
+.collection-flap{position:absolute;left:-1px;right:-1px;top:-1px;height:62px;border:1px solid #ffffff20;border-radius:7px 7px 23px 23px;background:linear-gradient(155deg,#414149,#202127 65%);box-shadow:0 6px 8px #0004;transform-origin:top;transition:transform .55s}
+.collection-clasp{position:absolute;top:44px;left:calc(50% - 9px);width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#7f8084 1px,#14151a 3px,#08090c);box-shadow:0 2px 4px #0009}
+.collection-slot{position:absolute;left:calc(50% - 26px);top:96px;width:52px;height:13px;border-radius:9px;background:#60343b;box-shadow:inset 0 4px 5px #0009}
+.collection-pages{position:absolute;inset:7px 0 1px 15px;transform:translateZ(-7px)}
+.collection-pages i{position:absolute;inset:calc(var(--page)*-1px) calc(var(--page)*2.3px) calc(var(--page)*1px) 0;border-radius:4px;background:#be8b86;border:1px solid #ffffff35;box-shadow:1px 0 2px #0006}
+.collection-pages i:nth-child(2){background:#c3ab7c}.collection-pages i:nth-child(3){background:#a6b38b}.collection-pages i:nth-child(4){background:#87aca9}.collection-pages i:nth-child(5){background:#829bad}.collection-pages i:nth-child(6){background:#968ea9}.collection-pages i:nth-child(7){background:#b18f9f}
+.collection-tile:hover .collection-cover,.collection-tile:focus-visible .collection-cover,.folder-card:hover .collection-cover{transform:perspective(750px) rotateY(-10deg) rotateX(2deg) translateY(-8px)}
+.collection-tile:hover .collection-flap,.folder-card:hover .collection-flap{transform:rotateX(12deg)}
+@media(prefers-reduced-motion:reduce){.collection-cover,.collection-flap{transition:none!important;transform:none!important}}

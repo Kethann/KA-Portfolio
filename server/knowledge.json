@@ -1,0 +1,24 @@
+{
+  "name": "Kethan",
+  "bio": "PLACEHOLDER -- replace with the real bio. e.g. a few sentences on who you are, your background, and what kind of design work you do.",
+  "process": "PLACEHOLDER -- replace with a short description of your actual design process (discovery, concepting, revisions, delivery -- whatever your real workflow is).",
+  "availability": "PLACEHOLDER -- e.g. 'Currently booking projects starting March 2026.'",
+  "pricing_note": "Project-based, scoped after a first conversation -- no fixed rate card.",
+  "projects": [
+    {
+      "title": "PLACEHOLDER PROJECT",
+      "category": "Film Posters",
+      "year": "2024",
+      "summary": "PLACEHOLDER -- one or two sentences on this specific piece.",
+      "tools": ["Photoshop"],
+      "link": "/#portfolio"
+    }
+  ],
+  "contact": {
+    "email": "voletikethan120@gmail.com",
+    "socials": {
+      "instagram": "https://www.instagram.com/kethan_artzz",
+      "behance": "https://www.behance.net/kethanvoleti"
+    }
+  }
+}

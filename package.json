@@ -1,0 +1,33 @@
+{
+  "name": "ka-crystal-reconstruction",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "KA crystal-logo hero + portfolio gallery, with a small Node backend for the portfolio AI assistant.",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js",
+    "build": "tsc --noEmit && vite build && node --test tests/gallery-build.test.mjs",
+    "frontend": "vite",
+    "test": "node --test tests/creator.test.mjs tests/folder.test.mjs tests/gallery.test.mjs tests/folder-shelf.test.mjs tests/poster.test.mjs"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "gsap": "^3.12.7",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@types/three": "^0.185.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.4.3"
+  },
+  "overrides": {
+    "qs": "^6.16.0"
+  }
+}
