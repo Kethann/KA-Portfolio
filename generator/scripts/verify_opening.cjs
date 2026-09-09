@@ -28,7 +28,7 @@ const context=vm.createContext({THREE, console, MANIFEST:structuredClone(origina
   spawnSpark(){},spawnGlitterBurst(){},updateSparks(){},updateSkillCallouts(){}});
 const names=['fractureOpeningCore','fractureGeometry','openingDrift','clamp01','lerp','lerp3',
   'easeInCubic','easeOutCubic','easeSlowSnap','smootherStep','toWorld','screenEdgeSpawnPoint',
-  'buildShards','updateShardsIdle','updateShardsAssembling','assertSharedCoreOrigin','spawnImpactSpark'];
+  'buildShards','updateShardsIdle','updateShardsAssembling','assertSharedCoreOrigin'];
 names.forEach(n=>{assert(functions.has(n),n);vm.runInContext(functions.get(n),context)});
 vm.runInContext('fractureOpeningCore()',context);
 const cells=context.MANIFEST.shards.filter(s=>s.openingCore);
@@ -109,7 +109,7 @@ for(const [width,height] of [[320,932],[390,844],[768,1024],[1440,900],[3840,216
   const fov=context.computeResponsiveFovBase(width/height);
   const halfHeight=980*Math.tan(THREE.MathUtils.degToRad(fov)/2);
   assert(halfHeight*width/height>=232/2+46*2.1-1e-7);
-  assert(width*height*context.renderPixelRatio()**2<=12000001);
+  assert(width*height*context.renderPixelRatio()**2<=6000001);
 }
 Object.assign(context,{icons:[],renderer:{setPixelRatio(){},setSize(){},render(){}},layoutIcons(){}});
 // Desktop framing enlarges the entire reconstruction; phones retain the original framing.
@@ -165,12 +165,28 @@ context.buildJoinSeams();
 assert(context.joinSeams.geometry.attributes.position.count>40);
 assert([...context.joinSeams.geometry.attributes.position.array].every(Number.isFinite));
 context.updateJoinSeams(4999);assert(!context.joinSeams.visible);
+context.updateJoinSeams(5219);assert(!context.joinSeams.visible,'allow the fragments to settle first');
 context.updateJoinSeams(5300);assert(context.joinSeams.visible);
 const earlyFront=context.joinSeams.material.uniforms.uFront.value;
 context.updateJoinSeams(5900);assert(context.joinSeams.material.uniforms.uFront.value>earlyFront);
-context.updateJoinSeams(6500);assert(!context.joinSeams.visible);
+context.updateJoinSeams(6720);assert(!context.joinSeams.visible);
 context.reducedMotion=true;context.updateJoinSeams(5300);assert(!context.joinSeams.visible);
 console.log('PASS: real fracture seams charge only after joining, travel outward, expire completely, and honor reduced motion.');
+
+assert(!functions.has('spawnSpark')&&!functions.has('spawnGlitterBurst'),'no free-floating or center spark overlays');
+assert(functions.get('makeBlurredGlowTexture').includes("'destination-in'"),'bloom must follow the original crystal alpha');
+// Exercise the lifecycle controller with the same functions shipped in the homepage.
+const heroRafs=new Map();let heroId=0,heroNow=1000;
+const heroContext=vm.createContext({assetsLoaded:0,logoMesh:null,heroFrame:0,motionLoopActive:true,document:{hidden:false},
+  phase:'assembling',heroVisible:true,heroPausedAt:0,phaseStart:100,lastFrameT:100,performance:{now:()=>heroNow},
+  frame(){},requestAnimationFrame:fn=>{heroRafs.set(++heroId,fn);return heroId;},cancelAnimationFrame:key=>heroRafs.delete(key)});
+for(const name of ['scheduleHero','syncHero'])vm.runInContext(functions.get(name),heroContext);
+heroContext.scheduleHero();assert.equal(heroRafs.size,0,'do not render before assets initialize');
+heroContext.assetsLoaded=2;heroContext.logoMesh={};heroContext.scheduleHero();heroContext.scheduleHero();assert.equal(heroRafs.size,1);
+heroContext.document.hidden=true;heroContext.syncHero();assert.equal(heroRafs.size,0);
+heroNow=61000;heroContext.document.hidden=false;heroContext.syncHero();assert.equal(heroContext.phaseStart,60100);assert.equal(heroRafs.size,1);
+heroContext.phase='held';heroContext.heroVisible=false;heroContext.syncHero();assert.equal(heroRafs.size,0);
+console.log('PASS: no sprite sparks; alpha-constrained bloom; one hero RAF; load/visibility gates; no hidden-time jump.');
 
 // Exercise the actual background-to-logo bridge, including one-time image upload reuse.
 let ambientCall;

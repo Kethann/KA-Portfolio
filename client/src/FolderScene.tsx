@@ -62,9 +62,10 @@ export const FolderScene=forwardRef<FolderHandle,Props>(function FolderScene({pr
         card.image.material.map=texture;card.image.material.color.set(0xffffff);card.image.material.needsUpdate=true;
         const ratio=texture.image.width/texture.image.height,w=Math.min(2.62,1.56*ratio);
         card.image.scale.set(w,w/ratio,1);
+        schedule();
       },undefined,()=>{/* The project title and preview remain usable if a thumbnail is unavailable. */}));
     }
-    const setState=(next:string)=>{state=next;callbacks.current.onState(next);};
+    const setState=(next:string)=>{state=next;callbacks.current.onState(next);schedule();};
     const timeline=createFolderTimeline(gsap,hinge,sides,dividers,folder,cards,()=>setState('open'),()=>setState('closed'));
     function toggle(){
       if(state==='preview'||state==='restoring'||state==='opening'||state==='closing')return;
@@ -96,6 +97,7 @@ export const FolderScene=forwardRef<FolderHandle,Props>(function FolderScene({pr
       const rect=element.getBoundingClientRect();if(!rect.width||!rect.height)return;
       pointer.set((event.clientX-rect.left)/rect.width*2-1,-(event.clientY-rect.top)/rect.height*2+1);target.copy(pointer);
       needsHitTest=true;
+      schedule();
     }
     function pick(){
       needsHitTest=false;
@@ -108,7 +110,7 @@ export const FolderScene=forwardRef<FolderHandle,Props>(function FolderScene({pr
       }
       renderer.domElement.style.cursor=folderHovered||hovered>=0?'pointer':'default';
     }
-    function leave(){down=null;target.set(0,0);pointer.set(10,10);hovered=-1;folderHovered=false;needsHitTest=false;renderer.domElement.style.cursor='default';}
+    function leave(){down=null;target.set(0,0);pointer.set(10,10);hovered=-1;folderHovered=false;needsHitTest=false;renderer.domElement.style.cursor='default';schedule();}
     function pointerDown(event:PointerEvent){if(!event.isPrimary||event.button!==0)return;down={x:event.clientX,y:event.clientY};move(event);}
     function pointerUp(event:PointerEvent){
       if(!down||Math.hypot(event.clientX-down.x,event.clientY-down.y)>10){down=null;return;}
@@ -137,9 +139,10 @@ export const FolderScene=forwardRef<FolderHandle,Props>(function FolderScene({pr
       }
       renderer.setPixelRatio(Math.min(devicePixelRatio||1,compact?1.5:1.8,Math.sqrt(3200000/(width*height))));
       renderer.setSize(width,height);updateCamera();
+      schedule();
     }
     const observer=new ResizeObserver(resize);observer.observe(element);resize();
-    function onMotion(){reduced=media.matches;if(reduced){if(state==='opening')timeline.progress(1);else if(state==='closing')timeline.progress(0);}}
+    function onMotion(){reduced=media.matches;if(reduced){if(state==='opening')timeline.progress(1);else if(state==='closing')timeline.progress(0);}schedule();}
     media.addEventListener('change',onMotion);
     function tick(now:number){
       frame=0;if(disposed||!visible||document.hidden)return;
@@ -162,7 +165,7 @@ export const FolderScene=forwardRef<FolderHandle,Props>(function FolderScene({pr
           card.group.rotation.z+=(card.rotation-card.group.rotation.z)*damp;
         }
       });
-      updateCamera();renderer.render(scene,camera);frame=requestAnimationFrame(tick);
+      updateCamera();renderer.render(scene,camera);if(!reduced)frame=requestAnimationFrame(tick);
     }
     const newScale=new THREE.Vector3();
     function schedule(){if(!frame&&!disposed&&visible&&!document.hidden){last=performance.now();frame=requestAnimationFrame(tick);}}

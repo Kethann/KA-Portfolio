@@ -28,9 +28,9 @@
   --dur-slow: 0.9s;
 
   /* ---- one glass material system, shared by nav / assistant panel / lightbox chrome ---- */
-  --glass-bg: rgba(24, 10, 9, 0.52);
-  --glass-bg-heavy: rgba(15, 6, 6, 0.6);
-  --glass-blur: blur(26px) saturate(180%) brightness(1.08);
+  --glass-bg: linear-gradient(145deg,rgba(255,244,230,.075),rgba(255,255,255,.015) 48%),rgba(23,19,25,.55);
+  --glass-bg-heavy: linear-gradient(145deg,rgba(255,244,230,.065),transparent 58%),rgba(18,16,23,.83);
+  --glass-blur: blur(18px) saturate(135%);
   --glass-border: 1px solid rgba(255, 255, 255, 0.16);
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.3);
   --glass-shadow: 0 10px 36px rgba(0, 0, 0, 0.4);
@@ -169,7 +169,10 @@ canvas{ display:block; width:100%; height:100%; }
   position:relative; z-index:1; background:transparent; border:none; color:rgba(255,255,255,0.78);
   font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; letter-spacing:0.12em;
   text-transform:uppercase; padding:11px 20px; border-radius:999px; cursor:pointer; font-weight:500;
-  transition:color var(--dur-fast) ease, opacity .3s ease, transform .3s ease;
+  /* [smoother liquid] the entering item's own settle uses a gentle overshoot spring (the same
+     curve as --panda-bounce elsewhere) instead of a flat ease -- it pops in and eases past its
+     resting scale before settling, reading as elastic rather than a mechanical fade. */
+  transition:color var(--dur-fast) ease, opacity .42s ease, transform .5s var(--panda-bounce, cubic-bezier(.34,1.5,.64,1));
 }
 .nav-item:hover{ color:var(--ink); }
 .nav-item[aria-current="page"]{ color:rgba(255, 250, 245, 1); }
@@ -177,10 +180,10 @@ canvas{ display:block; width:100%; height:100%; }
 /* [FIFO conveyor, mobile] outgoing item slides/shrinks toward the hamburger icon; incoming item
    starts faded/scaled down at its edge and settles to rest -- transform/opacity only. */
 .nav-item.nav-item-exiting{
-  transition:opacity .3s ease, transform .3s ease;
-  opacity:0; transform:scale(.55) translateX(var(--exit-x,24px)); pointer-events:none;
+  transition:opacity .34s cubic-bezier(.4,0,1,1), transform .34s cubic-bezier(.4,0,1,1);
+  opacity:0; transform:scale(.5) translateX(var(--exit-x,28px)); pointer-events:none;
 }
-.nav-item.nav-item-entering{ opacity:0; transform:scale(.7) translateX(var(--enter-x,16px)); }
+.nav-item.nav-item-entering{ opacity:0; transform:scale(.62) translateX(var(--enter-x,20px)); }
 @media (prefers-reduced-motion: reduce){
   .nav-item, .nav-item.nav-item-exiting, .nav-item.nav-item-entering{ transition:opacity .15s ease; transform:none; }
 }
@@ -691,8 +694,8 @@ footer.site-footer{
 :root{
   --ink-dim:rgba(237,235,232,.72);
   --ink-faint:rgba(237,235,232,.5);
-  --glass-bg:rgba(29,25,29,.58);
-  --glass-blur:blur(22px) saturate(145%);
+  --glass-bg:linear-gradient(145deg,rgba(255,244,230,.075),rgba(255,255,255,.015) 48%),rgba(29,25,29,.58);
+  --glass-blur:blur(18px) saturate(135%);
   --glass-border:1px solid rgba(255,242,226,.2);
   --accent-glass:linear-gradient(145deg,rgba(255,241,221,.28),rgba(229,181,149,.13) 48%,rgba(190,211,234,.12));
 }
@@ -1393,7 +1396,7 @@ html{overflow-x:clip;scroll-padding-top:110px;}
 })();
 </script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="./dist/assets/three-r128.min.js"></script>
 <script>
 (function(){
 "use strict";
@@ -1456,9 +1459,9 @@ const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
 function renderPixelRatio(){
   // Refresh on browser zoom / monitor changes, bounded by framebuffer cost.
   const pixels = Math.max(1, window.innerWidth * window.innerHeight);
-  const budget = isMobile ? 5000000 : 12000000;
-  const zoom = window.visualViewport?.scale || 1;
-  return Math.min((window.devicePixelRatio || 1) * zoom, 3, Math.sqrt(budget / pixels));
+  const budget = isMobile ? 2400000 : 6000000;
+  const zoom = 1;
+  return Math.min((window.devicePixelRatio || 1) * zoom, 2, Math.sqrt(budget / pixels));
 }
 renderer.setPixelRatio(renderPixelRatio());
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -1524,10 +1527,10 @@ function onAssetLoad(){
   assetsLoaded++;
   if (assetsLoaded === 2){ init(); }
 }
-atlasTex = loader.load(ATLAS_SRC, onAssetLoad);
+atlasTex = loader.load(ATLAS_SRC, onAssetLoad, undefined, function(e){ console.error('The crystal atlas texture failed to load.', e); });
 atlasTex.minFilter = THREE.LinearFilter;
 atlasTex.magFilter = THREE.LinearFilter;
-cutoutTex = loader.load(CUTOUT_SRC, onAssetLoad);
+cutoutTex = loader.load(CUTOUT_SRC, onAssetLoad, undefined, function(e){ console.error('The crystal cutout texture failed to load.', e); });
 cutoutTex.minFilter = THREE.LinearFilter;
 cutoutTex.magFilter = THREE.LinearFilter;
 atlasTex.anisotropy = cutoutTex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
@@ -1562,57 +1565,6 @@ function makeSoftDotTexture(){
   return new THREE.CanvasTexture(c);
 }
 const softDotTex = makeSoftDotTexture();
-
-// ---------------------------------------------------------------- blast tex --
-// A bright, white-hot SHARP STAR spark -- a hot core plus crisp radiating rays (not a soft round
-// glow blob whose only motion is an opacity fade). Used for every spark billboard: per-shard
-// landing flashes and the core reveal-ignition flash alike (see spawnSpark/updateSparks below).
-function makeBlastTexture(){
-  const size = 256, cx = size/2, cy = size/2;
-  const c = document.createElement('canvas'); c.width = c.height = size;
-  const g = c.getContext('2d');
-  g.globalCompositeOperation = 'lighter'; // rays and core add together instead of overpainting
-
-  // sharp tapered ray, drawn as a thin kite/diamond so its edges stay crisp rather than a soft
-  // blurred streak -- length/width/angle/alpha all parameterized so the 4 primary + 4 secondary
-  // rays below are just calls with different numbers, not separately hand-drawn shapes.
-  function drawRay(length, width, angle, alpha){
-    g.save();
-    g.translate(cx, cy);
-    g.rotate(angle);
-    const grad = g.createLinearGradient(0, -length, 0, length);
-    grad.addColorStop(0,    'rgba(255,255,255,0)');
-    grad.addColorStop(0.46, `rgba(255,238,210,${alpha})`);
-    grad.addColorStop(0.5,  `rgba(255,255,255,${Math.min(1, alpha*1.15)})`);
-    grad.addColorStop(0.54, `rgba(255,238,210,${alpha})`);
-    grad.addColorStop(1,    'rgba(255,120,60,0)');
-    g.fillStyle = grad;
-    g.beginPath();
-    g.moveTo(0, -length);
-    g.lineTo(width/2, 0);
-    g.lineTo(0, length);
-    g.lineTo(-width/2, 0);
-    g.closePath();
-    g.fill();
-    g.restore();
-  }
-  drawRay(size*0.5,  size*0.05, 0,             0.95); // vertical
-  drawRay(size*0.5,  size*0.05, Math.PI/2,     0.95); // horizontal
-  drawRay(size*0.34, size*0.022, Math.PI/4,    0.55); // diagonal, shorter + dimmer -- an 8-point
-  drawRay(size*0.34, size*0.022, -Math.PI/4,   0.55); // star reads sharper than a plain cross
-
-  // hot white core -- where the rays originate, bright enough to fully blow out at peak opacity
-  const core = g.createRadialGradient(cx,cy,0,cx,cy,size*0.15);
-  core.addColorStop(0,    'rgba(255,255,255,1)');
-  core.addColorStop(0.35, 'rgba(255,244,222,0.95)');
-  core.addColorStop(0.7,  'rgba(255,190,120,0.45)');
-  core.addColorStop(1,    'rgba(255,150,80,0)');
-  g.fillStyle = core;
-  g.beginPath(); g.arc(cx, cy, size*0.15, 0, Math.PI*2); g.fill();
-
-  return new THREE.CanvasTexture(c);
-}
-const blastTex = makeBlastTexture();
 
 // ================================================================ INIT ==
 let shards = [];       // real cut fragments -- these are what assembles
@@ -1652,11 +1604,7 @@ window.addEventListener('ka-ambient-light',function(event){
     renderer.render(scene,camera);
   }
 });
-let regionGlowFired = new Set(); // [v30] which regions have already fired their completion glow this assembling cycle -- cleared on each 'shattered'->'assembling' transition (including Replay)
-// one-shot flag for the core ignition flash fired right as the reveal wipe begins (see
-// updateLogoReveal) -- cleared alongside regionGlowFired on every 'shattered'->'assembling'
-// transition so it fires exactly once per assembly cycle, including on Replay.
-let coreFlashFired = false;
+
 // GOD MODE v4 FIX B: this used to track reveal progress so updateShardsAssembling could grow
 // the assembled cluster a few percent right at the reveal crossfade (GROW_MIN=0.965 -> 1.0) --
 // a runtime compensation for the mosaic and the resolved render landing at two slightly
@@ -1694,7 +1642,7 @@ let chargeEnv = 0;
 // the moment the shape is fully traced out is exactly when it should visibly catch fire as one
 // object, not just have its last piece click in.
 let blastEnv = 0;
-const BLAST_FLASH_DUR = 560; // total lifetime of the global silhouette flash, ms -- SUPERCHARGE: longer, hotter finish
+const BLAST_FLASH_DUR = 220; // total lifetime of the global silhouette flash, ms -- SUPERCHARGE: longer, hotter finish
 
 // ENERGIZE PULSE (new): a brief, bright charge-up on the mark's own silhouette OUTLINE, fired
 // once near the end of the shattered hold, right before the fragments start moving -- "the logo
@@ -1774,12 +1722,8 @@ const REVEAL_DUR = 1200; // shortened from 1500 -- paired with the tighter WIPE_
 const SHINE_INTERVAL_MIN = 5000;     // continuous specular shine, randomized 5-6s between sweeps
 const SHINE_INTERVAL_MAX = 6000;
 const SHINE_SWEEP_DUR    = 750;
-// GOD MODE v9: once resting, small random sparkle/glow keeps appearing at random spots inside the
-// crystal at random SLOW intervals, looping indefinitely -- distinct from (and much subtler/
-// smaller than) the periodic specular shine sweep above. Reuses the existing spark sprite pool
-// (see spawnSpark/updateSparks) rather than a new rendering path.
-const IDLE_SPARKLE_MIN = 1400;
-const IDLE_SPARKLE_MAX = 3200;
+
+
 // a handful of directions the glint can cross the crystal from -- all convex combinations
 // (both weights >=0, summing to 1) so `vUv.x*wx + vUv.y*wy` always ranges cleanly 0..1 and the
 // same -0.22..1.22 sweep range works unmodified for every one of them. Picked randomly (along
@@ -1807,7 +1751,7 @@ function applySweepUniform(mesh, sT, easeFn){
 // held-phase repeating shine state (variable interval, not just a fixed modulo)
 let shineActive = false, shineStartT = 0, shineNextAt = 0;
 let bootDone = false;           // GOD MODE v9: true once the near-darkness boot fade has finished
-let nextSparkleAt = 0;          // GOD MODE v9: held-phase ambient interior sparkle timer
+
 const ICONS_START_GAP  = 500;
 const ICON_STAGGER     = 90;
 const ICON_DUR         = 820;
@@ -1944,8 +1888,7 @@ function init(){
   buildJoinSeams();
   buildIcons();
   buildSkillCallouts();
-  buildSparkPool();
-  buildGlitterPool();
+
   buildAmbientShards();
   // [v26 Task 4] live-toggle support: if the OS setting changes to reduced-motion mid-session
   // while the animated sequence is running, snap immediately to the same final resting state
@@ -1991,7 +1934,8 @@ function init(){
   renderer.render(scene, camera);
   phase = 'shattered';
   phaseStart = performance.now();
-  requestAnimationFrame(frame);
+  if(document.hidden)heroPausedAt=phaseStart;
+  scheduleHero();
 }
 
 // ------------------------------------------------- shard shader --
@@ -2476,13 +2420,16 @@ const pulseFragment = `
 // behind it, especially at thin pointed tips like the K's blade, which looks like a stray
 // misaligned shape rather than a soft glow. A real blur pass fixes that.
 function makeBlurredGlowTexture(img, blurPx){
-  const pad = Math.ceil(blurPx * 3);
   const c = document.createElement('canvas');
-  c.width = img.width + pad*2;
-  c.height = img.height + pad*2;
+  c.width = img.width;
+  c.height = img.height;
   const g = c.getContext('2d');
   g.filter = `blur(${blurPx}px)`;
-  g.drawImage(img, pad, pad, img.width, img.height);
+  g.drawImage(img, 0, 0);
+  // Bloom is energy within the crystal, clipped to its original alpha silhouette.
+  g.filter = 'none';
+  g.globalCompositeOperation = 'destination-in';
+  g.drawImage(img, 0, 0);
   const tex = new THREE.CanvasTexture(c);
   tex.minFilter = THREE.LinearFilter;
   tex.magFilter = THREE.LinearFilter;
@@ -2527,7 +2474,7 @@ function buildJoinSeams(){
 }
 function updateJoinSeams(t){
   if(!joinSeams)return;
-  const age=t-ASSEMBLY_FULL_T;
+  const age=t-ASSEMBLY_FULL_T-220;
   joinSeams.visible=!reducedMotion&&age>=0&&age<1500;
   if(!joinSeams.visible)return;
   const progress=clamp01(age/1500);
@@ -2580,199 +2527,6 @@ function buildLogo(){
   scene.add(logoMesh);
 }
 
-// ------------------------------------------------------ fusion spark pool --
-// A small reusable pool of additive glow billboards, one per CURRENTLY-active collision flash.
-// 169 shards land across a spread of times (already staggered by the assembly formula), so at
-// most a handful of sparks are ever alive at once -- a fixed pool this size comfortably covers
-// every real overlap without allocating 169 permanent billboards that sit idle almost all the
-// time.
-//
-// GOD MODE v5: these are still plain camera-facing billboard MESHES (not THREE.Sprite) -- that
-// choice is kept because hand-billboarding via the camera's own right/up basis vectors (read
-// straight off viewMatrix) is simple and already working, not because a fragment-shader hook is
-// needed any more. The HARD CONTAINMENT runtime clip these used to carry (sampling a baked
-// silhouette mask and multiplying it into alpha) is REMOVED this round -- see the shard shader
-// below for the full reasoning: a smooth, eroded silhouette mask cuts a mathematically perfect
-// line straight through a crystal's own jagged texture, which reads as "sliced," not as a natural
-// broken edge. Containment is now handled entirely at the POSITION level (the v3/v4 build-time
-// silhouette clamp, unchanged) -- sparks just render their texture directly, same as before v3.
-const sparkVertex = `
-  uniform vec2 uSize;
-  varying vec2 vUv;
-  void main(){
-    vUv = uv;
-    vec3 center = modelMatrix[3].xyz; // this mesh's own world position (rotation/scale stay identity)
-    vec3 camRight = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
-    vec3 camUp    = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
-    vec3 worldPos = center + camRight * (position.x * uSize.x) + camUp * (position.y * uSize.y);
-    gl_Position = projectionMatrix * viewMatrix * vec4(worldPos, 1.0);
-  }
-`;
-const sparkFragment = `
-  uniform sampler2D map;
-  uniform float uOpacity;
-  varying vec2 vUv;
-  void main(){
-    vec4 tex = texture2D(map, vUv);
-    gl_FragColor = vec4(tex.rgb, tex.a * uOpacity);
-  }
-`;
-// GOD MODE v5 "crystalline lock-snap": per-shard fusion-flash total lifetime, split 8%
-// attack / 92% decay (see sparkEnv in updateShardsAssembling). Also scales the neighbor
-// pair-spark's own life and the main spawnSpark sprite's life at each shard's lock moment.
-const BLAST_DUR = 480; // [v27 Track B] up from 360 -- only 10 landings total now, each one gets room to be savored, per B.3
-const SPARK_POOL_SIZE = 28;
-const sparkGeom = new THREE.PlaneGeometry(1,1);
-let sparkPool = [];
-function buildSparkPool(){
-  for (let i=0;i<SPARK_POOL_SIZE;i++){
-    const mat = new THREE.ShaderMaterial({
-      uniforms: {
-        map: { value: blastTex },
-        uOpacity: { value: 0 },
-        uSize: { value: new THREE.Vector2(1,1) },
-      },
-      vertexShader: sparkVertex, fragmentShader: sparkFragment,
-      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-    });
-    const mesh = new THREE.Mesh(sparkGeom, mat);
-    mesh.userData.kaKind = 'spark'; // v19 diagnostics -- see window.__kaDebugScene()
-    mesh.visible = false;
-    scene.add(mesh);
-    sparkPool.push({ mesh, active:false, startT:0, dur:0, baseScale:1, peakOpacity:0.65 });
-  }
-}
-// Spawn one collision flash at (x,y,z), sized off `scale`, lasting `dur` ms, starting "now" (t
-// in the same phase-relative clock updateShardsAssembling already runs on). `peakOpacity`
-// (default 0.65) lets a specific spark -- e.g. the single core reveal-ignition flash, see
-// updateLogoReveal -- burn brighter than the routine per-shard landing sparks. `kind` picks the
-// texture: 'star' (default, the sharp radiating flash) or 'glow' (softDotTex's soft round ember --
-// see spawnImpactSpark below for where the mix of the two actually gets decided). Silently no-ops
-// if every pooled billboard is currently busy -- with 28 slots against a naturally-staggered
-// 169-shard landing schedule this essentially never happens, and missing one flash among many is
-// invisible.
-function spawnSpark(x, y, z, scale, dur, t, peakOpacity, kind){
-  let slot = sparkPool.find(sp => !sp.active);
-  if (!slot) return;
-  slot.active = true; slot.startT = t; slot.dur = dur; slot.baseScale = scale*.48;
-  slot.peakOpacity = peakOpacity === undefined ? 0.65 : peakOpacity;
-  slot.mesh.material.uniforms.map.value = kind === 'glow' ? softDotTex : blastTex;
-  slot.mesh.position.set(x, y, z);
-  slot.mesh.visible = true;
-  slot.mesh.material.uniforms.uOpacity.value = 0;
-}
-// GOD MODE v39: a real collision firing the exact same sharp star every single time (169 shards,
-// each landing) read as one repetitive icon replaying rather than organic impact variety -- and at
-// the size the star had been tuned to, it visually dominated every landing. This dispatcher is
-// what every actual per-shard COLLISION call site below routes through instead of spawnSpark
-// directly: it rolls a kind each time -- a bright but notably smaller star (rare), a soft round
-// glow (common), or a small soft glow (common) -- so landings read as a varied field of impacts,
-// not one oversized icon stamped 169 times. `baseSize` is the same "size off the shard" value call
-// sites already computed; the per-kind multiplier is what actually fixes the star's dominance.
-function spawnImpactSpark(x, y, z, baseSize, dur, t){
-  const roll = Math.random();
-  let sizeMul, peakOpacity, kind;
-  if (roll < 0.22){ kind = 'star'; sizeMul = 0.55; peakOpacity = 0.7; }
-  else if (roll < 0.64){ kind = 'glow'; sizeMul = 0.95; peakOpacity = 0.5; }
-  else { kind = 'glow'; sizeMul = 0.5; peakOpacity = 0.38; }
-  spawnSpark(x, y, z, baseSize * sizeMul, dur, t, peakOpacity, kind);
-}
-
-// ------------------------------------------------------ glitter burst pool --
-// [shard collision glow fix] the old per-shard landing flash (a single billboard fading over
-// BLAST_DUR=480ms) read as one large, slowish glow. This replaces it with a fast (150-250ms),
-// small-scale scatter of several tiny fragments flying outward from the collision point, each
-// with its own randomized size/rotation/trajectory -- a glitter burst, not a uniform pulse.
-// Reuses the same camera-facing billboard technique as sparkVertex/sparkFragment, adding only a
-// per-particle in-plane rotation (uRot) and a per-particle outward drift (uFrom/uTo, lerped by
-// progress in the vertex shader so the drift costs nothing extra in the JS update loop).
-const glitterVertex = `
-  uniform vec2 uSize;
-  uniform float uRot;
-  uniform vec3 uFrom, uTo;
-  uniform float uProgress;
-  varying vec2 vUv;
-  void main(){
-    vUv = uv;
-    vec3 center = mix(uFrom, uTo, uProgress);
-    vec3 camRight = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
-    vec3 camUp    = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
-    float c = cos(uRot), s = sin(uRot);
-    vec2 p = vec2(position.x * c - position.y * s, position.x * s + position.y * c);
-    vec3 worldPos = center + camRight * (p.x * uSize.x) + camUp * (p.y * uSize.y);
-    gl_Position = projectionMatrix * viewMatrix * vec4(worldPos, 1.0);
-  }
-`;
-const GLITTER_DUR_MIN = 150, GLITTER_DUR_MAX = 250; // fast burst, not a lingering glow
-const GLITTER_POOL_SIZE = 54; // several tiny particles per burst, a few bursts can overlap
-const glitterGeom = new THREE.PlaneGeometry(1,1);
-let glitterPool = [];
-function buildGlitterPool(){
-  for (let i=0;i<GLITTER_POOL_SIZE;i++){
-    const mat = new THREE.ShaderMaterial({
-      uniforms: {
-        map: { value: blastTex },
-        uOpacity: { value: 0 },
-        uSize: { value: new THREE.Vector2(1,1) },
-        uRot: { value: 0 },
-        uFrom: { value: new THREE.Vector3() },
-        uTo: { value: new THREE.Vector3() },
-        uProgress: { value: 0 },
-      },
-      vertexShader: glitterVertex, fragmentShader: sparkFragment,
-      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
-    });
-    const mesh = new THREE.Mesh(glitterGeom, mat);
-    mesh.userData.kaKind = 'glitter';
-    mesh.visible = false;
-    scene.add(mesh);
-    glitterPool.push({ mesh, active:false, startT:0, dur:0, peakOpacity:0.8, spin:0 });
-  }
-}
-// Spawn a fast scatter of tiny fragments from (x,y,z), sized off `baseSize`. Each particle gets
-// its own random size, rotation, spin speed, outward angle/distance and lifetime -- a natural
-// glitter/sparkle feel rather than a uniform pulse. Silently skips particles once the pool is
-// exhausted (54 slots against a handful of simultaneous landings is comfortable headroom).
-function spawnGlitterBurst(x, y, z, baseSize, t){
-  const count = 5 + Math.floor(Math.random() * 5); // 5-9 fragments
-  for (let i=0;i<count;i++){
-    const slot = glitterPool.find(sp => !sp.active);
-    if (!slot) return;
-    const ang = Math.random() * Math.PI * 2;
-    const dist = baseSize * (0.5 + Math.random() * 1.3);
-    slot.active = true;
-    slot.startT = t;
-    slot.dur = GLITTER_DUR_MIN + Math.random() * (GLITTER_DUR_MAX - GLITTER_DUR_MIN);
-    slot.peakOpacity = 0.55 + Math.random() * 0.35;
-    slot.spin = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 5);
-    slot.mesh.material.uniforms.map.value = Math.random() < 0.5 ? softDotTex : blastTex;
-    slot.mesh.material.uniforms.uFrom.value.set(x, y, z);
-    slot.mesh.material.uniforms.uTo.value.set(x + Math.cos(ang) * dist, y + Math.sin(ang) * dist, z);
-    slot.mesh.material.uniforms.uSize.value.set(baseSize * (0.12 + Math.random() * 0.16), baseSize * (0.12 + Math.random() * 0.16));
-    slot.mesh.material.uniforms.uRot.value = Math.random() * Math.PI * 2;
-    slot.mesh.material.uniforms.uProgress.value = 0;
-    slot.mesh.visible = true;
-    slot.mesh.material.uniforms.uOpacity.value = 0;
-  }
-}
-function updateGlitter(t){
-  glitterPool.forEach(slot => {
-    if (!slot.active) return;
-    const age = t - slot.startT;
-    if (age >= slot.dur){
-      slot.active = false;
-      slot.mesh.visible = false;
-      slot.mesh.material.uniforms.uOpacity.value = 0;
-      return;
-    }
-    const e = age / slot.dur;
-    // very fast attack, fast fade -- 150-250ms total, reads as a scatter/sparkle not a glow-hold
-    const env = e < 0.18 ? easeOutCubic(e/0.18) : 1 - easeInCubic((e-0.18)/0.82);
-    slot.mesh.material.uniforms.uOpacity.value = env * slot.peakOpacity;
-    slot.mesh.material.uniforms.uProgress.value = easeOutCubic(Math.min(1, e * 1.15));
-    slot.mesh.material.uniforms.uRot.value += slot.spin * 0.05;
-  });
-}
 // ---------------------------------------------------- ambient crystals --
 // GOD MODE v6 SUPERCHARGE: extra atmosphere, explicitly separate from the 169 real
 // logo-reconstructing fragments -- these stream in from random points well outside the
@@ -2875,33 +2629,8 @@ function updateAmbientShards(t){
     a.mesh.material.uniforms.uOpacity.value = 0.48 * edgeFade;
     // one small collision spark, only for the streaks pulled into a genuine close pass, only
     // once, right as it crosses nearest to the mark's own center
-    if (a.closePass && !a.sparked && lt > 0.42 && lt < 0.58){
-      const distFromCenter = Math.hypot(px, py);
-      if (distFromCenter < 130){
-        a.sparked = true;
-        spawnImpactSpark(px, py, pz + 1, Math.max(a.mesh.scale.x, a.mesh.scale.y) * 0.6, 260, t);
-      }
-    }
+
   });
-}
-function updateSparks(t){
-  sparkPool.forEach(slot => {
-    if (!slot.active) return;
-    const age = t - slot.startT;
-    if (age >= slot.dur){
-      slot.active = false;
-      slot.mesh.visible = false;
-      slot.mesh.material.uniforms.uOpacity.value = 0;
-      return;
-    }
-    const e = age / slot.dur;
-    // fast attack, quick decay -- a spark, not a lingering glow-hold
-    const env = e < 0.25 ? easeOutCubic(e/0.25) : 1 - easeInCubic((e-0.25)/0.75);
-    slot.mesh.material.uniforms.uOpacity.value = env * slot.peakOpacity;
-    const sz = slot.baseScale * lerp(1.0, 2.2, env);
-    slot.mesh.material.uniforms.uSize.value.set(sz, sz);
-  });
-  updateGlitter(t);
 }
 
 // ------------------------------------------------------------- icon build --
@@ -3341,70 +3070,38 @@ window.__kaDebugScene = function(){
   console.log('[KA diagnostics]', report);
   return report;
 };
-setInterval(() => {
-  if (phase !== 'held') return;
-  const report = kaSceneDiagnostics();
-  if (report.unexpectedlyVisible.length){
-    console.warn('[KA diagnostics] real shard(s) visible during held -- this should be impossible given enforceShardVisibility; run window.__kaDebugScene() for full detail', report.unexpectedlyVisible);
-  }
-}, 3000);
-
-// ============================================================= v27 TRACK A: TEMPORARY ==
-// Targeted capture logging for the recurring stray-cluster bug -- remove this whole block once
-// the investigation is closed. Deliberately NOT a naive "any shard far from center" check: during
-// 'shattered' and the pre-REVEAL_START part of 'assembling', EVERY shard is legitimately far from
-// center by design (screenEdgeSpawnPoint scatters them there on purpose) -- flagging that would
-// just be constant noise, not evidence. The only phases where "far from center" is actually
-// abnormal are 'held' (nothing but the resolved mark should be visible/positioned there at all --
-// already covered above, this block adds full per-shard detail to it) and the tail of
-// 'assembling' once past REVEAL_START, where every real shard should already be at or very near
-// its own landedR by then.
-const STRAY_CLUSTER_MIN_COUNT = 3; // a coherent cluster, not one stray piece
-const STRAY_CLUSTER_RADIUS = cutDiagHalf * 1.5; // generous margin past the largest legitimate landed radius
-function logStrayClusterCandidate(){
-  const expectedCenter = { x: centerMx, y: centerMy };
-  let outliers = [];
-  if (phase === 'held'){
-    outliers = shards.filter(s => s.mesh.visible);
-  } else if (phase === 'assembling' && t_globalForDiagnostics > REVEAL_START){
-    outliers = shards.filter(s => {
-      if (!s.mesh.visible) return false;
-      const dist = Math.hypot(s.mesh.position.x - expectedCenter.x, s.mesh.position.y - expectedCenter.y);
-      return dist > STRAY_CLUSTER_RADIUS;
-    });
-  } else {
-    return; // shattered / pre-REVEAL_START assembling -- being far from center is expected here, not evidence
-  }
-  if (outliers.length >= STRAY_CLUSTER_MIN_COUNT){
-    console.warn('[STRAY CLUSTER DEBUG]', {
-      timestamp: performance.now(),
-      phase,
-      outlierShardIds: outliers.map(s => s.id),
-      outlierPositions: outliers.map(s => ({ id: s.id, x: s.mesh.position.x, y: s.mesh.position.y, z: s.mesh.position.z })),
-      outlierCoreOrigin: outliers.map(s => s.coreOrigin), // what each one's toWorld() call actually used as its center
-      expectedCenter,
-      coreOriginMatchesExpected: outliers.map(s => s.coreOrigin.x === expectedCenter.x && s.coreOrigin.y === expectedCenter.y),
-    });
-  }
-}
-let t_globalForDiagnostics = 0; // frame() updates this each tick so the interval below can read current t without changing frame()'s own signature
-setInterval(logStrayClusterCandidate, 1000);
-
 // ==================================================================== FRAME LOOP ==
-let heroVisible = true;
+let heroVisible = true, heroFrame = 0, heroPausedAt = 0, heroHold = ASSEMBLE_DELAY;
 const heroSpacer = document.querySelector('.hero-spacer');
 if (heroSpacer){
-  new IntersectionObserver(entries => { heroVisible = entries[0].isIntersecting; }).observe(heroSpacer);
+  new IntersectionObserver(entries => { heroVisible = entries[0].isIntersecting; syncHero(); }).observe(heroSpacer);
 }
+function scheduleHero(){
+  if(assetsLoaded!==2 || !logoMesh)return;
+  if(!heroFrame && motionLoopActive && !document.hidden && (phase!=='held'||heroVisible)) heroFrame=requestAnimationFrame(frame);
+}
+function syncHero(){
+  if(document.hidden || (phase==='held'&&!heroVisible)){
+    if(!heroPausedAt)heroPausedAt=performance.now();
+    cancelAnimationFrame(heroFrame);heroFrame=0;
+  }else{
+    if(heroPausedAt){phaseStart+=performance.now()-heroPausedAt;heroPausedAt=0;lastFrameT=0;}
+    scheduleHero();
+  }
+}
+document.addEventListener('visibilitychange',syncHero);
+window.addEventListener('pagehide',()=>{cancelAnimationFrame(heroFrame);heroFrame=0;if(!heroPausedAt)heroPausedAt=performance.now();});
+window.addEventListener('pageshow',syncHero);
 function frame(ts){
+  heroFrame=0;
   if (!motionLoopActive) return; // [v26 Task 4] cleanly stops the loop once reduced-motion is toggled on mid-session -- no further work, no further scheduling
-  requestAnimationFrame(frame);
+  if(document.hidden || (phase==='held'&&!heroVisible)){syncHero();return;}
+  scheduleHero();
   if (lastFrameT === 0) lastFrameT = ts;
   const dt = ts - lastFrameT; lastFrameT = ts;
   // Gallery scrolling gets the GPU once reconstruction has finished.
   if (phase === 'held' && (!heroVisible || document.hidden)) return;
   const t = ts - phaseStart;
-  t_globalForDiagnostics = t; // [v27 Track A temporary] lets logStrayClusterCandidate's setInterval read current t
 
   // Driven unconditionally, every frame, off the raw animation clock (ts) rather than the
   // per-phase-relative t -- this is what lets the shader's continuous rim shimmer (and the
@@ -3414,8 +3111,9 @@ function frame(ts){
   logoMesh.material.uniforms.uAmbientTint.value.lerp(ambientLightTint,1-Math.exp(-dt/650));
   logoMesh.material.uniforms.uAmbientStrength.value=phase==='held'?ambientLightStrength:0;
 
-  mouseSmoothed.x = lerp(mouseSmoothed.x, mouse.x, 0.045);
-  mouseSmoothed.y = lerp(mouseSmoothed.y, mouse.y, 0.045);
+  const pointerEase=1-Math.exp(-Math.min(dt,100)/360);
+  mouseSmoothed.x = lerp(mouseSmoothed.x, mouse.x, pointerEase);
+  mouseSmoothed.y = lerp(mouseSmoothed.y, mouse.y, pointerEase);
 
   updateDust(ts);
 
@@ -3478,7 +3176,7 @@ function frame(ts){
       shineActive = false;
       shineNextAt = SHINE_INTERVAL_MIN + Math.random()*(SHINE_INTERVAL_MAX - SHINE_INTERVAL_MIN);
       // GOD MODE v9: arm the first ambient interior sparkle for this held cycle
-      nextSparkleAt = IDLE_SPARKLE_MIN + Math.random()*(IDLE_SPARKLE_MAX - IDLE_SPARKLE_MIN);
+
       replayBtn?.classList.add('on');
     }
   } else if (phase === 'held'){
@@ -3523,21 +3221,8 @@ function frame(ts){
       logoMesh.material.uniforms.uSweepPos.value = -1;
     }
 
-    // GOD MODE v9: ambient interior sparkle -- small, random glints inside the resting crystal,
-    // looping indefinitely at random SLOW intervals, independent of (and much subtler than) the
-    // periodic specular shine sweep above. Reuses the existing spark sprite pool (the same one
-    // fusion sparks use during assembly) rather than a new rendering path, spawned at a genuine
-    // shard's own landed position each time so every sparkle sits somewhere the crystal actually
-    // has real geometry, not an approximated interior region.
-    if (t >= nextSparkleAt){
-      const pick = shards[Math.floor(Math.random() * shards.length)];
-      spawnSpark(pick.landedPos.x, pick.landedPos.y, 3,
-                 Math.max(pick.w, pick.h) * (0.45 + Math.random()*0.4),
-                 450 + Math.random()*400, t, 0.4, 'glow'); // a resting twinkle, not an impact -- always the soft glow, never the sharp star
-      nextSparkleAt = t + IDLE_SPARKLE_MIN + Math.random()*(IDLE_SPARKLE_MAX - IDLE_SPARKLE_MIN);
-    }
     updateAmbientShards(ts); // SUPERCHARGE: keep the ambient layer alive through the held/resting state
-    updateSparks(t);
+
   } else if (phase === 'disassembling'){
     const p = clamp01(t / DISASSEMBLE_DUR);
     // Mirror the reveal crossfade, in reverse, instead of just cutting the shard mosaic to
@@ -3593,10 +3278,7 @@ function frame(ts){
     updateCamera(1 - easeInCubic(p), ts, dt);
     if (p >= 1){
       phase = 'shattered'; phaseStart = ts;
-      // brief hold in shattered form before auto-reassembling
-      setTimeout(() => {
-        if (phase === 'shattered'){ randomizeSweep(); phase = 'assembling'; phaseStart = performance.now(); regionGlowFired.clear(); coreFlashFired = false; }
-      }, 650);
+      heroHold=650;
     }
   }
 
@@ -3622,11 +3304,8 @@ function frame(ts){
   updateSkillCallouts();
   renderer.render(scene, camera);
 
-  if (phase === 'shattered' && !frame._armed){
-    frame._armed = true;
-    setTimeout(() => {
-      if (phase === 'shattered'){ randomizeSweep(); phase = 'assembling'; phaseStart = performance.now(); }
-    }, ASSEMBLE_DELAY);
+  if (phase === 'shattered' && ts-phaseStart >= heroHold){
+    randomizeSweep();phase='assembling';phaseStart=ts;
   }
 }
 
@@ -3885,99 +3564,18 @@ function updateShardsAssembling_LEGACY_10piece_v27(ts, t){
     // moment that transmutation completes, not an unrelated flash layered over a static tint.
     const baseTint = lerp3(RAW_TINT, RESOLVED_TINT, smootherStep(posE));
 
-    // FUSION SPARK -- fires once, the instant THIS shard's own Repair flight crosses ~94%
-    // complete (posE, not lt, since posE is the actual eased travel fraction driving its
-    // position). See the impactAt field note in buildShards for why this replaces a single
-    // global blast: 169 shards landing across a naturally staggered schedule produces a
-    // continuous scatter of small collision flashes instead of one flat event tacked onto an
-    // already-finished piece.
-    if (s.impactAt === null && posE >= 0.94){
-      s.impactAt = t;
-      // GOD MODE v9: randomize this shard's own spark envelope shape -- attack/decay split,
-      // overall lifetime, and peak brightness all vary per shard (fixed once, at the moment of
-      // impact, so a single shard's own flash stays internally consistent frame to frame) so the
-      // wall of 169 landings reads as chaotic electrical charging rather than one smooth pulse
-      // shape stamped out identically everywhere. See sparkEnv below for how these combine with a
-      // stacked-sine flicker into the final envelope.
-      s.sparkAttackFrac = 0.05 + Math.random() * 0.14;    // 5-19% attack (was a fixed 8%)
-      s.sparkDurMul = 0.75 + Math.random() * 0.6;         // 0.75x-1.35x this shard's own lifetime
-      s.sparkPeak = 1.4 + Math.random() * 0.6;            // [v27 Track B] 1.4-2.0x peak (up from 1.0-1.6x) -- fewer, bigger pieces means each arrival is a headline moment
-      s.sparkFlickerFreq1 = 0.02 + Math.random() * 0.05;  // two stacked flicker frequencies so it
-      s.sparkFlickerFreq2 = 0.05 + Math.random() * 0.11;  // never settles into one clean beat
-      s.sparkFlickerPhase1 = Math.random() * Math.PI * 2;
-      s.sparkFlickerPhase2 = Math.random() * Math.PI * 2;
-      spawnGlitterBurst(endX, endY, 2, Math.max(s.w, s.h) * 1.6, t); // [glitter fix] fast small-scale sparkle scatter, replaces the old single large/slow collision glow
-      // GOD MODE v5 "crystalline lock-snap": a handful of tiny, very short-lived seam-line
-      // sparks scattered right at this shard's own edge, distinct from the main flash above --
-      // the main flash reads as "this piece arrived," these tiny ones read as "...and the seam
-      // just caught the light," a quick chime-like flicker rather than a bigger glow. Optional
-      // per spec; kept cheap (short life, tiny radius, reuses the same sprite pool).
-      const chimeCount = 2 + Math.floor(Math.random() * 3); // 6-9 -- SUPERCHARGE: busier lock-snap chime
-      for (let c = 0; c < chimeCount; c++){
-        const ang = Math.random() * Math.PI * 2;
-        const rad = Math.max(s.w, s.h) * (0.35 + Math.random() * 0.25);
-        spawnSpark(endX + Math.cos(ang) * rad, endY + Math.sin(ang) * rad,
-                   0.8 + Math.random() * 0.6, Math.max(s.w, s.h) * 0.18,
-                   90 + Math.random() * 50, t, 0.4, 'glow'); // small companion flecks -- always the soft glow
-      }
-      // Neighbor micro-spark: if another shard landed within the last ~180ms AND sits close
-      // enough to plausibly be an adjacent piece, spawn a second, smaller flash at the midpoint
-      // between them -- that's the spark that specifically reads as "these two just collided,"
-      // distinct from "this one piece arrived." Only ever fires once per pair (pairSparked guard)
-      // so two adjacent pieces landing close together don't relight each other repeatedly.
-      if (!s.pairSparked){
-        for (let j=0;j<shards.length;j++){
-          const s2 = shards[j];
-          if (s2 === s || s2.impactAt === null || s2.pairSparked) continue;
-          if (Math.abs(s2.impactAt - s.impactAt) > 180) continue;
-          const dx2 = s2.landedPos.x - s.landedPos.x, dy2 = s2.landedPos.y - s.landedPos.y;
-          const neighborThresh = (s.w + s.h + s2.w + s2.h) * 0.55;
-          if (Math.hypot(dx2, dy2) < neighborThresh){
-            spawnImpactSpark((s.landedPos.x + s2.landedPos.x) * 0.5, (s.landedPos.y + s2.landedPos.y) * 0.5, 2.5,
-                       Math.max(s.w, s.h) * 0.55, Math.round(BLAST_DUR * 0.85), t);
-            s.pairSparked = true; s2.pairSparked = true;
-            break;
-          }
-        }
-      }
-    }
-    // Warm overexposure on the shard's OWN material while its spark is alive -- the sprite alone
-    // reads as a glow floating near the piece; brightening the piece's own texture at the same
-    // moment is what sells the flash as coming FROM the collision itself. Values above 1 in
-    // uTint genuinely overexpose (the fragment shader multiplies texture color by it directly,
-    // with no tone mapping), not just tint. GOD MODE v5: this now ADDS onto baseTint (the
-    // continuous raw->resolved transmutation above) instead of overwriting it outright, so the
-    // flash reads as "the transmutation completing in a burst of light," not an unrelated pulse
-    // that happens to interrupt whatever color the shard was already at.
-    // GOD MODE v5 "crystalline lock-snap": shortened and sharpened from the previous round's
-    // softer 260ms/25%-attack envelope -- a crystal facet locking into place should read as a
-    // sharp snap-and-fade, not a gentle bloom.
-    // GOD MODE v9: the attack/decay split, overall duration, and peak are now this shard's OWN
-    // randomized values (set once at impact, above) instead of one fixed 8%/92% shape shared by
-    // every shard -- and on top of that base attack/decay envelope, a flicker term (two stacked
-    // sines at per-shard, non-matching frequencies) makes the brightness stutter/waver while it's
-    // active rather than rising and falling smoothly, reading as an unstable arc catching and
-    // dropping rather than a uniform, well-behaved pulse. The base `shape` still guarantees the
-    // envelope starts and ends at exactly 0 regardless of the flicker riding on top of it.
-    let sparkEnv = 0;
-    if (s.impactAt !== null){
-      const age = t - s.impactAt;
-      const dur = BLAST_DUR * s.sparkDurMul;
-      if (age < dur){
-        const attackDur = dur * s.sparkAttackFrac, decayDur = dur * (1 - s.sparkAttackFrac);
-        const shape = age < attackDur ? easeOutCubic(age/attackDur) : 1 - easeInCubic((age-attackDur)/decayDur);
-        const flicker = 0.72 + 0.28 *
-          (0.5 + 0.5*Math.sin(age*s.sparkFlickerFreq1 + s.sparkFlickerPhase1)) *
-          (0.5 + 0.5*Math.sin(age*s.sparkFlickerFreq2 + s.sparkFlickerPhase2));
-        sparkEnv = shape * flicker * s.sparkPeak;
-      }
-    }
+    // The impact belongs to this exact mesh/atlas alpha, including polygon boundaries.
+    if (s.impactAt === null && lt >= 1) s.impactAt = t;
+    // Smooth fast attack and decay; no per-frame random flicker or external overlay.
+    const impactAge = s.impactAt === null ? -1 : t-s.impactAt;
+    const sparkEnv = impactAge < 0 || impactAge >= 180 ? 0 :
+      smootherStep(impactAge/22) * (1-smootherStep((impactAge-22)/158));
     // SUPERCHARGE: hotter per-shard overexposure at the moment of impact
     s.mesh.material.uniforms.uTint.value.set(
       baseTint.x + sparkEnv*0.20, baseTint.y + sparkEnv*0.14, baseTint.z + sparkEnv*0.09
     );
   });
-  updateSparks(t);
+
   return allDone;
 }
 
@@ -4497,127 +4095,18 @@ function updateShardsAssembling(ts, t){
     // moment that transmutation completes, not an unrelated flash layered over a static tint.
     const baseTint = lerp3(RAW_TINT, RESOLVED_TINT, smootherStep(posE));
 
-    // FUSION SPARK -- fires once, the instant THIS shard's own Repair flight crosses ~94%
-    // complete (posE, not lt, since posE is the actual eased travel fraction driving its
-    // position). See the impactAt field note in buildShards for why this replaces a single
-    // global blast: 169 shards landing across a naturally staggered schedule produces a
-    // continuous scatter of small collision flashes instead of one flat event tacked onto an
-    // already-finished piece.
-    if (s.impactAt === null && posE >= 0.94){
-      s.impactAt = t;
-      // GOD MODE v9: randomize this shard's own spark envelope shape -- attack/decay split,
-      // overall lifetime, and peak brightness all vary per shard (fixed once, at the moment of
-      // impact, so a single shard's own flash stays internally consistent frame to frame) so the
-      // wall of 169 landings reads as chaotic electrical charging rather than one smooth pulse
-      // shape stamped out identically everywhere. See sparkEnv below for how these combine with a
-      // stacked-sine flicker into the final envelope.
-      s.sparkAttackFrac = 0.05 + Math.random() * 0.14;    // 5-19% attack (was a fixed 8%)
-      s.sparkDurMul = 0.75 + Math.random() * 0.6;         // 0.75x-1.35x this shard's own lifetime
-      s.sparkPeak = 1.0 + Math.random() * 0.6;            // 1.0-1.6x peak overexposure -- SUPERCHARGE
-      s.sparkFlickerFreq1 = 0.02 + Math.random() * 0.05;  // two stacked flicker frequencies so it
-      s.sparkFlickerFreq2 = 0.05 + Math.random() * 0.11;  // never settles into one clean beat
-      s.sparkFlickerPhase1 = Math.random() * Math.PI * 2;
-      s.sparkFlickerPhase2 = Math.random() * Math.PI * 2;
-      spawnGlitterBurst(endX, endY, 2, Math.max(s.w, s.h) * 0.72, t); // [glitter fix] fast small-scale sparkle scatter, replaces the old single large/slow collision glow
-      // GOD MODE v5 "crystalline lock-snap": a handful of tiny, very short-lived seam-line
-      // sparks scattered right at this shard's own edge, distinct from the main flash above --
-      // the main flash reads as "this piece arrived," these tiny ones read as "...and the seam
-      // just caught the light," a quick chime-like flicker rather than a bigger glow. Optional
-      // per spec; kept cheap (short life, tiny radius, reuses the same sprite pool).
-      const chimeCount = 2 + Math.floor(Math.random() * 3); // 6-9 -- SUPERCHARGE: busier lock-snap chime
-      for (let c = 0; c < chimeCount; c++){
-        const ang = Math.random() * Math.PI * 2;
-        const rad = Math.max(s.w, s.h) * (0.35 + Math.random() * 0.25);
-        spawnSpark(endX + Math.cos(ang) * rad, endY + Math.sin(ang) * rad,
-                   0.8 + Math.random() * 0.6, Math.max(s.w, s.h) * 0.18,
-                   90 + Math.random() * 50, t, 0.4, 'glow'); // small companion flecks -- always the soft glow
-      }
-      // Neighbor micro-spark: if another shard landed within the last ~180ms AND sits close
-      // enough to plausibly be an adjacent piece, spawn a second, smaller flash at the midpoint
-      // between them -- that's the spark that specifically reads as "these two just collided,"
-      // distinct from "this one piece arrived." Only ever fires once per pair (pairSparked guard)
-      // so two adjacent pieces landing close together don't relight each other repeatedly.
-      if (!s.pairSparked){
-        for (let j=0;j<shards.length;j++){
-          const s2 = shards[j];
-          if (s2 === s || s2.impactAt === null || s2.pairSparked) continue;
-          if (Math.abs(s2.impactAt - s.impactAt) > 180) continue;
-          const dx2 = s2.landedPos.x - s.landedPos.x, dy2 = s2.landedPos.y - s.landedPos.y;
-          const neighborThresh = (s.w + s.h + s2.w + s2.h) * 0.55;
-          if (Math.hypot(dx2, dy2) < neighborThresh){
-            spawnImpactSpark((s.landedPos.x + s2.landedPos.x) * 0.5, (s.landedPos.y + s2.landedPos.y) * 0.5, 2.5,
-                       Math.max(s.w, s.h) * 0.55, Math.round(BLAST_DUR * 0.85), t);
-            s.pairSparked = true; s2.pairSparked = true;
-            break;
-          }
-        }
-      }
-    }
-    // Warm overexposure on the shard's OWN material while its spark is alive -- the sprite alone
-    // reads as a glow floating near the piece; brightening the piece's own texture at the same
-    // moment is what sells the flash as coming FROM the collision itself. Values above 1 in
-    // uTint genuinely overexpose (the fragment shader multiplies texture color by it directly,
-    // with no tone mapping), not just tint. GOD MODE v5: this now ADDS onto baseTint (the
-    // continuous raw->resolved transmutation above) instead of overwriting it outright, so the
-    // flash reads as "the transmutation completing in a burst of light," not an unrelated pulse
-    // that happens to interrupt whatever color the shard was already at.
-    // GOD MODE v5 "crystalline lock-snap": shortened and sharpened from the previous round's
-    // softer 260ms/25%-attack envelope -- a crystal facet locking into place should read as a
-    // sharp snap-and-fade, not a gentle bloom.
-    // GOD MODE v9: the attack/decay split, overall duration, and peak are now this shard's OWN
-    // randomized values (set once at impact, above) instead of one fixed 8%/92% shape shared by
-    // every shard -- and on top of that base attack/decay envelope, a flicker term (two stacked
-    // sines at per-shard, non-matching frequencies) makes the brightness stutter/waver while it's
-    // active rather than rising and falling smoothly, reading as an unstable arc catching and
-    // dropping rather than a uniform, well-behaved pulse. The base `shape` still guarantees the
-    // envelope starts and ends at exactly 0 regardless of the flicker riding on top of it.
-    let sparkEnv = 0;
-    if (s.impactAt !== null){
-      const age = t - s.impactAt;
-      const dur = BLAST_DUR * s.sparkDurMul;
-      if (age < dur){
-        const attackDur = dur * s.sparkAttackFrac, decayDur = dur * (1 - s.sparkAttackFrac);
-        const shape = age < attackDur ? easeOutCubic(age/attackDur) : 1 - easeInCubic((age-attackDur)/decayDur);
-        const flicker = 0.72 + 0.28 *
-          (0.5 + 0.5*Math.sin(age*s.sparkFlickerFreq1 + s.sparkFlickerPhase1)) *
-          (0.5 + 0.5*Math.sin(age*s.sparkFlickerFreq2 + s.sparkFlickerPhase2));
-        sparkEnv = shape * flicker * s.sparkPeak;
-      }
-    }
+    // The impact belongs to this exact mesh/atlas alpha, including polygon boundaries.
+    if (s.impactAt === null && lt >= 1) s.impactAt = t;
+    // Smooth fast attack and decay; no per-frame random flicker or external overlay.
+    const impactAge = s.impactAt === null ? -1 : t-s.impactAt;
+    const sparkEnv = impactAge < 0 || impactAge >= 180 ? 0 :
+      smootherStep(impactAge/22) * (1-smootherStep((impactAge-22)/158));
     // SUPERCHARGE: hotter per-shard overexposure at the moment of impact
     s.mesh.material.uniforms.uTint.value.set(
       baseTint.x + sparkEnv*0.20, baseTint.y + sparkEnv*0.14, baseTint.z + sparkEnv*0.09
     );
   });
 
-  // [v30] region-completion glow: once every fragment tagged to a region has individually
-  // landed (checked here by counting each shard's own s.lt, never via any shared object or
-  // group), fire one larger, brighter glow across that region's own landed footprint --
-  // layered on top of, not replacing, each fragment's own smaller fusion spark above. ~10 of
-  // these fire across a full sequence (5 regions x 2 letters), each a clearer beat than any
-  // single fragment is spark.
-  const regionStats = {};
-  shards.forEach(s => {
-    if (!(s.region in regionStats)) regionStats[s.region] = { total: 0, landed: 0, minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
-    const r = regionStats[s.region];
-    r.total++;
-    if (s.lt >= 1){
-      r.landed++;
-      r.minX = Math.min(r.minX, s.landedPos.x); r.maxX = Math.max(r.maxX, s.landedPos.x);
-      r.minY = Math.min(r.minY, s.landedPos.y); r.maxY = Math.max(r.maxY, s.landedPos.y);
-    }
-  });
-  Object.keys(regionStats).forEach(region => {
-    const r = regionStats[region];
-    if (r.total > 0 && r.landed === r.total && !regionGlowFired.has(region)){
-      regionGlowFired.add(region);
-      const cx = (r.minX + r.maxX) / 2, cy = (r.minY + r.maxY) / 2;
-      const span = Math.max(30, Math.hypot(r.maxX - r.minX, r.maxY - r.minY));
-      spawnSpark(cx, cy, 3, span * 0.42, Math.round(BLAST_DUR * 1.15), t, 0.55, 'glow'); // a whole region completing reads as a broad soft glow, not a sharp point flash
-    }
-  });
-
-  updateSparks(t);
   return allDone;
 }
 
@@ -4633,15 +4122,7 @@ function updateLogoReveal(t){
   const revealStart = REVEAL_START;
   const revealDur = REVEAL_DUR;
 
-  // CORE IGNITION FLASH: one sharp star-spark fired from the mark's own exact center the instant
-  // the reveal begins -- reads as "the light that then spreads outward," matching the wipe itself
-  // (wipeYGlobal below), which also grows outward from this same center. One-shot per assembly
-  // cycle via coreFlashFired (reset alongside regionGlowFired on every Replay).
-  if (!coreFlashFired && t >= revealStart){
-    coreFlashFired = true;
-    spawnSpark(0, 0, 5, cutDiagHalf * 0.28, 480, t, 1.0);
-  }
-
+  // Internal seams carry the reveal; the center stays clear.
   const revealT = clamp01((t - revealStart) / revealDur);
   // the resolved mark's scale/position NEVER animates -- it was set once in buildLogo() and
   // stays put the whole time (see buildLogo: logoMesh.scale.set(dw,dh,1), position (0,0,0)).
@@ -4712,7 +4193,7 @@ function updateLogoReveal(t){
   // for this frame, so the gate's block branch is a pure safety net that should never fire in
   // normal operation, not a per-frame corrector.
   if (t >= revealStart){
-    setResolvedMarkVisibility(1, blastEnv, wipeYGlobal, t);
+    setResolvedMarkVisibility(1, blastEnv * .24, wipeYGlobal, t);
   } else {
     setResolvedMarkVisibility(0, 0, WIPE_Y_FULLY_HIDDEN, t);
   }
@@ -5707,7 +5188,14 @@ function shiftConveyor(dir){
   if (outgoingEl){
     outgoingEl.style.setProperty("--exit-x", (dir > 0 ? "24px" : "-24px"));
     outgoingEl.classList.add("nav-item-exiting");
-    setTimeout(function(){ if (outgoingEl.parentNode) outgoingEl.remove(); }, 320);
+    // [stale-bounds fix] navItems was queried synchronously above, while the outgoing element is
+    // still physically in the DOM (removal is deferred so the exit transition can play) -- it
+    // stays that way, uncorrected, until the NEXT render/shift happens to re-query it. A drag
+    // that starts in the meantime would compute its bounds off a detached node (offsetLeft/Width
+    // both read 0 once removed), corrupting the very first/last edge the overshoot math depends
+    // on. Re-querying here, once the element actually leaves the DOM, keeps navItems honest at
+    // all times, not just immediately after a render.
+    setTimeout(function(){ if (outgoingEl.parentNode) outgoingEl.remove(); refreshNavItemRefs(); }, 320);
   }
   var incomingEl = document.createElement("button");
   incomingEl.className = "nav-item nav-item-entering"; incomingEl.type = "button";
@@ -5727,6 +5215,11 @@ nav.addEventListener('pointerdown',function(e){
   if (!button || navDrag || !e.isPrimary || e.button!==0) return;
   cancelAnimationFrame(pillRAF);
   navPill.classList.remove('is-releasing');
+  // [stale-bounds fix] belt-and-suspenders -- re-query right before building this gesture's
+  // bounds, rather than trusting that whatever last touched navItems (a render, a shift, its
+  // deferred cleanup) has already run by now. Cheap, and makes correctness here not depend on
+  // timing assumptions elsewhere.
+  refreshNavItemRefs();
   var rect=nav.getBoundingClientRect();
   navDrag={id:e.pointerId,target:button,x:e.clientX-rect.left,rect:rect,raf:0,lastX:e.clientX-rect.left,lastT:performance.now(),
     bounds:navItems.map(function(el){return {el:el,left:el.offsetLeft,width:el.offsetWidth};})};
@@ -5734,16 +5227,14 @@ nav.addEventListener('pointerdown',function(e){
   navDrag.holdTimer=setTimeout(function(){if(navDrag) nav.classList.add('is-holding');},160);
   button.setAttribute('data-preview','');
 });
-nav.addEventListener('pointermove',function(e){
-  if(!navDrag || e.pointerId!==navDrag.id) return;
-  var drag=navDrag;
-  drag.x=e.clientX-drag.rect.left;
-  nav.classList.add('is-holding');
-  if(drag.raf) return;
-  drag.raf=requestAnimationFrame(function(){
-    if(navDrag!==drag) return;
-    drag.raf=0;
-
+// [race-condition fix] this used to live only inside pointermove's rAF callback. Since that
+// callback is throttled to one per frame (`if(drag.raf) return;`), a fast drag ending in a
+// pointerup could fire BEFORE the final queued move's rAF ever ran -- pointerup used to just
+// pick the nearest item from the stale pre-shift bounds directly, silently skipping the
+// conveyor commit entirely on exactly the drags most likely to be flicked. Now it's a named
+// function so pointerup can run it synchronously on the final coordinate before deciding
+// anything, guaranteeing the last frame of motion is never dropped.
+function processNavDragStep(drag){
     var now=performance.now(),velocity=(drag.x-drag.lastX)/Math.max(8,now-drag.lastT);
     var firstB=drag.bounds[0], lastB=drag.bounds[drag.bounds.length-1];
     var canConveyor = mobileNavQuery.matches && NAV_ITEMS.length > navSlotCount();
@@ -5752,17 +5243,23 @@ nav.addEventListener('pointermove',function(e){
     // leftward drag; +1 = pushed past the right edge, a rightward drag) -- used for the
     // resistance stretch below, which should visually pull toward whichever edge is being
     // pushed against. The CONVEYOR's advance/retreat direction is the opposite of this: per
-    // spec, dragging LEFT (overshooting the left edge) is what ADVANCES the queue (reveals the
-    // next item, oldest-visible exits) -- so shiftConveyor is called with -dir below, not dir.
+    // [direction fix, confirmed against real-device feel] overshooting the RIGHT edge (a
+    // rightward drag, dir=+1) is what ADVANCES the queue (reveals the next item, oldest-visible
+    // exits toward the menu) -- the opposite mapping read as backwards in hand, even though it
+    // matched a literal "drag left" reading of the spec. shiftConveyor is now called with dir
+    // directly, not -dir.
     if (drag.x < firstB.left){ overshoot=firstB.left-drag.x; dir=-1; }
     else if (drag.x > lastB.left+lastB.width){ overshoot=drag.x-(lastB.left+lastB.width); dir=1; }
 
     if (canConveyor && overshoot>0){
-      // logical advance (reveal next item) happens on a LEFT overshoot (dir===-1) per spec, so
-      // the availability check and the shiftConveyor call both use -dir, not dir.
-      var canShift = dir<0 ? (navVisibleStart+navSlotCount()<NAV_ITEMS.length) : (navVisibleStart>0);
+      var canShift = dir>0 ? (navVisibleStart+navSlotCount()<NAV_ITEMS.length) : (navVisibleStart>0);
       var flick = Math.abs(velocity) > NAV_OVERSHOOT_FLICK;
-      if (canShift && (overshoot>NAV_OVERSHOOT_TRIGGER || (flick && overshoot>8)) && shiftConveyor(-dir)){
+      if (canShift && (overshoot>NAV_OVERSHOOT_TRIGGER || (flick && overshoot>8)) && shiftConveyor(dir)){
+        // [reveal, don't navigate] a conveyor shift only ever means "bring this item into the
+        // bar" -- it's not the same gesture as tapping/selecting a section, so releasing right
+        // after a shift must not also switchSection() to whatever item the pointer happens to
+        // be nearest now. Marked here and checked in pointerup below.
+        drag.shifted = true;
         // committed -- rebuild bounds against the freshly rendered items (excluding the one
         // still mid-exit, which is about to detach and shouldn't count as a real boundary) and
         // re-base the drag's own rect so the in-progress gesture continues without a jump.
@@ -5773,10 +5270,13 @@ nav.addEventListener('pointermove',function(e){
       } else {
         // resistance -- extra elastic stretch beyond the normal drag cap, pill pinned at the
         // edge, no shift yet (snaps back on release via the existing endNavDrag/movePill path).
-        var pull=Math.min(1,overshoot/60);
+        // [smoother liquid] sqrt-eased rather than linear -- stretch grows fast at first touch
+        // then tapers as you keep pulling, reading as genuine rubber-band resistance instead of
+        // a constant-rate ramp.
+        var pull=Math.sqrt(Math.min(1,overshoot/60));
         pillW = dir>0? lastB.width : firstB.width;
         pillX = dir>0? (lastB.left+lastB.width-pillW) : firstB.left;
-        var rStretch=reducedMotion?1:1.28+pull*0.5;
+        var rStretch=reducedMotion?1:1.22+pull*0.62;
         var rSqueeze=1/Math.pow(rStretch,.48);
         navPill.style.width=pillW+'px';
         navPill.style.borderRadius=reducedMotion?'999px':dir>0?'62% 38% 38% 62% / 48% 55% 45% 52%':'38% 62% 62% 38% / 55% 48% 52% 45%';
@@ -5801,14 +5301,34 @@ nav.addEventListener('pointermove',function(e){
     navPill.style.borderRadius=reducedMotion?'999px':velocity>=0?'62% 38% 38% 62% / 48% 55% 45% 52%':'38% 62% 62% 38% / 55% 48% 52% 45%';
     navPill.style.setProperty('--liquid-light',velocity>=0?'72%':'28%');
     navPill.style.transform='translateX('+pillX+'px) scale('+stretch+','+squeeze+')';
+}
+nav.addEventListener('pointermove',function(e){
+  if(!navDrag || e.pointerId!==navDrag.id) return;
+  var drag=navDrag;
+  drag.x=e.clientX-drag.rect.left;
+  nav.classList.add('is-holding');
+  if(drag.raf) return;
+  drag.raf=requestAnimationFrame(function(){
+    if(navDrag!==drag) return;
+    drag.raf=0;
+    processNavDragStep(drag);
   });
 });
 nav.addEventListener('pointerup',function(e){
   if(navDrag && e.pointerId===navDrag.id){
-    // Resolve the final event directly, even when it arrives before a paint.
-    var x=e.clientX-navDrag.rect.left;
-    navDrag.target=navDrag.bounds.reduce(function(a,b){return Math.abs(x-b.left-b.width/2)<Math.abs(x-a.left-a.width/2)?b:a;}).el;
-    endNavDrag(true);
+    // Resolve the final event directly, even when it arrives before a paint -- cancel any
+    // still-pending rAF from the last move (it would otherwise run a frame late, after
+    // endNavDrag has already torn navDrag down) and process this exact final coordinate
+    // synchronously so a conveyor commit on the very last pixel of motion is never missed.
+    var drag=navDrag;
+    cancelAnimationFrame(drag.raf); drag.raf=0;
+    drag.x=e.clientX-drag.rect.left;
+    processNavDragStep(drag);
+    // [reveal, don't navigate] if this gesture ever triggered a conveyor shift, releasing just
+    // leaves the freshly-revealed item sitting in the bar -- it does NOT also switchSection() to
+    // it. Only a plain (no-shift) drag still commits like the original press-and-slide-to-select
+    // gesture always has.
+    endNavDrag(!drag.shifted);
   }
 });
 nav.addEventListener('pointercancel',function(){endNavDrag(false);});
@@ -5866,7 +5386,7 @@ function switchSection(name){
     }
     // [about page] poster-wall intro, replayed fresh every time About becomes active -- same
     // restart pattern as the contact card above (remove class, force reflow, re-add).
-    if (name === "about") playAboutIntro();
+    if (name === "about") window.playAboutIntro();
   }, outMs);
 }
 
@@ -6492,247 +6012,45 @@ function sendMessage(text){
 </script>
 
 <style>
-/* ============================================================ PANDA MASCOT (perched on the
-   existing assistant-launcher bubble; purely decorative, pointer-events:none so the bubble
-   underneath stays the entire clickable surface) ================================================ */
-:root{
-  --panda-ease:cubic-bezier(.45,0,.15,1);       /* organic accelerate/decelerate, not linear */
-  --panda-bounce:cubic-bezier(.34,1.5,.64,1);   /* slight overshoot -- reads as alive, not mechanical */
-}
-#panda-mascot{
-  position:fixed; z-index:71; right:24px; bottom:58px; width:64px; height:64px;
-  pointer-events:none; transform-box:fill-box;
-  filter:drop-shadow(0 3px 5px rgba(0,0,0,0.4)) drop-shadow(0 0 10px rgba(255,148,56,0));
-  transition:filter .3s ease;
-}
-#panda-mascot svg{ display:block; width:100%; height:100%; overflow:visible; }
-/* identity cue (D.5): a soft, always-on pulsing glow ring behind the bubble+panda group, so the
-   character reads as "the chat assistant" no matter which idle behavior is currently playing --
-   independent of data-state, never toggled off by it. (An earlier version also added a small
-   circular badge icon here, but it visually read as a second/duplicate chat bubble next to the
-   real one, so it's been removed -- the glow alone is the identity cue.) */
-.panda-glow{
-  position:fixed; z-index:70; right:24px; bottom:36px; width:64px; height:64px;
-  border-radius:50%; pointer-events:none;
-  background:radial-gradient(circle, rgba(255,148,56,0.32), rgba(255,148,56,0) 70%);
-  animation:pandaGlowPulse 3.2s ease-in-out infinite;
-}
-@keyframes pandaGlowPulse{ 0%,100%{ opacity:.55; transform:scale(0.92); } 50%{ opacity:1; transform:scale(1.08); } }
-#panda-mascot .p-critter{
-  transform-box:fill-box; transform-origin:50% 90%;
-  animation:pandaBreathe 3.8s var(--panda-ease) infinite, pandaIdleSway 5.4s var(--panda-ease) infinite;
-}
-#panda-mascot .p-eye{ transform-box:fill-box; transform-origin:50% 50%; animation:pandaBlink 4.6s ease-in-out infinite; }
-#panda-mascot .p-eye-r{ animation-delay:.04s; }
-#panda-mascot .p-ear{ transform-box:fill-box; transform-origin:50% 85%; animation:pandaEarTwitch 7s ease-in-out infinite; }
-#panda-mascot .p-ear-r{ animation-delay:3.4s; }
-#panda-mascot .p-arm{ transform-box:fill-box; transform-origin:50% 12%; animation:pandaArmIdle 5.2s var(--panda-ease) infinite; }
-#panda-mascot .p-arm-r{ animation-delay:.5s; }
-#panda-mascot .p-mouth-smile{ opacity:0; }
-#panda-mascot .p-mouth-line{ transform-box:fill-box; transform-origin:50% 50%; }
-
-@keyframes pandaBreathe{ 0%,100%{ transform:scaleY(1); } 25%{ transform:scaleY(0.994); } 50%{ transform:scaleY(0.982); } 75%{ transform:scaleY(0.994); } }
-@keyframes pandaIdleSway{ 0%,100%{ transform:rotate(0deg) translateX(0); } 50%{ transform:rotate(-1.3deg) translateX(-0.6px); } }
-@keyframes pandaBlink{ 0%,88%,100%{ transform:scaleY(1); } 92%{ transform:scaleY(0.12); } 96%{ transform:scaleY(1); } }
-@keyframes pandaEarTwitch{ 0%,92%,100%{ transform:rotate(0deg); } 95%{ transform:rotate(-6deg); } }
-@keyframes pandaArmIdle{ 0%,100%{ transform:rotate(0deg); } 50%{ transform:rotate(4deg); } }
-
-/* happy: soft sway, paws drawn together, gentle smile -- eased with a touch of overshoot so the
-   paws-together motion reads as a deliberate, bouncy gesture rather than a metronome tick */
-#panda-mascot[data-state="happy"] .p-critter{ animation:pandaBreathe 3.8s var(--panda-ease) infinite, pandaHappySway 2.8s var(--panda-ease) infinite; }
-#panda-mascot[data-state="happy"] .p-arm-l{ animation:pandaHappyArmL 2.8s var(--panda-bounce) infinite; }
-#panda-mascot[data-state="happy"] .p-arm-r{ animation:pandaHappyArmR 2.8s var(--panda-bounce) infinite; }
-#panda-mascot[data-state="happy"] .p-mouth-smile{ opacity:1; }
-#panda-mascot[data-state="happy"] .p-mouth-line{ opacity:0; }
-@keyframes pandaHappySway{ 0%,100%{ transform:rotate(0deg); } 30%{ transform:rotate(-1deg); } 50%{ transform:rotate(-2.8deg); } 70%{ transform:rotate(-1deg); } }
-@keyframes pandaHappyArmL{ 0%,100%{ transform:rotate(0deg); } 45%{ transform:rotate(40deg); } 55%{ transform:rotate(38deg); } }
-@keyframes pandaHappyArmR{ 0%,100%{ transform:rotate(0deg); } 45%{ transform:rotate(-40deg); } 55%{ transform:rotate(-38deg); } }
-
-/* sleepy: slow head nod, still arms, occasional yawn stretch on the mouth */
-#panda-mascot[data-state="sleepy"] .p-head{ animation:pandaSleepyNod 4.6s var(--panda-ease) infinite; }
-#panda-mascot[data-state="sleepy"] .p-eye{ animation:pandaSleepyBlink 4.6s ease-in-out infinite; }
-#panda-mascot[data-state="sleepy"] .p-mouth-line{ animation:pandaYawn 8s ease-in-out infinite; }
-#panda-mascot[data-state="sleepy"] .p-arm{ animation:none; transform:rotate(2deg); }
-@keyframes pandaSleepyNod{ 0%,100%{ transform:rotate(0deg) translateY(0); } 40%{ transform:rotate(5deg) translateY(1px); } 55%{ transform:rotate(7deg) translateY(2px); } 80%{ transform:rotate(3deg) translateY(1px); } }
-@keyframes pandaSleepyBlink{ 0%,70%,100%{ transform:scaleY(1); } 85%{ transform:scaleY(0.15); } 92%{ transform:scaleY(0.15); } }
-@keyframes pandaYawn{ 0%,78%,100%{ transform:scaleY(1); } 85%{ transform:scaleY(3.4); } 92%{ transform:scaleY(3.4); } 96%{ transform:scaleY(1); } }
-
-/* eating (midday only): a paw brings something up to the mouth, chewing motion */
-#panda-mascot[data-state="eating"] .p-arm-r{ animation:pandaEatArm 1.6s var(--panda-ease) infinite; }
-#panda-mascot[data-state="eating"] .p-mouth-line{ animation:pandaChew 0.9s ease-in-out infinite; }
-#panda-mascot[data-state="eating"] .p-head{ animation:pandaEatNod 1.6s ease-in-out infinite; }
-@keyframes pandaEatArm{ 0%,100%{ transform:rotate(0deg) translateY(0); } 40%{ transform:rotate(-58deg) translateY(-3px); } 65%{ transform:rotate(-58deg) translateY(-3px); } }
-@keyframes pandaChew{ 0%,100%{ transform:scaleY(1); } 50%{ transform:scaleY(0.35); } }
-@keyframes pandaEatNod{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(1.5px); } }
-
-/* presence/attention cue (D.6): a short, subtle bounce + glow flash, triggered from JS at three
-   moments -- right after the hero reveal, after a period of inactivity, and after the visitor
-   finishes browsing a piece of content (the lightbox closing) -- never a fixed idle behavior. */
-#panda-mascot.panda-attn{ animation:pandaAttnBounce 1.1s var(--panda-bounce); }
-.panda-glow.panda-attn{ animation:pandaGlowPulse 3.2s ease-in-out infinite, pandaAttnGlow 1.6s ease-out; }
-@keyframes pandaAttnBounce{ 0%{ transform:translateY(0); } 30%{ transform:translateY(-9px); } 55%{ transform:translateY(0); } 75%{ transform:translateY(-3px); } 100%{ transform:translateY(0); } }
-@keyframes pandaAttnGlow{ 0%{ box-shadow:0 0 0 0 rgba(255,148,56,0); } 30%{ box-shadow:0 0 0 10px rgba(255,148,56,0.22); } 100%{ box-shadow:0 0 0 22px rgba(255,148,56,0); } }
-
-@media (prefers-reduced-motion: reduce){
-  #panda-mascot *{ animation:none !important; }
-  #panda-mascot.panda-attn, .panda-glow.panda-attn{ animation:none !important; }
-  .panda-glow{ animation:none !important; opacity:.7; }
-}
-@media (max-width:600px){
-  /* scaled to match the enlarged mobile chat bubble (62px, up from 56px) above, so the panda
-     stays proportionally perched rather than shrinking relative to a now-bigger bubble.
-     [sync fix] the bubble's mobile bottom offset is max(16px, env(safe-area-inset-bottom)) --
-     on a phone with a home-indicator safe area, that pushes the bubble UP. The panda/glow here
-     must add the same safe-area term or they stay put while the bubble moves, breaking the
-     "perched on top" alignment on exactly those devices. */
-  #panda-mascot{ right:18px; bottom:calc(max(16px, env(safe-area-inset-bottom)) + 34px); width:58px; height:58px; }
-  .panda-glow{ right:18px; bottom:calc(max(16px, env(safe-area-inset-bottom)) + 12px); width:58px; height:58px; }
-}
-
-.panda-bubble{
-  position:fixed; z-index:71; right:26px; bottom:128px;
-  max-width:210px; padding:10px 13px; border-radius:14px 14px 4px 14px;
-  background:var(--glass-bg-heavy); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
-  border:var(--glass-border); box-shadow:var(--glass-highlight), var(--glass-shadow);
-  color:var(--ink); font-size:12.5px; line-height:1.4;
-  opacity:0; transform:translateY(6px) scale(0.94); pointer-events:none;
-  transition:opacity .4s ease, transform .4s ease;
-}
-.panda-bubble.show{ opacity:1; transform:translateY(0) scale(1); }
-@media (max-width:600px){
-  .panda-bubble{ right:14px; bottom:118px; max-width:180px; }
-}
+:root{--panda-ease:cubic-bezier(.45,0,.15,1);--panda-bounce:cubic-bezier(.22,.8,.28,1);}
+#panda-mascot{position:absolute;left:50%;bottom:26px;width:104px;height:112px;transform:translateX(-50%);pointer-events:none;opacity:0;transition:opacity .35s ease;}
+#panda-mascot.is-ready{opacity:1;}
+#panda-mascot canvas{display:block;width:100%;height:100%;}
+.assistant-launcher{isolation:isolate;overflow:visible;}
+.assistant-launcher::after{content:"";position:absolute;inset:1px;border-radius:inherit;background:linear-gradient(135deg,#fff2,transparent 48%,#dec5b50b);pointer-events:none;opacity:.4;transition:opacity .25s ease,transform .4s var(--ease-standard);}
+.assistant-launcher:hover::after,.assistant-launcher:focus-visible::after{opacity:.85;transform:scale(.97,1.02);}
+.panda-bubble{position:absolute;right:0;bottom:142px;width:max-content;max-width:min(210px,calc(100vw - 48px));padding:10px 13px;border-radius:14px 14px 4px 14px;background:var(--glass-bg-heavy);border:var(--glass-border);box-shadow:var(--glass-highlight),var(--glass-shadow);color:var(--ink);font:400 12px/1.5 Manrope,sans-serif;opacity:0;transform:translateY(4px);pointer-events:none;transition:opacity .3s ease,transform .3s ease;}
+.panda-bubble.show{opacity:1;transform:translateY(0);}
+@media(max-width:600px){#panda-mascot{width:96px;height:104px;bottom:30px;}.panda-bubble{bottom:138px;}}
+@media(prefers-reduced-motion:reduce){#panda-mascot,.panda-bubble,.assistant-launcher::after{transition:none;}}
 </style>
-
-<div class="panda-glow" id="panda-glow" aria-hidden="true"></div>
-<div id="panda-mascot" aria-hidden="true">
-  <svg viewBox="0 0 100 100">
-    <defs>
-      <radialGradient id="pandaFur" cx="42%" cy="35%" r="75%">
-        <stop offset="0%" stop-color="#ffffff"/>
-        <stop offset="100%" stop-color="#e9e4da"/>
-      </radialGradient>
-      <radialGradient id="pandaDark" cx="38%" cy="30%" r="80%">
-        <stop offset="0%" stop-color="#3a3530"/>
-        <stop offset="100%" stop-color="#161311"/>
-      </radialGradient>
-    </defs>
-    <g class="p-critter">
-      <ellipse class="p-foot" cx="38" cy="90" rx="7" ry="4" fill="url(#pandaDark)"/>
-      <ellipse class="p-foot" cx="62" cy="90" rx="7" ry="4" fill="url(#pandaDark)"/>
-      <ellipse class="p-body" cx="50" cy="72" rx="26" ry="22" fill="url(#pandaFur)"/>
-      <ellipse class="p-arm p-arm-l" cx="26" cy="68" rx="8.5" ry="13" fill="url(#pandaDark)"/>
-      <ellipse class="p-arm p-arm-r" cx="74" cy="68" rx="8.5" ry="13" fill="url(#pandaDark)"/>
-      <g class="p-head">
-        <circle class="p-ear p-ear-l" cx="30" cy="18" r="9" fill="url(#pandaDark)"/>
-        <circle class="p-ear p-ear-r" cx="70" cy="18" r="9" fill="url(#pandaDark)"/>
-        <circle cx="50" cy="38" r="24" fill="url(#pandaFur)"/>
-        <ellipse class="p-cheek" cx="32" cy="44" rx="5" ry="3.2" fill="#ffb199" opacity="0.35"/>
-        <ellipse class="p-cheek" cx="68" cy="44" rx="5" ry="3.2" fill="#ffb199" opacity="0.35"/>
-        <ellipse cx="38" cy="35" rx="8" ry="10" fill="url(#pandaDark)" transform="rotate(-14 38 35)"/>
-        <ellipse cx="62" cy="35" rx="8" ry="10" fill="url(#pandaDark)" transform="rotate(14 62 35)"/>
-        <circle class="p-eye p-eye-l" cx="38" cy="37" r="3.1" fill="#fff"/>
-        <circle class="p-eye p-eye-r" cx="62" cy="37" r="3.1" fill="#fff"/>
-        <circle cx="38" cy="37.6" r="1.5" fill="#161311"/>
-        <circle cx="62" cy="37.6" r="1.5" fill="#161311"/>
-        <ellipse cx="50" cy="47" rx="3" ry="2" fill="#161311"/>
-        <rect class="p-mouth-line" x="45" y="52" width="10" height="2.4" rx="1.2" fill="#161311"/>
-        <path class="p-mouth-smile" d="M43,52 Q50,58 57,52" stroke="#161311" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-      </g>
-    </g>
-  </svg>
-</div>
-<div class="panda-bubble" id="panda-bubble">Hi, I'm Panda — ask me anything about the work!</div>
-<script>
-(function(){
-"use strict";
-var mascot = document.getElementById("panda-mascot");
-var bubble = document.getElementById("panda-bubble");
-var glow = document.getElementById("panda-glow");
-if (!mascot) return;
-var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-// [randomized idle loop] cycles the panda's data-state -- CSS ([data-state="..."] rules above)
-// owns all actual motion; this just decides which behavior is showing and for how long, so
-// repeat visits/reloads don't see the same pattern. "eating" only ever enters the pool during
-// local midday hours, per the visitor's own system clock.
-var STATES = ["happy", "sleepy", "eating"];
-function eligibleStates(){
-  var hour = new Date().getHours();
-  var midday = hour >= 11 && hour < 15;
-  return midday ? STATES : STATES.filter(function(s){ return s !== "eating"; });
+<script type="module">
+// Load after the initial document is interactive; the chat icon is the lightweight fallback.
+const launcher=document.getElementById('assistant-launcher');
+const mascot=document.createElement('span');mascot.id='panda-mascot';mascot.setAttribute('aria-hidden','true');launcher.append(mascot);
+const welcome=document.createElement('span');welcome.className='panda-bubble';welcome.setAttribute('aria-hidden','true');welcome.textContent="Hi, I'm Panda. Ask me about the work.";launcher.append(welcome);
+let disposePanda=null,pending=false,generation=0,welcomeTimer=0,idleHandle=0;
+async function startPanda(){
+  if(pending||disposePanda)return;pending=true;const current=++generation;
+  try{const {mountPanda}=await import('./dist/assets/panda.js');
+    if(current!==generation)return;
+    const dispose=await mountPanda(mascot,launcher);
+    if(current!==generation)dispose();else disposePanda=dispose;
+  }catch{mascot.classList.remove('is-ready');}finally{if(current===generation)pending=false;}
 }
-var currentState = null;
-function cycle(){
-  var pool = eligibleStates();
-  if (pool.length > 1) pool = pool.filter(function(s){ return s !== currentState; });
-  currentState = pool[Math.floor(Math.random() * pool.length)];
-  mascot.setAttribute("data-state", currentState);
-  var dwell = 6000 + Math.random() * 8000; // 6-14s, randomized so timing/order varies per load
-  setTimeout(cycle, dwell);
-}
-if (reducedMotion){
-  mascot.setAttribute("data-state", "happy");
-} else {
-  cycle();
-}
-
-// [one-time welcome bubble] shown once per tab session, right after the hero intro finishes.
+function schedulePanda(){if('requestIdleCallback' in window)idleHandle=requestIdleCallback(startPanda,{timeout:1800});else idleHandle=setTimeout(startPanda,400);}
+function hideWelcome(){clearTimeout(welcomeTimer);welcome.classList.remove('show');}
 function showWelcome(){
-  if (!bubble) return;
-  try {
-    if (sessionStorage.getItem("pandaWelcomeShown")) return;
-    sessionStorage.setItem("pandaWelcomeShown", "1");
-  } catch (err) { /* storage unavailable (private mode etc.) -- show it once for this load anyway */ }
-  requestAnimationFrame(function(){ bubble.classList.add("show"); });
-  setTimeout(function(){ bubble.classList.remove("show"); }, 5200);
+  if(document.hidden||launcher.getAttribute('aria-expanded')==='true')return;
+  try{if(sessionStorage.getItem('pandaWelcomeShown'))return;sessionStorage.setItem('pandaWelcomeShown','1');}catch{}
+  welcome.classList.add('show');welcomeTimer=setTimeout(hideWelcome,5200);
 }
-
-// [presence/attention cues, D.6] a short, subtle bounce + glow flash -- never a popup, just
-// pulls the eye toward the bubble for ~1.6s then settles back into the normal idle loop.
-var attnTimer = null;
-function triggerAttention(){
-  if (reducedMotion) return;
-  mascot.classList.remove("panda-attn"); if (glow) glow.classList.remove("panda-attn");
-  void mascot.offsetWidth; // restart the animation even if it's still mid-flight from a previous cue
-  mascot.classList.add("panda-attn"); if (glow) glow.classList.add("panda-attn");
-  clearTimeout(attnTimer);
-  attnTimer = setTimeout(function(){
-    mascot.classList.remove("panda-attn"); if (glow) glow.classList.remove("panda-attn");
-  }, 1700);
-}
-// 1) right after the hero reveal finishes, to draw first-time attention to the bubble
-window.addEventListener("ka-sequence-complete", function(){
-  setTimeout(showWelcome, 500);
-  setTimeout(triggerAttention, 350);
-}, { once:true });
-
-// 2) after a period of user inactivity (no scroll/click/pointer movement/key press)
-var INACTIVITY_MIN = 20000, INACTIVITY_MAX = 30000;
-var inactivityTimer = null;
-function armInactivityTimer(){
-  clearTimeout(inactivityTimer);
-  var delay = INACTIVITY_MIN + Math.random() * (INACTIVITY_MAX - INACTIVITY_MIN);
-  inactivityTimer = setTimeout(function(){ triggerAttention(); armInactivityTimer(); }, delay);
-}
-["scroll","click","mousemove","keydown","touchstart"].forEach(function(evt){
-  window.addEventListener(evt, armInactivityTimer, { passive:true });
-});
-armInactivityTimer();
-
-// 3) after the visitor finishes browsing a piece of content -- this site has no search feature,
-// so the closest equivalent "completed browsing" moment is the poster lightbox closing (it
-// dropping the "open" class) after they viewed a piece full-size.
-var lightboxEl = document.getElementById("lightbox");
-if (lightboxEl){
-  var wasOpen = lightboxEl.classList.contains("open");
-  new MutationObserver(function(){
-    var isOpen = lightboxEl.classList.contains("open");
-    if (wasOpen && !isOpen) setTimeout(triggerAttention, 300);
-    wasOpen = isOpen;
-  }).observe(lightboxEl, { attributes:true, attributeFilter:["class"] });
-}
-})();
+window.addEventListener('ka-sequence-complete',showWelcome,{once:true});
+launcher.addEventListener('click',hideWelcome);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)hideWelcome();});
+window.addEventListener('pagehide',()=>{generation++;pending=false;disposePanda?.();disposePanda=null;hideWelcome();if('cancelIdleCallback' in window)cancelIdleCallback(idleHandle);else clearTimeout(idleHandle);});
+window.addEventListener('pageshow',event=>{if(event.persisted)schedulePanda();});
+schedulePanda();
 </script>
 
 <style>
@@ -6859,7 +6177,7 @@ function updateCursor(now){
     shadowGradient.addColorStop(0.4, "rgba(10,7,5,"+(0.18*headLife)+")");
     shadowGradient.addColorStop(1, "rgba(10,7,5,"+(0.5*headLife)+")");
     tctx.strokeStyle = shadowGradient;
-    tctx.lineWidth = 3 + headLife*3.25; // [35% smaller] was 4.6 + headLife*5
+    tctx.lineWidth = 2.1 + headLife*2.28; // [35% then 30% smaller] was 4.6 + headLife*5
     smoothTrailPath(tctx, trailPoints);
     tctx.stroke();
     var gradient = tctx.createLinearGradient(tail.x, tail.y, head.x, head.y);
@@ -6870,10 +6188,10 @@ function updateCursor(now){
     // smoothed path, just two stroke weights, so the line reads as one soft elastic ribbon
     // rather than a hard wire, still with no seams since each pass is one continuous stroke().
     tctx.strokeStyle = gradient;
-    tctx.lineWidth = 2.1 + headLife*2.6; // [35% smaller] was 3.2 + headLife*4
+    tctx.lineWidth = 1.47 + headLife*1.82; // [35% then 30% smaller] was 3.2 + headLife*4
     smoothTrailPath(tctx, trailPoints);
     tctx.stroke();
-    tctx.lineWidth = 0.85 + headLife*1.43; // [35% smaller] was 1.3 + headLife*2.2
+    tctx.lineWidth = 0.6 + headLife*1.0; // [35% then 30% smaller] was 1.3 + headLife*2.2
     smoothTrailPath(tctx, trailPoints);
     tctx.stroke();
   }
@@ -6893,8 +6211,14 @@ window.addEventListener("pointermove",function(event){
   // [trail scope fix] this used to also match any <canvas>, which silently disabled the trail
   // over the full-viewport WebGL hero canvas (#stage) -- the single biggest area of the page --
   // leaving it visible only over plain DOM sections. Real interactive controls (buttons/links/
-  // form fields) still hide it so it never obscures something clickable.
-  var interactive=event.composedPath().some(function(el){return el.matches && el.matches("button,a,input,textarea,select,[role='button']");});
+  // form fields) still hide it so it never obscures something clickable -- except the nav bar,
+  // which hides it as a whole block (the gaps between its buttons aren't covered by the button
+  // hitbox, so a per-element check let the trail smear behind the pill), and the chat launcher,
+  // which explicitly wants the trail to keep drawing under/around it.
+  var path=event.composedPath();
+  var overNav=path.some(function(el){return el.closest && el.closest("#site-nav");});
+  if(overNav){stopCursorLoop();return;}
+  var interactive=path.some(function(el){return el.matches && el.id!=="assistant-launcher" && el.matches("button,a,input,textarea,select,[role='button']");});
   if(interactive){stopCursorLoop();return;}
   rawX=event.clientX; rawY=event.clientY; rawTime=performance.now(); havePointer=true;
   startCursorLoop();
@@ -6932,11 +6256,12 @@ for (var i = 0; i < EMBER_COUNT; i++){
   embers.push(e);
 }
 
-var emberLoopActive = false;
+var emberLoopActive = false, emberFrame = 0;
 var lastEmberT = performance.now();
 function updateEmbers(now){
-  if (reducedMotion){ emberLoopActive = false; return; }
-  requestAnimationFrame(updateEmbers);
+  emberFrame=0;
+  if (reducedMotion || document.hidden){ emberLoopActive = false; return; }
+  emberFrame=requestAnimationFrame(updateEmbers);
   var dt = now - lastEmberT; lastEmberT = now;
   embers.forEach(function(e){
     e.life += dt;
@@ -6949,15 +6274,18 @@ function updateEmbers(now){
   });
 }
 function startEmberLoop(){
-  if (emberLoopActive) return;
+  if (emberLoopActive || reducedMotion || document.hidden) return;
   emberLoopActive = true;
   lastEmberT = performance.now();
-  requestAnimationFrame(updateEmbers);
+  emberFrame=requestAnimationFrame(updateEmbers);
 }
 function stopEmberLoop(){
+  cancelAnimationFrame(emberFrame);emberFrame=0;emberLoopActive=false;
   embers.forEach(function(e){ e.el.style.opacity = "0"; });
 }
 
+document.addEventListener('visibilitychange',function(){if(document.hidden)stopEmberLoop();else startEmberLoop();});
+window.addEventListener('pagehide',function(){stopCursorLoop();stopEmberLoop();});
 if (!reducedMotion){ startCursorLoop(); startEmberLoop(); }
 
 window.matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change", function(e){
@@ -6993,7 +6321,7 @@ window.matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change",
 .cf-card{box-shadow:0 24px 64px #0008,0 2px 6px #0005;}
 .filmstrip button{padding:3px;background:#ffffff04;transition:background .2s ease,border-color .2s ease;}
 .filmstrip button.active{background:#ffe5c818;border-color:#ffe5c880;}
-.assistant-panel{border-radius:26px;background:linear-gradient(145deg,#252029ed,#100f16f2);box-shadow:inset 0 1px #ffffff26,0 28px 90px #0009;border-color:#fff3;min-height:min(450px,calc(100svh - 130px));}
+.assistant-panel{border-radius:26px;background:var(--glass-bg-heavy);box-shadow:var(--glass-highlight),0 22px 54px #0007;border-color:#fff3;min-height:min(450px,calc(100svh - 130px));}
 .assistant-head{padding:21px 22px 18px;align-items:flex-start;background:radial-gradient(ellipse at 0 0,#e9b79615,transparent 75%);}
 .assistant-head h3{font-size:16px;letter-spacing:-.02em;}
 .assistant-head p{font-size:12px;line-height:1.55;margin-top:5px;max-width:245px;color:#c5bcc7;}
@@ -7032,5 +6360,21 @@ window.matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change",
 @media(max-width:600px){#folder-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}#folder-grid .folder-card{min-height:235px;padding:14px 4px}#folder-grid .collection-cover{width:124px;height:155px}#folder-grid .folder-label h3{font-size:12px}}
 @media(max-width:600px){.assistant-panel{width:calc(100vw - 24px);right:12px;bottom:84px;max-height:calc(100svh - 110px);}.skill-label{font-size:10.5px;letter-spacing:.02em;}}
 @media(prefers-reduced-motion:reduce){.nav-pill.is-releasing::before{animation:none;}.folder-card::before,.folder-card::after,.cf-controls button{transition:none;}.assistant-typing span,.assistant-msg.bot .cursor{animation:none;}}
+
+/* Glass depth comes from static surface lighting; interaction changes only opacity/transform. */
+.assistant-panel,.assistant-panel.open,.assistant-panel.closing{filter:none;}
+.assistant-panel.open{transition:opacity .3s ease,transform .4s var(--ease-standard);}
+.assistant-panel.closing{transition:opacity .2s ease,transform .25s ease;transform:scale(.97);}
+body:has(.assistant-panel.open) #site-nav,body:has(.assistant-panel.open) .site-section{filter:none;}
+.assistant-panel{z-index:72;}
+.assistant-close,.assistant-chip{min-height:44px;}
+.assistant-close{min-width:44px;}
+.assistant-messages{overflow-wrap:anywhere;}
+.nav-pill{transition:border-radius .24s ease,opacity .25s ease;}
+@media(max-width:760px){:root{--glass-blur:blur(12px) saturate(125%);}}
+@media(max-width:600px){.assistant-panel{bottom:calc(max(16px,env(safe-area-inset-bottom)) + 74px);min-height:0;max-height:calc(100dvh - max(16px,env(safe-area-inset-bottom)) - max(12px,env(safe-area-inset-top)) - 86px);}}
+@media(max-height:500px){.assistant-panel{top:8px;bottom:8px;max-height:calc(100dvh - 16px);min-height:0;}.assistant-head{padding:12px 16px;}.assistant-chips{padding-bottom:8px;}}
+@media(prefers-reduced-motion:reduce){.assistant-panel,.assistant-panel.open,.assistant-panel.closing{transform:none;transition:opacity .15s ease;}}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){:root{--glass-bg:#211d24;--glass-bg-heavy:#17151d;}}
 
 </style>

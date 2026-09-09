@@ -7,9 +7,9 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node server/index.js",
-    "build": "tsc --noEmit && vite build && node --test tests/gallery-build.test.mjs",
+    "build": "tsc --noEmit && vite build && node --test tests/gallery-build.test.mjs tests/delivery.test.mjs && node generator/scripts/verify_startup.cjs",
     "frontend": "vite",
-    "test": "node --test tests/creator.test.mjs tests/folder.test.mjs tests/gallery.test.mjs tests/folder-shelf.test.mjs tests/poster.test.mjs"
+    "test": "node --test tests/creator.test.mjs tests/folder.test.mjs tests/gallery.test.mjs tests/folder-shelf.test.mjs tests/poster.test.mjs tests/panda.test.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",

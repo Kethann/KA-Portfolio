@@ -36,7 +36,10 @@ if(options.startServices !== false){
 // Explicit public paths keep inbox, credentials, source, and backups private.
 app.get(['/', '/index.html'],(req,res)=>res.sendFile(resolve(root,'index.html')));
 app.get('/crystal',(req,res)=>res.sendFile(resolve(root,'index.html')));
-app.use('/assets',express.static(resolve(root,'dist/assets'),{index:false,maxAge:'1y',immutable:true}));
+app.use('/assets',express.static(resolve(root,'dist/assets'),{index:false,maxAge:'1y',immutable:true,setHeaders(res,file){
+  // Entry URLs are stable; only content-hashed dependencies can be cached immutably.
+  if(/[/\\](gallery|poster|panda)\.js$/.test(file))res.setHeader('Cache-Control','no-cache');
+}}));
 app.use('/dist/assets',express.static(resolve(root,'dist/assets'),{index:false,maxAge:0}));
 app.get(['/creator','/creator/'],(req,res)=>{res.set('Cache-Control','no-store');res.sendFile(resolve(root,'public/creator.html'));});
 app.get(['/assets/creator.js','/assets/creator.css'],(req,res)=>res.sendFile(resolve(root,'public',req.path.split('/').pop())));

@@ -21,6 +21,7 @@ class Element{
   addEventListener(k,fn,capture=false){(this.events[k]??=[]).push({fn,capture});}removeEventListener(k,fn){this.events[k]=(this.events[k]||[]).filter(x=>x.fn!==fn);}
   emit(k,e={}){const event={target:this,isPrimary:true,button:0,pointerId:1,pointerType:'touch',clientX:0,clientY:0,detail:1,preventDefault(){this.prevented=true;},stopImmediatePropagation(){this.stopped=true;},...e};for(const {fn} of [...(this.events[k]||[])].sort((a,b)=>b.capture-a.capture)){fn(event);if(event.stopped)break;}return event;}
   closest(s){return s==='.nav-item'&&this.className==='nav-item'?this:this.parent?.closest(s);}
+  querySelectorAll(s){return s==='.nav-item'?this.children.filter(e=>e.className==='nav-item'):[];}
   getBoundingClientRect(){return {left:0,top:0,width:390,height:300};}
   setPointerCapture(id){this.capture=id;}hasPointerCapture(id){return this.capture===id;}releasePointerCapture(){this.capture=null;}
   focus(){this.focused=true;}scrollTo(options){this.scroll=options;}
@@ -30,15 +31,15 @@ const window=new Element();window.innerWidth=390;
 const nav=new Element(),pill=new Element();
 const items=['contact','portfolio','gallery'].map((name,i)=>{const e=new Element('button');e.className='nav-item';e.setAttribute('data-section',name);e.offsetLeft=6+i*100;nav.appendChild(e);return e;});
 const sections=Object.fromEntries(items.map(e=>{const name=e.getAttribute('data-section'),s=new Element();s.hidden=name!=='portfolio';return [name,s];}));
-const c=vm.createContext({console,window,document:{createElement:t=>new Element(t)},nav,navPill:pill,navItems:items,sections,
-  activeSection:'portfolio',reducedMotion:false,pillX:106,pillW:100,pillVX:0,pillRAF:0,lastPillT:0,sectionTimer:null,galleryTeardown:()=>{},galleryCoverflowEl:new Element(),
+const c=vm.createContext({console,window,document:{createElement:t=>new Element(t)},nav,navItemsContainer:nav,navPill:pill,navItems:items,sections,
+  activeSection:'portfolio',mobileNavQuery:{matches:false},reducedMotion:false,pillX:106,pillW:100,pillVX:0,pillRAF:0,lastPillT:0,sectionTimer:null,galleryTeardown:()=>{},galleryCoverflowEl:new Element(),
   performance:{now:()=>time},requestAnimationFrame:fn=>{rafs.set(++id,fn);return id;},cancelAnimationFrame:i=>rafs.delete(i),
   setTimeout:fn=>{timers.set(++id,fn);return id;},clearTimeout:i=>timers.delete(i),
   ResizeObserver:class{observe(){}disconnect(){}},POSTERS:[],IMG_BASE:'images/',
   buildPicture:()=>new Element('picture'),isPinned:()=>false,setPinned(){},sampleDominantColor:(p,cb)=>cb('#c88'),openLightbox:(p,i)=>{c.opened=i;}});
 function timersOnce(){const tasks=[...timers.values()];timers.clear();tasks.forEach(f=>f());}
 function frames(){for(let n=0;n<100&&rafs.size;n++){time+=16.667;const callbacks=[...rafs.values()];rafs.clear();callbacks.forEach(f=>f(time));}}
-for(const name of ['clamp','movePill','switchSection','mountCoverflow']) vm.runInContext(funcs.get(name),c);
+for(const name of ['clamp','movePill','switchSection','mountCoverflow','refreshNavItemRefs']) vm.runInContext(funcs.get(name),c);
 const start=script.indexOf('// Pointer capture keeps a held selection');
 vm.runInContext(script.slice(start,script.indexOf('var sectionTimer',start)),c);
 nav.emit('pointerdown',{target:items[1],clientX:150});timersOnce();assert(nav.classList.contains('is-holding'));

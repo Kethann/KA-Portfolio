@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import brushUrl from './assets/images/poster/brush.png';
-import inkUrl from './assets/images/poster/ink.png';
-import paintUrl from './assets/images/poster/paint.png';
-import blueUrl from './assets/images/poster/blue-plaster.jpg';
-import redUrl from './assets/images/poster/red-plaster.jpg';
+import brushUrl from './assets/images/poster/brush.webp';
+import inkUrl from './assets/images/poster/ink.webp';
+import paintUrl from './assets/images/poster/paint.webp';
+import blueUrl from './assets/images/poster/blue-plaster.webp';
+import redUrl from './assets/images/poster/red-plaster.webp';
 
 export const artworkSources=[
   {url:blueUrl,full:true},{url:paintUrl,full:false},{url:redUrl,full:true},

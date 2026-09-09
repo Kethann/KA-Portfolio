@@ -2,6 +2,11 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import postcss from 'postcss';
 
+test('compiled panda exposes its lazy mount without requiring a browser at import time',async()=>{
+  const panda=await import('../dist/assets/panda.js');
+  assert.equal(typeof panda.mountPanda,'function');
+});
+
 test('ambient artwork loads independently of the gallery',async()=>{
   const poster=await import('../dist/assets/poster.js');
   assert.equal(typeof poster.startPosterBackground,'function');
