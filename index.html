@@ -72,6 +72,35 @@ body{
 }
 #stage{ position:fixed; inset:0; z-index:2; }
 canvas{ display:block; width:100%; height:100%; }
+/* Procedural nebula backdrop -- the deepest layer, behind the crystal hero (#stage, z-index:2)
+   and the ember drift (.ember-layer, z-index:1). This CSS is the fallback appearance (a static
+   gradient + a handful of fixed star dots via box-shadow): it's what shows if WebGL is
+   unavailable or fails to init, and it's what's visible for an instant before the WebGL canvas
+   mounts on top of it -- so it's deliberately close in mood to the animated version, not a
+   jarring flash-of-different-background. Once the canvas mounts, it fully covers this div's own
+   background (opaque clear color), so there's no need to swap classes on success.*/
+#nebula-bg{
+  position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none;
+  background:
+    radial-gradient(ellipse 60% 45% at 62% 38%, rgba(120,40,20,0.35), transparent 60%),
+    radial-gradient(ellipse 40% 35% at 30% 60%, rgba(30,50,90,0.22), transparent 60%),
+    radial-gradient(ellipse at 50% 50%, #0a0a0d 0%, #050506 60%, #020203 100%);
+}
+#nebula-bg::before{
+  content:"";
+  position:absolute; inset:0;
+  background-image:
+    radial-gradient(1.6px 1.6px at 12% 22%, #fff, transparent),
+    radial-gradient(1.3px 1.3px at 78% 14%, #fff, transparent),
+    radial-gradient(1.8px 1.8px at 34% 68%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 58% 48%, #fff, transparent),
+    radial-gradient(1.4px 1.4px at 88% 76%, #fff, transparent),
+    radial-gradient(1.1px 1.1px at 6% 82%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 46% 8%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 70% 92%, #fff, transparent);
+  opacity:0.55;
+}
+#nebula-bg canvas{ position:absolute; inset:0; }
 /* GOD MODE v9: dark-boot veil -- a plain DOM overlay (not a WebGL blend) so the near-darkness
    open-and-brighten is rock solid across every renderer/GPU, sidestepping any additive-blending
    opacity quirks entirely. Sits above the canvas, below the replay UI. */
@@ -547,7 +576,16 @@ footer.site-footer{
 .fav-chip:hover{ color:var(--ink); }
 .fav-chip.active{ color:var(--amber); border-color:var(--amber); }
 .fav-chip:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
-.folder-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:32px; perspective:1400px; }
+.folder-grid{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:32px; perspective:1400px;
+  /* translucent glass shelf instead of sitting directly on the bare (often near-black, this
+     far from the nebula's own bright center) page background -- lets the drifting nebula
+     colors show through, softened by blur, rather than the cards reading as floating in a
+     flat void. Reuses the same --glass-* tokens the nav/footer/assistant panel already share. */
+  padding:clamp(24px,4vw,40px); border-radius:28px;
+  background:var(--glass-bg); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  border:var(--glass-border); box-shadow:var(--glass-highlight), var(--glass-shadow);
+}
 .folder-card{
   position:relative; border-radius:18px; overflow:hidden; cursor:pointer; border:1px solid var(--line);
   background:#0a0a0b; aspect-ratio:4/3; padding:0;
@@ -794,6 +832,7 @@ html{overflow-x:clip;scroll-padding-top:110px;}
   </div>
 </nav>
 
+<div id="nebula-bg" aria-hidden="true"></div>
 <div id="stage"></div>
 <script>
 (function(){
@@ -1398,6 +1437,347 @@ html{overflow-x:clip;scroll-padding-top:110px;}
 
 <script src="./dist/assets/three-r128.min.js"></script>
 <script>
+// Procedural deep-space nebula backdrop -- the site's deepest visual layer, sitting behind the
+// crystal hero (#stage) and the ember drift. Fully self-contained (its own renderer/scene/RAF
+// loop, sharing only the global THREE the line above already loaded -- no second Three.js
+// instance, unlike the separate ESM bundle the panda character uses), so a failure here can
+// never touch the hero's own render loop. Feature-detects WebGL and bails to the CSS fallback
+// (#nebula-bg's own background, see the stylesheet) on any failure or on prefers-reduced-motion.
+(function(){
+"use strict";
+var container = document.getElementById('nebula-bg');
+if (!container || typeof THREE === 'undefined') return;
+var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var isMobile = window.matchMedia('(max-width: 760px)').matches || /Mobi|Android/i.test(navigator.userAgent);
+var renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias:false, alpha:false, powerPreference:'low-power', failIfMajorPerformanceCaveat:false });
+} catch (e) { renderer = null; }
+if (!renderer) return; // CSS fallback (already painted) stands as-is.
+renderer.setClearColor(0x050506, 1);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1 : 1.5));
+container.appendChild(renderer.domElement);
+
+var scene = new THREE.Scene();
+var camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 2000);
+camera.position.set(0, 0, 0);
+
+// -------------------------------------------------------------- starfield --
+var STAR_COUNT = isMobile ? 1100 : 2600;
+var starGeom = new THREE.BufferGeometry();
+var starPos = new Float32Array(STAR_COUNT * 3);
+var starSize = new Float32Array(STAR_COUNT);
+var starBright = new Float32Array(STAR_COUNT);
+var starTwinkle = new Float32Array(STAR_COUNT);
+var starTwinkleFreq = new Float32Array(STAR_COUNT);
+for (var i = 0; i < STAR_COUNT; i++){
+  // a spherical shell (not a filled ball) so stars read as a field around the viewer rather
+  // than clustering thicker toward the center -- radius randomized within a band, direction
+  // uniform over the sphere.
+  var u = Math.random(), v = Math.random();
+  var theta = u * Math.PI * 2, phi = Math.acos(2 * v - 1);
+  var r = 140 + Math.random() * 340;
+  starPos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+  starPos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+  starPos[i*3+2] = -Math.abs(r * Math.cos(phi)) - 40; // bias behind the camera's forward view
+  // a few large bright stars, mostly small faint ones -- weighted toward the small end
+  var sizeRoll = Math.pow(Math.random(), 3);
+  starSize[i] = 1.1 + sizeRoll * 3.4;
+  starBright[i] = 0.35 + Math.random() * 0.65;
+  starTwinkle[i] = Math.random() * Math.PI * 2;
+  starTwinkleFreq[i] = 0.0009 + Math.random() * 0.0014;
+}
+starGeom.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+starGeom.setAttribute('aSize', new THREE.BufferAttribute(starSize, 1));
+starGeom.setAttribute('aBright', new THREE.BufferAttribute(starBright, 1));
+starGeom.setAttribute('aTwinkle', new THREE.BufferAttribute(starTwinkle, 1));
+starGeom.setAttribute('aTwinkleFreq', new THREE.BufferAttribute(starTwinkleFreq, 1));
+var starMat = new THREE.ShaderMaterial({
+  // [v37] stars stay clearly visible even while the rest of the backdrop (nebula/galaxies/
+  // shards) sits dim -- direct feedback wanted the stars' own twinkle/glitter legible without
+  // brightening anything else or touching the smooth interaction already in place.
+  uniforms: { uPixelRatio: { value: renderer.getPixelRatio() }, uIntro: { value: 0.8 }, uTime: { value: 0 } },
+  vertexShader:
+    'attribute float aSize, aBright, aTwinkle, aTwinkleFreq;' +
+    'uniform float uPixelRatio, uTime;' +
+    'varying float vBright;' +
+    'void main(){' +
+    // a gentle per-star glitter -- each star's own phase/frequency, kept subtle (0.7..1.0 of
+    // its own base brightness) so it reads as a sparkle, not a flicker
+    '  float twinkle = 0.7 + 0.3 * sin(uTime * aTwinkleFreq + aTwinkle);' +
+    '  vBright = aBright * twinkle;' +
+    '  vec4 mv = modelViewMatrix * vec4(position, 1.0);' +
+    '  gl_Position = projectionMatrix * mv;' +
+    '  gl_PointSize = aSize * uPixelRatio * (280.0 / -mv.z);' +
+    '}',
+  fragmentShader:
+    'uniform float uIntro;' +
+    'varying float vBright;' +
+    'void main(){' +
+    '  vec2 c = gl_PointCoord - 0.5;' +
+    '  float d = length(c) * 2.0;' +
+    '  if (d > 1.0) discard;' +
+    '  float core = smoothstep(1.0, 0.0, d);' +
+    '  float glow = smoothstep(1.0, 0.0, d) * 0.5 + pow(1.0 - d, 4.0) * 0.5;' +
+    '  gl_FragColor = vec4(vec3(1.0, 0.98, 0.94) * glow, glow * vBright * uIntro);' +
+    '}',
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+});
+var stars = new THREE.Points(starGeom, starMat);
+var nearGroup = new THREE.Group();
+nearGroup.add(stars);
+scene.add(nearGroup);
+
+// ---------------------------------------------------------------- nebula --
+// Compact 2D simplex noise (Ashima Arts / Ian McEwan, MIT) -- the standard, widely-reused GLSL
+// implementation, not a bespoke one; kept exactly in its canonical compact form.
+var SIMPLEX_GLSL =
+  'vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}' +
+  'vec2 mod289(vec2 x){return x-floor(x*(1.0/289.0))*289.0;}' +
+  'vec3 permute(vec3 x){return mod289(((x*34.0)+1.0)*x);}' +
+  'float snoise(vec2 v){' +
+  '  const vec4 C=vec4(0.211324865405187,0.366025403784439,-0.577350269189626,0.024390243902439);' +
+  '  vec2 i=floor(v+dot(v,C.yy));' +
+  '  vec2 x0=v-i+dot(i,C.xx);' +
+  '  vec2 i1=(x0.x>x0.y)?vec2(1.0,0.0):vec2(0.0,1.0);' +
+  '  vec4 x12=x0.xyxy+C.xxzz; x12.xy-=i1;' +
+  '  i=mod289(i);' +
+  '  vec3 p=permute(permute(i.y+vec3(0.0,i1.y,1.0))+i.x+vec3(0.0,i1.x,1.0));' +
+  '  vec3 m=max(0.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.0);' +
+  '  m=m*m; m=m*m;' +
+  '  vec3 x=2.0*fract(p*C.www)-1.0;' +
+  '  vec3 h=abs(x)-0.5;' +
+  '  vec3 ox=floor(x+0.5);' +
+  '  vec3 a0=x-ox;' +
+  '  m*=1.79284291400159-0.85373472095314*(a0*a0+h*h);' +
+  '  vec3 g; g.x=a0.x*x0.x+h.x*x0.y; g.yz=a0.yz*x12.xz+h.yz*x12.yw;' +
+  '  return 130.0*dot(m,g);' +
+  '}' +
+  'float fbm(vec2 p){' +
+  '  float v=0.0, amp=0.5;' +
+  '  for (int oct=0; oct<4; oct++){ v+=amp*snoise(p); p*=2.02; amp*=0.55; }' +
+  '  return v;' +
+  '}';
+var NEBULA_W = 2600, NEBULA_H = 1300;
+var nebulaGeom = new THREE.PlaneGeometry(NEBULA_W, NEBULA_H, 1, 1);
+var nebulaMat = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uIntro: { value: 0.22 } },
+  vertexShader:
+    'varying vec2 vUv;' +
+    'void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader:
+    SIMPLEX_GLSL +
+    'uniform float uTime, uIntro;' +
+    'varying vec2 vUv;' +
+    'void main(){' +
+    '  vec2 p = (vUv - 0.5) * vec2(2.6, 1.4);' +
+    '  float t = uTime;' +
+    // domain warp: offset the sample point by a slower, larger-scale noise field so the cloud
+    // reads as organic wisps folding into each other, not a flat repeating noise texture
+    '  vec2 warp = vec2(fbm(p * 0.6 + vec2(0.0, t * 0.6)), fbm(p * 0.6 - vec2(t * 0.5, 0.0))) * 0.55;' +
+    '  float n = fbm(p * 1.15 + warp + vec2(t * 0.18, -t * 0.12));' +
+    '  float n2 = fbm(p * 1.6 - warp * 0.7 + vec2(-t * 0.1, t * 0.22));' +
+    // [v34] widened from (-0.15,0.65)/(−1.0,0.3) -- the old narrow band left most of the field
+    // at zero density, reading as flat black away from the brightest wisps ("completely dark"
+    // per direct feedback). A broader band means most of the noise field now contributes SOME
+    // translucent tint, only the deepest noise troughs stay near-black.
+    '  float density = smoothstep(-0.55, 0.45, n) * smoothstep(-1.0, 0.5, n2);' +
+    // soft radial vignette, also widened -- the cloud still fades out before the plane's own
+    // edges, just later, and a small ambient floor (below) keeps even the faded-out rim a dim
+    // translucent glass tone rather than dropping all the way to pure black.
+    '  float vign = 1.0 - smoothstep(0.55, 1.45, length(p) / 1.55);' +
+    '  density = density * vign + 0.05 * vign;' +
+    // [v35] deep-space violet/magenta core with a cyan-blue accent -- the earlier warm red/
+    // orange sat too close to the crystal's own red and the two blurred together; violet reads
+    // as clearly separate territory (background vs. foreground subject) at a glance.
+    '  vec3 nebulaCore = vec3(0.62, 0.24, 0.92);' +
+    '  vec3 nebulaEdge = vec3(0.16, 0.05, 0.30);' +
+    '  vec3 accentBlue = vec3(0.20, 0.45, 0.92);' +
+    '  float blueMix = smoothstep(0.15, 0.75, n2) * 0.55;' +
+    '  vec3 color = mix(nebulaEdge, nebulaCore, smoothstep(0.0, 0.7, n));' +
+    '  color = mix(color, accentBlue, blueMix);' +
+    // [v34] 0.5 -> 0.72 -- roughly halves the perceived darkness without pushing the nebula to
+    // full opacity ("not full", per direct feedback) -- foreground text/cards still read clearly
+    // on top since this is additive-blended and capped well under 1.0.
+    // [v35] * uIntro -- the whole layer starts dim (uIntro ~0.22) while the hero crystal is
+    // still assembling, then fades up to full life once it settles (see the JS-side intro-fade
+    // logic below), so the cosmic backdrop visibly "comes alive" as its own beat rather than
+    // being at full brightness from the very first frame.
+    '  float alpha = clamp(density, 0.0, 1.0) * 0.72 * uIntro;' +
+    '  gl_FragColor = vec4(color, alpha);' +
+    '}',
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+});
+var nebula = new THREE.Mesh(nebulaGeom, nebulaMat);
+var farGroup = new THREE.Group();
+farGroup.position.z = -600;
+farGroup.add(nebula);
+scene.add(farGroup);
+
+// ------------------------------------------------------------------ galaxies --
+// A handful of soft, blurred smudges -- a single procedural radial-gradient sprite texture
+// (drawn once on an offscreen canvas), reused across instances with per-instance tint/scale/
+// position, rather than a texture per galaxy.
+function makeGalaxyTexture(){
+  var size = 128;
+  var c = document.createElement('canvas'); c.width = c.height = size;
+  var ctx = c.getContext('2d');
+  var g = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+  g.addColorStop(0, 'rgba(255,255,255,0.9)');
+  g.addColorStop(0.35, 'rgba(255,255,255,0.35)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  var tex = new THREE.CanvasTexture(c);
+  tex.needsUpdate = true;
+  return tex;
+}
+var galaxyTex = makeGalaxyTexture();
+var GALAXY_COLORS = [0xffcf9e, 0xffb37a, 0x9ec4ff, 0xc9d8ff, 0xffdcc2];
+var GALAXY_COUNT = isMobile ? 3 : 6;
+var galaxySprites = [];
+for (var gI = 0; gI < GALAXY_COUNT; gI++){
+  var gBaseOpacity = 0.10 + Math.random() * 0.10;
+  var gMat = new THREE.SpriteMaterial({
+    map: galaxyTex, color: GALAXY_COLORS[gI % GALAXY_COLORS.length],
+    transparent: true, opacity: gBaseOpacity,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  var sprite = new THREE.Sprite(gMat);
+  var gAng = Math.random() * Math.PI * 2, gR = 180 + Math.random() * 260;
+  sprite.position.set(Math.cos(gAng) * gR, Math.sin(gAng) * gR * 0.6, -260 - Math.random() * 220);
+  var gScale = 90 + Math.random() * 150;
+  sprite.scale.set(gScale * (0.6 + Math.random() * 0.8), gScale, 1);
+  nearGroup.add(sprite);
+  galaxySprites.push({ mat: gMat, base: gBaseOpacity });
+}
+
+// ------------------------------------------------------- drifting crystal shards --
+// Small faceted glints that slowly drift through the field -- a "live wallpaper" touch tying
+// the backdrop back to the site's own crystal motif, distinct from the plain round stars.
+// One procedural sprite texture (a diamond facet with a bright glint line down its spine),
+// reused across instances with per-instance tint/scale/rotation/speed.
+function makeShardTexture(){
+  var size = 96;
+  var c = document.createElement('canvas'); c.width = c.height = size;
+  var ctx = c.getContext('2d');
+  ctx.translate(size/2, size/2);
+  ctx.beginPath();
+  ctx.moveTo(0, -size*0.46); ctx.lineTo(size*0.22, 0); ctx.lineTo(0, size*0.46); ctx.lineTo(-size*0.22, 0);
+  ctx.closePath();
+  var g = ctx.createLinearGradient(0, -size*0.46, 0, size*0.46);
+  g.addColorStop(0, 'rgba(255,255,255,0.95)');
+  g.addColorStop(0.5, 'rgba(255,225,255,0.55)');
+  g.addColorStop(1, 'rgba(255,255,255,0.05)');
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(0, -size*0.4); ctx.lineTo(0, size*0.4); ctx.stroke();
+  var tex = new THREE.CanvasTexture(c);
+  tex.needsUpdate = true;
+  return tex;
+}
+var shardTex = makeShardTexture();
+var SHARD_COLORS = [0xd6b8ff, 0x9ec4ff, 0xffc9f2, 0xb794ff];
+var SHARD_COUNT = isMobile ? 8 : 16;
+var shards = [];
+for (var sI = 0; sI < SHARD_COUNT; sI++){
+  var shBase = 0.22 + Math.random() * 0.28;
+  var shMat = new THREE.SpriteMaterial({
+    map: shardTex, color: SHARD_COLORS[sI % SHARD_COLORS.length],
+    transparent: true, opacity: shBase, blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  var shSprite = new THREE.Sprite(shMat);
+  var shScale = 5 + Math.random() * 10;
+  shSprite.scale.set(shScale, shScale * 1.4, 1);
+  var shard = {
+    sprite: shSprite, mat: shMat, base: shBase,
+    x: (Math.random() - 0.5) * 480, y: (Math.random() - 0.5) * 320, z: -60 - Math.random() * 280,
+    vx: (Math.random() - 0.5) * 0.006, vy: 0.004 + Math.random() * 0.008,
+    twinkleSeed: Math.random() * Math.PI * 2, twinkleFreq: 0.0006 + Math.random() * 0.0008,
+  };
+  shSprite.position.set(shard.x, shard.y, shard.z);
+  nearGroup.add(shSprite);
+  shards.push(shard);
+}
+
+// ---------------------------------------------------------------- parallax --
+// Stars/galaxies (nearGroup) shift more than the nebula (farGroup) in response to pointer/
+// scroll, the classic near-moves-more-than-far depth cue -- both smoothed (lerped toward a
+// target each frame, never snapped) so the motion stays gentle, and both capped small so this
+// stays a backdrop cue, never something that competes with foreground content.
+var parallaxTarget = { x: 0, y: 0 };
+var parallaxCurrent = { x: 0, y: 0 };
+var NEAR_STRENGTH = 26, FAR_STRENGTH = 8;
+if (!reducedMotion){
+  window.addEventListener('pointermove', function(e){
+    parallaxTarget.x = (e.clientX / window.innerWidth - 0.5);
+    parallaxTarget.y = (e.clientY / window.innerHeight - 0.5);
+  }, { passive: true });
+  window.addEventListener('scroll', function(){
+    var maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    parallaxTarget.y = (window.scrollY / maxScroll - 0.5) * 0.6;
+  }, { passive: true });
+}
+
+function resize(){
+  var w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h, false);
+  starMat.uniforms.uPixelRatio.value = renderer.getPixelRatio();
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ------------------------------------------------------------------- intro dim level --
+// The backdrop stays at this dim level permanently (see the uIntro defaults above) -- an
+// earlier version faded it up to full brightness once the hero settled, but direct feedback
+// preferred the dim opening look kept throughout, not just as an intro beat.
+function clamp01(x){ return x < 0 ? 0 : x > 1 ? 1 : x; }
+function smootherStep(x){ x = clamp01(x); return x*x*x*(x*(x*6-15)+10); }
+
+var clock = { last: 0, elapsed: 0 };
+var rafId = 0;
+function frame(now){
+  rafId = requestAnimationFrame(frame);
+  if (document.hidden) return;
+  var dt = clock.last ? Math.min(now - clock.last, 100) : 16.7;
+  clock.last = now; clock.elapsed += dt;
+  parallaxCurrent.x += (parallaxTarget.x - parallaxCurrent.x) * 0.045;
+  parallaxCurrent.y += (parallaxTarget.y - parallaxCurrent.y) * 0.045;
+  nearGroup.position.x = parallaxCurrent.x * NEAR_STRENGTH;
+  nearGroup.position.y = -parallaxCurrent.y * NEAR_STRENGTH;
+  farGroup.position.x = parallaxCurrent.x * FAR_STRENGTH;
+  farGroup.position.y = -parallaxCurrent.y * FAR_STRENGTH;
+  // barely-perceptible constant drift, independent of parallax -- stars feel alive even with
+  // the pointer resting still
+  stars.rotation.y += dt * 0.0000045;
+  stars.rotation.x += dt * 0.0000018;
+  nebulaMat.uniforms.uTime.value = clock.elapsed * 0.00003;
+  starMat.uniforms.uTime.value = clock.elapsed;
+  // drifting crystal shards -- slow linear travel with wraparound, plus a gentle twinkle and a
+  // slow spin so each glint reads as alive rather than a static decal
+  for (var shI = 0; shI < shards.length; shI++){
+    var sh = shards[shI];
+    sh.x += sh.vx * dt; sh.y -= sh.vy * dt;
+    if (sh.y < -220) { sh.y = 220; sh.x = (Math.random() - 0.5) * 480; }
+    if (sh.x > 280) sh.x = -280; else if (sh.x < -280) sh.x = 280;
+    sh.sprite.position.set(sh.x, sh.y, sh.z);
+    sh.sprite.material.rotation += dt * 0.00015;
+    var twinkle = 0.65 + 0.35 * Math.sin(clock.elapsed * sh.twinkleFreq + sh.twinkleSeed);
+    sh.mat.opacity = sh.base * twinkle * nebulaMat.uniforms.uIntro.value;
+  }
+  renderer.render(scene, camera);
+}
+document.addEventListener('visibilitychange', function(){
+  if (!document.hidden) clock.last = 0; // avoid one huge dt after a long background tab
+});
+renderer.render(scene, camera); // one immediate frame so there's never a blank gap before RAF's first tick
+if (!reducedMotion) rafId = requestAnimationFrame(frame);
+})();
+</script>
+<script>
 (function(){
 "use strict";
 
@@ -1565,12 +1945,27 @@ function makeSoftDotTexture(){
   return new THREE.CanvasTexture(c);
 }
 const softDotTex = makeSoftDotTexture();
+// [v36] a pure radial gradient (dark, fading smoothly to fully transparent, no shape/silhouette
+// of any kind) used for the resolved mark's soft contact shadow -- see buildLogo.
+function makeRadialShadowTexture(){
+  const size = 256;
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+  g.addColorStop(0, 'rgba(0,0,0,0.85)');
+  g.addColorStop(0.35, 'rgba(0,0,0,0.55)');
+  g.addColorStop(0.7, 'rgba(0,0,0,0.18)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(c);
+}
 
 // ================================================================ INIT ==
 let shards = [];       // real cut fragments -- these are what assembles
 let dust = null;       // ambient instanced glow motes -- atmosphere only
 let logoMesh = null;
 let logoGlow = null;
+let logoShadow = null;
 let icons = [];
 let phase = 'shattered';   // shattered | assembling | held | disassembling
 let phaseStart = 0;
@@ -2502,6 +2897,24 @@ function buildLogo(){
   logoGlow.position.set(0,0,-14);
   scene.add(logoGlow);
 
+  // [v36] a soft contact shadow behind the mark -- a plain radial gradient (dark center fading
+  // smoothly all the way to fully transparent), NOT a blurred copy of the letterform's own
+  // silhouette -- the earlier version still read as a shape with an edge once blurred; a pure
+  // radial falloff has no contour to read as an edge at all, which is what a generic soft
+  // drop-shadow should look like. Normally (not additively) blended so it actually darkens
+  // rather than brightens. Driven through setLogoGlowOpacity, the SAME single gated write-point
+  // logoGlow already goes through -- never written anywhere else -- so it can't leak outside
+  // the one legal reveal window any differently than the glow it's paired with.
+  const shadowTex = makeRadialShadowTexture();
+  const shadowMat = new THREE.MeshBasicMaterial({
+    map: shadowTex, transparent:true, depthWrite:false, toneMapped:false, opacity:0,
+  });
+  logoShadow = new THREE.Mesh(geom, shadowMat);
+  logoShadow.userData.kaKind = 'logoShadow';
+  logoShadow.scale.set(dw * 1.55, dh * 1.35, 1);
+  logoShadow.position.set(8, -14, -16);
+  scene.add(logoShadow);
+
   const mat = new THREE.ShaderMaterial({
     uniforms: {
       map: { value: cutoutTex }, uAlpha: { value: 0 },
@@ -2940,6 +3353,7 @@ function settleStatic(){
   });
   logoMesh.material.uniforms.uAlpha.value = 1;
   logoGlow.material.opacity = 0.18;
+  logoShadow.material.opacity = 0.32;
   logoMesh.scale.set(logoMesh.userData.dw, logoMesh.userData.dh, 1);
   icons.forEach(ic => {
     ic.sprite.position.set(ic.landX, ic.landY, ic.landZ);
@@ -2993,9 +3407,11 @@ function setLogoGlowOpacity(opacity, currentT){
   if (!isResolvedMarkRevealWindow(currentT) && opacity !== 0){
     console.error('[LogoAssembly] blocked an attempt to show the resolved mark\'s glow outside its window', { phase, currentT, REVEAL_START, opacity });
     logoGlow.material.opacity = 0;
+    logoShadow.material.opacity = 0;
     return;
   }
   logoGlow.material.opacity = opacity;
+  logoShadow.material.opacity = Math.min(opacity * 1.8, 0.55);
 }
 
 // GOD MODE v15: same principle as setResolvedMarkVisibility above, applied to the 169 real
