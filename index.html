@@ -758,7 +758,7 @@ html{overflow-x:clip;scroll-padding-top:110px;}
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
     </button>
     <div class="expand-panel glass-panel" id="expand-panel" role="menu">
-      <a href="#" data-expand-link role="menuitem">About</a>
+      <a href="#" id="about-link" data-expand-link data-section="about" role="menuitem">About</a>
     </div>
   </div>
 </nav>
@@ -829,6 +829,212 @@ html{overflow-x:clip;scroll-padding-top:110px;}
         <button class="contact-submit field-full" type="submit">Send message</button>
         <p class="contact-status field-full" id="contact-status" role="status" aria-live="polite"></p>
       </form>
+    </div>
+  </div>
+</section>
+
+<style>
+/* ============================================================ ABOUT PAGE ===================== */
+.about-wrap{
+  position:relative; width:100%; max-width:1100px; margin:0 auto;
+  padding:100px clamp(20px,5vw,48px) 80px; isolation:isolate;
+  /* [scroll fix] without this, the page's total scrollable height can end up shorter than
+     hero-spacer + one full viewport once every OTHER section is hidden -- scrollIntoView then
+     can't actually bring About's top flush with the viewport top (it hits the scroll ceiling
+     early), leaving the fixed hero canvas visibly bleeding through above the content. */
+  min-height:100svh; box-sizing:border-box;
+}
+.about-glow{
+  position:fixed; z-index:-1; pointer-events:none; border-radius:50%; filter:blur(60px);
+  opacity:0; transition:opacity .4s ease; will-change:transform;
+}
+#section-about:not([hidden]) ~ .about-glow, #section-about:not([hidden]) .about-glow{ opacity:1; }
+.about-glow-a{ top:-10%; left:-8%; width:52vw; height:52vw; max-width:640px; max-height:640px;
+  background:radial-gradient(circle, rgba(255,148,56,0.16), transparent 70%); }
+.about-glow-b{ bottom:-12%; right:-10%; width:46vw; height:46vw; max-width:560px; max-height:560px;
+  background:radial-gradient(circle, rgba(255,68,68,0.13), transparent 70%); }
+
+/* ---- entry animation: brief poster-wall flash before the page content reveals ---- */
+.poster-wall-intro{
+  position:fixed; inset:0; z-index:65; pointer-events:none; overflow:hidden;
+  opacity:1; background:var(--ground);
+}
+.poster-wall-intro.pw-done{ opacity:0; transition:opacity .25s ease .05s; }
+.poster-wall-intro .pw-thumb{
+  position:absolute; width:min(26vw,220px); border-radius:10px; box-shadow:0 20px 60px rgba(0,0,0,0.5);
+  opacity:0; transform:translateY(40px) scale(0.7) rotate(var(--pw-rot,0deg));
+}
+.poster-wall-intro.pw-play .pw-thumb{ animation:posterWallFlash .5s var(--panda-bounce,cubic-bezier(.34,1.4,.64,1)) forwards; }
+.pw-1{ left:6%;  top:18%; --pw-rot:-8deg; animation-delay:.00s !important; }
+.pw-2{ left:28%; top:8%;  --pw-rot:5deg;  animation-delay:.07s !important; }
+.pw-3{ left:50%; top:22%; --pw-rot:-4deg; animation-delay:.14s !important; }
+.pw-4{ left:70%; top:10%; --pw-rot:7deg;  animation-delay:.21s !important; }
+.pw-5{ left:38%; top:40%; --pw-rot:-3deg; animation-delay:.28s !important; }
+@keyframes posterWallFlash{
+  0%{ opacity:0; transform:translateY(40px) scale(0.7) rotate(var(--pw-rot)); }
+  55%{ opacity:1; transform:translateY(0) scale(1.04) rotate(var(--pw-rot)); }
+  100%{ opacity:0; transform:translateY(-24px) scale(0.96) rotate(var(--pw-rot)); }
+}
+@media (prefers-reduced-motion: reduce){
+  .poster-wall-intro{ display:none; }
+}
+
+/* ---- headline / bio ---- */
+.about-headline{
+  font-size:var(--step-3); line-height:1.08; margin:0 0 20px; max-width:16ch;
+  opacity:0; transform:translateY(18px);
+}
+.about-bio-text{
+  font-size:var(--step-0); line-height:1.7; color:var(--ink-dim); max-width:62ch; margin:0 0 64px;
+  opacity:0; transform:translateY(14px);
+}
+#section-about.about-intro-done .about-headline{
+  animation:aboutFadeUp .7s var(--ease-standard) .05s forwards;
+}
+#section-about.about-intro-done .about-bio-text{
+  animation:aboutFadeUp .7s var(--ease-standard) .28s forwards;
+}
+@keyframes aboutFadeUp{ to{ opacity:1; transform:translateY(0); } }
+@media (prefers-reduced-motion: reduce){
+  .about-headline, .about-bio-text{ opacity:1; transform:none; animation:none; }
+}
+
+.about-block{ margin-top:72px; }
+.about-block .gallery-head{ margin-bottom:28px; }
+
+/* ---- skills constellation ---- */
+.skills-constellation{
+  position:relative; height:clamp(260px,32vw,360px); width:100%;
+}
+.skills-lines{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+.skill-shimmer-line{
+  stroke:url(#about-skill-line); stroke-width:.35; opacity:.5; vector-effect:non-scaling-stroke;
+  stroke-dasharray:4 3; animation:skillShimmer 6s linear infinite;
+}
+@keyframes skillShimmer{ to{ stroke-dashoffset:-70; } }
+.skill-node{
+  position:absolute; transform:translate(-50%,-50%); width:58px; height:58px; border-radius:50%;
+  background:var(--glass-bg); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  border:var(--glass-border); box-shadow:var(--glass-highlight), var(--glass-shadow);
+  color:var(--ink); font-family:'JetBrains Mono', ui-monospace, monospace; font-size:14px; font-weight:600;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:transform .25s var(--ease-snappy), box-shadow .25s ease;
+  animation:skillDrift 5s ease-in-out infinite;
+}
+.skill-node .skill-node-label{ pointer-events:none; }
+.sn-1{ animation-delay:0s; } .sn-2{ animation-delay:.6s; } .sn-3{ animation-delay:1.2s; } .sn-4{ animation-delay:1.8s; }
+@keyframes skillDrift{ 0%,100%{ transform:translate(-50%,-50%) translateY(0); } 50%{ transform:translate(-50%,-50%) translateY(-7px); } }
+.skill-node:hover, .skill-node:focus-visible, .skill-node.sn-active{
+  transform:translate(-50%,-50%) scale(1.14);
+  box-shadow:var(--glass-highlight), 0 0 24px 4px rgba(255,148,56,0.35), var(--glass-shadow);
+  outline:none;
+}
+.skill-tooltip{
+  position:absolute; bottom:calc(100% + 12px); left:50%; transform:translateX(-50%) translateY(6px);
+  width:max-content; max-width:220px; padding:10px 14px; border-radius:14px;
+  font-family:'Manrope',sans-serif; font-size:12px; line-height:1.4; font-weight:400; color:var(--ink);
+  text-align:left; opacity:0; pointer-events:none; transition:opacity .2s ease, transform .2s ease;
+}
+.skill-node:hover .skill-tooltip, .skill-node:focus-visible .skill-tooltip, .skill-node.sn-active .skill-tooltip{
+  opacity:1; transform:translateX(-50%) translateY(0);
+}
+@media (prefers-reduced-motion: reduce){
+  .skill-node{ animation:none; }
+  .skill-shimmer-line{ animation:none; }
+}
+
+/* ---- featured work strip ---- */
+.about-work-strip{
+  display:flex; gap:16px; overflow-x:auto; scroll-snap-type:x proximity; overscroll-behavior-x:contain;
+  padding:6px 4px 18px; scrollbar-width:thin;
+}
+.about-work-strip button{
+  flex:0 0 auto; scroll-snap-align:center; width:min(58vw,240px); border-radius:12px; border:1px solid transparent;
+  padding:0; background:none; cursor:pointer; overflow:hidden; transition:transform .3s var(--ease-snappy);
+}
+.about-work-strip img{
+  width:100%; aspect-ratio:2/3; object-fit:cover; display:block; border-radius:12px;
+  transition:transform .3s var(--ease-snappy);
+}
+.about-work-strip button:hover{ transform:translateY(-4px) rotate(-1deg); }
+.about-work-strip button:hover img{ transform:scale(1.05); }
+.about-work-strip button:focus-visible{ outline:2px solid var(--amber); outline-offset:3px; }
+@media (prefers-reduced-motion: reduce){
+  .about-work-strip button, .about-work-strip img{ transition:none; }
+  .about-work-strip button:hover{ transform:none; }
+  .about-work-strip button:hover img{ transform:none; }
+}
+@media(max-width:600px){
+  .about-headline{ font-size:var(--step-2); }
+  .about-bio-text{ margin-bottom:48px; }
+  .skills-constellation{ height:300px; }
+  .skill-node{ width:50px; height:50px; font-size:12px; }
+}
+</style>
+
+<section class="site-section" id="section-about" data-section="about" hidden>
+  <div class="about-glow about-glow-a" aria-hidden="true"></div>
+  <div class="about-glow about-glow-b" aria-hidden="true"></div>
+
+  <div class="poster-wall-intro" id="poster-wall-intro" aria-hidden="true">
+    <img class="pw-thumb pw-1" src="images/tiger-blue-480.webp" alt="">
+    <img class="pw-thumb pw-2" src="images/devara-11-days-480.webp" alt="">
+    <img class="pw-thumb pw-3" src="images/devara-14-days-480.webp" alt="">
+    <img class="pw-thumb pw-4" src="images/vara-23-days-480.webp" alt="">
+    <img class="pw-thumb pw-5" src="images/wa-00-40-18-480.webp" alt="">
+  </div>
+
+  <div class="about-wrap">
+    <div class="about-bio">
+      <h1 class="about-headline" id="about-headline">Kethan Artzz — Visual Storyteller for the Big Screen</h1>
+      <p class="about-bio-text" id="about-bio-text">I'm a graphic designer based in India, specializing in movie poster and publicity campaign design. My work has shaped the visual identity for major theatrical releases — from Salaar and Devara to WAR 2, Kuravaali, and campaigns spanning both Indian and Hollywood cinema. Since 2019, I've been crafting key art that doesn't just advertise a film — it captures its emotional core in a single frame. Every poster is a puzzle: balancing star power, mood, typography, and story into something that stops people mid-scroll. Available for freelance and full-time collaborations — always looking for the next story worth telling visually.</p>
+    </div>
+
+    <div class="about-block" id="about-skills-block">
+      <div class="gallery-head">
+        <h2>Skills</h2>
+        <p>Tools that shape every frame</p>
+      </div>
+      <div class="skills-constellation" id="skills-constellation">
+        <svg class="skills-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="about-skill-line" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#b8d8ef" stop-opacity=".55"/>
+              <stop offset="60%" stop-color="#ffe8cd" stop-opacity=".95"/>
+              <stop offset="100%" stop-color="#e8aa82" stop-opacity=".7"/>
+            </linearGradient>
+          </defs>
+          <line class="skill-shimmer-line" x1="18" y1="28" x2="52" y2="16"/>
+          <line class="skill-shimmer-line" x1="52" y1="16" x2="82" y2="34"/>
+          <line class="skill-shimmer-line" x1="18" y1="28" x2="40" y2="62"/>
+          <line class="skill-shimmer-line" x1="82" y1="34" x2="62" y2="70"/>
+          <line class="skill-shimmer-line" x1="40" y1="62" x2="62" y2="70"/>
+        </svg>
+        <button type="button" class="skill-node sn-1" style="left:18%;top:28%;" aria-label="Photoshop">
+          <span class="skill-node-label">Ps</span>
+          <span class="skill-tooltip glass-panel">Photoshop — compositing and retouching every key art layer</span>
+        </button>
+        <button type="button" class="skill-node sn-2" style="left:52%;top:16%;" aria-label="Illustrator">
+          <span class="skill-node-label">Ai</span>
+          <span class="skill-tooltip glass-panel">Illustrator — vector typography and title treatments</span>
+        </button>
+        <button type="button" class="skill-node sn-3" style="left:82%;top:34%;" aria-label="Figma">
+          <span class="skill-node-label">Fg</span>
+          <span class="skill-tooltip glass-panel">Figma — campaign layouts and social deliverable systems</span>
+        </button>
+        <button type="button" class="skill-node sn-4" style="left:40%;top:62%;" aria-label="Lightroom">
+          <span class="skill-node-label">Lr</span>
+          <span class="skill-tooltip glass-panel">Lightroom — color grading and mood across a full campaign</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="about-block" id="about-work-block">
+      <div class="gallery-head">
+        <h2>Featured Work</h2>
+        <p>Key art from recent campaigns</p>
+      </div>
+      <div class="about-work-strip" id="about-work-strip"></div>
     </div>
   </div>
 </section>
@@ -5328,6 +5534,10 @@ expandPanel.addEventListener("click", function(e){
   // inside the [data-expand-link] button, so a click can land on a child rather than it directly
   if (e.target.closest("[data-expand-link]")) closeExpand(false);
 });
+document.getElementById("about-link").addEventListener("click", function(e){
+  e.preventDefault();
+  switchSection("about");
+});
 document.addEventListener("keydown", function(e){
   if (!expandOpen) return;
   if (e.key === "Escape"){ closeExpand(true); return; }
@@ -5343,7 +5553,8 @@ document.addEventListener("keydown", function(e){
 var sections = {
   contact: document.getElementById("section-contact"),
   portfolio: document.getElementById("section-portfolio"),
-  gallery: document.getElementById("section-gallery")
+  gallery: document.getElementById("section-gallery"),
+  about: document.getElementById("section-about")
 };
 var galleryCoverflowEl = document.getElementById("gallery-coverflow");
 var galleryTeardown = null;
@@ -5489,6 +5700,9 @@ function switchSection(name){
       void card.offsetWidth; // restart the transition even if it's already mid-flight from a rapid nav switch
       requestAnimationFrame(function(){ card.classList.add("in"); });
     }
+    // [about page] poster-wall intro, replayed fresh every time About becomes active -- same
+    // restart pattern as the contact card above (remove class, force reflow, re-add).
+    if (name === "about") playAboutIntro();
   }, outMs);
 }
 
@@ -5520,6 +5734,96 @@ window.addEventListener("ka-sequence-complete", function(){
 if (reducedMotion){
   window.addEventListener("ka-sequence-complete", function(){}, { once: true });
 }
+
+// ==================================================================== ABOUT PAGE ==
+(function(){
+  "use strict";
+  var aboutSection = document.getElementById("section-about");
+  if (!aboutSection) return;
+  var introEl = document.getElementById("poster-wall-intro");
+  var introTimer = null;
+
+  // [Part A] poster-wall intro -- restart-safe (same remove/reflow/re-add pattern the contact
+  // card already uses), so repeat visits to About replay cleanly rather than only firing once
+  // ever. Skipped entirely under reduced motion via the CSS `display:none` on .poster-wall-intro.
+  window.playAboutIntro = function(){
+    if (window.buildAboutWorkStrip) window.buildAboutWorkStrip();
+    clearTimeout(introTimer);
+    aboutSection.classList.remove("about-intro-done");
+    if (reducedMotion){
+      aboutSection.classList.add("about-intro-done");
+      return;
+    }
+    introEl.classList.remove("pw-play", "pw-done");
+    void introEl.offsetWidth;
+    introEl.classList.add("pw-play");
+    introTimer = setTimeout(function(){
+      introEl.classList.add("pw-done");
+      aboutSection.classList.add("about-intro-done");
+    }, 620); // last thumbnail's animation-delay (.28s) + its own .5s duration, plus a small margin
+  };
+
+  // [Part B] scroll-triggered reveals -- reuses the site's existing revealOnScroll() helper
+  // (see the folder-grid/coverflow cards for the same call), so timing/behavior matches site-wide.
+  ["about-skills-block", "about-work-block"].forEach(function(id){
+    revealOnScroll(document.getElementById(id));
+  });
+
+  // [Part B] subtle parallax on the two decorative glow blobs -- rAF-throttled, and the scroll
+  // listener only does meaningful work while About is the visible section (cheap early-return
+  // otherwise), transform-only.
+  var glowA = document.querySelector(".about-glow-a"), glowB = document.querySelector(".about-glow-b");
+  var parallaxQueued = false;
+  function updateParallax(){
+    parallaxQueued = false;
+    if (aboutSection.hidden) return;
+    var y = window.scrollY;
+    if (glowA) glowA.style.transform = "translateY(" + (y * 0.06) + "px)";
+    if (glowB) glowB.style.transform = "translateY(" + (y * -0.04) + "px)";
+  }
+  window.addEventListener("scroll", function(){
+    if (parallaxQueued || reducedMotion) return;
+    parallaxQueued = true;
+    requestAnimationFrame(updateParallax);
+  }, { passive: true });
+
+  // [Part C] skill nodes -- hover already works via CSS (:hover/:focus-visible); this adds
+  // tap-to-toggle for touch devices (no :hover) and closes any open tooltip on an outside tap.
+  var skillNodes = Array.prototype.slice.call(document.querySelectorAll(".skill-node"));
+  skillNodes.forEach(function(node){
+    node.addEventListener("click", function(e){
+      var wasActive = node.classList.contains("sn-active");
+      skillNodes.forEach(function(n){ n.classList.remove("sn-active"); });
+      if (!wasActive) node.classList.add("sn-active");
+    });
+  });
+  document.addEventListener("click", function(e){
+    if (!e.target.closest(".skill-node")) skillNodes.forEach(function(n){ n.classList.remove("sn-active"); });
+  });
+
+  // [Part D] featured work strip -- built from the same real POSTERS data Gallery/Portfolio use,
+  // clicking a thumbnail opens the exact same lightbox (openLightbox), so preview behavior is
+  // identical to the rest of the site rather than a separate one-off implementation.
+  var workStrip = document.getElementById("about-work-strip");
+  function buildAboutWorkStrip(){
+    if (!workStrip || workStrip.children.length) return; // build once; POSTERS may not be ready on first call
+    if (!POSTERS || !POSTERS.length) return;
+    workStrip.innerHTML = "";
+    POSTERS.forEach(function(poster, i){
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.setAttribute("aria-label", "View " + poster.title);
+      var img = document.createElement("img");
+      img.src = IMG_BASE + poster.slug + "-480.webp";
+      img.alt = poster.title;
+      img.loading = "lazy";
+      btn.appendChild(img);
+      btn.addEventListener("click", function(){ openLightbox(POSTERS, i, btn); });
+      workStrip.appendChild(btn);
+    });
+  }
+  window.buildAboutWorkStrip = buildAboutWorkStrip;
+})();
 
 // ==================================================================== CONTACT FORM ==
 var contactForm = document.getElementById("contact-form");
