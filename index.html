@@ -1966,10 +1966,20 @@ let dust = null;       // ambient instanced glow motes -- atmosphere only
 let logoMesh = null;
 let logoGlow = null;
 let logoShadow = null;
+let logoHighlight = null;
+let logoAlphaMap = null;
 let icons = [];
 let phase = 'shattered';   // shattered | assembling | held | disassembling
 let phaseStart = 0;
 let sequenceCompleteFired = false; // see the 'ka-sequence-complete' dispatch below -- fires once, ever
+// Bubble retract/expand (see setBubbles/updateIcons): bubblesRetracted is the logical target
+// state each bubble animates toward; bubbleAutoRetractArmed latches true the one time the
+// automatic post-reveal retraction fires, which is also the gate that turns on click-to-toggle
+// (Part B is only "live" after Part A's one-time auto retract has happened).
+let bubblesRetracted = false;
+let bubbleAutoRetractArmed = false;
+let logoHoverActive = false;
+let lastTs = 0;
 let ambientLightStrength = 0;
 const ambientLightTint = new THREE.Vector3(.7,.7,.7);
 const reflectionTextures=new WeakMap();
@@ -2025,25 +2035,11 @@ let logoRevealE = 0;
 // "something moved" read at any intensity; the camera keeps doing exactly one thing through this
 // entire window, the same continuous idle breathing from updateCamera, completely unmodified.
 let chargeEnv = 0;
-// SILHOUETTE FLASH (GOD MODE v5 restore): a brief, bright flash across the resolved mark's own
-// exact silhouette -- since the resolved-mark plane is alpha-clipped to the true KA cutout, a
-// quick whole-texture brighten-toward-white reads as the KA SHAPE ITSELF flashing, a "light
-// frame" of the mark, not a generic screen flash. This existed in an earlier round (the old
-// global `uBlast`, fired once at the very end of the sequence) and was removed in favor of the
-// continuous per-shard fusion sparks introduced afterward -- but per direct feedback, the
-// per-shard sparks read as many small local events, not the single decisive "the whole mark just
-// caught light" beat the silhouette flash gave. Both now coexist: per-shard sparks keep firing
-// throughout assembly (unchanged), and this fires once, sharply, right as the reveal completes --
-// the moment the shape is fully traced out is exactly when it should visibly catch fire as one
-// object, not just have its last piece click in.
-let blastEnv = 0;
-const BLAST_FLASH_DUR = 220; // total lifetime of the global silhouette flash, ms -- SUPERCHARGE: longer, hotter finish
-
 // ENERGIZE PULSE (new): a brief, bright charge-up on the mark's own silhouette OUTLINE, fired
 // once near the end of the shattered hold, right before the fragments start moving -- "the logo
 // being energized" before it starts pulling itself back together, distinct from (and much
 // softer/hazier than) the sharp lock-snap flash above. This deliberately does NOT touch
-// logoMesh's own uAlpha/uBlast (that would reveal the crisp, fully-formed resolved texture
+// logoMesh's own uAlpha (that would reveal the crisp, fully-formed resolved texture
 // through the gaps, spoiling the "still broken" read) -- it only drives logoGlow, the existing
 // blurred/silhouette-shaped glow plane that already sits behind the shards, so what's visible is
 // a soft, glowing OUTLINE of the KA shape flaring up and fading again while the shards are still
@@ -2114,37 +2110,11 @@ const REVEAL_DUR = 1200; // shortened from 1500 -- paired with the tighter WIPE_
 // whole sequence during which the resolved mark may be nonzero -- see setResolvedMarkVisibility
 // below, the single gate every write to it must pass through -- and no per-effect exception is
 // carved into it for any kind of preview/tease, ever again.
-const SHINE_INTERVAL_MIN = 5000;     // continuous specular shine, randomized 5-6s between sweeps
-const SHINE_INTERVAL_MAX = 6000;
-const SHINE_SWEEP_DUR    = 750;
 
 
-// a handful of directions the glint can cross the crystal from -- all convex combinations
-// (both weights >=0, summing to 1) so `vUv.x*wx + vUv.y*wy` always ranges cleanly 0..1 and the
-// same -0.22..1.22 sweep range works unmodified for every one of them. Picked randomly (along
-// with forward/reverse) each time a sweep fires, so repeats don't always catch the light from
-// the same angle -- "not same direction of reflection... random sides or type of reflection".
-const SWEEP_DIRS = [
-  { x: 0.42, y: 0.58 },  // steep diagonal, bottom-left -> top-right leaning
-  { x: 0.58, y: 0.42 },  // shallow diagonal, the mirror of the above
-  { x: 0.85, y: 0.15 },  // mostly horizontal, left -> right
-  { x: 0.15, y: 0.85 },  // mostly vertical, bottom -> top
-  { x: 0.5,  y: 0.5  },  // even 45-degree diagonal
-];
-let sweepDirIdx = 0;
-let sweepReverse = false;
-function randomizeSweep(){
-  sweepDirIdx = Math.floor(Math.random() * SWEEP_DIRS.length);
-  sweepReverse = Math.random() < 0.5;
-}
-function applySweepUniform(mesh, sT, easeFn){
-  const dir = SWEEP_DIRS[sweepDirIdx];
-  mesh.material.uniforms.uSweepDir.value.set(dir.x, dir.y);
-  const from = sweepReverse ? 1.22 : -0.22, to = sweepReverse ? -0.22 : 1.22;
-  mesh.material.uniforms.uSweepPos.value = lerp(from, to, easeFn(sT));
-}
-// held-phase repeating shine state (variable interval, not just a fixed modulo)
-let shineActive = false, shineStartT = 0, shineNextAt = 0;
+
+
+
 let bootDone = false;           // GOD MODE v9: true once the near-darkness boot fade has finished
 
 const ICONS_START_GAP  = 500;
@@ -2153,6 +2123,14 @@ const ICON_DUR         = 820;
 const PULSE_DELAY      = 550;   // after everything has landed
 const PULSE_DUR        = 1400;
 const DISASSEMBLE_DUR  = 1500;
+
+// Retract/expand: the 8 bubbles auto-tuck behind the logo exactly once, timed to overlap the
+// same settle-glow window PULSE_DELAY/PULSE_DUR already drive (see updateIcons) -- so the
+// bubbles finish tucking in right as the reveal sequence hands off into the steady 'held' glow,
+// one continuous gesture rather than two separate beats. Every later toggle (click/tap) reuses
+// the exact same per-bubble animation, just triggered on demand instead of automatically.
+const BUBBLE_STAGGER_MS  = 48;  // 30-80ms cascade window per spec
+const BUBBLE_RETRACT_DUR = 640; // ms, per-bubble base duration (jittered slightly per toggle)
 
 // v24: turns "every shard references the one true shared center" from an assumption (already
 // true today only because toWorld() is a single pure function with one closure-captured
@@ -2273,6 +2251,8 @@ function openingDrift(s, ts){
 function init(){
   fractureOpeningCore();
   buildShards();
+  buildShardGlow();
+  buildCometTrails();
   assertSharedCoreOrigin();
   // GOD MODE v11: grand total across BOTH flights (Entrance then Repair) -- REVEAL_START's own
   // formula (below) is unchanged, it just now measures back from the true end of Phase B.
@@ -2361,11 +2341,17 @@ const shardFragment = `
   uniform sampler2D map;
   uniform float uOpacity;
   uniform vec3 uTint;
+  uniform vec3 uGlow;
   varying vec2 vUv;
   void main(){
     vec4 tex = texture2D(map, vUv);
     if (tex.a < 0.01) discard;
-    gl_FragColor = vec4(tex.rgb * uTint, tex.a * uOpacity);
+    // uTint is multiplicative (color transmutation/impact overexposure) -- multiplying an
+    // already dark, saturated crystal pixel by ~1.1x stays dark, so it alone can't read as an
+    // actual glint. uGlow is additive on top, the same way real light catching a facet would
+    // lift it -- driven by the scattered-phase ambient shine (see updateShardsIdle).
+    float facet = smoothstep(.18,.85,max(tex.r,max(tex.g,tex.b)));
+    gl_FragColor = vec4(tex.rgb * uTint + uGlow * facet * .22, tex.a * uOpacity);
   }
 `;
 
@@ -2632,6 +2618,9 @@ function buildDust(){
     inst.setMatrixAt(i, dummy.matrix);
   }
   scene.add(inst);
+  const dustColor=new THREE.Color(.38,.29,.22);
+  for(let i=0;i<COUNT;i++)inst.setColorAt(i,dustColor);
+  inst.instanceColor.setUsage(THREE.DynamicDrawUsage);
   dust = { inst, data, dummy, count: COUNT };
 }
 
@@ -2682,14 +2671,7 @@ const pulseFragment = `
                                  // comparison in the same real-world-proportional space.
   uniform float uTime;         // now driven every frame regardless of phase (see frame()) so
                                 // time-based effects -- the wipe noise during assembly, and the
-                                // continuous rim shimmer below -- never freeze between phases
-  uniform float uBlast;        // GOD MODE v5 restore: a brief, sharp whole-mark flash toward
-                                // white, driven by blastEnv in updateLogoReveal, firing once right
-                                // as the reveal wipe completes -- reads as the KA's own exact
-                                // silhouette catching light as one shape, distinct from (and layered
-                                // alongside) the continuous per-shard fusion sparks in JS (see
-                                // impactAt in updateShardsAssembling), which keep firing throughout
-                                // assembly unchanged
+                                // subtle facet lighting below -- never freeze between phases
   uniform float uCharge;       // 0..1, driven by chargeEnv in updateLogoReveal -- the "Charge &
                                 // Bloom" pre-reveal beat that replaced the old camera zoom punch.
                                 // Purely photometric: brightens the crystal itself and boosts the
@@ -2766,21 +2748,8 @@ const pulseFragment = `
       vec3 goldReflection = mix(vec3(1.0, 0.48, 0.05), vec3(1.0, 0.96, 0.42), goldT);
       col += band2 * mix(goldReflection,uAmbientTint,clamp(uAmbientStrength*9.0,0.0,.6)) * 0.36;
     }
-    if (uBlast > 0.0){
-      // SUPERCHARGE: pushed from 0.8 toward a near-total whiteout at the flash's own peak --
-      // this is the single "just fused shut" beat the whole mark gets once, so it can afford
-      // to read as genuinely overexposed for an instant, not a mild brightening.
-      col = mix(col, vec3(1.0, 0.99, 0.97), clamp(uBlast, 0.0, 1.0) * 0.85);
-    }
-    // CONTINUOUS RIM SHIMMER: a very low-amplitude, always-on brightening, independent of the
-    // periodic specular sweep above. The old build's "held" state had nothing running between
-    // sweeps every 5-6s -- long enough that the piece read as a static image in the gaps. This
-    // is intentionally subtle (4-6% of full brightness) so it never competes with the sweep or
-    // the wipe seam; it exists purely so no single frame of the resting mark is ever perfectly
-    // still, the same way a real polished crystal never looks perfectly dead under ambient light.
-    col += vec3(1.0, 0.85, 0.65) * (0.05 + 0.05 * sin(uTime * 0.00035));
-    float facetGlint = 0.5 + 0.5 * sin(uTime * 0.0012 + vUv.x * 8.0 + vUv.y * 6.0);
-    col += vec3(1.0, 0.72, 0.3) * facetGlint * 0.035;
+
+    // Local piece masks supply emission; the resolved texture retains its dark facets.
     float facetLight = smoothstep(.16,.82,max(tex.r,max(tex.g,tex.b)));
     float neighborAlpha=min(min(texture2D(map,vUv+vec2(uTexel.x,0.)).a,texture2D(map,vUv-vec2(uTexel.x,0.)).a),min(texture2D(map,vUv+vec2(0.,uTexel.y)).a,texture2D(map,vUv-vec2(0.,uTexel.y)).a));
     float rim=clamp((tex.a-neighborAlpha)*3.,0.,1.);
@@ -2883,19 +2852,9 @@ function buildLogo(){
   // other at a different scale
   const { w: dw, h: dh } = fitContain(CUT_W, CUT_H, LOGO_BOX_W, LOGO_BOX_H);
 
-  // soft blurred glow plane, behind, additive -- reads as bloom without a post pass
-  const blurPx = CUT_W * 0.045;
-  const { tex: glowTex, w: glowPxW, h: glowPxH } = makeBlurredGlowTexture(cutoutTex.image, blurPx);
-  const glowMat = new THREE.MeshBasicMaterial({
-    map: glowTex, transparent:true, blending:THREE.AdditiveBlending,
-    depthWrite:false, toneMapped:false, opacity:0, color:0xffba8c
-  });
-  logoGlow = new THREE.Mesh(geom, glowMat);
-  logoGlow.userData.kaKind = 'logoGlow'; // v19 diagnostics -- see window.__kaDebugScene()
-  const pxToWorld = dw / CUT_W; // == dh / CUT_H, aspect is preserved by fitContain
-  logoGlow.scale.set(glowPxW * pxToWorld, glowPxH * pxToWorld, 1);
-  logoGlow.position.set(0,0,-14);
-  scene.add(logoGlow);
+  // Retain the phase-envelope handle, but no global silhouette bloom is rendered.
+  logoGlow = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({transparent:true,opacity:0}));
+  logoGlow.visible = false;
 
   // [v36] a soft contact shadow behind the mark -- a plain radial gradient (dark center fading
   // smoothly all the way to fully transparent), NOT a blurred copy of the letterform's own
@@ -2915,6 +2874,35 @@ function buildLogo(){
   logoShadow.position.set(8, -14, -16);
   scene.add(logoShadow);
 
+  // [v37] inner highlight -- a Soft-Light-style brightening pass sitting just in front of the
+  // resolved mark, meant to be the clear "peak" of the whole sequence (brighter/more refined
+  // than any scattered shard's own glow tier, see TIER_PRESETS). True soft-light needs to read
+  // what's already composited behind it, which isn't available without a render-target pass;
+  // this approximates the same CONTRAST-PRESERVING quality soft-light is chosen for (it lifts
+  // an already-bright area much more than a dark one, unlike a flat additive wash which lifts
+  // everything equally) by weighting its own strength per-pixel by that pixel's luminance in
+  // the very same cutout texture -- already-bright facets catch the highlight, dark crack
+  // grooves stay dark, exactly the selective brightening soft-light is known for.
+  const highlightMat = new THREE.ShaderMaterial({
+    uniforms: { map: { value: cutoutTex }, uAlpha: { value: 0 } },
+    vertexShader: `varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader: `uniform sampler2D map;uniform float uAlpha;varying vec2 vUv;
+      void main(){
+        vec4 tex=texture2D(map,vUv);
+        if(tex.a<.05)discard;
+        float lum=dot(tex.rgb,vec3(0.299,0.587,0.114));
+        float w=smoothstep(0.32,0.92,lum);
+        gl_FragColor=vec4(vec3(1.0,0.93,0.82)*w,tex.a*w*uAlpha);
+      }`,
+    transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, depthTest:false,
+  });
+  logoHighlight = new THREE.Mesh(geom, highlightMat);
+  logoHighlight.userData.kaKind = 'logoHighlight';
+  logoHighlight.scale.set(dw, dh, 1);
+  logoHighlight.position.set(0, 0, 0.5);
+  // Per-piece emission now supplies the highlights.
+  logoHighlight.visible = false;
+
   const mat = new THREE.ShaderMaterial({
     uniforms: {
       map: { value: cutoutTex }, uAlpha: { value: 0 },
@@ -2926,7 +2914,6 @@ function buildLogo(){
       uSweepDir: { value: new THREE.Vector2(0.42, 0.58) },
       uWipeY: { value: -1 }, uWipeBand: { value: WIPE_BAND }, uTime: { value: 0 },
       uLogoWH: { value: new THREE.Vector2(dw, dh) },
-      uBlast: { value: 0 },
       uCharge: { value: 0 },
     },
     vertexShader: pulseVertex, fragmentShader: pulseFragment,
@@ -2935,9 +2922,27 @@ function buildLogo(){
   logoMesh = new THREE.Mesh(geom, mat);
   logoMesh.scale.set(dw, dh, 1);
   logoMesh.position.set(0,0,0);
+  // Explicit draw order, not depth-buffer order: logoMesh is transparent+depthWrite:false (like
+  // everything else here), so the z-buffer alone can't be trusted to occlude other transparent
+  // objects behind it. Retracted skill bubbles instead get a renderOrder BELOW this (see
+  // updateIcons), so the painter's-algorithm draw itself covers them wherever the logo's own
+  // texture alpha is opaque -- genuine occlusion, same trick joinSeams/resolvedEmission already
+  // use in reverse (renderOrder ABOVE this) to guarantee they layer over the logo.
+  logoMesh.renderOrder = 5;
   logoMesh.userData.dw = dw; logoMesh.userData.dh = dh;
   logoMesh.userData.kaKind = 'resolvedLogo'; // v19 diagnostics -- see window.__kaDebugScene()
   scene.add(logoMesh);
+  buildLogoAlphaMap();
+  buildSurfaceParticles();
+  buildResolvedEmission();
+}
+
+// CPU alpha mask is used only for interaction hit tests, never as a rendered particle fill.
+function buildLogoAlphaMap(){
+  const img=cutoutTex.image, w=256, h=Math.max(1,Math.round(w*img.height/img.width));
+  const off=document.createElement('canvas');off.width=w;off.height=h;
+  const ctx=off.getContext('2d');ctx.drawImage(img,0,0,w,h);
+  logoAlphaMap={data:ctx.getImageData(0,0,w,h).data,w,h};
 }
 
 // ---------------------------------------------------- ambient crystals --
@@ -3285,20 +3290,194 @@ function buildIcons(){
       floatFreqY: 0.00095 + Math.random()*0.00035,
       floatAmpX: ICON_SIZE * (0.06 + Math.random()*0.03),
       floatAmpY: ICON_SIZE * (0.07 + Math.random()*0.03),
+      // Retract/expand (see setBubbles/updateIcons): retractT is the live 0(expanded)-1(retracted)
+      // blend; retractFrom/retractTo/retractStart/retractDur describe the in-flight animation
+      // toward it. curveDir/curveAmp give this bubble its own slightly arced (not straight-line)
+      // travel path, per Part C.
+      retractT: 0, retractFrom: 0, retractTo: 0, retractStart: -Infinity, retractDur: BUBBLE_RETRACT_DUR,
+      curveDir: Math.random() < 0.5 ? -1 : 1,
+      curveAmp: 0.16 + Math.random()*0.14,
     });
   });
 }
 
-// ------------------------------------------------------------ input --
-window.addEventListener('mousemove', (e) => {
-  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = (e.clientY / window.innerHeight) * 2 - 1;
-});
-window.addEventListener('touchmove', (e) => {
-  if (!e.touches || !e.touches[0]) return;
-  mouse.x = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
-  mouse.y = (e.touches[0].clientY / window.innerHeight) * 2 - 1;
-}, { passive:true });
+// Surface interaction never changes the original crystal material or its opacity.
+const surfacePointer={x:0,y:0,pending:false,lastX:NaN,lastY:NaN};
+const surfaceRay=new THREE.Raycaster(),surfaceNDC=new THREE.Vector2();
+let surfaceParticles=null,cometTrails=null;
+function sampleCutoutAlpha(u,v){
+  if(!logoAlphaMap||u<0||u>1||v<0||v>1)return 0;
+  const x=Math.min(logoAlphaMap.w-1,Math.floor(u*logoAlphaMap.w));
+  const y=Math.min(logoAlphaMap.h-1,Math.floor((1-v)*logoAlphaMap.h));
+  return logoAlphaMap.data[(y*logoAlphaMap.w+x)*4+3]/255;
+}
+function queueSurfacePointer(e){
+  mouse.x=e.clientX/window.innerWidth*2-1;mouse.y=e.clientY/window.innerHeight*2-1;
+  if(reducedMotion||document.hidden)return;
+  const path=e.composedPath?e.composedPath():[e.target];
+  if(path.some(node=>node.matches&&node.matches('a,button,input,textarea,select,nav,[role="dialog"],.site-section'))){surfacePointer.pending=false;surfacePointer.lastX=NaN;return;}
+  if(e.type==='pointermove'&&e.clientX===surfacePointer.x&&e.clientY===surfacePointer.y)return;
+  if(e.type==='pointerdown')surfacePointer.lastX=NaN;
+  surfacePointer.x=e.clientX;surfacePointer.y=e.clientY;surfacePointer.pending=true;
+}
+window.addEventListener('pointermove',queueSurfacePointer,{passive:true});
+window.addEventListener('pointerdown',queueSurfacePointer,{passive:true});
+window.addEventListener('pointercancel',()=>{surfacePointer.pending=false;surfacePointer.lastX=NaN;},{passive:true});
+window.addEventListener('pointerout',e=>{if(!e.relatedTarget){surfacePointer.pending=false;surfacePointer.lastX=NaN;}},{passive:true});
+
+// Bubble retract/expand click-to-toggle (Part B) + hover cue (Part E.12). Kept deliberately
+// separate from queueSurfacePointer/surfacePointer above: that pointer tracking short-circuits
+// under reducedMotion (it only feeds the decorative dust-particle system), but the hover cursor
+// cue and the click hit-test are real affordances that must keep working either way.
+let hoverPointerX = NaN, hoverPointerY = NaN;
+window.addEventListener('pointermove', e => { hoverPointerX = e.clientX; hoverPointerY = e.clientY; }, {passive:true});
+function raycastLogo(clientX, clientY){
+  if (!Number.isFinite(clientX) || !logoMesh) return null;
+  surfaceNDC.set(clientX/window.innerWidth*2-1, 1-clientY/window.innerHeight*2);
+  camera.updateMatrixWorld(); logoMesh.updateMatrixWorld();
+  surfaceRay.setFromCamera(surfaceNDC, camera);
+  const hit = surfaceRay.intersectObject(logoMesh, false)[0];
+  return (hit && hit.uv && sampleCutoutAlpha(hit.uv.x, hit.uv.y) > .5) ? hit : null;
+}
+// Only "live" once Part A's one-time auto-retract has happened -- see bubbleAutoRetractArmed.
+function bubbleToggleAvailable(){ return phase === 'held' && bubbleAutoRetractArmed; }
+function updateLogoHoverCue(){
+  const over = bubbleToggleAvailable() && !!raycastLogo(hoverPointerX, hoverPointerY);
+  if (over !== logoHoverActive){
+    logoHoverActive = over;
+    document.body.style.cursor = over ? 'pointer' : '';
+  }
+}
+window.addEventListener('click', e => {
+  if (!bubbleToggleAvailable()) return;
+  const path = e.composedPath ? e.composedPath() : [e.target];
+  if (path.some(node => node.matches && node.matches('a,button,input,textarea,select,nav,[role="dialog"],.site-section'))) return;
+  if (raycastLogo(e.clientX, e.clientY)) setBubbles(!bubblesRetracted, lastTs);
+}, {passive:true});
+function buildSurfaceParticles(){
+  const count=isMobile?64:112,positions=new Float32Array(count*3),alpha=new Float32Array(count),sizes=new Float32Array(count),tints=new Float32Array(count);
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.BufferAttribute(positions,3).setUsage(THREE.DynamicDrawUsage));
+  geometry.setAttribute('aAlpha',new THREE.BufferAttribute(alpha,1).setUsage(THREE.DynamicDrawUsage));
+  geometry.setAttribute('aSize',new THREE.BufferAttribute(sizes,1).setUsage(THREE.DynamicDrawUsage));
+  geometry.setAttribute('aTint',new THREE.BufferAttribute(tints,1).setUsage(THREE.DynamicDrawUsage));
+  const material=new THREE.ShaderMaterial({
+    uniforms:{uDpr:{value:renderer.getPixelRatio()}},
+    vertexShader:`attribute float aAlpha,aSize,aTint;uniform float uDpr;varying float vAlpha,vTint;
+      void main(){vAlpha=aAlpha;vTint=aTint;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_PointSize=max(1.,aSize*uDpr);}`,
+    // [fix] was a flat vec3(0.0) (pure black) with NormalBlending -- read as black particles
+    // scattering across the bright crystal whenever the cursor moved over it. Each particle now
+    // gets its own warm red/gold/white mix (aTint, set once per emission below) and blends
+    // additively, so it can only ever ADD light on top of the crystal, never darken it.
+    fragmentShader:`varying float vAlpha,vTint;void main(){float r=length(gl_PointCoord-.5);if(r>.5||vAlpha<=0.)discard;
+      vec3 ember=vec3(0.95,0.22,0.08);vec3 gold=vec3(1.0,0.66,0.24);vec3 white=vec3(1.0,0.95,0.85);
+      vec3 col=mix(ember,gold,clamp(vTint*2.0,0.0,1.0));
+      col=mix(col,white,clamp(vTint*2.0-1.0,0.0,1.0));
+      gl_FragColor=vec4(col,vAlpha*(1.-smoothstep(.24,.5,r)));}`,
+    transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false,toneMapped:false
+  });
+  const mesh=new THREE.Points(geometry,material);mesh.frustumCulled=false;mesh.renderOrder=12;mesh.visible=false;
+  mesh.userData.kaKind='surfaceDispersion';scene.add(mesh);
+  const slots=Array.from({length:count},()=>({age:0,life:0,x:0,y:0,z:0,vx:0,vy:0,vz:0,size:0,tint:0}));
+  surfaceParticles={mesh,positions,alpha,sizes,tints,slots,next:0};
+}
+function clearSurfaceParticles(){
+  surfacePointer.pending=false;surfacePointer.lastX=NaN;surfacePointer.lastY=NaN;
+  if(!surfaceParticles)return;
+  surfaceParticles.slots.forEach(slot=>slot.life=0);surfaceParticles.alpha.fill(0);surfaceParticles.mesh.visible=false;
+  surfaceParticles.mesh.geometry.attributes.aAlpha.needsUpdate=true;
+}
+function emitSurfaceParticles(x,y,moveX=0,moveY=0,count=3){
+  const system=surfaceParticles;if(!system)return;
+  for(let n=0;n<count;n++){
+    const angle=Math.atan2(y,x)+(Math.random()-.5)*1.6;
+    const px=x+(Math.random()-.5)*6,py=y+(Math.random()-.5)*6;
+    if(sampleCutoutAlpha(px/logoMesh.userData.dw+.5,py/logoMesh.userData.dh+.5)<.5)continue;
+    const slot=system.slots[system.next];system.next=(system.next+1)%system.slots.length;
+    slot.age=0;slot.life=.75+Math.random()*.4;slot.x=px;slot.y=py;slot.z=3;
+    const speed=65+Math.random()*65;
+    slot.vx=Math.cos(angle)*speed+Math.max(-25,Math.min(25,moveX*2));
+    slot.vy=Math.sin(angle)*speed+Math.max(-25,Math.min(25,moveY*2));
+    slot.vz=15+Math.random()*25;slot.size=1.5+Math.random()*1.2;
+    slot.tint=Math.random(); // 0 = ember red, 0.5 = warm gold, 1 = near-white -- a genuine mix, not one flat color
+  }
+}
+function updateSurfaceParticles(dt){
+  if(!surfaceParticles)return;
+  const ready=phase==='held'||(phase==='assembling'&&logoMesh.material.uniforms.uWipeY.value>=1.19);
+  if(reducedMotion||!ready){clearSurfaceParticles();return;}
+  const system=surfaceParticles,seconds=Math.min(.05,Math.max(0,dt/1000));
+  if(surfacePointer.pending){
+    surfacePointer.pending=false;
+    surfaceNDC.set(surfacePointer.x/window.innerWidth*2-1,1-surfacePointer.y/window.innerHeight*2);
+    camera.updateMatrixWorld();logoMesh.updateMatrixWorld();surfaceRay.setFromCamera(surfaceNDC,camera);
+    const hit=surfaceRay.intersectObject(logoMesh,false)[0];
+    if(hit&&hit.uv&&sampleCutoutAlpha(hit.uv.x,hit.uv.y)>.5){
+      const x=hit.point.x,y=hit.point.y,dx=Number.isFinite(surfacePointer.lastX)?x-surfacePointer.lastX:0,dy=Number.isFinite(surfacePointer.lastY)?y-surfacePointer.lastY:0;
+      // Distance-based emission prevents high-refresh screens from producing denser noise.
+      if(!Number.isFinite(surfacePointer.lastX)||Math.hypot(dx,dy)>2){
+        const count=Math.min(6,Math.max(2,Math.floor(Math.hypot(dx,dy)/3)));
+        emitSurfaceParticles(x,y,dx,dy,count);surfacePointer.lastX=x;surfacePointer.lastY=y;
+      }
+    }else{surfacePointer.lastX=NaN;surfacePointer.lastY=NaN;}
+  }
+  let active=0;
+  system.slots.forEach((slot,i)=>{
+    if(!slot.life){system.alpha[i]=0;return;}
+    slot.age+=seconds;if(slot.age>=slot.life){slot.life=0;system.alpha[i]=0;return;}
+    active++;slot.x+=slot.vx*seconds;slot.y+=slot.vy*seconds;slot.z+=slot.vz*seconds;
+    const life=slot.age/slot.life;
+    system.positions[i*3]=slot.x;system.positions[i*3+1]=slot.y;system.positions[i*3+2]=slot.z;
+    system.alpha[i]=Math.min(1,slot.age/.045)*Math.pow(1-life,1.1)*.88;
+    system.sizes[i]=slot.size*(1-life*.75);
+    system.tints[i]=slot.tint;
+  });
+  system.mesh.visible=active>0;
+  if(active){for(const attribute of Object.values(system.mesh.geometry.attributes))attribute.needsUpdate=true;system.mesh.material.uniforms.uDpr.value=renderer.getPixelRatio();}
+}
+
+// One instanced draw for a bounded selection of Tier 2/3 fragments; no trail-object spawning.
+function buildCometTrails(){
+  const selected=shards.filter(s=>s.glowTier>=2).sort((a,b)=>b.glowTier-a.glowTier).slice(0,isMobile?3:6);
+  const geometry=new THREE.PlaneGeometry(1,1);
+  const material=new THREE.ShaderMaterial({
+    vertexShader:`varying vec2 vUv;varying vec3 vColor;
+      void main(){vUv=uv;vColor=instanceColor;gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.);}`,
+    fragmentShader:`varying vec2 vUv;varying vec3 vColor;
+      void main(){float width=mix(.04,.38,pow(vUv.x,.65));float crossSection=exp(-pow(abs(vUv.y-.5)/width,2.)*3.);
+        float envelope=pow(vUv.x,1.7)*smoothstep(0.,.12,vUv.x)*(1.-smoothstep(.96,1.,vUv.x));
+        vec3 warm=mix(vec3(1.,.24,.035),vec3(1.,.88,.63),vUv.x);
+        gl_FragColor=vec4(warm*vColor,crossSection*envelope*.8);}`,
+    transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:true,toneMapped:false
+  });
+  const mesh=new THREE.InstancedMesh(geometry,material,selected.length),dummy=new THREE.Object3D(),color=new THREE.Color();
+  mesh.frustumCulled=false;mesh.userData.kaKind='cometTrails';mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const slots=selected.map(shard=>({shard,last:0,x:0,y:0,z:0}));
+  slots.forEach((slot,i)=>{dummy.scale.set(0,0,0);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);mesh.setColorAt(i,color.setRGB(0,0,0));});
+  scene.add(mesh);mesh.visible=false;cometTrails={mesh,dummy,color,slots};
+}
+function updateCometTrails(ts){
+  if(!cometTrails)return;
+  const {mesh,dummy,color,slots}=cometTrails;
+  if(reducedMotion||phase!=='assembling'){mesh.visible=false;slots.forEach(slot=>slot.last=0);return;}
+  let active=0;
+  slots.forEach((slot,i)=>{
+    const s=slot.shard,p=s.mesh.position,dt=slot.last?Math.max(.001,(ts-slot.last)/1000):0;
+    const vx=dt?(p.x-slot.x)/dt:0,vy=dt?(p.y-slot.y)/dt:0,speed=Math.hypot(vx,vy);
+    slot.x=p.x;slot.y=p.y;slot.z=p.z;slot.last=ts;
+    const travel=s.lt>0&&s.lt<1&&s.mesh.visible&&s.mesh.material.uniforms.uOpacity.value>.05;
+    const strength=travel?smootherStep((speed-35)/350)*(1-smootherStep((s.lt-.8)/.2)):0;
+    if(strength>.005){
+      active++;const length=Math.min(125,Math.max(s.w,s.h)*1.4+speed*.10),width=Math.min(20,Math.max(3,Math.min(s.w,s.h)*.55));
+      dummy.position.set(p.x-vx/speed*length*.5,p.y-vy/speed*length*.5,p.z-.8);
+      dummy.rotation.set(0,0,Math.atan2(vy,vx));dummy.scale.set(length,width,1);
+      color.setRGB(strength,strength,strength);
+    }else{dummy.scale.set(0,0,0);color.setRGB(0,0,0);}
+    dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);mesh.setColorAt(i,color);
+  });
+  mesh.visible=active>0;mesh.instanceMatrix.needsUpdate=true;mesh.instanceColor.needsUpdate=true;
+}
+
 
 function onResize(){
   camera.aspect = window.innerWidth/window.innerHeight;
@@ -3335,6 +3514,7 @@ replayBtn?.addEventListener('click', () => {
   phase = 'disassembling';
   phaseStart = performance.now();
   replayBtn?.classList.remove('on');
+  clearSurfaceParticles();
 });
 
 // ------------------------------------------------------------- static (reduced motion) --
@@ -3344,6 +3524,8 @@ replayBtn?.addEventListener('click', () => {
 // function instead renders the single correct FINAL state once, synchronously, with no animation
 // and nothing to leak early -- there's no premature-reveal bug this could ever reproduce.
 function settleStatic(){
+  clearSurfaceParticles();
+  if(cometTrails)cometTrails.mesh.visible=false;
   if(joinSeams)joinSeams.visible=false;
   shards.forEach(s => {
     s.mesh.position.set(s.landedPos.x, s.landedPos.y, s.landedPos.z);
@@ -3352,8 +3534,10 @@ function settleStatic(){
     s.mesh.visible = false;
   });
   logoMesh.material.uniforms.uAlpha.value = 1;
-  logoGlow.material.opacity = 0.18;
+  logoGlow.material.opacity = 0;
+  updateCrystalEmission(0, true);
   logoShadow.material.opacity = 0.32;
+  logoHighlight.material.uniforms.uAlpha.value = 0.5;
   logoMesh.scale.set(logoMesh.userData.dw, logoMesh.userData.dh, 1);
   icons.forEach(ic => {
     ic.sprite.position.set(ic.landX, ic.landY, ic.landZ);
@@ -3374,7 +3558,7 @@ function settleStatic(){
 // cause. Patching each new cause where it was found (as v8's clamp, then v9's narrower version of
 // the same clamp, both did) fixes the specific symptom but leaves the next different cause free to
 // reintroduce the same complaint. The actual fix is architectural: NO function anywhere in this
-// file is allowed to write logoMesh's uAlpha/uBlast/uWipeY, or logoGlow's opacity, directly --
+// file is allowed to write logoMesh's uAlpha/uWipeY, or logoGlow's opacity, directly --
 // every one of those writes, everywhere, goes through exactly these two functions, which are the
 // only code that ever touches those uniforms. There is exactly one legal window for either of
 // them to be nonzero -- the real reveal (assembling, once REVEAL_START is reached) through held,
@@ -3391,12 +3575,10 @@ function setResolvedMarkVisibility(alpha, blast, wipeY, currentT){
     // regression is impossible to miss in development but never actually reaches the screen.
     console.error('[LogoAssembly] blocked an attempt to reveal the resolved mark outside its window', { phase, currentT, REVEAL_START, alpha, blast, wipeY });
     logoMesh.material.uniforms.uAlpha.value = 0;
-    logoMesh.material.uniforms.uBlast.value = 0;
     logoMesh.material.uniforms.uWipeY.value = WIPE_Y_FULLY_HIDDEN;
     return;
   }
   logoMesh.material.uniforms.uAlpha.value = alpha;
-  logoMesh.material.uniforms.uBlast.value = blast;
   logoMesh.material.uniforms.uWipeY.value = wipeY;
 }
 function setLogoGlowOpacity(opacity, currentT){
@@ -3408,11 +3590,17 @@ function setLogoGlowOpacity(opacity, currentT){
     console.error('[LogoAssembly] blocked an attempt to show the resolved mark\'s glow outside its window', { phase, currentT, REVEAL_START, opacity });
     logoGlow.material.opacity = 0;
     logoShadow.material.opacity = 0;
+    logoHighlight.material.uniforms.uAlpha.value = 0;
     return;
   }
   logoGlow.material.opacity = opacity;
   logoShadow.material.opacity = Math.min(opacity * 1.8, 0.55);
+  // Inner highlight rides the same gated opacity, scaled up to be the clear "peak" moment --
+  // meaningfully brighter than any scattered shard's own Tier 3 max glow (see TIER_PRESETS).
+  logoHighlight.material.uniforms.uAlpha.value = Math.min(opacity * 2.6, 0.85);
 }
+
+const LOGO_HELD_GLOW = 0.22;
 
 // GOD MODE v15: same principle as setResolvedMarkVisibility above, applied to the 169 real
 // shards. updateShardsAssembling only ever fades a landed shard's uOpacity toward 0 via
@@ -3505,7 +3693,7 @@ function syncHero(){
     scheduleHero();
   }
 }
-document.addEventListener('visibilitychange',syncHero);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)clearSurfaceParticles();syncHero();});
 window.addEventListener('pagehide',()=>{cancelAnimationFrame(heroFrame);heroFrame=0;if(!heroPausedAt)heroPausedAt=performance.now();});
 window.addEventListener('pageshow',syncHero);
 function frame(ts){
@@ -3515,12 +3703,14 @@ function frame(ts){
   scheduleHero();
   if (lastFrameT === 0) lastFrameT = ts;
   const dt = ts - lastFrameT; lastFrameT = ts;
+  lastTs = ts; // read by the click-to-toggle handler above, which fires outside this loop
   // Gallery scrolling gets the GPU once reconstruction has finished.
   if (phase === 'held' && (!heroVisible || document.hidden)) return;
   const t = ts - phaseStart;
+  updateLogoHoverCue(); // no-op unless the click-to-toggle interaction is actually live
 
   // Driven unconditionally, every frame, off the raw animation clock (ts) rather than the
-  // per-phase-relative t -- this is what lets the shader's continuous rim shimmer (and the
+  // per-phase-relative t -- this is what lets the shader's subtle facet lighting (and the
   // wipe-boundary noise during assembly) keep animating smoothly straight through every phase
   // transition instead of freezing whenever a phase that doesn't explicitly touch uTime is active.
   logoMesh.material.uniforms.uTime.value = ts;
@@ -3589,8 +3779,8 @@ function frame(ts){
         sequenceCompleteFired = true;
         window.dispatchEvent(new CustomEvent('ka-sequence-complete'));
       }
-      shineActive = false;
-      shineNextAt = SHINE_INTERVAL_MIN + Math.random()*(SHINE_INTERVAL_MAX - SHINE_INTERVAL_MIN);
+
+
       // GOD MODE v9: arm the first ambient interior sparkle for this held cycle
 
       replayBtn?.classList.add('on');
@@ -3606,36 +3796,13 @@ function frame(ts){
     // its readers explicitly anyway (consistent with how every other one-shot effect here resets
     // on phase entry) rather than relying on that timing margin
     logoMesh.material.uniforms.uCharge.value = 0;
-    blastEnv = 0;
-    // GOD MODE v10: the mark's own shape-visibility uniforms (uAlpha/uBlast/uWipeY) are only ever
-    // written through setResolvedMarkVisibility now -- 'held' is one of that gate's allowed
-    // windows, so this keeps the mark fully, cleanly revealed (alpha 1, no residual blast,
-    // wipeYGlobal already at its fully-open value from the reveal that just finished) rather than
-    // writing uBlast directly.
+    // Keep the resolved crystal fully visible throughout the resting phase.
     setResolvedMarkVisibility(1, 0, wipeYGlobal, t);
+    setLogoGlowOpacity(LOGO_HELD_GLOW, t);
     keyLight.intensity = KEY_LIGHT_BASE;
     rimLight.intensity = RIM_LIGHT_BASE;
 
-    // continuous specular shine: once at rest, the crystal keeps catching the light every
-    // 5-6s (randomized per cycle, not a metronomic fixed 5.000s) instead of only once right
-    // after it resolves. Direction/angle is re-randomized (randomizeSweep) each time a new
-    // sweep starts, so consecutive glints don't all catch the light from the same side.
-    if (t >= shineNextAt && !shineActive){
-      shineActive = true;
-      shineStartT = t;
-      randomizeSweep();
-    }
-    if (shineActive){
-      const localT = t - shineStartT;
-      const shineT = clamp01(localT / SHINE_SWEEP_DUR);
-      applySweepUniform(logoMesh, shineT, smootherStep);
-      if (localT >= SHINE_SWEEP_DUR){
-        shineActive = false;
-        shineNextAt = t + SHINE_INTERVAL_MIN + Math.random()*(SHINE_INTERVAL_MAX - SHINE_INTERVAL_MIN);
-      }
-    } else {
-      logoMesh.material.uniforms.uSweepPos.value = -1;
-    }
+    logoMesh.material.uniforms.uSweepPos.value = -1;
 
     updateAmbientShards(ts); // SUPERCHARGE: keep the ambient layer alive through the held/resting state
 
@@ -3717,11 +3884,14 @@ function frame(ts){
   // separate "clean up after everyone" pass to maintain, extend, or accidentally carve a new
   // exception into -- the guarantee lives at the write site, not in a patch applied after it.
 
+  updateCrystalEmission(ts,false,dt);
+  updateSurfaceParticles(dt);
+  updateCometTrails(ts);
   updateSkillCallouts();
   renderer.render(scene, camera);
 
   if (phase === 'shattered' && ts-phaseStart >= heroHold){
-    randomizeSweep();phase='assembling';phaseStart=ts;
+    phase='assembling';phaseStart=ts;
   }
 }
 
@@ -4004,6 +4174,24 @@ function updateShardsAssembling_LEGACY_10piece_v27(ts, t){
 // updateShardsAssembling (same names, new bodies, defined above) are what the phase machine
 // actually invokes now.
 // ============================================================================
+// ------------------------------------------------------------ glow tier system --
+// Four discrete glow tiers, assigned once per shard at build time and stable for its whole
+// scattered flight (never re-picked frame to frame) -- weighted so most pieces land in the
+// middle tiers, with true no-glow and true max-glow pieces staying comparatively rare accents.
+// TIER_PRESETS[i] = [innerMul, outerMul]: multipliers on top of the existing twinkle/shineWarmth
+// ambient glow, kept separate from the approach/join escalation (sparkEnv, motionGlow), which
+// still applies on top of every tier including 0 -- a plain shard still gets its join flash.
+const TIER_PRESETS = [ [0, 0], [0.32, 0.12], [0.68, 0.55], [1.0, 1.0] ];
+const TIER_WEIGHTS = [0.15, 0.40, 0.35, 0.10]; // tier 0..3, sums to 1
+function pickGlowTier(){
+  let r = Math.random(), acc = 0;
+  for (let tier = 0; tier < TIER_WEIGHTS.length; tier++){
+    acc += TIER_WEIGHTS[tier];
+    if (r < acc) return tier;
+  }
+  return TIER_WEIGHTS.length - 1;
+}
+
 function buildShards(){
   const shardList = MANIFEST.shards;
   const geomBase = new THREE.PlaneGeometry(1,1);
@@ -4103,6 +4291,7 @@ function buildShards(){
         // see updateShardsIdle/Assembling for the mix toward RESOLVED_TINT (neutral, i.e. the
         // texture's own true polished color) as each shard actually flies into place.
         uTint: { value: new THREE.Vector3(RAW_TINT.x, RAW_TINT.y, RAW_TINT.z) },
+        uGlow: { value: new THREE.Vector3(0, 0, 0) }, // ambient scattered-phase shine, see updateShardsIdle
       },
       vertexShader: shardVertex, fragmentShader: shardFragment,
       transparent: true, side: THREE.DoubleSide, depthWrite: false,
@@ -4253,6 +4442,21 @@ function buildShards(){
       // logo as pieces click into place -- not one flash tacked onto an already-finished piece.
       impactAt: null,
       pairSparked: false,
+      // Ambient scattered-phase shine -- baked once per shard (own phase/frequency/intensity)
+      // so all 169 pieces, down to the smallest dust-sized fragments, twinkle asynchronously
+      // while drifting rather than either sitting flat or flashing in unison. See
+      // updateShardsIdle for where this is actually read each frame.
+      shineSeed: Math.random()*Math.PI*2,
+      shineFreq: 0.0005 + Math.random()*0.0009,
+      // [tightened] was 0.55-1.25 (2.27x spread) -- combined with the twinkle sine's own
+      // 0.42-1.0 floor, the total spread was wide enough that some shards read as barely lit
+      // ("normal only") right next to others reading as blown-out bright, rather than one
+      // consistent glow language with just gentle per-shard variation. Narrower band, same idea.
+      shineWarmth: 0.88 + Math.random()*0.3,
+      // Glow tier (0=none, 1=minimal, 2=medium, 3=max) -- picked once here, read every frame by
+      // updateShardsIdle/Assembling as a multiplier on the ambient twinkle/halo above. See
+      // TIER_PRESETS.
+      glowTier: pickGlowTier(),
       // true only for a genuine statistical outlier (see the precompute-pass note above), never
       // for a normal large structural piece.
       isMegaOutlier,
@@ -4326,9 +4530,221 @@ function buildShards(){
   });
 }
 
+﻿// Surface-derived emission: one RGB mask atlas and one instanced draw for every piece.
+// R stores sharp edges/facets, G close bloom, B wide atmospheric scattering.
+let shardGlow = null, resolvedEmission = null;
+function buildShardGlow(){
+  const tile=128,pad=24,inner=tile-pad*2,cols=Math.ceil(Math.sqrt(shards.length));
+  const atlas=document.createElement('canvas');atlas.width=atlas.height=cols*tile;
+  const out=atlas.getContext('2d'),source=document.createElement('canvas'),blur=document.createElement('canvas');
+  source.width=source.height=blur.width=blur.height=tile;
+  const ctx=source.getContext('2d',{willReadFrequently:true}),bc=blur.getContext('2d',{willReadFrequently:true});
+  const rects=new Float32Array(shards.length*4),seeds=new Float32Array(shards.length*3);
+  shards.forEach((shard,i)=>{
+    const entry=MANIFEST.shards[i],rect=entry.atlas;
+    ctx.clearRect(0,0,tile,tile);ctx.save();
+    if(entry.fracturePolygon){ctx.beginPath();entry.fracturePolygon.forEach((p,j)=>{
+      const x=pad+(p.x+.5)*inner,y=pad+(.5-p.y)*inner;
+      if(j)ctx.lineTo(x,y);else ctx.moveTo(x,y);
+    });ctx.closePath();ctx.clip();}
+    ctx.drawImage(atlasTex.image,rect.x,rect.y,rect.w,rect.h,pad,pad,inner,inner);ctx.restore();
+    const pixels=ctx.getImageData(0,0,tile,tile),original=new Uint8ClampedArray(pixels.data);
+    const luminance=new Float32Array(tile*tile),offsets=[-1,1,-tile,tile];
+    for(let n=0;n<luminance.length;n++){const k=n*4;luminance[n]=(original[k]*.299+original[k+1]*.587+original[k+2]*.114)/255;}
+    for(let y=0;y<tile;y++)for(let x=0;x<tile;x++){
+      const n=y*tile+x,k=n*4,a=original[k+3]/255;
+      let edge=0,contrast=0;
+      if(x>0&&y>0&&x<tile-1&&y<tile-1){for(const d of offsets){
+        edge=Math.max(edge,a-original[(n+d)*4+3]/255);contrast=Math.max(contrast,Math.abs(luminance[n]-luminance[n+d]));
+      }}
+      // Crack lips and bright facets emit; dark interiors retain their original contrast.
+      const energy=a*Math.min(1,edge*.85+contrast*.5+Math.pow(luminance[n],2.4)*.38);
+      pixels.data[k]=pixels.data[k+1]=pixels.data[k+2]=255;pixels.data[k+3]=Math.round(energy*255);
+    }
+    ctx.putImageData(pixels,0,0);
+    bc.clearRect(0,0,tile,tile);bc.filter='blur(2px)';bc.drawImage(source,0,0);
+    const near=bc.getImageData(0,0,tile,tile).data;
+    bc.clearRect(0,0,tile,tile);bc.filter='blur(7px)';bc.drawImage(source,0,0);bc.filter='none';
+    const far=bc.getImageData(0,0,tile,tile).data;
+    for(let k=0;k<pixels.data.length;k+=4){
+      pixels.data[k]=pixels.data[k+3];pixels.data[k+1]=near[k+3];pixels.data[k+2]=far[k+3];pixels.data[k+3]=255;
+    }
+    const col=i%cols,row=Math.floor(i/cols);out.putImageData(pixels,col*tile,row*tile);
+    rects.set([col/cols,1-(row+1)/cols,1/cols,1/cols],i*4);
+    seeds.set([shard.shineSeed,.55+(i*0.61803398875%1)*.6,.7+(i*0.41421356%1)*.6],i*3);
+  });
+  const texture=new THREE.CanvasTexture(atlas);texture.generateMipmaps=false;texture.minFilter=THREE.LinearFilter;
+  const geom=new THREE.PlaneGeometry(1,1);
+  geom.setAttribute('aRect',new THREE.InstancedBufferAttribute(rects,4));
+  geom.setAttribute('aEmission',new THREE.InstancedBufferAttribute(seeds,3));
+  const mat=new THREE.ShaderMaterial({
+    uniforms:{map:{value:texture},uTime:{value:0},uMotion:{value:1}},
+    vertexShader:`attribute vec4 aRect;attribute vec3 aEmission;varying vec2 vUv,vLocal;varying vec3 vEmission,vStrength;
+      void main(){vLocal=uv;vUv=aRect.xy+uv*aRect.zw;vEmission=aEmission;vStrength=instanceColor;
+        gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.);}`,
+    fragmentShader:`uniform sampler2D map;uniform float uTime,uMotion;varying vec2 vUv,vLocal;varying vec3 vEmission,vStrength;
+      void main(){vec3 mask=texture2D(map,vUv).rgb;
+        float pulse=1.+uMotion*(.07*sin(uTime*.63*vEmission.z+vEmission.x)+.035*sin(uTime*1.13+vEmission.x*2.3));
+        float spark=pow(max(0.,sin(uTime*.71*vEmission.z+vEmission.x)),48.)*uMotion;
+        float facetSpot=pow(max(0.,sin(dot(vLocal,vec2(17.,23.))+vEmission.x)),16.);
+        vec3 hot=vec3(1.,.84,.57)*mask.r*(.65+spark*facetSpot*.7);
+        vec3 close=vec3(1.,.36,.075)*mask.g*1.35;
+        vec3 air=vec3(.95,.18,.025)*mask.b*1.1;
+        float boundary=smoothstep(0.,.06,min(min(vLocal.x,1.-vLocal.x),min(vLocal.y,1.-vLocal.y)));
+        vec3 emission=(hot+close+air)*pulse*vEmission.y*vStrength*boundary;
+        if(max(emission.r,max(emission.g,emission.b))<.001)discard;
+        gl_FragColor=vec4(emission,0.);}`,
+    transparent:true,blending:THREE.CustomBlending,
+    blendEquation:THREE.AddEquation,blendSrc:THREE.OneFactor,blendDst:THREE.OneFactor,
+    blendEquationAlpha:THREE.AddEquation,blendSrcAlpha:THREE.ZeroFactor,blendDstAlpha:THREE.OneFactor,
+    depthWrite:false,depthTest:false,toneMapped:false
+  });
+  const inst=new THREE.InstancedMesh(geom,mat,shards.length),dummy=new THREE.Object3D(),color=new THREE.Color();
+  inst.userData.kaKind='pieceSurfaceEmission';inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  inst.frustumCulled=false;inst.renderOrder=7;
+  shards.forEach((s,i)=>{dummy.scale.set(0,0,0);dummy.updateMatrix();inst.setMatrixAt(i,dummy.matrix);inst.setColorAt(i,color.setRGB(0,0,0));});
+  inst.instanceColor.setUsage(THREE.DynamicDrawUsage);scene.add(inst);
+  shardGlow={inst,dummy,color,expansion:tile/inner,energies:new Float32Array(shards.length),lights:new Float32Array(shards.length*4),lastDustLight:-Infinity};
+}
+﻿// The assembled artwork has different contours from the source fragments. Sample its own
+// surface for emission, with independent timing owned by the nearest landed crystal.
+function buildResolvedEmission(){
+  const dw=logoMesh.userData.dw,dh=logoMesh.userData.dh,w=64,h=Math.round(64*dh/dw);
+  const data=new Uint8Array(w*h*4);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const px=((x+.5)/w-.5)*dw,py=((y+.5)/h-.5)*dh;
+    let best=Infinity,owner=0;
+    shards.forEach((s,i)=>{const d=(px-s.landedPos.x)**2+(py-s.landedPos.y)**2;if(d<best){best=d;owner=i;}});
+    const i=(y*w+x)*4;data[i]=Math.round((shards[owner].shineSeed/(Math.PI*2)%1)*255);
+    data[i+1]=Math.round((.35+(owner*.61803398875%1)*.55)*255);
+    data[i+2]=Math.round((.35+(owner*.41421356%1)*.55)*255);data[i+3]=255;
+  }
+  const owners=new THREE.DataTexture(data,w,h,THREE.RGBAFormat);
+  owners.minFilter=owners.magFilter=THREE.LinearFilter;owners.needsUpdate=true;
+  // Bake two soft bloom radii from the finished artwork once, never from raw shard outlines.
+  const bloomSource=document.createElement('canvas'),bloomCanvas=document.createElement('canvas');
+  const bw=512,bh=Math.round(bw*dh/dw),px=Math.round(bw*.1),py=Math.round(bh*.1);
+  bloomSource.width=bloomCanvas.width=bw+px*2;bloomSource.height=bloomCanvas.height=bh+py*2;
+  bloomSource.getContext('2d').drawImage(cutoutTex.image,px,py,bw,bh);
+  const bloomContext=bloomCanvas.getContext('2d');
+  bloomContext.filter='blur(18px)';bloomContext.globalAlpha=.7;bloomContext.drawImage(bloomSource,0,0);
+  bloomContext.filter='blur(6px)';bloomContext.globalAlpha=.85;bloomContext.drawImage(bloomSource,0,0);
+  const bloomTexture=new THREE.CanvasTexture(bloomCanvas);bloomTexture.generateMipmaps=false;bloomTexture.minFilter=THREE.LinearFilter;
+  const mat=new THREE.ShaderMaterial({
+    uniforms:{uBloom:{value:bloomTexture},map:{value:cutoutTex},uOwners:{value:owners},uStep:{value:new THREE.Vector2(3/CUT_W,3/CUT_H)},
+      uGlowEnvelope:{value:1},uWH:{value:new THREE.Vector2(dw,dh)},uTime:{value:0},uMotion:{value:1},uOpacity:{value:0},uReveal:{value:-2}},
+    vertexShader:`varying vec2 vUv,vBloomUv;void main(){vBloomUv=uv;vUv=uv*1.2-.1;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader:`uniform sampler2D map,uOwners,uBloom;uniform vec2 uStep,uWH;uniform float uTime,uMotion,uOpacity,uReveal,uGlowEnvelope;varying vec2 vUv,vBloomUv;
+      vec4 crystal(vec2 uv){if(uv.x<0.||uv.y<0.||uv.x>1.||uv.y>1.)return vec4(0.);return texture2D(map,uv);}
+      float energy(vec4 c){float l=dot(c.rgb,vec3(.299,.587,.114));return c.a*smoothstep(.12,.78,l);}
+      void main(){
+        vec4 c=crystal(vUv),left=crystal(vUv-vec2(uStep.x,0.)),right=crystal(vUv+vec2(uStep.x,0.));
+        vec4 up=crystal(vUv+vec2(0.,uStep.y)),down=crystal(vUv-vec2(0.,uStep.y));
+        float center=energy(c),near=(energy(left)+energy(right)+energy(up)+energy(down))*.25;
+        float far=(energy(crystal(vUv+uStep*vec2(3.,0.)))+energy(crystal(vUv-uStep*vec2(3.,0.)))+
+          energy(crystal(vUv+uStep*vec2(0.,3.)))+energy(crystal(vUv-uStep*vec2(0.,3.)))+
+          energy(crystal(vUv+uStep*vec2(2.,2.)))+energy(crystal(vUv+uStep*vec2(-2.,2.)))+
+          energy(crystal(vUv+uStep*vec2(2.,-2.)))+energy(crystal(vUv-uStep*vec2(2.,2.))))*.125;
+        float crack=abs(center-near),edge=max(0.,c.a-min(min(left.a,right.a),min(up.a,down.a)));
+        vec3 owner=texture2D(uOwners,clamp(vUv,0.,1.)).rgb;
+        float phase=owner.r*6.2831853,frequency=.45+owner.b*.55;
+        float pulse=1.+uMotion*.075*sin(uTime*frequency+phase);
+        float sparkle=uMotion*pow(max(0.,sin(uTime*(frequency+.13)+phase)),48.);
+        float hot=(crack*.8+edge*.35+center*.16)*c.a;
+        vec3 radiance=vec3(1.,.96,.84)*hot*(.75+sparkle*.35)+vec3(1.,.64,.12)*near*.24+vec3(1.,.24,.025)*far*.16;
+        vec4 bloom=texture2D(uBloom,vBloomUv);
+        // A visible soft halo outside the silhouette; restrained spill over sharp interior facets.
+        float bloomEnergy=dot(bloom.rgb,vec3(.5,.35,.15))*bloom.a;
+        vec3 haloColor=mix(vec3(1.,.24,.025),vec3(1.,.65,.14),smoothstep(.12,.65,bloom.a));
+        radiance+=haloColor*bloomEnergy*1.4*(1.-c.a*.82);
+        // Suppress all source RGB in dark transparent texels; only a soft sampled halo remains.
+        float radius=length((vUv-.5)*uWH)/(length(uWH)*.5);
+        float reveal=1.-smoothstep(uReveal-.11,uReveal+.11,radius);
+        radiance*=uGlowEnvelope*uOpacity*reveal*pulse*(.72+owner.g*.45);
+        if(max(radiance.r,max(radiance.g,radiance.b))<.001)discard;
+        gl_FragColor=vec4(radiance,0.);
+      }`,
+    transparent:true,blending:THREE.CustomBlending,
+    blendEquation:THREE.AddEquation,blendSrc:THREE.OneFactor,blendDst:THREE.OneFactor,
+    blendEquationAlpha:THREE.AddEquation,blendSrcAlpha:THREE.ZeroFactor,blendDstAlpha:THREE.OneFactor,
+    depthWrite:false,depthTest:false,toneMapped:false
+  });
+  resolvedEmission=new THREE.Mesh(new THREE.PlaneGeometry(1,1),mat);
+  resolvedEmission.scale.set(dw*1.2,dh*1.2,1);resolvedEmission.position.z=.5;
+  resolvedEmission.renderOrder=7;resolvedEmission.visible=false;resolvedEmission.userData.kaKind='resolvedSurfaceEmission';
+  scene.add(resolvedEmission);
+}
+
+// Existing approach envelopes are retained as small energy accents, never circular sprites.
+function setShardGlowHalo(index,x,y,z,w,h,mag){if(shardGlow)shardGlow.energies[index]=Math.max(0,mag||0);}
+// Active-frame time only: no timers, hidden-tab jumps, or opacity changes to the crystal.
+const finalGlowCycle={stage:'initial',elapsed:0,duration:5000};
+function advanceFinalGlow(dt,resting,still){
+  const cycle=finalGlowCycle;
+  if(!resting||still){cycle.stage='initial';cycle.elapsed=0;cycle.duration=5000;return 1;}
+  cycle.elapsed+=Math.min(250,Math.max(0,dt));
+  while(cycle.elapsed>=cycle.duration){
+    cycle.elapsed-=cycle.duration;
+    if(cycle.stage==='wait'){cycle.stage='pulse';cycle.duration=5000;}
+    else{cycle.stage='wait';cycle.duration=3000+Math.random()*5000;}
+  }
+  if(cycle.stage==='wait')return 0;
+  if(cycle.stage==='initial')return 1-smootherStep(cycle.elapsed/5000);
+  return cycle.elapsed<1400?smootherStep(cycle.elapsed/1400):1-smootherStep((cycle.elapsed-1400)/3600);
+}
+function updateCrystalEmission(ts,staticPose=false,dt=0){
+  if(!shardGlow)return;
+  if(resolvedEmission){
+    const u=resolvedEmission.material.uniforms;
+    u.uTime.value=ts*.001;u.uMotion.value=reducedMotion?0:1;
+    u.uGlowEnvelope.value=advanceFinalGlow(dt,phase==='held',staticPose||reducedMotion);
+    u.uOpacity.value=staticPose?1:logoMesh.material.uniforms.uAlpha.value;
+    u.uReveal.value=staticPose?1.2:logoMesh.material.uniforms.uWipeY.value;
+    resolvedEmission.visible=u.uOpacity.value>0;
+  }
+  const {inst,dummy,color,expansion,energies}=shardGlow;
+  inst.material.uniforms.uTime.value=ts/1000;inst.material.uniforms.uMotion.value=reducedMotion?0:1;
+  let activePieces=0;
+  shards.forEach((s,i)=>{
+    const resolved=staticPose||phase==='held';
+    const opacity=resolved?0:(s.mesh.visible?s.mesh.material.uniforms.uOpacity.value:0);
+    // During the reveal, carry each landed piece's light across the texture handoff.
+    const revealed=logoMesh&&logoMesh.material.uniforms.uAlpha.value>0&&s.lt>=1?
+      smootherStep((logoMesh.material.uniforms.uWipeY.value-s.landedR+.06)/.12)*logoMesh.material.uniforms.uAlpha.value:0;
+    // Raw shard imagery must fade with its shard, never persist around the resolved cutout.
+    const strength=opacity*(.85+Math.min(.3,energies[i]*.18));
+    if(strength>.001)activePieces++;
+    dummy.position.copy(s.mesh.position);dummy.rotation.copy(s.mesh.rotation);
+    if(resolved){dummy.position.set(s.landedPos.x,s.landedPos.y,s.landedPos.z);dummy.rotation.set(0,0,0);}
+    dummy.position.z+=.6;dummy.scale.set(s.w*expansion,s.h*expansion,1);dummy.updateMatrix();
+    inst.setMatrixAt(i,dummy.matrix);inst.setColorAt(i,color.setRGB(strength,strength,strength));
+    const pulse=1+(reducedMotion?0:.07*Math.sin(ts*.00063*(.7+(i*.41421356%1)*.6)+s.shineSeed));
+    const lightIndex=i*4,lights=shardGlow.lights;
+    lights[lightIndex]=dummy.position.x;lights[lightIndex+1]=dummy.position.y;
+    lights[lightIndex+2]=dummy.position.z;lights[lightIndex+3]=Math.max(strength,(resolved?.85:revealed*.85)*(resolvedEmission?resolvedEmission.material.uniforms.uGlowEnvelope.value:1))*pulse;
+  });
+  inst.visible=activePieces>0;
+  inst.instanceMatrix.needsUpdate=true;inst.instanceColor.needsUpdate=true;
+  // Nearby atmospheric motes pick up local warm light. Cursor dust remains black.
+  if(dust&&!reducedMotion&&ts-shardGlow.lastDustLight>=50){
+    shardGlow.lastDustLight=ts;
+    const positions=dust.inst.instanceMatrix.array,lights=shardGlow.lights;
+    for(let i=0;i<dust.count;i++){
+      const k=i*16;let light=0;
+      for(let j=0;j<lights.length;j+=4){
+        const dx=positions[k+12]-lights[j],dy=positions[k+13]-lights[j+1],dz=positions[k+14]-lights[j+2];
+        const distance=dx*dx+dy*dy+dz*dz;
+        if(distance<14400)light+=lights[j+3]*Math.pow(1-distance/14400,2)*.13;
+      }
+      light=Math.min(.7,light);dust.inst.setColorAt(i,color.setRGB(.38+light,.29+light*.63,.22+light*.3));
+    }
+    dust.inst.instanceColor.needsUpdate=true;
+  }
+}
+
 function updateShardsIdle(ts, t, gentle){
   const amp = gentle ? 8 : 13;
-  shards.forEach(s => {
+  shards.forEach((s, i) => {
     // [v26 Task 6] a shard flagged initially-missing stays genuinely absent for the whole
     // shattered/idle phase -- not just displaced, actually not rendered -- until its own
     // assembling-phase delay elapses (see updateShardsAssembling).
@@ -4338,6 +4754,17 @@ function updateShardsIdle(ts, t, gentle){
     // KA sitting there by itself; every other shard is at normal resting brightness.
     s.mesh.material.uniforms.uOpacity.value = s.isMegaOutlier ? 0.05 : 0.94;
     s.mesh.material.uniforms.uTint.value.set(RAW_TINT.x, RAW_TINT.y, RAW_TINT.z);
+    // Ambient shine while scattered -- a gentle, per-shard-phased twinkle (light catching a
+    // facet), same warm amber ratio as the existing impact spark but held well below its peak
+    // (0.10 here vs. that spark's 0.20) so this stays the ambient mood-setter, not the payoff.
+    // Applies to every shard uniformly regardless of size -- nothing here is size-gated, so the
+    // smallest dust fragments twinkle exactly like the large structural pieces. A real floor
+    // (0.42 minimum, not 0) so there's always a baseline glow present from the moment a shard
+    // first appears, not just an occasional twinkle dipping to nothing between pulses.
+    const twinkle = 0.68 + 0.32*(0.5 + 0.5*Math.sin(ts*s.shineFreq + s.shineSeed));
+    const tierPreset = TIER_PRESETS[s.glowTier];
+    const shine = twinkle * s.shineWarmth * 0.12 * tierPreset[0];
+    s.mesh.material.uniforms.uGlow.value.set(shine, shine*0.7, shine*0.45);
     // each shard runs on its OWN frequency (posFreq/rotFreq, randomized per-shard at build
     // time) rather than a single shared frequency -- that's what keeps 169 independently
     // tumbling crystals from ever drifting into phase with each other and reading, in
@@ -4355,13 +4782,17 @@ function updateShardsIdle(ts, t, gentle){
     s.mesh.rotation.x = 0;
     s.mesh.rotation.y = 0;
     s.mesh.rotation.z = s.startRot.z + Math.sin(rDrift)*s.rotAmp;
+    // Bloom halo bleeding past this shard's own edges -- see buildShardGlow. Uses the same
+    // twinkle magnitude as the in-shard glow above so the two read as one light, not two.
+    setShardGlowHalo(i, s.mesh.position.x, s.mesh.position.y, s.mesh.position.z, s.w, s.h, twinkle*s.shineWarmth*0.5*tierPreset[1]);
   });
+  if (shardGlow){ shardGlow.inst.instanceMatrix.needsUpdate = true; if (shardGlow.inst.instanceColor) shardGlow.inst.instanceColor.needsUpdate = true; }
 }
 
 function updateShardsAssembling(ts, t){
   let allDone = true;
 
-  shards.forEach(s => {
+  shards.forEach((s, i) => {
     if (t < s.repairDelay){
       // still waiting for its own turn -- same per-shard-frequency tumble as the shattered
       // phase (updateShardsIdle).
@@ -4381,6 +4812,13 @@ function updateShardsAssembling(ts, t){
       s.mesh.rotation.z = s.startRot.z + Math.sin(rDrift)*s.rotAmp;
       s.mesh.material.uniforms.uOpacity.value = s.isMegaOutlier ? 0.05 : 0.94;
       s.mesh.material.uniforms.uTint.value.set(RAW_TINT.x, RAW_TINT.y, RAW_TINT.z);
+      // Ambient shine while waiting to launch -- same scattered-phase twinkle as updateShardsIdle,
+      // same real floor (never drops to zero) and same bloom halo bleeding past its own edges.
+      const twinkle = 0.68 + 0.32*(0.5 + 0.5*Math.sin(ts*s.shineFreq + s.shineSeed));
+      const tierPreset = TIER_PRESETS[s.glowTier];
+      const shine = twinkle * s.shineWarmth * 0.12 * tierPreset[0];
+      s.mesh.material.uniforms.uGlow.value.set(shine, shine*0.7, shine*0.45);
+      setShardGlowHalo(i, s.mesh.position.x, s.mesh.position.y, s.mesh.position.z, s.w, s.h, twinkle*s.shineWarmth*0.5*tierPreset[1]);
       return;
     }
 
@@ -4450,13 +4888,14 @@ function updateShardsAssembling(ts, t){
     // position is finalized) so the same value can also drive the pre-dissolve shimmer just below.
     const localFade = 1 - smootherStep((wipeYGlobal - (s.landedR + s.wipeJitter)) / (WIPE_BAND*2) + 0.5);
 
-    // cheap motion-blur: stretch the plane slightly along its velocity while moving fast
+    // Keep the crystal rigid; the separate tapered tail carries motion blur.
+    let speed = 0, velX = 0, velY = 0;
     if (s.mesh.position && lt < 0.94){
       const dx = px - s.mesh.position.x, dy = py - s.mesh.position.y;
       const elapsed = Math.max(1, Math.min(50, ts - (s.motionTs ?? (ts - 16.667))));
-      const speed = Math.hypot(dx,dy) * 16.667 / elapsed;
-      const stretch = Math.min(1.16, 1 + speed*0.012);
-      s.mesh.scale.set(s.w*stretch, s.h, 1);
+      speed = Math.hypot(dx,dy) * 16.667 / elapsed;
+      velX = dx; velY = dy;
+      s.mesh.scale.set(s.w, s.h, 1);
     } else {
       s.mesh.scale.set(s.w, s.h, 1);
     }
@@ -4521,7 +4960,31 @@ function updateShardsAssembling(ts, t){
     s.mesh.material.uniforms.uTint.value.set(
       baseTint.x + sparkEnv*0.20, baseTint.y + sparkEnv*0.14, baseTint.z + sparkEnv*0.09
     );
+    // The same ambient twinkle/halo carries all the way through the flight now, not just the
+    // scattered/waiting pose -- a shard shouldn't visibly go dark the instant it launches. The
+    // impact spark (sparkEnv, in uTint above) still rides on top as the brighter join-moment
+    // payoff; this is the continuous baseline underneath it.
+    const flightTwinkle = 0.68 + 0.32*(0.5 + 0.5*Math.sin(ts*s.shineFreq + s.shineSeed));
+    const tierPreset = TIER_PRESETS[s.glowTier];
+    // A second, motion-linked glow ON TOP of the twinkle: the faster this specific shard is
+    // travelling right now (same `speed` the motion-blur stretch above already computed), the
+    // brighter and whiter it glows from within -- reads as the crystal visibly charging with
+    // energy as it streaks toward its landing point, not just a constant idle shimmer. Unlike
+    // the ambient twinkle, this escalation is NOT tier-gated -- every shard, even a Tier-0
+    // "plain" one, still gets its motion charge and join flash; only the passive baseline glow
+    // is what the tier controls.
+    const motionGlow = clamp01(speed * 0.045) * localFade;
+    const flightShine = (flightTwinkle * s.shineWarmth * 0.12 * tierPreset[0] + sparkEnv*0.22) * localFade;
+    s.mesh.material.uniforms.uGlow.value.set(
+      flightShine + motionGlow*0.5,
+      flightShine*0.7 + motionGlow*0.5*0.85,
+      flightShine*0.45 + motionGlow*0.5*0.72
+    );
+    setShardGlowHalo(i, px, py, pzFinal, s.w, s.h,
+      (flightTwinkle*s.shineWarmth*0.5*tierPreset[1] + sparkEnv*0.7)*localFade + motionGlow*0.8,
+      velX, velY);
   });
+  if (shardGlow){ shardGlow.inst.instanceMatrix.needsUpdate = true; if (shardGlow.inst.instanceColor) shardGlow.inst.instanceColor.needsUpdate = true; }
 
   return allDone;
 }
@@ -4558,7 +5021,7 @@ function updateLogoReveal(t){
   {
     const chargeRiseStart = revealStart - 350;
     const chargePeakAt = revealStart + revealDur * 0.5;
-    const chargeEnd = revealStart + revealDur + 320;
+    const chargeEnd = revealStart + revealDur;
     if (t < chargeRiseStart || t > chargeEnd){
       chargeEnv = 0;
     } else if (t < chargePeakAt){
@@ -4582,24 +5045,6 @@ function updateLogoReveal(t){
   // the mark's own shape, just traced from the inside out now instead of bottom to top.
   wipeYGlobal = lerp(-0.20, 1.20, revealE);
 
-  // SILHOUETTE FLASH: fires once, right as the wipe line clears the top of the frame (revealT
-  // reaching 1 means every pixel has been handed from shard-mosaic to clean-render) -- this is
-  // the instant the whole KA shape is first fully, cleanly formed, so it's exactly when the
-  // shape should visibly flash, not before (nothing to flash yet) and not noticeably after (the
-  // moment would already feel over). Same sharp 8%/92% attack/decay split as the per-shard
-  // lock-snap, just scaled to the whole mark instead of one fragment, and started a hair before
-  // revealT actually hits 1 (BLAST_LEAD) so it doesn't trail the wipe's own completion.
-  // Computed here, BEFORE the gate call below, so alpha/blast/wipeY can all be handed to
-  // setResolvedMarkVisibility together in one call.
-  const BLAST_LEAD = 60;
-  const blastStart = revealStart + revealDur - BLAST_LEAD;
-  const blastAge = t - blastStart;
-  if (blastAge < 0 || blastAge > BLAST_FLASH_DUR){
-    blastEnv = 0;
-  } else {
-    const attackDur = BLAST_FLASH_DUR * 0.08, decayDur = BLAST_FLASH_DUR * 0.92;
-    blastEnv = blastAge < attackDur ? easeOutCubic(blastAge/attackDur) : 1 - easeInCubic((blastAge-attackDur)/decayDur);
-  }
 
   // GOD MODE v10: the ONLY writer of these three uniforms is setResolvedMarkVisibility. Pass it
   // the real "hidden" values (not just values that happen to render as hidden) before revealStart
@@ -4609,7 +5054,7 @@ function updateLogoReveal(t){
   // for this frame, so the gate's block branch is a pure safety net that should never fire in
   // normal operation, not a per-frame corrector.
   if (t >= revealStart){
-    setResolvedMarkVisibility(1, blastEnv * .24, wipeYGlobal, t);
+    setResolvedMarkVisibility(1, 0, wipeYGlobal, t);
   } else {
     setResolvedMarkVisibility(0, 0, WIPE_Y_FULLY_HIDDEN, t);
   }
@@ -4620,7 +5065,10 @@ function updateLogoReveal(t){
   // the plane's own scale and position are untouched (that rule holds absolutely, per the
   // original spec), it just breathes brighter in sync with layers 1 and 3 above. Routed through
   // the identical gate logoMesh uses -- see setLogoGlowOpacity above.
-  setLogoGlowOpacity(0.12 * revealE * lerp(1.0, 1.25, chargeEnv), t);
+  // [v37] 0.12 -> 0.19 base -- paired with the new inner highlight above, this is meant to read
+  // as the clear escalation/payoff of the whole sequence once the mark settles, visibly beyond
+  // any single scattered shard's own glow (even a Tier 3 max one).
+  setLogoGlowOpacity(LOGO_HELD_GLOW * revealE, t);
 
   // Real scene lights, ramped the same way the light-only replacement for the zoom punch calls
   // for. Note honestly: nothing in this scene currently renders lit (shards and the resolved
@@ -4633,35 +5081,62 @@ function updateLogoReveal(t){
   keyLight.intensity = KEY_LIGHT_BASE * lerp(1.0, 2.1, chargeEnv); // SUPERCHARGE
   rimLight.intensity = RIM_LIGHT_BASE * lerp(1.0, 2.1, chargeEnv); // SUPERCHARGE
 
-  // reflective specular sweep -- a second, distinct beat: a bright glint crossing the crystal
-  // once the wipe has fully finished, like a last catch of light confirming the facet has
-  // locked into place. Kept sequential (not overlapping the wipe) so the two effects read as
-  // two intentional beats, not a busy pile-up. Direction is randomized per playthrough (see
-  // randomizeSweep, called whenever a new assembling phase starts).
-  const SWEEP_DELAY = 180, SWEEP_DUR = 640;
-  const sweepStart = revealStart + revealDur + SWEEP_DELAY;
-  const sweepT = clamp01((t - sweepStart) / SWEEP_DUR);
-  if (sweepT > 0 && sweepT < 1){
-    applySweepUniform(logoMesh, sweepT, easeOutCubic);
-  } else {
-    logoMesh.material.uniforms.uSweepPos.value = -1;
-  }
+  logoMesh.material.uniforms.uSweepPos.value = -1;
 
-  // [reflection fix] the bottom-to-top warm pulse band that used to run here overlapped the
-  // specular sweep above (pulseStart landed inside the sweep's own active window), reading as
-  // two reflections firing at once. uPulseY is kept permanently inactive so the sweep above is
-  // the only reflection-style beat after reveal.
+  // Keep whole-logo reflection bands inactive after reveal.
   logoMesh.material.uniforms.uPulseY.value = -1;
 
-  // GOD MODE v5 restore: the single end-of-sequence "uBlast" silhouette flash is back (see
-  // blastEnv above), now firing alongside -- not instead of -- the continuous per-shard fusion
-  // sparks in updateShardsAssembling (see impactAt). The two read as different scales of the same
-  // idea: each shard gets its own small local spark as it locks in throughout assembly, and the
-  // whole mark gets one decisive flash of its own exact shape the instant the reveal completes.
+
+}
+
+// Drives one bubble's retract(1)/expand(0) blend toward ic.retractTo, easing depending on
+// direction: retracting (tucking in) eases out smoothly with no overshoot (smootherStep) so it
+// never looks like it pops through the logo surface; expanding (popping back out) reuses the
+// existing easeOutBack "spring" curve already used for the entrance pop, for a lively, slightly
+// overshooting release that reads as the same liquid-glass-style physics used elsewhere on the
+// site. Interruptible mid-flight: retractFrom always captures wherever the bubble actually was
+// (see setBubbles), not the old target, so re-clicking mid-animation re-eases from the live value
+// instead of snapping.
+function bubbleRetractBlend(ic, ts){
+  const expanding = ic.retractTo < ic.retractFrom;
+  const p = ic.retractDur > 0 ? clamp01((ts - ic.retractStart) / ic.retractDur) : 1;
+  if (p <= 0) return ic.retractFrom;
+  const e = expanding ? easeOutBack(p) : smootherStep(p);
+  return lerp(ic.retractFrom, ic.retractTo, e);
+}
+
+// Part B: toggles all 8 bubbles between expanded (current ring layout) and retracted (tucked
+// behind the logo), reused identically for Part A's one-time automatic retraction -- same
+// stagger, same per-bubble curved path, same spring easing, just triggered automatically once
+// instead of by a click. ts is the raw animation clock (not phase-relative t) so the stagger
+// keeps working correctly however/whenever this is called.
+function setBubbles(retract, ts){
+  bubblesRetracted = retract;
+  const jitter = reducedMotion ? 0 : 1;
+  icons.forEach((ic, i) => {
+    ic.retractFrom = bubbleRetractBlend(ic, ts); // capture the live value, not the old target -- see above
+    ic.retractTo = retract ? 1 : 0;
+    ic.retractStart = ts + i * BUBBLE_STAGGER_MS * jitter;
+    ic.retractDur = reducedMotion ? 1 : BUBBLE_RETRACT_DUR + (Math.random()*140 - 70);
+  });
 }
 
 function updateIcons(t, ts){
   const iconsStart = REVEAL_START + REVEAL_DUR + ICONS_START_GAP;
+  // Part A: the one-time auto-retract fires exactly once, timed to the settle "pulse" window
+  // that already carries the reveal glow's fade-off into the steady held glow (see updateLogoReveal
+  // / PULSE_DELAY/PULSE_DUR) -- so the bubbles finish tucking away right as that glow finishes
+  // settling, one continuous gesture instead of two separate beats. Guarded by
+  // bubbleAutoRetractArmed so it can only ever fire on this exact crossing, once, ever (bubbleAutoRetractArmed
+  // also gates click-to-toggle -- see the click handler below -- so Part B only goes "live" after
+  // this has happened, per spec).
+  if (!bubbleAutoRetractArmed){
+    const autoRetractStartT = iconsStart + ICON_STAGGER*(icons.length-1) + ICON_DUR + PULSE_DELAY;
+    if (t >= autoRetractStartT){
+      bubbleAutoRetractArmed = true;
+      setBubbles(true, ts);
+    }
+  }
   icons.forEach((ic, i) => {
     const delay = iconsStart + i*ICON_STAGGER;
     const lt = clamp01((t - delay) / ic.dur);
@@ -4689,9 +5164,36 @@ function updateIcons(t, ts){
       y += Math.cos(dt*ic.floatFreqY + ic.floatSeed*1.3) * ic.floatAmpY * smootherStep(lt);
       scale *= 1 + Math.sin(dt*0.0011 + ic.angle*2)*0.025*smootherStep(lt);
     }
+
+    // Retract/expand overlay (Parts A-D): blended on top of the landed pose above rather than
+    // replacing it, so the continuous float/entrance logic above never has to know retraction
+    // exists. rt=0 is fully expanded (the pose already computed above); rt=1 is fully tucked
+    // behind the logo's own center, where the logo's opaque silhouette (drawn at a HIGHER
+    // renderOrder while retracted -- see below) actually covers it on screen.
+    const rt = bubbleRetractBlend(ic, ts);
+    ic.retractT = rt;
+    const rtClamped = clamp01(rt);
+    if (rtClamped > 0){
+      // Slightly arced travel (Part C.6): a lateral bow, perpendicular to this bubble's own
+      // ring angle, that peaks mid-transition and returns to zero at both ends -- so it never
+      // looks like a straight radial slide, and lines up with x/y exactly at rt=0 and rt=1.
+      const arc = ic.curveAmp * ICON_SIZE * Math.sin(Math.PI * rtClamped) * ic.curveDir;
+      const perpX = -Math.sin(ic.angle), perpY = Math.cos(ic.angle);
+      x = lerp(x, 0, rtClamped) + perpX*arc;
+      y = lerp(y, 0, rtClamped) + perpY*arc;
+      z = lerp(z, -8, rtClamped); // behind the logo's own z=0 plane
+      scale *= lerp(1, 0.18, rtClamped);
+    }
+    const retractAlpha = 1 - smootherStep(rtClamped);
     ic.sprite.position.set(x, y, z);
-    ic.sprite.scale.set(scale, scale, 1);
-    ic.sprite.material.opacity = alpha;
+    ic.sprite.scale.set(Math.max(0.001, scale), Math.max(0.001, scale), 1);
+    ic.sprite.material.opacity = alpha * retractAlpha;
+    // Draw-order occlusion (Part D): swapped past the halfway point of the retract blend, by
+    // which time the alpha fade above has already dimmed the bubble most of the way down, so the
+    // renderOrder flip itself reads as invisible rather than a pop. See logoMesh.renderOrder's
+    // own comment in buildLogo for why draw order (not depth-buffer z-testing) is what actually
+    // does the occluding here.
+    ic.sprite.renderOrder = rtClamped > 0.5 ? 1 : 8;
   });
 }
 
@@ -6429,15 +6931,21 @@ function sendMessage(text){
 
 <style>
 :root{--panda-ease:cubic-bezier(.45,0,.15,1);--panda-bounce:cubic-bezier(.22,.8,.28,1);}
-#panda-mascot{position:absolute;left:50%;bottom:26px;width:104px;height:112px;transform:translateX(-50%);pointer-events:none;opacity:0;transition:opacity .35s ease;}
+/* [Part B] 35% smaller (104x112 -> 68x73, same aspect) -- bottom offset left unchanged so the
+   panda's own base/feet stay anchored at the exact same point relative to the launcher bubble,
+   just with a smaller body rising from it, rather than shifting the perch point too. */
+#panda-mascot{position:absolute;left:50%;bottom:26px;width:68px;height:73px;transform:translateX(-50%);pointer-events:none;opacity:0;transition:opacity .35s ease;}
 #panda-mascot.is-ready{opacity:1;}
 #panda-mascot canvas{display:block;width:100%;height:100%;}
 .assistant-launcher{isolation:isolate;overflow:visible;}
 .assistant-launcher::after{content:"";position:absolute;inset:1px;border-radius:inherit;background:linear-gradient(135deg,#fff2,transparent 48%,#dec5b50b);pointer-events:none;opacity:.4;transition:opacity .25s ease,transform .4s var(--ease-standard);}
 .assistant-launcher:hover::after,.assistant-launcher:focus-visible::after{opacity:.85;transform:scale(.97,1.02);}
-.panda-bubble{position:absolute;right:0;bottom:142px;width:max-content;max-width:min(210px,calc(100vw - 48px));padding:10px 13px;border-radius:14px 14px 4px 14px;background:var(--glass-bg-heavy);border:var(--glass-border);box-shadow:var(--glass-highlight),var(--glass-shadow);color:var(--ink);font:400 12px/1.5 Manrope,sans-serif;opacity:0;transform:translateY(4px);pointer-events:none;transition:opacity .3s ease,transform .3s ease;}
+/* [Part B] bottom follows the panda's new, shorter height (26px base + 73px tall + ~4px gap)
+   so the speech bubble still sits just above its head, not floating with a leftover gap sized
+   for the old taller panda. */
+.panda-bubble{position:absolute;right:0;bottom:103px;width:max-content;max-width:min(210px,calc(100vw - 48px));padding:10px 13px;border-radius:14px 14px 4px 14px;background:var(--glass-bg-heavy);border:var(--glass-border);box-shadow:var(--glass-highlight),var(--glass-shadow);color:var(--ink);font:400 12px/1.5 Manrope,sans-serif;opacity:0;transform:translateY(4px);pointer-events:none;transition:opacity .3s ease,transform .3s ease;}
 .panda-bubble.show{opacity:1;transform:translateY(0);}
-@media(max-width:600px){#panda-mascot{width:96px;height:104px;bottom:30px;}.panda-bubble{bottom:138px;}}
+@media(max-width:600px){#panda-mascot{width:62px;height:68px;bottom:30px;}.panda-bubble{bottom:102px;}}
 @media(prefers-reduced-motion:reduce){#panda-mascot,.panda-bubble,.assistant-launcher::after{transition:none;}}
 </style>
 <script type="module">
@@ -6585,13 +7093,15 @@ function updateCursor(now){
     var head = trailPoints[trailPoints.length-1], tail = trailPoints[0];
     var headLife = Math.max(0, 1-(now-head.time)/TRAIL_LIFETIME);
     tctx.lineCap = "round"; tctx.lineJoin = "round";
-    // dark contrast pass first -- a soft near-black shadow slightly wider than the color passes
-    // below, so the line stays legible against bright surfaces (the glossy KA logo highlights)
-    // and not just against dark empty space. Same single smoothed path, same gradient shape.
+    // contrast pass first -- slightly wider than the color passes below, so the line stays
+    // legible against bright surfaces (the glossy KA logo highlights) and not just against dark
+    // empty space. A deep warm red instead of near-black, so dragging across the bright crystal
+    // logo reads as a dark ember/red accent (matching the site's own warm palette) rather than a
+    // literal black mark. Same single smoothed path, same gradient shape.
     var shadowGradient = tctx.createLinearGradient(tail.x, tail.y, head.x, head.y);
-    shadowGradient.addColorStop(0, "rgba(10,7,5,0)");
-    shadowGradient.addColorStop(0.4, "rgba(10,7,5,"+(0.18*headLife)+")");
-    shadowGradient.addColorStop(1, "rgba(10,7,5,"+(0.5*headLife)+")");
+    shadowGradient.addColorStop(0, "rgba(120,20,10,0)");
+    shadowGradient.addColorStop(0.4, "rgba(120,20,10,"+(0.18*headLife)+")");
+    shadowGradient.addColorStop(1, "rgba(160,30,12,"+(0.5*headLife)+")");
     tctx.strokeStyle = shadowGradient;
     tctx.lineWidth = 2.1 + headLife*2.28; // [35% then 30% smaller] was 4.6 + headLife*5
     smoothTrailPath(tctx, trailPoints);

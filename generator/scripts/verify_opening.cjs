@@ -24,11 +24,12 @@ const context=vm.createContext({THREE, console, MANIFEST:structuredClone(origina
   camera:{position:{z:800},fov:45,aspect:1.5}, cutDiagHalf:190,
   RAW_TINT:new THREE.Vector3(.58,.3,.27),RESOLVED_TINT:new THREE.Vector3(1,1,1),
   WIPE_BAND:.11,ASSEMBLE_DELAY:900,ASSEMBLE_SPAN:3600,BLAST_DUR:400,
-  shardVertex:'',shardFragment:'',wipeYGlobal:-2,regionGlowFired:new Set(),
+  shardVertex:'',shardFragment:'',wipeYGlobal:-2,regionGlowFired:new Set(),shardGlow:null,
   spawnSpark(){},spawnGlitterBurst(){},updateSparks(){},updateSkillCallouts(){}});
 const names=['fractureOpeningCore','fractureGeometry','openingDrift','clamp01','lerp','lerp3',
   'easeInCubic','easeOutCubic','easeSlowSnap','smootherStep','toWorld','screenEdgeSpawnPoint',
-  'buildShards','updateShardsIdle','updateShardsAssembling','assertSharedCoreOrigin'];
+  'buildShards','updateShardsIdle','updateShardsAssembling','assertSharedCoreOrigin','pickGlowTier','setShardGlowHalo'];
+for(const name of ['TIER_PRESETS','TIER_WEIGHTS'])vm.runInContext('const '+name+'='+main.match(new RegExp('const '+name+' = (.*);'))[1],context);
 names.forEach(n=>{assert(functions.has(n),n);vm.runInContext(functions.get(n),context)});
 vm.runInContext('fractureOpeningCore()',context);
 const cells=context.MANIFEST.shards.filter(s=>s.openingCore);

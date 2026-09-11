@@ -89,14 +89,18 @@ export function createPanda(compact: boolean): Character {
     const yaw=Math.sin(time*.19)*.08*(1-sleep)+look.x*(.12+watch*.15);
     const damp=1-Math.exp(-dt*7);
     head.rotation.y+= (yaw-head.rotation.y)*damp;
-    head.rotation.x+= (sleep*.26-call*.1+eat*bite*.06-look.y*.08-head.rotation.x)*damp;
-    head.rotation.z=Math.sin(time*.31)*.025+sleep*.13+call*Math.sin(elapsed*.48)*.04;
+    // Sleepy is its own distinct pose, not just a smaller version of idle: the head droops and
+    // lolls noticeably to one side (nodding off), the body slumps forward, and both arms fold
+    // in and rest low against the belly instead of hanging at the sides.
+    head.rotation.x+= (sleep*.42-call*.1+eat*bite*.06-look.y*.08-head.rotation.x)*damp;
+    head.rotation.z=Math.sin(time*.31)*.025*(1-sleep)+sleep*.24+call*Math.sin(elapsed*.48)*.04;
     body.scale.y=1+Math.sin(time*(sleep?1.1:1.5))*.009+stretch*reach*.045;
-    body.rotation.z=sleep*-.08+play*Math.sin(elapsed*.7)*.025;
-    arms[0].rotation.z=-.12+eat*(1.05+bite*.18)-stretch*reach*2.35-play*.24;
-    arms[1].rotation.z=.12+call*1.98+stretch*reach*2.25+play*(.25+Math.sin(elapsed*.9)*.2);
-    arms[0].rotation.x=-eat*(.65+bite*.17)-play*.35;
-    arms[1].rotation.x=-call*.38-play*.45;
+    body.rotation.z=sleep*-.16+play*Math.sin(elapsed*.7)*.025;
+    body.rotation.x=sleep*.09;
+    arms[0].rotation.z=-.12+eat*(1.05+bite*.18)-stretch*reach*2.35-play*.24+sleep*.55;
+    arms[1].rotation.z=.12+call*1.98+stretch*reach*2.25+play*(.25+Math.sin(elapsed*.9)*.2)-sleep*.55;
+    arms[0].rotation.x=-eat*(.65+bite*.17)-play*.35+sleep*.32;
+    arms[1].rotation.x=-call*.38-play*.45+sleep*.32;
     const blink=Math.pow(Math.max(0,Math.cos(time*1.37+Math.sin(time*.23)*1.5)),36);
     eyes.forEach(eye=>eye.scale.y=.074*Math.max(.055,(1-blink*.92)*(1-sleep*.95)));
     mouth.scale.y=.012*(1+eat*bite*.5+stretch*reach*2);

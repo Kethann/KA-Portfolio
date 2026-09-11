@@ -15,7 +15,10 @@ test('the running portfolio serves the homepage, lazy panda and all built assets
     const base='http://127.0.0.1:'+server.address().port;
     const page=await fetch(base);assert.equal(page.status,200);
     const html=await page.text();assert(html.includes("import('./dist/assets/panda.js')"));assert(html.includes('assistant-launcher'));
-    for(const asset of ['/dist/assets/panda.js','/dist/assets/three-r128.min.js'])assert.equal((await fetch(base+asset)).status,200,asset);
+    for(const asset of ['/dist/assets/panda.js','/dist/assets/three-r128.min.js']){
+      const response=await fetch(base+asset);assert.equal(response.status,200,asset);
+      await response.arrayBuffer();
+    }
     for(const name of await readdir(resolve(root,'dist/assets'))){
       const response=await fetch(base+'/assets/'+name);assert.equal(response.status,200,name);assert((await response.arrayBuffer()).byteLength>0,name);
       if(['gallery.js','poster.js','panda.js'].includes(name))assert.equal(response.headers.get('cache-control'),'no-cache');
