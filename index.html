@@ -1,6 +1,26 @@
 <!doctype html>
 <title>KA Crystal Reconstruction</title>
 <meta charset="utf-8">
+<script>
+// ==================================================================== API BASE CONFIG ==
+// Every /api/* call in this file (portfolio, visit counter, contact, assistant, upscaler) goes
+// through kaApiUrl() so there is exactly one place to point them somewhere else. Empty string
+// (the default) means "same origin as this page" -- today's behavior, zero risk, works as long
+// as this file and server/index.js are served from the same place. This ONLY needs to change if
+// this exact file is ever hosted somewhere that can't also run the Node server (a static host
+// like GitHub Pages, which cannot run server/index.js at all) -- in that case, set this to that
+// server's own public URL (e.g. "https://your-server-domain.com", no trailing slash) so the
+// static copy's API calls reach the real server instead of 404ing against the static host. A
+// single var here (not duplicated per script block, unlike isMobile/reducedMotion elsewhere in
+// this file) so it never needs editing in more than one place: every later <script> block reads
+// this same global.
+// The one call below that reads/writes a session (the visit counter's dedupe cookie) passes
+// credentials:"include" so that cookie still round-trips when KA_API_BASE points at a different
+// origin than this page -- browsers never send/accept cookies cross-origin without it, with or
+// without CORS headers. See server/app.js for the matching Access-Control-Allow-* response side.
+var KA_API_BASE = "";
+function kaApiUrl(path){ return KA_API_BASE + path; }
+</script>
 <!-- [mobile fix] without this, phones default to a ~980px desktop-width virtual viewport --
      every @media(max-width:600px) rule in this file silently never applies on a real device,
      and everything renders zoomed out (tiny nav/hamburger/chat bubble) until pinch-zoomed. -->
@@ -1382,7 +1402,7 @@ html{overflow-x:clip;scroll-padding-top:110px;}
     }, REQUEST_TIMEOUT_MS);
 
     statusEl.textContent = "Enhancing with a real super-resolution model… this can take a little while.";
-    fetch("/api/enhance", {
+    fetch(kaApiUrl("/api/enhance"), {
       method: "POST",
       headers: { "Content-Type": file.type },
       body: file,
@@ -6627,7 +6647,7 @@ contactForm.addEventListener("submit", function(e){
   submitBtn.disabled = true;
   contactStatus.textContent = "Sending…";
   contactStatus.dataset.state = "";
-  fetch("/api/contact", {
+  fetch(kaApiUrl("/api/contact"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -6689,7 +6709,7 @@ function applyPortfolioData(data){
   applySiteAppearance(data);
 }
 function loadPortfolioFromAPI(){
-  fetch("/api/portfolio").then(function(res){
+  fetch(kaApiUrl("/api/portfolio")).then(function(res){
     if (!res.ok) throw new Error("portfolio API unavailable");
     return res.json();
   }).then(applyPortfolioData).catch(function(){
@@ -6872,7 +6892,9 @@ document.querySelectorAll(".footer-link").forEach(revealOnScroll);
 // Skipped inside the creator studio's own live-preview iframe (?preview=1) so an admin
 // previewing draft edits never inflates their own visitor analytics.
 if (!/[?&]preview=1(&|$)/.test(location.search)){
-  fetch("/api/visit", { method: "POST" }).catch(function(){});
+  // credentials:"include" so the dedupe cookie round-trips even when KA_API_BASE points at a
+  // different origin than this page (see the API BASE CONFIG note at the very top of this file).
+  fetch(kaApiUrl("/api/visit"), { method: "POST", credentials: "include" }).catch(function(){});
 }
 
 })();
@@ -7139,7 +7161,7 @@ function sendMessage(text){
   var cursorEl = null;
   var fullText = "";
 
-  fetch("/api/assistant", {
+  fetch(kaApiUrl("/api/assistant"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

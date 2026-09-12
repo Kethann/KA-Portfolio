@@ -78,6 +78,7 @@ const messagesEl=new Element(),panel=new Element(),launcher=new Element(),input=
 let reads=0;const chatEvents=[];
 const packets=['data: {"text":"Hello"}\n\n','data: [DONE]\n\n'];
 const chat=vm.createContext({console,window,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},navigator:{language:'en'},TextDecoder,history:[],opened:false,streaming:false,followChat:true,closeTimer:null,reducedMotion:false,
+  kaApiUrl:path=>path, // mirrors the real KA_API_BASE=''-by-default helper at the top of index.html (see the "API BASE CONFIG" script block)
   messagesEl,panel,launcher,input,sendBtn,chipsEl:new Element(),QUICK_REPLIES:[],pickGreeting:()=>"Welcome",
   document:{createElement:t=>new Element(t),dispatchEvent:event=>chatEvents.push(event)},requestAnimationFrame:c.requestAnimationFrame,setTimeout:c.setTimeout,clearTimeout:c.clearTimeout,
   fetch:()=>Promise.resolve({ok:true,body:{getReader:()=>({read:()=>Promise.resolve(reads<packets.length?{done:false,value:new TextEncoder().encode(packets[reads++])}:{done:true})})}})});

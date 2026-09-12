@@ -97,6 +97,19 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
     if(req.get('sec-fetch-site')==='cross-site' || (origin && origin!==`${req.protocol}://${req.get('host')}`)) return fail(res,403,'This request must come from this website.');
     next();
   }
+  // Same as sameOrigin above, but also accepts the configured ALLOWED_ORIGIN(s) (see
+  // server/app.js) -- for the two PUBLIC routes (/visit, /contact) that index.html needs to
+  // reach even when it's served as a static file from somewhere else (GitHub Pages). Deliberately
+  // NOT used for anything under /creator/* -- the admin surface stays same-origin-only via the
+  // plain sameOrigin above, regardless of what ALLOWED_ORIGIN is set to.
+  const allowedOrigins=(process.env.ALLOWED_ORIGIN||'').split(',').map(s=>s.trim()).filter(Boolean);
+  function sameOriginOrAllowed(req,res,next){
+    const origin=req.get('origin');
+    const selfOrigin=`${req.protocol}://${req.get('host')}`;
+    if(origin && allowedOrigins.includes(origin)) return next();
+    if(req.get('sec-fetch-site')==='cross-site' || (origin && origin!==selfOrigin)) return fail(res,403,'This request must come from this website.');
+    next();
+  }
   function auth(req,res,next){
     const now=Date.now();
     for(const [id,s] of sessions) if(s.expires<now) sessions.delete(id);
@@ -110,12 +123,18 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
   // one increment per visitor (tracked via a long-lived, non-httpOnly cookie so a page reload or
   // a second tab doesn't inflate the count) -- always responds with the current total either way,
   // so the homepage counter reads correctly even for a repeat visitor whose cookie is still valid.
-  router.post('/visit',sameOrigin,(req,res)=>{
+  router.post('/visit',sameOriginOrAllowed,(req,res)=>{
     if(!rate(req,res,'visit',30)) return;
     const seen=(req.get('cookie')||'').split(';').map(x=>x.trim()).some(c=>c.startsWith('ka_visited='));
     if(!seen){
       visitors={count:visitors.count+1};save(visitPath,visitors);
-      res.cookie('ka_visited','1',{sameSite:'strict',secure:req.secure,maxAge:365*24*60*60*1000,path:'/'});
+      // [fix] SameSite=Strict cookies are never sent on a cross-SITE request at all -- once
+      // index.html can be served from a different origin than this API (see ALLOWED_ORIGIN),
+      // a Strict cookie set here would never round-trip back, and every visit would look "new"
+      // forever. 'none' requires Secure (HTTPS-only, enforced by browsers), so it only applies
+      // once the server is actually served over HTTPS; local plain-HTTP dev falls back to 'lax',
+      // which is exactly as effective as 'strict' was for a same-origin deployment anyway.
+      res.cookie('ka_visited','1',{sameSite:req.secure?'none':'lax',secure:req.secure,maxAge:365*24*60*60*1000,path:'/'});
     }
     // Part B: one LOG ENTRY per visit call (not deduped like the unique-visitor count above --
     // "recent visits" in the dashboard is meant to show real traffic, repeat and all). IP/location
@@ -127,7 +146,7 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
     save(visitLogPath,visitLog);
     res.json({count:visitors.count});
   });
-  router.post('/contact',sameOrigin,(req,res)=>{
+  router.post('/contact',sameOriginOrAllowed,(req,res)=>{
     if(!rate(req,res,'contact',5)) return;
     const body=req.body||{};
     if(body.website) return res.status(202).json({ok:true});

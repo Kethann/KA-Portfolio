@@ -27,6 +27,32 @@ const app = express();
 app.disable('x-powered-by');
 if(process.env.TRUST_PROXY==='1')app.set('trust proxy',1);
 app.use(express.json({ limit: "512kb" }));
+// CORS for the PUBLIC api only (see server/creator.js's sameOriginOrAllowed for the matching
+// request-side check): this exists for exactly one scenario -- index.html served as a static
+// file from somewhere that can't also run this server (GitHub Pages, say), fetching its data
+// from wherever this server actually runs. ALLOWED_ORIGIN is unset by default, so by default
+// this changes nothing (comma-separated list if there's ever more than one static frontend --
+// e.g. a GitHub Pages URL and a preview deploy). The admin-only /api/creator/* surface is
+// deliberately NOT covered by this -- server/creator.js keeps that same-origin-only regardless
+// of ALLOWED_ORIGIN, since the creator studio is only ever opened by visiting this server
+// directly, never from the static copy.
+const allowedOrigins = (process.env.ALLOWED_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
+if (allowedOrigins.length){
+  app.use('/api', (req, res, next) => {
+    const origin = req.get('origin');
+    if (origin && allowedOrigins.includes(origin)){
+      res.set('Access-Control-Allow-Origin', origin);
+      res.set('Vary', 'Origin');
+      res.set('Access-Control-Allow-Credentials', 'true');
+    }
+    if (req.method === 'OPTIONS'){
+      res.set('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.set('Access-Control-Allow-Headers', 'Content-Type,X-CSRF-Token');
+      return res.sendStatus(204);
+    }
+    next();
+  });
+}
 const creator = await createCreatorRouter({root,dataDir:options.dataDir,password:options.password});
 app.use('/api',creator.router);
 if(options.startServices !== false){
