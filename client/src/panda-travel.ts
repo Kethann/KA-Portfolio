@@ -15,7 +15,7 @@ export function advanceTravel(state:TravelState,dt:number,reduced:boolean){
   }
 }
 export function travelPose(state:TravelState,perch:{x:number;y:number},home:{x:number;y:number},height:number,size:number){
-  let x=home.x,y=home.y,rotation=0,opacity=1,climb=0,thread=0;
+  let x=home.x,y=home.y,rotation=0,opacity=1,climb=0,thread=0,webTipY=0;
   const t=state.elapsed;
   if(state.stage==='down'||state.stage==='perched'||state.stage==='release'){
     const p=state.stage==='down'?ease(t/2.2):1;
@@ -26,10 +26,16 @@ export function travelPose(state:TravelState,perch:{x:number;y:number},home:{x:n
     const p=Math.min(1,t/.8);x=perch.x+Math.sin(p*Math.PI)*18;y=perch.y+(height+size-perch.y)*p*p;
     rotation=p*115;opacity=1-ease((p-.65)/.35);
   }else if(state.stage==='return'){
-    const p=ease(t/2.1);y=height+size+(home.y-height-size)*p;
-    x=home.x+Math.sin(t*7)*2*Math.sin(Math.PI*p);climb=-(1-ease((t-1.65)/.45));thread=Math.min(1,t/.2)*(1-ease((t-1.75)/.35));opacity=Math.min(1,t/.18);
+    // Shoot upward first, hold the attachment, then pull up along the fixed web.
+    const cast=ease(t/.42),p=ease((t-.56)/1.54);
+    const start=height+size,anchor=home.y+size*.2;
+    webTipY=start+size*.2+(anchor-start-size*.2)*cast;
+    y=start+(home.y-start)*p;
+    x=home.x+Math.sin((t-.56)*7)*2*Math.sin(Math.PI*p);
+    climb=ease((t-.56)/.12)*(1-ease((t-1.75)/.35));
+    thread=ease(t/.06)*(1-ease((t-1.85)/.25));opacity=ease((t-.56)/.15);
   }
-  return {x,y,rotation,opacity,climb,thread};
+  return {x,y,rotation,opacity,climb,thread,webTipY};
 }
 // Exact damped spring integration keeps thread tension consistent across refresh rates.
 export type ThreadSpring={x:number;v:number};

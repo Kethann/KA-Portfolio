@@ -54,8 +54,8 @@ function setupPreview(){
     else if(msg.type==='ka-preview-selected'){$('#preview-selection').textContent='Editing: '+msg.id;}
     else if(msg.type==='ka-preview-moved'){
       site.layoutOverrides[msg.breakpoint]=site.layoutOverrides[msg.breakpoint]||{};
-      site.layoutOverrides[msg.breakpoint][msg.id]={x:Math.round(msg.x),y:Math.round(msg.y)};
-      $('#preview-selection').textContent=msg.id+' moved ('+msg.breakpoint+')';
+      site.layoutOverrides[msg.breakpoint][msg.id]={x:Math.round(msg.x),y:Math.round(msg.y),scale:Math.round((msg.scale||1)*100)/100};
+      $('#preview-selection').textContent=msg.id+' — '+Math.round((msg.scale||1)*100)+'% ('+msg.breakpoint+')';
       markDirty();
     }
   });
@@ -65,10 +65,50 @@ function setupPreview(){
     if(w>=240&&h>=240)setPreviewSize(w,h);
   });
   $('#edit-layout-toggle').addEventListener('change',e=>{
-    $('#preview-selection').textContent=e.target.checked?'Click an element in the preview to select it.':'';
+    $('#preview-selection').textContent=e.target.checked?'Click an element to select it, drag to move, drag its corner dot to resize.':'';
     postToPreview({type:'ka-preview-edit-mode',enabled:e.target.checked});
   });
   applyDevicePreset();
+  setupSplitDivider();
+}
+// Draggable split-screen divider (Part A.1's "resizable/toggleable" controls panel) -- persisted
+// to localStorage so the admin's chosen split survives a reload, purely a per-browser UI
+// preference (not portfolio content), so it never goes through the publish/save mechanism.
+function setupSplitDivider(){
+  const divider=$('#split-divider'),split=$('#split');
+  if(divider.dataset.wired)return;
+  divider.dataset.wired='1';
+  const MIN=280,MAX_FRACTION=0.7; // never let the preview pane get crushed to nothing
+  const saved=Number(localStorage.getItem('ka-controls-width'));
+  if(saved>=MIN)split.style.setProperty('--controls-w',saved+'px');
+  function setWidth(px){
+    const max=Math.round(split.getBoundingClientRect().width*MAX_FRACTION);
+    const clamped=Math.max(MIN,Math.min(max,Math.round(px)));
+    split.style.setProperty('--controls-w',clamped+'px');
+    localStorage.setItem('ka-controls-width',String(clamped));
+  }
+  function startDrag(startX,startWidth){
+    split.classList.add('dragging');divider.classList.add('dragging');
+    function onMove(x){setWidth(startWidth+(x-startX));}
+    function onPointerMove(e){onMove(e.clientX);}
+    function onPointerUp(){
+      window.removeEventListener('pointermove',onPointerMove);
+      window.removeEventListener('pointerup',onPointerUp);
+      split.classList.remove('dragging');divider.classList.remove('dragging');
+    }
+    window.addEventListener('pointermove',onPointerMove);
+    window.addEventListener('pointerup',onPointerUp);
+  }
+  divider.addEventListener('pointerdown',e=>{
+    e.preventDefault();
+    startDrag(e.clientX,$('#controls-pane').getBoundingClientRect().width);
+  });
+  // Keyboard equivalent (the divider is a focusable role="separator") -- left/right nudge by 24px.
+  divider.addEventListener('keydown',e=>{
+    const width=$('#controls-pane').getBoundingClientRect().width;
+    if(e.key==='ArrowLeft'){setWidth(width-24);e.preventDefault();}
+    else if(e.key==='ArrowRight'){setWidth(width+24);e.preventDefault();}
+  });
 }
 function postToPreview(message){
   const frame=$('#preview-frame');

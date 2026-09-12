@@ -64,7 +64,7 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
     host.style.opacity=String(pose.opacity);host.dataset.travel=travel.stage;
     if(thread&&rope&&loose){
       const returning=travel.stage==='return';
-      threadX=pose.x+width*.5;threadY=Math.max(0,pose.y+height*(returning ? .82 : .2));
+      threadX=pose.x+width*.5;threadY=Math.max(0,pose.y+height*.2);
       if(pointer.moved){
         const near=travel.stage==='perched'&&pointer.y>0&&pointer.y<threadY&&Math.abs(pointer.x-threadX)<26;
         if(near){const proximity=1-Math.abs(pointer.x-threadX)/26;
@@ -74,16 +74,19 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
         wasNear=near;pointer.moved=false;
       }
       stepThreadSpring(tension,dt);
-      if(travel.stage==='fall'){
+      rope.style.strokeDasharray='none';rope.style.strokeDashoffset='0';
+      if(returning){
+        const tipX=home.x+width*.5,tipY=pose.webTipY;
+        // The tip leads; after attachment only the hand end moves up the web.
+        rope.setAttribute('d',`M ${threadX.toFixed(2)} ${threadY.toFixed(2)} L ${tipX.toFixed(2)} ${tipY.toFixed(2)}`);
+        loose.setAttribute('d',`M ${tipX-3} ${tipY+3} L ${tipX} ${tipY} L ${tipX+3} ${tipY+3} M ${tipX} ${tipY} L ${tipX} ${tipY+5}`);
+        thread.style.opacity=String(pose.thread);
+      }else if(travel.stage==='fall'){
         const paths=threadPaths(snapX,snapY,0,.58,0,travel.elapsed);
         thread.style.opacity=String(paths.opacity);rope.setAttribute('d',paths.upper);loose.setAttribute('d',paths.lower);
       }else if(pose.thread>0){
-        const paths=threadPaths(threadX,threadY,media.matches?0:tension.x,hit,time-disturbed,null,returning?(window.visualViewport?.height||innerHeight)+height*2:0);
+        const paths=threadPaths(threadX,threadY,media.matches?0:tension.x,hit,time-disturbed,null);
         rope.setAttribute('d',paths.upper);loose.setAttribute('d','');thread.style.opacity=String(pose.thread);
-        // Cast a new thread from its anchor before it becomes taut during the return.
-        rope.setAttribute('pathLength','1');
-        rope.style.strokeDasharray=travel.stage==='return'?'1':'none';
-        rope.style.strokeDashoffset=travel.stage==='return'?String(Math.max(0,1-travel.elapsed/.32)):'0';
       }else{
         thread.style.opacity='0';
       }

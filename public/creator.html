@@ -26,7 +26,7 @@
 <section id="project-view" class="view panel" hidden><div class="section-head"><div><h1>Project collection.</h1><p>Every five projects form one physical card stack. Change their order and folder below.</p></div><button id="add-project">Add project</button></div><label class="upload">Create projects from images<input id="upload" type="file" accept="image/png,image/jpeg,image/webp" multiple></label><div id="images" class="image-list"></div></section>
 <section id="asset-view" class="view panel" hidden><div class="section-head"><div><h1>Image library.</h1><p>Uploads are stored on the server. Remove images only when they are no longer used in published projects.</p></div><button id="refresh-assets">Refresh images</button></div><label class="upload">Upload to library<input id="library-upload" type="file" accept="image/png,image/jpeg,image/webp" multiple></label><div id="assets" class="image-list"></div></section>
 <section id="security" class="view" hidden><div class="panel narrow"><span class="eyebrow">Private access</span><h1>A fresh passcode.</h1><form id="password"><label>New passcode<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="256" required></label><p>Use at least 12 characters. Saving signs out all creator sessions.</p><button class="primary">Change passcode</button></form></div></section>
-</div><div id="preview-pane"><div class="preview-toolbar">
+</div><div id="split-divider" role="separator" aria-orientation="vertical" aria-label="Resize panels" tabindex="0"></div><div id="preview-pane"><div class="preview-toolbar">
 <label>Device<select id="device-preset">
 <option value="responsive" data-w="0" data-h="0">Responsive (fit panel)</option>
 <optgroup label="Phones">

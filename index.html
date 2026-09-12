@@ -6759,16 +6759,26 @@ function applySiteAppearance(data){
   }
   applyLayoutOverrides(data);
 }
-// Lightweight drag-and-drop (Part C): PREVIEW_DRAGGABLE_IDS is deliberately tiny -- only elements
-// that were ALREADY position:fixed/free-floating before this feature existed (nothing else in the
-// page's layout depends on their exact position), so dragging one can never disturb the site's
-// actual hand-tuned grid/flex layout. See server/creator.js's identical DRAGGABLE_IDS list, which
-// is the real source of truth for what's allowed to save -- this client-side copy only decides
-// what's draggable in the UI, the server independently re-validates every id it's asked to store.
+// Lightweight drag-and-drop (Part C): PREVIEW_DRAGGABLE_IDS is deliberately small -- only
+// elements that were ALREADY position:fixed/free-floating before this feature existed (nothing
+// else in the page's layout depends on their exact position), so dragging/resizing one can never
+// disturb the site's actual hand-tuned grid/flex layout. See server/creator.js's identical
+// DRAGGABLE_IDS list, which is the real source of truth for what's allowed to save -- this
+// client-side copy only decides what's draggable in the UI, the server independently re-validates
+// every id it's asked to store.
+// [fix] 'replay' was removed after discovering there's no actual <button id="replay"> in the
+// page any more -- only dormant CSS and a JS variable that always resolves to null. See the
+// identical note on server/creator.js's DRAGGABLE_IDS.
 var PREVIEW_DRAGGABLE_IDS = ["assistant-launcher"];
 function currentLayoutBreakpoint(){
   return window.innerWidth <= 760 ? "mobile" : window.innerWidth <= 1024 ? "tablet" : "desktop";
 }
+// [fix] this used to write el.style.transform directly -- but several of these elements ALREADY
+// use transform themselves for their own purposes (#replay's show/hide slide, .assistant-launcher's
+// :hover{transform:scale(1.06)}), and an inline style.transform always wins over any stylesheet
+// rule, so a dragged/resized element would have silently lost its own animation the moment an
+// override applied. `translate`/`scale` are separate CSS properties (not part of `transform`) that
+// compose additively with whatever transform the element already has, so this can't happen.
 function applyLayoutOverrides(data){
   var bp = currentLayoutBreakpoint();
   var overrides = (data.layoutOverrides && data.layoutOverrides[bp]) || {};
@@ -6776,7 +6786,8 @@ function applyLayoutOverrides(data){
     var el = document.getElementById(id);
     if (!el) return;
     var pos = overrides[id];
-    el.style.transform = pos ? "translate3d(" + pos.x + "px," + pos.y + "px,0)" : "";
+    el.style.translate = pos ? pos.x + "px " + pos.y + "px" : "";
+    el.style.scale = pos && pos.scale ? String(pos.scale) : "";
   });
 }
 loadPortfolioFromAPI();
@@ -6794,21 +6805,30 @@ window.addEventListener("resize", function(){
 // registered for it, i.e. a harmless no-op. Nothing here can be triggered by a visitor: entering
 // edit mode requires a postMessage the studio itself sends, and the studio only runs behind the
 // authenticated /creator login.
-var kaPreviewEditMode = false, kaPreviewOutline = null;
+var kaPreviewEditMode = false, kaPreviewOutline = null, kaPreviewHandle = null, kaPreviewSelectedEl = null;
 function kaPreviewEnsureOutline(){
   if (kaPreviewOutline) return kaPreviewOutline;
   kaPreviewOutline = document.createElement("div");
   kaPreviewOutline.style.cssText = "position:fixed;pointer-events:none;z-index:99999;border:2px solid #FF9438;border-radius:8px;box-shadow:0 0 0 2px rgba(255,148,56,.35);display:none;transition:none;";
+  // A single reusable resize handle (a small dot at the selected element's corner) rather than
+  // one per draggable element -- it just follows whichever element is currently selected.
+  kaPreviewHandle = document.createElement("div");
+  kaPreviewHandle.style.cssText = "position:fixed;z-index:100000;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#FF9438;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:none;cursor:nwse-resize;";
+  kaPreviewHandle.addEventListener("pointerdown", kaPreviewResizePointerDown);
   document.documentElement.appendChild(kaPreviewOutline);
+  document.documentElement.appendChild(kaPreviewHandle);
   return kaPreviewOutline;
 }
 function kaPreviewShowOutline(el){
   var o = kaPreviewEnsureOutline();
-  if (!el){ o.style.display = "none"; return; }
+  kaPreviewSelectedEl = el;
+  if (!el){ o.style.display = "none"; kaPreviewHandle.style.display = "none"; return; }
   var r = el.getBoundingClientRect();
   o.style.display = "block";
   o.style.left = (r.left - 4) + "px"; o.style.top = (r.top - 4) + "px";
   o.style.width = (r.width + 8) + "px"; o.style.height = (r.height + 8) + "px";
+  kaPreviewHandle.style.display = "block";
+  kaPreviewHandle.style.left = (r.right + 4) + "px"; kaPreviewHandle.style.top = (r.bottom + 4) + "px";
 }
 function kaPreviewSetEditMode(enabled){
   kaPreviewEditMode = enabled;
@@ -6818,26 +6838,58 @@ function kaPreviewSetEditMode(enabled){
   });
   if (!enabled) kaPreviewShowOutline(null);
 }
+// current translate/scale read back off the element's own inline style -- see applyLayoutOverrides'
+// comment above for why these are the standalone CSS properties, not `transform`.
+function kaPreviewReadPos(el){
+  var m = /(-?[\d.]+)px\s+(-?[\d.]+)px/.exec(el.style.translate || "");
+  return { x: m ? parseFloat(m[1]) : 0, y: m ? parseFloat(m[2]) : 0, scale: parseFloat(el.style.scale) || 1 };
+}
 function kaPreviewPointerDown(e){
   if (!kaPreviewEditMode) return;
   e.preventDefault();
   var el = e.currentTarget, id = el.id;
   kaPreviewShowOutline(el);
   try { window.parent.postMessage({ type: "ka-preview-selected", id: id }, window.location.origin); } catch(err){}
-  var startX = e.clientX, startY = e.clientY;
-  var m = /translate3d\(([-\d.]+)px,\s*([-\d.]+)px/.exec(el.style.transform || "");
-  var baseX = m ? parseFloat(m[1]) : 0, baseY = m ? parseFloat(m[2]) : 0;
+  var startX = e.clientX, startY = e.clientY, base = kaPreviewReadPos(el);
   function onMove(ev){
-    var x = baseX + (ev.clientX - startX), y = baseY + (ev.clientY - startY);
-    el.style.transform = "translate3d(" + x + "px," + y + "px,0)";
+    var x = base.x + (ev.clientX - startX), y = base.y + (ev.clientY - startY);
+    el.style.translate = x + "px " + y + "px";
     kaPreviewShowOutline(el);
   }
   function onUp(ev){
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
-    var x = baseX + (ev.clientX - startX), y = baseY + (ev.clientY - startY);
+    var x = base.x + (ev.clientX - startX), y = base.y + (ev.clientY - startY);
     try {
-      window.parent.postMessage({ type: "ka-preview-moved", id: id, breakpoint: currentLayoutBreakpoint(), x: x, y: y }, window.location.origin);
+      window.parent.postMessage({ type: "ka-preview-moved", id: id, breakpoint: currentLayoutBreakpoint(), x: x, y: y, scale: base.scale }, window.location.origin);
+    } catch(err){}
+  }
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+}
+// Dragging the corner handle scales the selected element (Part C.6's "resizing") -- driven by
+// distance from the element's own center, same idea as resizing a Figma frame from its handle.
+function kaPreviewResizePointerDown(e){
+  if (!kaPreviewEditMode || !kaPreviewSelectedEl) return;
+  e.preventDefault(); e.stopPropagation();
+  var el = kaPreviewSelectedEl, id = el.id;
+  var r = el.getBoundingClientRect();
+  var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  var startDist = Math.max(1, Math.hypot(e.clientX - cx, e.clientY - cy));
+  var base = kaPreviewReadPos(el);
+  function scaleFor(ev){
+    var dist = Math.max(1, Math.hypot(ev.clientX - cx, ev.clientY - cy));
+    return Math.min(2.5, Math.max(0.5, base.scale * (dist / startDist)));
+  }
+  function onMove(ev){
+    el.style.scale = String(scaleFor(ev));
+    kaPreviewShowOutline(el);
+  }
+  function onUp(ev){
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    try {
+      window.parent.postMessage({ type: "ka-preview-moved", id: id, breakpoint: currentLayoutBreakpoint(), x: base.x, y: base.y, scale: scaleFor(ev) }, window.location.origin);
     } catch(err){}
   }
   window.addEventListener("pointermove", onMove);

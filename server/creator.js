@@ -16,6 +16,11 @@ export const FONT_CHOICES=['Manrope','Poppins','Playfair Display','Space Grotesk
 // site's actual structural layout (nav, grid, cards) stays exactly as hand-tuned, untouched by
 // this system. Extending drag-and-drop to a new element later is just adding its id here AND
 // giving it a data-ka-draggable attribute in index.html -- nothing else in this file changes.
+// [fix] 'replay' was removed after discovering there's no actual <button id="replay"> in the
+// page anymore -- only dormant CSS (#replay{...}) and a JS variable (replayBtn) that always
+// resolves to null via optional chaining, same dead-feature pattern as #visitor-counter's own
+// leftover CSS found earlier. Nothing to drag there; left out rather than keeping a silently
+// no-op entry.
 export const DRAGGABLE_IDS=['assistant-launcher'];
 export const LAYOUT_BREAKPOINTS=['mobile','tablet','desktop'];
 // Lightweight, dependency-free User-Agent classification for the visitor log (Part B). Not meant
@@ -274,9 +279,10 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
       if(src&&typeof src==='object'){
         for(const [id,pos] of Object.entries(src)){
           if(!DRAGGABLE_IDS.includes(id)) return fail(res,400,'Unknown layout element: '+id);
-          const x=Number(pos?.x),y=Number(pos?.y);
+          const x=Number(pos?.x),y=Number(pos?.y),scale=pos?.scale===undefined?1:Number(pos.scale);
           if(!Number.isFinite(x)||!Number.isFinite(y)||Math.abs(x)>2000||Math.abs(y)>2000) return fail(res,400,'Layout position out of range.');
-          clean[id]={x,y};
+          if(!Number.isFinite(scale)||scale<0.5||scale>2.5) return fail(res,400,'Layout scale out of range.');
+          clean[id]={x,y,scale};
         }
       }
       layoutOverrides[bp]=clean;

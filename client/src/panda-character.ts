@@ -94,15 +94,10 @@ export function createPanda(compact: boolean): Character {
   root.rotation.y=-.13;
   return {root,activities,dispose:()=>disposeObject(root),climb(time,weight){
     if(!weight)return;
-    if(weight<0){
-      const amount=-weight,push=.5+.5*Math.sin(time*7);
-      arms.forEach((arm,i)=>{arm.rotation.z=THREE.MathUtils.lerp(arm.rotation.z,(i?1:-1)*(.3+push*.22),amount);arm.rotation.x=THREE.MathUtils.lerp(arm.rotation.x,-.25,amount);});
-      head.rotation.x=THREE.MathUtils.lerp(head.rotation.x,-.12,amount);
-      phone.visible=bamboo.visible=toy.visible=sleepMarks.visible=false;
-      return;
-    }
-    arms.forEach((arm,i)=>{const sign=i?1:-1;arm.rotation.z=sign*(2.55+Math.sin(time*7+i*Math.PI)*.23);arm.rotation.x=-.15;});
-    head.rotation.x=-.08;head.rotation.z=Math.sin(time*3.5)*.025;body.rotation.z=Math.sin(time*7)*.025;
+    arms.forEach((arm,i)=>{const sign=i?1:-1;arm.rotation.z=THREE.MathUtils.lerp(arm.rotation.z,sign*(2.55+Math.sin(time*7+i*Math.PI)*.23),weight);arm.rotation.x=THREE.MathUtils.lerp(arm.rotation.x,-.15,weight);});
+    head.rotation.x=THREE.MathUtils.lerp(head.rotation.x,-.08,weight);
+    head.rotation.z=THREE.MathUtils.lerp(head.rotation.z,Math.sin(time*3.5)*.025,weight);
+    body.rotation.z=THREE.MathUtils.lerp(body.rotation.z,Math.sin(time*7)*.025,weight);
     phone.visible=bamboo.visible=toy.visible=sleepMarks.visible=false;
   },wave(elapsed){
     if(elapsed<0)return;

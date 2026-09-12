@@ -105,7 +105,7 @@ test('spider-panda remains above chat, waits for closure, falls, then returns at
 test('climbing and bottom-web return arms stay inside the panda camera',()=>{
  const character=geometry.createPanda(true),camera=new THREE.PerspectiveCamera(32,68/73,.1,30);
  camera.position.set(.2,1.4,5.2);camera.lookAt(0,1.02,0);camera.updateMatrixWorld(true);
- for(const weight of [-1,-.5,1])for(let time=0;time<3;time+=.15){
+ for(const weight of [0,.25,.5,1])for(let time=0;time<3;time+=.15){
   character.update('relaxing',time,1,time,new THREE.Vector2(),.05);character.climb(time,weight);character.root.updateMatrixWorld(true);
   character.root.traverse(object=>{
    if(!object.visible||!object.geometry)return;
@@ -178,9 +178,9 @@ test('live panda controller tears, casts a fresh thread, greets once, and cancel
  const move=new Event('pointermove');move.clientX=295;move.clientY=20;document.dispatchEvent(move);step(.1);
  assert(upper.attrs.d.includes(' L '));
  change(false);step(.38);assert.equal(host.dataset.travel,'fall');assert(lower.attrs.d.startsWith('M '));
- step(.8);assert.equal(host.dataset.travel,'return');assert.equal(lower.attrs.d,'');assert.equal(upper.style.strokeDasharray,'1');
+ step(.8);assert.equal(host.dataset.travel,'return');assert(lower.attrs.d.startsWith('M '),'web has a visible leading tip');assert.equal(upper.style.strokeDasharray,'none');
  const points=upper.attrs.d.match(/[-\d.]+/g).map(Number);
- assert.equal(points[1],786,'comeback web starts below the viewport and panda');
+ assert.equal(points[1],727.6,'panda stays below the viewport while casting');
  assert(points.at(-1)<points[1],'comeback web extends upward toward panda');
  step(2.2);assert.equal(host.dataset.travel,'idle');
  const greeting=launcher.children.find(el=>el.className?.includes('panda-return-greeting'));
@@ -197,11 +197,29 @@ test('bottom web settles and disappears smoothly at home at multiple refresh rat
   for(let i=0;i<hz*2.2;i++){
    const pose=travel.travelPose(state,{x:200,y:22},home,640,73);
    assert(pose.y<=previous+.00001,'return moves upward without a landing jump');previous=pose.y;
-   if(state.stage==='return')assert(pose.climb<=0,'return uses the bottom-web gesture');
+   if(state.stage==='return'){
+    assert(pose.climb>=0&&pose.climb<=1,'panda reaches upward along the cast web');
+    assert(pose.webTipY<=pose.y+73*.2+.00001,'tip leads the panda');
+    if(state.elapsed<=.56){assert.equal(pose.y,713);assert.equal(pose.opacity,0);assert.equal(pose.climb,0);}
+    if(state.elapsed>=.42)assert(Math.abs(pose.webTipY-(home.y+73*.2))<.00001,'attachment stays fixed while panda climbs');
+   }
    travel.advanceTravel(state,1/hz,false);
   }
   assert.equal(state.stage,'idle');
   const settled=travel.travelPose({stage:'return',elapsed:2.1,open:false},{x:200,y:22},home,640,73);
   assert.equal(settled.y,home.y);assert.equal(settled.thread,0);assert.equal(Math.abs(settled.climb),0);
  }
+});
+
+test('web tip travels upward before panda begins the return climb',()=>{
+ const home={x:360,y:510},perch={x:200,y:22};let lastTip=Infinity;
+ for(let t=0;t<=.56;t+=.01){
+  const pose=travel.travelPose({stage:'return',elapsed:t,open:false},perch,home,640,73);
+  assert(pose.webTipY<=lastTip+.00001);lastTip=pose.webTipY;
+  assert.equal(pose.y,713);assert.equal(pose.climb,0);
+ }
+ const attached=travel.travelPose({stage:'return',elapsed:.5,open:false},perch,home,640,73);
+ assert.equal(attached.webTipY,524.6);assert.equal(attached.thread,1);
+ const climbing=travel.travelPose({stage:'return',elapsed:1,open:false},perch,home,640,73);
+ assert(climbing.y<713&&climbing.climb>0);assert.equal(climbing.webTipY,attached.webTipY);
 });
