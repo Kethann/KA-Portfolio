@@ -75,15 +75,16 @@ const chatFuncs=new Map();
 function walkChat(n){if(!n||typeof n!=='object')return;if(n.type==='FunctionDeclaration')chatFuncs.set(n.id.name,chatScript.slice(n.start,n.end));Object.values(n).forEach(v=>Array.isArray(v)?v.forEach(walkChat):walkChat(v));}
 walkChat(acorn.parse(chatScript,{ecmaVersion:'latest'}));
 const messagesEl=new Element(),panel=new Element(),launcher=new Element(),input=new Element(),sendBtn=new Element();
-let reads=0;
+let reads=0;const chatEvents=[];
 const packets=['data: {"text":"Hello"}\n\n','data: [DONE]\n\n'];
-const chat=vm.createContext({console,window,navigator:{language:'en'},TextDecoder,history:[],opened:false,streaming:false,followChat:true,closeTimer:null,reducedMotion:false,
+const chat=vm.createContext({console,window,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},navigator:{language:'en'},TextDecoder,history:[],opened:false,streaming:false,followChat:true,closeTimer:null,reducedMotion:false,
   messagesEl,panel,launcher,input,sendBtn,chipsEl:new Element(),QUICK_REPLIES:[],pickGreeting:()=>"Welcome",
-  document:{createElement:t=>new Element(t)},requestAnimationFrame:c.requestAnimationFrame,setTimeout:c.setTimeout,clearTimeout:c.clearTimeout,
+  document:{createElement:t=>new Element(t),dispatchEvent:event=>chatEvents.push(event)},requestAnimationFrame:c.requestAnimationFrame,setTimeout:c.setTimeout,clearTimeout:c.clearTimeout,
   fetch:()=>Promise.resolve({ok:true,body:{getReader:()=>({read:()=>Promise.resolve(reads<packets.length?{done:false,value:new TextEncoder().encode(packets[reads++])}:{done:true})})}})});
 for(const name of ['addMessage','addTypingIndicator','removeChips','openPanel','closePanel','sendMessage']) vm.runInContext(chatFuncs.get(name),chat);
 (async()=>{
   chat.openPanel();chat.closePanel();chat.openPanel();timersOnce();frames();
+  assert.deepEqual(chatEvents.map(event=>event.detail.open),[true,false,true]);
   assert(!panel.hidden && panel.classList.contains('open'),'quick reopen was hidden by old close timer');
   chat.sendMessage('A test question');chat.sendMessage('Must not send twice');
   await new Promise(resolve=>setImmediate(resolve));

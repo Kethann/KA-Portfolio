@@ -6,6 +6,8 @@ export type Character = {
   activities: readonly Activity[];
   update: (activity: Activity, elapsed: number, weight: number, time: number, look: THREE.Vector2, dt: number) => void;
   dispose: () => void;
+  climb?: (time:number,weight:number) => void;
+  wave?: (elapsed:number) => void;
 };
 
 export function disposeObject(root: THREE.Object3D) {
@@ -25,7 +27,7 @@ export function disposeObject(root: THREE.Object3D) {
 export function createPanda(compact: boolean): Character {
   const root = new THREE.Group(), body = new THREE.Group(), head = new THREE.Group();
   root.add(body); body.add(head); head.position.set(0,1.23,.06);
-  const sphere = new THREE.SphereGeometry(1,32,24);
+  const sphere = new THREE.SphereGeometry(1,compact?20:32,compact?16:24);
   const ivory = new THREE.MeshPhysicalMaterial({color:0xe8e4d9,roughness:.92,sheen:1,sheenColor:0xffffff,sheenRoughness:.85});
   const charcoal = new THREE.MeshPhysicalMaterial({color:0x191b20,roughness:.94,sheen:1,sheenColor:0x666b73,sheenRoughness:.8});
   const muzzle = new THREE.MeshPhysicalMaterial({color:0xf1e9dd,roughness:.86,sheen:.6});
@@ -79,13 +81,42 @@ export function createPanda(compact: boolean): Character {
   const nodeMat=new THREE.MeshStandardMaterial({color:0xa6ad6b,roughness:.9});
   for(const y of [-.22,0,.22]) { const node=new THREE.Mesh(new THREE.TorusGeometry(.037,.008,5,12),nodeMat);node.rotation.x=Math.PI/2;node.position.y=y;bamboo.add(node); }
   const leaf=ellipsoid(bamboo,green,[.085,.24,0],[.12,.028,.032]);leaf.rotation.z=.5;
+  const sleepMarks=new THREE.Group();root.add(sleepMarks);
+  const sleepMaterial=new THREE.MeshBasicMaterial({color:0xeadbc2,transparent:true,depthWrite:false});
+  for(let i=0;i<3;i++){
+    const mark=new THREE.Group();sleepMarks.add(mark);
+    for(const [y,angle] of [[.04,0],[0,.65],[-.04,0]]){
+      const stroke=new THREE.Mesh(new THREE.BoxGeometry(.10,.018,.018),sleepMaterial);
+      stroke.position.y=y;stroke.rotation.z=angle;mark.add(stroke);
+    }
+  }
   const toy = ellipsoid(root,new THREE.MeshPhysicalMaterial({color:0xb5a1a0,roughness:.4,clearcoat:.4}),[.6,-.03,.47],[.14,.14,.14]);
   root.rotation.y=-.13;
-  return {root,activities,dispose:()=>disposeObject(root),update(activity,elapsed,weight,time,look,dt){
+  return {root,activities,dispose:()=>disposeObject(root),climb(time,weight){
+    if(!weight)return;
+    if(weight<0){
+      const amount=-weight,push=.5+.5*Math.sin(time*7);
+      arms.forEach((arm,i)=>{arm.rotation.z=THREE.MathUtils.lerp(arm.rotation.z,(i?1:-1)*(.3+push*.22),amount);arm.rotation.x=THREE.MathUtils.lerp(arm.rotation.x,-.25,amount);});
+      head.rotation.x=THREE.MathUtils.lerp(head.rotation.x,-.12,amount);
+      phone.visible=bamboo.visible=toy.visible=sleepMarks.visible=false;
+      return;
+    }
+    arms.forEach((arm,i)=>{const sign=i?1:-1;arm.rotation.z=sign*(2.55+Math.sin(time*7+i*Math.PI)*.23);arm.rotation.x=-.15;});
+    head.rotation.x=-.08;head.rotation.z=Math.sin(time*3.5)*.025;body.rotation.z=Math.sin(time*7)*.025;
+    phone.visible=bamboo.visible=toy.visible=sleepMarks.visible=false;
+  },wave(elapsed){
+    if(elapsed<0)return;
+    const ease=(x:number)=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
+    const amount=ease(elapsed/.4)*(1-ease((elapsed-2.2)/.6));
+    arms[1].rotation.z=THREE.MathUtils.lerp(arms[1].rotation.z,2.35+Math.sin(elapsed*10)*.25,amount);
+    arms[1].rotation.x=THREE.MathUtils.lerp(arms[1].rotation.x,-.12,amount);
+    head.rotation.z=THREE.MathUtils.lerp(head.rotation.z,-.08,amount);
+    phone.visible=bamboo.visible=toy.visible=sleepMarks.visible=false;
+  },update(activity,elapsed,weight,time,look,dt){
     const sleep=activity==='sleeping'?weight:0, eat=activity==='eating'?weight:0,call=activity==='calling'?weight:0;
     const play=activity==='playing'?weight:0,stretch=activity==='stretching'?weight:0,watch=activity==='watching'?weight:0;
     // Gesture, pause, and recover; distinct rhythms avoid identical short hard loops.
-    const bite=Math.pow(Math.max(0,Math.sin(elapsed*.73)),4),reach=Math.max(0,Math.sin(elapsed*.28));
+    const bite=Math.pow(.5+.5*Math.sin(elapsed*2.2),2),chew=Math.max(0,Math.sin(elapsed*9)),reach=Math.max(0,Math.sin(elapsed*.28));
     const yaw=Math.sin(time*.19)*.08*(1-sleep)+look.x*(.12+watch*.15);
     const damp=1-Math.exp(-dt*7);
     head.rotation.y+= (yaw-head.rotation.y)*damp;
@@ -94,16 +125,27 @@ export function createPanda(compact: boolean): Character {
     // in and rest low against the belly instead of hanging at the sides.
     head.rotation.x+= (sleep*.42-call*.1+eat*bite*.06-look.y*.08-head.rotation.x)*damp;
     head.rotation.z=Math.sin(time*.31)*.025*(1-sleep)+sleep*.24+call*Math.sin(elapsed*.48)*.04;
-    body.scale.y=1+Math.sin(time*(sleep?1.1:1.5))*.009+stretch*reach*.045;
+    const breath=Math.sin(time*1.35);
+    body.scale.y=1+Math.sin(time*1.5)*.009*(1-sleep)+sleep*breath*.026+stretch*reach*.045;
+    body.scale.x=1+sleep*breath*.012;
     body.rotation.z=sleep*-.16+play*Math.sin(elapsed*.7)*.025;
     body.rotation.x=sleep*.09;
-    arms[0].rotation.z=-.12+eat*(1.05+bite*.18)-stretch*reach*2.35-play*.24+sleep*.55;
+    arms[0].rotation.z=-.12+eat*(1.05+bite*.32)-stretch*reach*2.35-play*.24+sleep*.55;
     arms[1].rotation.z=.12+call*1.98+stretch*reach*2.25+play*(.25+Math.sin(elapsed*.9)*.2)-sleep*.55;
     arms[0].rotation.x=-eat*(.65+bite*.17)-play*.35+sleep*.32;
     arms[1].rotation.x=-call*.38-play*.45+sleep*.32;
     const blink=Math.pow(Math.max(0,Math.cos(time*1.37+Math.sin(time*.23)*1.5)),36);
     eyes.forEach(eye=>eye.scale.y=.074*Math.max(.055,(1-blink*.92)*(1-sleep*.95)));
-    mouth.scale.y=.012*(1+eat*bite*.5+stretch*reach*2);
+    mouth.scale.y=.012*(1+eat*(.5+chew*2.8)*bite+sleep*(1+breath*.6)+stretch*reach*2);
+    mouth.position.y=.035-eat*chew*bite*.012;
+    bamboo.rotation.z=-.28+eat*bite*.12;
+    leaf.rotation.z=.5+eat*Math.sin(elapsed*9)*bite*.16;
+    sleepMarks.visible=sleep>.005;sleepMaterial.opacity=sleep*.8;
+    sleepMarks.children.forEach((mark,i)=>{
+      const phase=(elapsed*.25+i/3)%1,fade=Math.sin(Math.PI*phase);
+      mark.position.set(.65+phase*.12,1.35+phase*.55,.35);
+      mark.scale.setScalar(Math.max(.001,sleep*fade*(.65+phase*.45)));
+    });
     phone.scale.setScalar(Math.max(.001,call));phone.visible=call>.005;
     bamboo.scale.setScalar(Math.max(.001,eat));bamboo.visible=eat>.005;
     toy.visible=play>.005;toy.scale.setScalar(.14*Math.max(.001,play));toy.position.x=.45+Math.sin(elapsed*.9)*.14;toy.rotation.z=-elapsed*.6;

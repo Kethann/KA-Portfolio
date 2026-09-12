@@ -66,3 +66,19 @@ Added a cached two-radius bloom texture derived from the finished crystal artwor
 ## Eased recurring glow
 
 After reveal, the final glow eases out over five seconds, waits a newly randomized 3?8 seconds, then eases in over 1.4 seconds and out over 3.6 seconds. The full returning glow lasts five seconds. Quintic easing gives zero slope and acceleration at each endpoint. The envelope changes only emitted light, including nearby dust illumination; the crystal stays opaque. The palette progresses from orange outer spill to yellow-gold inner bloom and warm-white hot facets. Active frame time drives the cycle without timers; reduced motion keeps steady illumination.
+
+
+## Translucent glass and spider-panda
+
+Reduced dark RGBA background fills in the public homepage glass styles by 35%, including shared normal/heavy tokens and navigation/section/chat surfaces, while retaining blur, borders on cards, text and accent colors. Gallery dark translucent fills receive the same reduction. The footer is borderless with a fading translucent background and a small ? 2026 Kethan Artzz line below its social links. About includes IMAGINE ? CREATE ? EVOLVE beneath its headline.
+
+The panda moves in a fixed, noninteractive layer outside the launcher's stacking context. Chat layout reserves space above its header. Opening starts a 2.2-second climb down a thin SVG thread with alternating arm motion; closing waits 340ms for the panel to disappear, falls for 800ms, then climbs to the launcher over 2.1 seconds. Travel shares the existing render loop and active clock, handles reduced motion, and removes its thread/listeners and restores the host on disposal. A mid-climb close releases from the current position.
+
+Tests cover climb camera bounds, travel at 30/60/144 Hz, clearance above the panel, delayed fall, reduced motion, resource cleanup and chat event ordering. Browser appearance, contrast across every nebula frame, physical touch behavior and device FPS remain unverified without a connected browser.
+
+
+## Reactive thread, synchronized tear and return greeting
+
+Cursor proximity to the open-chat thread adds a bounded impulse to a damped spring; sampled SVG points carry that disturbance along the thread. An exact spring step keeps damping consistent at 30/60/144 Hz. The thread remains intact during the panel's closing transition and splits on the same travel-state transition that starts the fall. Two paths produce a visible tear gap, traveling recoil wave and 550ms fade. The returning climb uses a newly drawn continuous path revealed from its anchor over 320ms.
+
+Arrival at the launcher triggers one 2.8-second paw wave and the existing glass speech-bubble treatment reading ?Hi, I'm back!?. Reopening cancels the greeting; reduced motion suppresses the added motion. SVG paths and greeting DOM are allocated once, share the existing render/active clock, ignore pointer hits, and are removed on disposal. Tests cover damping parity, immediate tear gap, intact pre-fall thread, recoil expiry and waving geometry bounds. Browser appearance and physical device performance remain unverified.

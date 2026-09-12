@@ -7,6 +7,41 @@ const scrypt=promisify(derive);
 const text=(value,max)=>typeof value==='string' ? value.trim().slice(0,max) : '';
 const equal=(a,b)=>typeof a==='string'&&typeof b==='string'&&Buffer.byteLength(a)===Buffer.byteLength(b)&&timingSafeEqual(Buffer.from(a),Buffer.from(b));
 const save=(path,data)=>{writeFileSync(path+'.tmp',JSON.stringify(data,null,2),{mode:0o600});renameSync(path+'.tmp',path);};
+// A small allowlisted set rather than free-text: the creator panel picks a font, it never types
+// raw CSS -- this is what makes it safe to drop the value straight into a stylesheet on the
+// public page (see index.html's applySiteAppearance) with no injection risk.
+export const FONT_CHOICES=['Manrope','Poppins','Playfair Display','Space Grotesk','system-ui'];
+// Lightweight drag-and-drop (Part C, scoped down deliberately): only elements that were ALREADY
+// free-floating (position:fixed, nothing else laid out relative to them) are draggable -- the
+// site's actual structural layout (nav, grid, cards) stays exactly as hand-tuned, untouched by
+// this system. Extending drag-and-drop to a new element later is just adding its id here AND
+// giving it a data-ka-draggable attribute in index.html -- nothing else in this file changes.
+export const DRAGGABLE_IDS=['assistant-launcher'];
+export const LAYOUT_BREAKPOINTS=['mobile','tablet','desktop'];
+// Lightweight, dependency-free User-Agent classification for the visitor log (Part B). Not meant
+// to rival a real UA-parsing library's accuracy -- just enough to bucket "device type" and a
+// coarse browser/OS label for the creator dashboard, which is all the spec actually asks for.
+export function classifyUserAgent(ua){
+  ua=typeof ua==='string'?ua:'';
+  const device=/iPad|Tablet(?!.*Mobile)|Android(?!.*Mobile)/i.test(ua)?'tablet':/Mobi|iPhone|Android/i.test(ua)?'mobile':'desktop';
+  let os='Other';
+  if(/Windows/i.test(ua))os='Windows';else if(/Mac OS X/i.test(ua)&&!/iPhone|iPad/i.test(ua))os='macOS';
+  else if(/iPhone|iPad|iPod/i.test(ua))os='iOS';else if(/Android/i.test(ua))os='Android';else if(/Linux/i.test(ua))os='Linux';
+  let browser='Other';
+  if(/Edg\//i.test(ua))browser='Edge';else if(/OPR\/|Opera/i.test(ua))browser='Opera';
+  else if(/Chrome\//i.test(ua)&&!/Chromium/i.test(ua))browser='Chrome';else if(/CriOS/i.test(ua))browser='Chrome';
+  else if(/Firefox\//i.test(ua)&&!/Seamonkey/i.test(ua))browser='Firefox';
+  else if(/Safari\//i.test(ua)&&!/Chrome|CriOS|Chromium|Android/i.test(ua))browser='Safari';
+  return {device,os,browser};
+}
+// Best-effort ONLY: with no paid/keyed geo-IP service configured, the only trustworthy source of
+// "approximate location" is whatever a fronting reverse proxy/CDN already resolved and forwarded
+// as a header (Cloudflare, Vercel, Netlify, Fastly, and most others do this for free at the edge).
+// Falls back to 'Unknown' rather than ever calling out to a third-party API with the visitor's
+// IP -- that would leak that IP to a service this project has no relationship with.
+function approxLocation(req){
+  return req.get('cf-ipcountry')||req.get('x-vercel-ip-country')||req.get('x-appengine-country')||req.get('x-geo-country')||'Unknown';
+}
 async function passwordHash(password,salt=randomBytes(16).toString('hex')){
   return {salt,hash:(await scrypt(password,salt,64)).toString('hex')};
 }
@@ -14,7 +49,7 @@ async function passwordHash(password,salt=randomBytes(16).toString('hex')){
 export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA_DIR||resolve(root,'server/data'),password=process.env.CREATOR_PASSWORD}={}){
   mkdirSync(dataDir,{recursive:true});
   const uploads=resolve(dataDir,'uploads');mkdirSync(uploads,{recursive:true});
-  const authPath=resolve(dataDir,'auth.json'),sitePath=resolve(dataDir,'portfolio.json'),inboxPath=resolve(dataDir,'inbox.json'),visitPath=resolve(dataDir,'visitors.json');
+  const authPath=resolve(dataDir,'auth.json'),sitePath=resolve(dataDir,'portfolio.json'),inboxPath=resolve(dataDir,'inbox.json'),visitPath=resolve(dataDir,'visitors.json'),visitLogPath=resolve(dataDir,'visitors-log.json');
   if(!existsSync(authPath)){
     const initial=password || randomBytes(18).toString('base64url');
     if(initial.length<12) throw new Error('CREATOR_PASSWORD must contain at least 12 characters.');
@@ -24,15 +59,27 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
   if(!existsSync(sitePath)) save(sitePath,JSON.parse(readFileSync(resolve(root,'server/portfolio-seed.json'),'utf8')));
   if(!existsSync(inboxPath)) save(inboxPath,[]);
   if(!existsSync(visitPath)) save(visitPath,{count:0});
+  const VISIT_LOG_CAP=5000; // FIFO cap -- a personal-portfolio-scale visitor log, not a data warehouse
+  if(!existsSync(visitLogPath)) save(visitLogPath,[]);
   let site=JSON.parse(readFileSync(sitePath,'utf8'));
   // Upgrade older saved collections without replacing artwork or edited copy.
   const defaults=JSON.parse(readFileSync(resolve(root,'server/portfolio-seed.json'),'utf8'));
-  const upgraded={...site,details:{...defaults.details,...site.details},images:site.images.map(project=>({id:project.slug,description:'',technologies:[],link:'',...project}))};
+  const DEFAULT_APPEARANCE={headingFont:'Manrope',bodyFont:'Manrope',textScale:1};
+  const DEFAULT_NOTICE={enabled:false,text:'',tone:'info'};
+  const DEFAULT_VISIBILITY={navGallery:true,navAbout:true};
+  const DEFAULT_LAYOUT={mobile:{},tablet:{},desktop:{}};
+  const upgraded={...site,
+    details:{...defaults.details,...DEFAULT_APPEARANCE,...site.details},
+    notice:{...DEFAULT_NOTICE,...site.notice},
+    visibility:{...DEFAULT_VISIBILITY,...site.visibility},
+    layoutOverrides:{...DEFAULT_LAYOUT,...site.layoutOverrides},
+    images:site.images.map(project=>({id:project.slug,description:'',technologies:[],link:'',downloadable:true,...project}))};
   if(JSON.stringify(upgraded)!==JSON.stringify(site)){
     upgraded.revision=(site.revision||0)+1;save(sitePath,upgraded);site=upgraded;
   }
   let inbox=JSON.parse(readFileSync(inboxPath,'utf8'));
   let visitors=JSON.parse(readFileSync(visitPath,'utf8'));
+  let visitLog=JSON.parse(readFileSync(visitLogPath,'utf8'));
   const sessions=new Map(),limits=new Map();
   const router=express.Router();
   router.use((req,res,next)=>{res.set('Cache-Control','no-store');res.set('X-Content-Type-Options','nosniff');next();});
@@ -70,6 +117,14 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
       visitors={count:visitors.count+1};save(visitPath,visitors);
       res.cookie('ka_visited','1',{sameSite:'strict',secure:req.secure,maxAge:365*24*60*60*1000,path:'/'});
     }
+    // Part B: one LOG ENTRY per visit call (not deduped like the unique-visitor count above --
+    // "recent visits" in the dashboard is meant to show real traffic, repeat and all). IP/location
+    // never leave this file: no public route ever reads visitLog, only the auth-gated
+    // /creator/visitors below does.
+    const {device,os,browser}=classifyUserAgent(req.get('user-agent'));
+    visitLog.push({at:new Date().toISOString(),ip:req.ip||'unknown',location:approxLocation(req),device,os,browser,newVisitor:!seen});
+    if(visitLog.length>VISIT_LOG_CAP) visitLog=visitLog.slice(visitLog.length-VISIT_LOG_CAP);
+    save(visitLogPath,visitLog);
     res.json({count:visitors.count});
   });
   router.post('/contact',sameOrigin,(req,res)=>{
@@ -113,6 +168,33 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
     }catch(error){next(error);}
   });
   router.get('/creator/messages',(req,res)=>res.json(inbox));
+  // Part B dashboard data. IP is included here (creator-authed only) but this route is the ONLY
+  // place it's ever exposed -- /api/portfolio, the public homepage, and every other public route
+  // never see it. Aggregates are computed on read rather than maintained incrementally: at this
+  // log scale (VISIT_LOG_CAP=5000) that's a trivial amount of work per request, not worth the
+  // bug surface of a second running total that could drift from the log.
+  router.get('/creator/visitors',(req,res)=>{
+    // Aggregates (byDevice/byDay/byLocation) are always computed over the FULL log regardless of
+    // the filters below -- they're "the shape of all traffic", not "the shape of this filtered
+    // view" -- while the returned log rows themselves honor device/from/to so the admin can drill
+    // into a specific slice (Part D.11) without the trend numbers jumping around underneath them.
+    const byDevice={},byDay={},byLocation={};
+    for(const entry of visitLog){
+      byDevice[entry.device]=(byDevice[entry.device]||0)+1;
+      const day=(entry.at||'').slice(0,10);
+      if(day) byDay[day]=(byDay[day]||0)+1;
+      byLocation[entry.location||'Unknown']=(byLocation[entry.location||'Unknown']||0)+1;
+    }
+    const {device,from,to}=req.query;
+    let filtered=visitLog;
+    if(typeof device==='string'&&device&&device!=='all') filtered=filtered.filter(e=>e.device===device);
+    if(typeof from==='string'&&from) filtered=filtered.filter(e=>e.at>=from);
+    // ISO timestamps sort lexically, so a plain "YYYY-MM-DD" date needs pushing to the END of
+    // that day before comparing -- otherwise every visit after midnight on the "to" date itself
+    // (anything with a time component) would incorrectly compare as "after" a bare date string.
+    if(typeof to==='string'&&to) filtered=filtered.filter(e=>e.at<=(to.length===10?to+'T23:59:59.999Z':to));
+    res.json({count:visitors.count,log:filtered.slice(-200).reverse(),byDevice,byDay,byLocation});
+  });
   router.get('/creator/assets',(req,res)=>res.json(readdirSync(uploads).filter(name=>/^[a-f0-9-]{36}\.(png|jpg|webp)$/.test(name)).map(name=>({src:'/uploads/'+name,bytes:statSync(resolve(uploads,name)).size,used:site.images.some(image=>image.src==='/uploads/'+name)}))));
   router.delete('/creator/assets/:name',(req,res)=>{
     if(!/^[a-f0-9-]{36}\.(png|jpg|webp)$/.test(req.params.name)) return fail(res,400,'Invalid image.');
@@ -151,6 +233,35 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
       details[key]=text(input.details?.[key],max);
       if(!details[key]) return fail(res,400,'Complete every portfolio text field.');
     }
+    // Typography (Part A): an allowlisted choice, not free text -- see FONT_CHOICES above.
+    details.headingFont=FONT_CHOICES.includes(input.details?.headingFont)?input.details.headingFont:'Manrope';
+    details.bodyFont=FONT_CHOICES.includes(input.details?.bodyFont)?input.details.bodyFont:'Manrope';
+    const scale=Number(input.details?.textScale);
+    details.textScale=Number.isFinite(scale)?Math.min(1.2,Math.max(0.85,scale)):1;
+    // Notice banner (Part A): a single site-wide announcement, plain text only (rendered as
+    // textContent on the public page, never innerHTML -- see index.html's applySiteAppearance).
+    const notice={enabled:!!input.notice?.enabled,text:text(input.notice?.text,220),tone:input.notice?.tone==='warning'?'warning':'info'};
+    if(notice.enabled&&!notice.text) return fail(res,400,'Add notice text before enabling the banner, or turn it off.');
+    // Section visibility (Part A): only the two genuinely optional nav destinations are
+    // toggleable -- Portfolio/Contact are the page's own core content, not "features".
+    const visibility={navGallery:input.visibility?.navGallery!==false,navAbout:input.visibility?.navAbout!==false};
+    // Lightweight drag-and-drop persistence (Part C): a bounded offset, per breakpoint, per
+    // allowlisted element id -- rejects anything else outright rather than silently dropping it,
+    // so a bad client payload fails loudly in the studio instead of quietly losing an edit.
+    const layoutOverrides={};
+    for(const bp of LAYOUT_BREAKPOINTS){
+      const src=input.layoutOverrides?.[bp];
+      const clean={};
+      if(src&&typeof src==='object'){
+        for(const [id,pos] of Object.entries(src)){
+          if(!DRAGGABLE_IDS.includes(id)) return fail(res,400,'Unknown layout element: '+id);
+          const x=Number(pos?.x),y=Number(pos?.y);
+          if(!Number.isFinite(x)||!Number.isFinite(y)||Math.abs(x)>2000||Math.abs(y)>2000) return fail(res,400,'Layout position out of range.');
+          clean[id]={x,y};
+        }
+      }
+      layoutOverrides[bp]=clean;
+    }
     const images=[];
     for(const image of input.images){
       if(!image||typeof image!=='object')return fail(res,400,'Invalid project.');
@@ -160,7 +271,8 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
       if(link){try{if(!['https:','http:'].includes(new URL(link).protocol))throw new Error();}catch{return fail(res,400,'Project links must start with https:// or http://.');}}
       if(!Array.isArray(image.technologies)||image.technologies.length>20) return fail(res,400,'Use up to 20 technology labels.');
       const technologies=image.technologies.map(v=>text(v,60)).filter(Boolean);
-      const common={id:slug,slug,title,cat,description,technologies,link};
+      const downloadable=image.downloadable!==false; // per-image gallery download permission (Part A) -- opt OUT, not opt in, so existing images stay downloadable unless explicitly turned off
+      const common={id:slug,slug,title,cat,description,technologies,link,downloadable};
       if(image.src){
         const uploaded=/^\/uploads\/[a-f0-9-]{36}\.(png|jpg|webp)$/.test(image.src)&&existsSync(resolve(uploads,image.src.split('/').pop()));
         const original=/^\/images\/[a-zA-Z0-9_-]+-(480|768|1080|1600|2400|3840|full)\.webp$/.test(image.src)&&existsSync(resolve(root,'images',image.src.split('/').pop()));
@@ -172,7 +284,7 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
         images.push({...original,...common});
       }
     }
-    const next={revision:site.revision+1,details,folders,images};save(sitePath,next);site=next;res.json(site);
+    const next={revision:site.revision+1,details,folders,images,notice,visibility,layoutOverrides};save(sitePath,next);site=next;res.json(site);
   });
   return {router,uploads};
 }

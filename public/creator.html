@@ -1,12 +1,55 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Creator studio · Kethan Artzz</title><link rel="stylesheet" href="/assets/creator.css"><script src="/assets/creator.js" defer></script></head><body>
 <header><a class="brand" href="/creator">KA <span>Creator studio</span></a><a href="/" target="_blank" rel="noopener">View portfolio ↗</a></header><p id="status" role="status" aria-live="polite"></p><main>
 <section id="login-view" class="login panel"><span class="eyebrow">Private creator access</span><h1>Welcome to your studio.</h1><p>Your work, your words, and the conversations they start.</p><form id="login"><label>Creator passcode<input name="password" type="password" required autocomplete="current-password"></label><button class="primary">Sign in</button></form></section>
-<div id="studio" hidden><div class="toolbar"><nav aria-label="Studio sections"><button data-tab="dashboard" aria-current="page">Dashboard</button><button data-tab="folder-view">Folders</button><button data-tab="project-view">Projects</button><button data-tab="content">Content</button><button data-tab="asset-view">Images</button><button data-tab="inbox">Messages <span id="unread"></span></button><button data-tab="security">Settings</button></nav><div class="actions"><button id="save" class="primary">Save portfolio</button><button id="logout">Sign out</button></div></div>
+<div id="studio" hidden><div id="split"><div id="controls-pane"><div class="toolbar"><nav aria-label="Studio sections"><button data-tab="dashboard" aria-current="page">Dashboard</button><button data-tab="folder-view">Folders</button><button data-tab="project-view">Projects</button><button data-tab="content">Content</button><button data-tab="appearance">Appearance</button><button data-tab="asset-view">Images</button><button data-tab="inbox">Messages <span id="unread"></span></button><button data-tab="visitors">Visitors</button><button data-tab="security">Settings</button></nav><div class="actions"><button id="save" class="primary">Publish changes</button><button id="logout">Sign out</button></div></div>
 <section id="dashboard" class="view"><span class="eyebrow">Studio overview</span><h1>A little order for your ideas.</h1><div id="overview" class="field-grid"></div><p>Edit folders, projects, and content as a draft. Save portfolio publishes those changes together. Message status and image uploads save immediately.</p></section>
 <section id="inbox" class="view" hidden><div class="section-head"><div><span class="eyebrow">Conversations</span><h1>Your inbox.</h1></div><label>Show<select id="message-filter"><option value="all">All messages</option><option value="new">New</option><option value="read">Read</option><option value="archived">Archived</option></select></label><button id="refresh">Refresh</button></div><div id="messages"></div></section>
 <section id="content" class="view panel" hidden><h1>Words & identity.</h1><form id="details" class="field-grid"><label>Creator name<input name="creatorName" required maxlength="80"></label><label>Tagline<input name="tagline" required maxlength="160"></label><label>Main heading<input name="portfolioTitle" required maxlength="100"></label><label>Portfolio introduction<textarea name="portfolioIntro" required maxlength="500"></textarea></label><label>Contact heading<input name="contactTitle" required maxlength="100"></label><label>Contact introduction<textarea name="contactIntro" required maxlength="1000"></textarea></label><label>Open folder button<input name="openLabel" required maxlength="60"></label><label>Close folder button<input name="closeLabel" required maxlength="60"></label><label>Project link button<input name="projectLabel" required maxlength="60"></label><label>Contact button<input name="contactButton" required maxlength="60"></label></form></section>
+<section id="appearance" class="view panel" hidden><h1>Typography, notices &amp; visibility.</h1>
+<form id="typography" class="field-grid"><h2>Typography</h2>
+<label>Heading font<select name="headingFont"></select></label>
+<label>Body font<select name="bodyFont"></select></label>
+<label>Text size<input name="textScale" type="range" min="0.85" max="1.2" step="0.01"></label>
+</form>
+<form id="notice-form" class="field-grid"><h2>Site notice</h2>
+<label class="row"><input name="enabled" type="checkbox"> Show a notice banner on the public site</label>
+<label>Notice text<input name="text" maxlength="220" placeholder="e.g. Site is in beta -- thanks for visiting!"></label>
+<label>Tone<select name="tone"><option value="info">Info</option><option value="warning">Warning</option></select></label>
+</form>
+<form id="visibility-form" class="field-grid"><h2>Section visibility</h2>
+<label class="row"><input name="navGallery" type="checkbox"> Show Gallery in the nav</label>
+<label class="row"><input name="navAbout" type="checkbox"> Show About in the nav</label>
+</form>
+</section>
+<section id="visitors" class="view" hidden><div class="section-head"><div><span class="eyebrow">Visitor analytics</span><h1>Who's stopping by.</h1></div><button id="refresh-visitors">Refresh</button></div><div id="visitor-overview" class="field-grid"></div><div id="visitor-charts" class="field-grid"></div><form id="visitor-filters" class="inline"><label>Device<select name="device"><option value="all">All devices</option><option value="desktop">Desktop</option><option value="mobile">Mobile</option><option value="tablet">Tablet</option></select></label><label>From<input name="from" type="date"></label><label>To<input name="to" type="date"></label><button type="button" id="visitor-filter-apply">Apply filters</button><button type="button" id="visitor-filter-clear">Clear</button></form><div id="visitor-log"></div></section>
 <section id="folder-view" class="view panel" hidden><h1>Your folders.</h1><p>Rename and reorder the folders on the public portfolio.</p><div id="folders"></div><form id="add-folder" class="inline"><label class="grow">New folder<input name="name" required maxlength="70" placeholder="e.g. Experiments"></label><button>Add folder</button></form></section>
 <section id="project-view" class="view panel" hidden><div class="section-head"><div><h1>Project collection.</h1><p>Every five projects form one physical card stack. Change their order and folder below.</p></div><button id="add-project">Add project</button></div><label class="upload">Create projects from images<input id="upload" type="file" accept="image/png,image/jpeg,image/webp" multiple></label><div id="images" class="image-list"></div></section>
 <section id="asset-view" class="view panel" hidden><div class="section-head"><div><h1>Image library.</h1><p>Uploads are stored on the server. Remove images only when they are no longer used in published projects.</p></div><button id="refresh-assets">Refresh images</button></div><label class="upload">Upload to library<input id="library-upload" type="file" accept="image/png,image/jpeg,image/webp" multiple></label><div id="assets" class="image-list"></div></section>
 <section id="security" class="view" hidden><div class="panel narrow"><span class="eyebrow">Private access</span><h1>A fresh passcode.</h1><form id="password"><label>New passcode<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="256" required></label><p>Use at least 12 characters. Saving signs out all creator sessions.</p><button class="primary">Change passcode</button></form></div></section>
-</div></main></body></html>
+</div><div id="preview-pane"><div class="preview-toolbar">
+<label>Device<select id="device-preset">
+<option value="responsive" data-w="0" data-h="0">Responsive (fit panel)</option>
+<optgroup label="Phones">
+<option value="iphone-se" data-w="375" data-h="667">iPhone SE</option>
+<option value="iphone-14" data-w="390" data-h="844">iPhone 14</option>
+<option value="iphone-15-pro-max" data-w="430" data-h="932">iPhone 15 Pro Max</option>
+<option value="pixel-7" data-w="412" data-h="915">Pixel 7</option>
+<option value="galaxy-s23" data-w="360" data-h="780">Galaxy S23</option>
+</optgroup>
+<optgroup label="Tablets">
+<option value="ipad" data-w="768" data-h="1024">iPad</option>
+<option value="ipad-pro" data-w="1024" data-h="1366">iPad Pro</option>
+<option value="android-tablet" data-w="800" data-h="1280">Android tablet</option>
+</optgroup>
+<optgroup label="Laptop / desktop">
+<option value="laptop" data-w="1366" data-h="768">Laptop (1366x768)</option>
+<option value="desktop" data-w="1920" data-h="1080">Desktop (1920x1080)</option>
+</optgroup>
+<option value="custom">Custom size…</option>
+</select></label>
+<span id="custom-size" class="row" hidden><input id="custom-w" type="number" min="240" max="3840" placeholder="Width" aria-label="Custom width"><span aria-hidden="true">×</span><input id="custom-h" type="number" min="240" max="3840" placeholder="Height" aria-label="Custom height"><button type="button" id="apply-custom">Apply</button></span>
+<label class="row"><input id="edit-layout-toggle" type="checkbox"> Edit layout</label>
+<span id="preview-selection" class="eyebrow"></span>
+</div>
+<div id="preview-viewport"><iframe id="preview-frame" title="Live site preview"></iframe></div>
+</div></div></main></body></html>
