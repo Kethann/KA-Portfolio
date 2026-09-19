@@ -98,12 +98,14 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
   const DEFAULT_APPEARANCE={headingFont:'Manrope',bodyFont:'Manrope',textScale:1,customFonts:[],glassBlur:18};
   const DEFAULT_NOTICE={enabled:false,text:'',tone:'info'};
   const DEFAULT_VISIBILITY={navGallery:true,navAbout:true};
+  const DEFAULT_STACKS={loop:true,covers:{}};
   const DEFAULT_LAYOUT={mobile:{},tablet:{},desktop:{}};
   const DEFAULT_BRANDING={enabled:false,logoUrl:''};
   const upgraded={...site,
     details:{...defaults.details,...DEFAULT_APPEARANCE,...site.details},
     notice:{...DEFAULT_NOTICE,...site.notice},
     visibility:{...DEFAULT_VISIBILITY,...site.visibility},
+    stacks:{...DEFAULT_STACKS,...site.stacks},
     layoutOverrides:{...DEFAULT_LAYOUT,...site.layoutOverrides},
     branding:{...DEFAULT_BRANDING,...site.branding},
     elementStyles:{...site.elementStyles},
@@ -442,7 +444,16 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
         images.push({...original,...common});
       }
     }
-    const next={revision:site.revision+1,details,folders,images,notice,visibility,layoutOverrides,branding,elementStyles};save(sitePath,next);site=next;res.json(site);
+    // Work panel (stacks): one global coverflow-looping switch, plus an optional cover image per stack.
+    // A cover only counts if it names an image that is currently inside that same folder; anything else
+    // is dropped so the public panel falls back to the stack's first image.
+    const stacks={loop:input.stacks?.loop!==false,covers:{}};
+    if(input.stacks?.covers&&typeof input.stacks.covers==='object'){
+      for(const [folder,slug] of Object.entries(input.stacks.covers)){
+        if(folders.includes(folder)&&images.some(i=>i.slug===slug&&i.cat===folder)) stacks.covers[folder]=slug;
+      }
+    }
+    const next={revision:site.revision+1,details,folders,images,notice,visibility,stacks,layoutOverrides,branding,elementStyles};save(sitePath,next);site=next;res.json(site);
   });
   return {router,uploads};
 }

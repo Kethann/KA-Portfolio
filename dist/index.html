@@ -978,7 +978,7 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
       <h2 id="portfolio-title" data-ka-editable="portfolioTitle">Portfolio</h2>
       <p id="portfolio-intro" data-ka-editable="portfolioIntro">Choose a category to browse</p>
     </div>
-    <div class="fav-filter">
+    <div class="fav-filter" hidden>
       <button class="fav-chip active" id="fav-chip-all" type="button">All</button>
       <button class="fav-chip" id="fav-chip-pinned" type="button">Pinned</button>
     </div>
@@ -5967,7 +5967,27 @@ function revealOnScroll(el){
   else el.classList.add("is-visible"); // no IO support -- fail visible, never hide content
 }
 
+// ---- Work panel: one image stack per category; clicking a stack opens the magnetic coverflow.
+// Rendered by the React WorkStacks component in dist/assets/gallery.js. The old folder grid + 3D folder
+// scene (openFolder / mountFolderGallery / FolderScene) are kept below but no longer used.
+var workStacks = null, workStacksLoading = false;
+function workStacksProps(){
+  var data = window.__kaLastPortfolioData || {};
+  return { folders: CATEGORIES.slice(), images: POSTERS, stacks: data.stacks || { loop: true, covers: {} } };
+}
+function renderWorkStacks(){
+  if (workStacks){ workStacks.update(workStacksProps()); return; }
+  if (workStacksLoading) return;
+  workStacksLoading = true;
+  import('./assets/gallery.js').then(function(module){
+    workStacks = module.mountStacks(portfolioCoverflowEl, workStacksProps());
+  }).catch(function(){
+    portfolioCoverflowEl.textContent = 'The portfolio could not load. Please refresh and try again.';
+  }).then(function(){ workStacksLoading = false; });
+}
 function buildFolders(){
+  renderWorkStacks();
+  return;
   folderGrid.innerHTML = "";
   CATEGORIES.forEach(function(cat){
     var posters = postersFor(cat, favFilter === "pinned");
@@ -6108,7 +6128,7 @@ var navItemsContainer = document.getElementById("nav-items");
 var NAV_ITEMS = [
   { name:"contact", label:"Contact" },
   { name:"portfolio", label:"Portfolio" },
-  { name:"gallery", label:"Gallery" },
+  // { name:"gallery", label:"Gallery" }, // removed from the nav; the Gallery section and FolderScene code are kept, unused
   { name:"about", label:"About" }
 ];
 var ALL_NAV_ITEMS = NAV_ITEMS.slice();

@@ -40,6 +40,7 @@ async function loadStudio(){
   for(const input of $('#details').elements) if(input.name)input.value=site.details[input.name]||'';
   site.notice=site.notice||{enabled:false,text:'',tone:'info'};
   site.visibility=site.visibility||{navGallery:true,navAbout:true};
+  site.stacks=site.stacks||{loop:true,covers:{}};site.stacks.covers=site.stacks.covers||{};
   site.layoutOverrides=site.layoutOverrides||{mobile:{},tablet:{},desktop:{}};
   site.details.customFonts=site.details.customFonts||[];
   if(site.details.glassBlur===undefined)site.details.glassBlur=18;
@@ -345,9 +346,10 @@ function renderLayoutPanel(){
 }
 function renderVisibilityForm(){
   const form=$('#visibility-form');
-  form.elements.navGallery.checked=site.visibility.navGallery!==false;
+  site.stacks=site.stacks||{loop:true,covers:{}};
+  form.elements.coverflowLoop.checked=site.stacks.loop!==false;
   form.elements.navAbout.checked=site.visibility.navAbout!==false;
-  form.elements.navGallery.onchange=()=>{site.visibility.navGallery=form.elements.navGallery.checked;markDirty();};
+  form.elements.coverflowLoop.onchange=()=>{site.stacks.loop=form.elements.coverflowLoop.checked;markDirty();};
   form.elements.navAbout.onchange=()=>{site.visibility.navAbout=form.elements.navAbout.checked;markDirty();};
 }
 // SVG bar chart -- no charting library pulled in for three small bar charts in an internal admin
@@ -503,9 +505,15 @@ function renderFolders(){
   const root=$('#folders');root.replaceChildren();
   site.folders.forEach((name,i)=>{
     const row=el('div',undefined,'folder-row'),input=el('input');input.value=name;input.maxLength=70;input.setAttribute('aria-label','Folder name');
-    input.addEventListener('change',()=>{const next=input.value.trim();if(!next||site.folders.some((f,j)=>j!==i&&f===next)){input.value=name;return status('Use a unique, nonempty folder name.',true);}site.folders[i]=next;site.images.forEach(image=>{if(image.cat===name)image.cat=next;});markDirty();renderFolders();renderImages();});
-    row.append(input,button('↑',()=>{reorder(site.folders,i,-1);renderFolders();}),button('↓',()=>{reorder(site.folders,i,1);renderFolders();}),button('Remove',()=>{if(site.images.some(image=>image.cat===name))return status('Move this folder’s images to another folder first.',true);if(!confirm('Delete the folder “'+name+'”? This can’t be undone.'))return;site.folders.splice(i,1);markDirty();renderFolders();},'danger'));
-    row.querySelectorAll('button')[0].setAttribute('aria-label','Move '+name+' up');row.querySelectorAll('button')[1].setAttribute('aria-label','Move '+name+' down');root.append(row);
+    input.addEventListener('change',()=>{const next=input.value.trim();if(!next||site.folders.some((f,j)=>j!==i&&f===next)){input.value=name;return status('Use a unique, nonempty folder name.',true);}site.folders[i]=next;site.images.forEach(image=>{if(image.cat===name)image.cat=next;});site.stacks.covers=site.stacks.covers||{};if(site.stacks.covers[name]){site.stacks.covers[next]=site.stacks.covers[name];delete site.stacks.covers[name];}markDirty();renderFolders();renderImages();});
+    row.append(input,button('↑',()=>{reorder(site.folders,i,-1);renderFolders();}),button('↓',()=>{reorder(site.folders,i,1);renderFolders();}),button('Remove',()=>{const inside=site.images.filter(image=>image.cat===name).length;if(!confirm(inside?'Delete the stack “'+name+'” and its '+inside+' image'+(inside===1?'':'s')+'? This can’t be undone.':'Delete the stack “'+name+'”? This can’t be undone.'))return;if(inside)site.images=site.images.filter(image=>image.cat!==name);delete (site.stacks.covers||{})[name];site.folders.splice(i,1);markDirty();renderFolders();renderImages();},'danger'));
+    row.querySelectorAll('button')[0].setAttribute('aria-label','Move '+name+' up');row.querySelectorAll('button')[1].setAttribute('aria-label','Move '+name+' down');
+    const coverLabel=el('label','Stack cover'),cover=el('select');cover.setAttribute('aria-label','Cover image for '+name);
+    const first=el('option','First image (default)');first.value='';cover.append(first);
+    site.images.filter(image=>image.cat===name).forEach(image=>{const o=el('option',image.title||image.slug);o.value=image.slug;cover.append(o);});
+    cover.value=(site.stacks.covers||{})[name]&&site.images.some(image=>image.slug===site.stacks.covers[name]&&image.cat===name)?site.stacks.covers[name]:'';
+    cover.addEventListener('change',()=>{site.stacks.covers=site.stacks.covers||{};if(cover.value)site.stacks.covers[name]=cover.value;else delete site.stacks.covers[name];markDirty();});
+    coverLabel.append(cover);row.append(coverLabel);root.append(row);
   });
 }
 function renderImages(){
@@ -516,7 +524,7 @@ function renderImages(){
     const fields=el('div',undefined,'fields');fields.append(field('Title',image.title,value=>image.title=value));
     const description=el('label','Description'),area=el('textarea');area.value=image.description||'';area.maxLength=4000;area.addEventListener('change',()=>{image.description=area.value;markDirty();});description.append(area);fields.append(description);
     fields.append(field('Technologies (comma separated)',(image.technologies||[]).join(', '),value=>image.technologies=value.split(',').map(v=>v.trim()).filter(Boolean)),field('Project URL',image.link||'',value=>image.link=value));
-    const label=el('label','Folder'),select=el('select');site.folders.forEach(name=>{const option=el('option',name);option.value=name;select.append(option);});select.value=image.cat;select.addEventListener('change',()=>{image.cat=select.value;markDirty();});label.append(select);fields.append(label);
+    const label=el('label','Folder'),select=el('select');site.folders.forEach(name=>{const option=el('option',name);option.value=name;select.append(option);});select.value=image.cat;select.addEventListener('change',()=>{image.cat=select.value;markDirty();renderFolders();});label.append(select);fields.append(label);
     const replace=el('label','Replace image'),file=el('input');file.type='file';file.accept='image/png,image/jpeg,image/webp';file.addEventListener('change',async()=>{if(!file.files[0])return;file.disabled=true;try{const result=await uploadFile(file.files[0]);image.src=result.src;markDirty();renderImages();status('Image replaced in draft. Save portfolio to publish.');}catch(error){status(error.message,true);}finally{file.disabled=false;}});replace.append(file);fields.append(replace);
     const downloadRow=el('label','','row'),downloadBox=el('input');downloadBox.type='checkbox';downloadBox.checked=image.downloadable!==false;downloadBox.addEventListener('change',()=>{image.downloadable=downloadBox.checked;markDirty();});downloadRow.append(downloadBox,document.createTextNode('Visitors can download this image'));fields.append(downloadRow);
     const actions=el('div',undefined,'actions');actions.append(button('Move up',()=>{reorder(site.images,i,-1);renderImages();}),button('Move down',()=>{reorder(site.images,i,1);renderImages();}),button('Remove',()=>{if(!confirm('Remove “'+(image.title||'this image')+'” from the portfolio? This can’t be undone.'))return;site.images.splice(i,1);markDirty();renderImages();},'danger'));row.append(img,fields,actions);root.append(row);

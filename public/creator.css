@@ -250,3 +250,6 @@ main{padding:20px clamp(18px,3vw,32px) calc(var(--dock-h) + 24px)}
 #dock-anchor:focus-within #dock{transform:translateY(0) scale(1);opacity:1}
 #dock-handle:focus-visible{height:24px}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+.folder-row{flex-wrap:wrap}
+.folder-row label{flex:1 1 200px;min-width:0}
