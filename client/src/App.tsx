@@ -1,3 +1,4 @@
+import {API_BASE} from './apiBase';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {FolderScene,type FolderHandle} from './FolderScene';
 import {imageUrl,type Portfolio,type Project} from './types';
@@ -7,7 +8,7 @@ function ArtBackdrop(){return <div className="art-backdrop" aria-hidden="true"><
 function Contact({content}:{content:Portfolio['details']}){
   const [status,setStatus]=useState(''),[sending,setSending]=useState(false);
   async function submit(event:React.FormEvent<HTMLFormElement>){event.preventDefault();const form=event.currentTarget;if(sending)return;setSending(true);setStatus('Sending your note…');
-    try{const response=await fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(new FormData(form)))});const data=await response.json();if(!response.ok)throw new Error(data.error||'Please try again.');form.reset();setStatus('Your message is in the studio inbox. Thank you for reaching out.');}catch(error){setStatus(error instanceof Error?error.message:'Unable to send. Please try again.');}finally{setSending(false);}
+    try{const response=await fetch(API_BASE+'/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(new FormData(form)))});const data=await response.json();if(!response.ok)throw new Error(data.error||'Please try again.');form.reset();setStatus('Your message is in the studio inbox. Thank you for reaching out.');}catch(error){setStatus(error instanceof Error?error.message:'Unable to send. Please try again.');}finally{setSending(false);}
   }
   return <section id="contact" className="contact"><div><span className="eyebrow">Start a conversation</span><h2>{content.contactTitle}</h2><p>{content.contactIntro}</p><Behance/></div><form onSubmit={submit}><div className="form-pair"><label>Name<input name="name" required maxLength={100} autoComplete="name" placeholder="Your name"/></label><label>Email<input name="email" required type="email" maxLength={254} autoComplete="email" placeholder="you@studio.com"/></label></div><label>Regarding<input name="subject" required maxLength={180} placeholder="A project, collaboration, or idea"/></label><label>Message<textarea name="message" required maxLength={8000} rows={5} placeholder="Tell me a little about it…"/></label><label className="honeypot" aria-hidden="true">Website<input name="website" tabIndex={-1} autoComplete="off"/></label><div className="form-bottom"><button type="submit" disabled={sending}>{sending?'Sending…':content.contactButton||'Send message'} <span aria-hidden="true">↗</span></button><p role="status">{status}</p></div></form></section>;
 }
@@ -19,7 +20,7 @@ export function Preview({project,onClose,label}:{project:Project;onClose:()=>voi
 export default function App(){
   const [data,setData]=useState<Portfolio|null>(null),[error,setError]=useState(''),[folder,setFolder]=useState(''),[page,setPage]=useState(0),[state,setState]=useState('closed'),[preview,setPreview]=useState<Project|null>(null),[webglError,setWebglError]=useState(false);
   const scene=useRef<FolderHandle>(null);
-  useEffect(()=>{const controller=new AbortController();fetch('/api/portfolio',{signal:controller.signal}).then(response=>{if(!response.ok)throw new Error('The collection could not be loaded.');return response.json();}).then((portfolio:Portfolio)=>{setData(portfolio);setFolder(portfolio.folders[0]||'');document.title=portfolio.details.creatorName+' · '+portfolio.details.portfolioTitle;}).catch(error=>{if(error.name!=='AbortError')setError(error.message);});return()=>controller.abort();},[]);
+  useEffect(()=>{const controller=new AbortController();fetch(API_BASE+'/api/portfolio',{signal:controller.signal}).then(response=>{if(!response.ok)throw new Error('The collection could not be loaded.');return response.json();}).then((portfolio:Portfolio)=>{setData(portfolio);setFolder(portfolio.folders[0]||'');document.title=portfolio.details.creatorName+' · '+portfolio.details.portfolioTitle;}).catch(error=>{if(error.name!=='AbortError')setError(error.message);});return()=>controller.abort();},[]);
   const collection=useMemo(()=>data?.images.filter(project=>project.cat===folder)||[],[data,folder]);
   const projects=useMemo(()=>collection.slice(page*5,page*5+5),[collection,page]);
   if(!data)return <main className="loading"><span className="wordmark">KA</span><p role="status">{error||'Opening the archive…'}</p>{error&&<button onClick={()=>location.reload()}>Try again</button>}</main>;

@@ -1,3 +1,4 @@
+import {API_BASE} from './apiBase';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {FolderScene,type FolderHandle} from './FolderScene';
 import {FolderCover} from './FolderCover';
@@ -15,7 +16,7 @@ export function Gallery({category,slugs,initialProjects,onBack}:GalleryOptions){
   useEffect(()=>{if(pending&&state==='closed'){setData(pending);setPending(null);}},[pending,state]);
   useEffect(()=>{
     const controller=new AbortController();
-    fetch('/api/portfolio',{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Offline');return r.json();}).then((site:Portfolio)=>{
+    fetch(API_BASE+'/api/portfolio',{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Offline');return r.json();}).then((site:Portfolio)=>{
       if(Array.isArray(site.images)&&Array.isArray(site.folders))setPending({...site,images:site.images.map(normalize)});
     }).catch(()=>{});return()=>controller.abort();
   },[]);
