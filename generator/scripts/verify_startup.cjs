@@ -25,7 +25,7 @@ class Renderer{domElement=new Element();capabilities={getMaxAnisotropy:()=>8};ge
 }}
 const window=new Element();Object.assign(window,{innerWidth:1440,innerHeight:900,devicePixelRatio:1,matchMedia:()=>({matches:false,addEventListener:noop})});
 window.addEventListener('ka-sequence-complete',()=>completed++);
-const context=vm.createContext({THREE:{...THREE,TextureLoader,WebGLRenderer:Renderer},document,window,console,navigator:{userAgent:'test'},
+const context=vm.createContext({kaLayoutW:()=>1440,kaLayoutH:()=>900,THREE:{...THREE,TextureLoader,WebGLRenderer:Renderer},document,window,console,navigator:{userAgent:'test'},
   performance:{now:()=>now},requestAnimationFrame:fn=>{rafs.set(++id,fn);return id;},cancelAnimationFrame:id=>rafs.delete(id),
   IntersectionObserver:class{observe(){}},CustomEvent:class extends Event{},HTMLImageElement:class{},setTimeout,clearTimeout});
 const vendor=path.resolve(__dirname,'../../public/three-r128.min.js');
