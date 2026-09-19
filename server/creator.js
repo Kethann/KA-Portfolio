@@ -1,4 +1,6 @@
 import express from 'express';
+import geoip from 'geoip-lite';
+import {proposeCreatorPatch} from './assistant.js';
 import {randomBytes, randomUUID, scrypt as derive, timingSafeEqual} from 'node:crypto';
 import {promisify} from 'node:util';
 import {existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync,readdirSync,statSync} from 'node:fs';
@@ -21,8 +23,25 @@ export const FONT_CHOICES=['Manrope','Poppins','Playfair Display','Space Grotesk
 // resolves to null via optional chaining, same dead-feature pattern as #visitor-counter's own
 // leftover CSS found earlier. Nothing to drag there; left out rather than keeping a silently
 // no-op entry.
-export const DRAGGABLE_IDS=['assistant-launcher'];
+export const DRAGGABLE_IDS=['assistant-launcher','site-notice','portfolio-title','portfolio-intro','contact-title','contact-intro'];
+// These four are in-flow text (a heading/paragraph inside the normal page layout), not
+// free-floating badges like the first two -- dragging them uses the same `translate` trick, which
+// visually moves the box WITHOUT reflowing anything around it, so the space it used to occupy
+// stays reserved and empty. A small nudge reads as deliberate placement; a huge one reads as
+// broken, disconnected text sitting over a blank gap. Bounded tighter than the free-floating ids
+// for exactly that reason.
+const TEXT_DRAGGABLE_IDS=['portfolio-title','portfolio-intro','contact-title','contact-intro'];
 export const LAYOUT_BREAKPOINTS=['mobile','tablet','desktop'];
+// Same magic-byte-sniffing idiom as the image upload route below (never trust a client-declared
+// Content-Type) -- covers the four font formats every current browser actually needs.
+function sniffFontExt(b){
+  if(b.length<4) return null;
+  if(b[0]===0x77&&b[1]===0x4f&&b[2]===0x46&&b[3]===0x32) return 'woff2';
+  if(b[0]===0x77&&b[1]===0x4f&&b[2]===0x46&&b[3]===0x46) return 'woff';
+  if(b.toString('ascii',0,4)==='OTTO') return 'otf';
+  if((b[0]===0&&b[1]===1&&b[2]===0&&b[3]===0)||b.toString('ascii',0,4)==='true') return 'ttf';
+  return null;
+}
 // Lightweight, dependency-free User-Agent classification for the visitor log (Part B). Not meant
 // to rival a real UA-parsing library's accuracy -- just enough to bucket "device type" and a
 // coarse browser/OS label for the creator dashboard, which is all the spec actually asks for.
@@ -39,13 +58,20 @@ export function classifyUserAgent(ua){
   else if(/Safari\//i.test(ua)&&!/Chrome|CriOS|Chromium|Android/i.test(ua))browser='Safari';
   return {device,os,browser};
 }
-// Best-effort ONLY: with no paid/keyed geo-IP service configured, the only trustworthy source of
-// "approximate location" is whatever a fronting reverse proxy/CDN already resolved and forwarded
-// as a header (Cloudflare, Vercel, Netlify, Fastly, and most others do this for free at the edge).
-// Falls back to 'Unknown' rather than ever calling out to a third-party API with the visitor's
-// IP -- that would leak that IP to a service this project has no relationship with.
+// [fix] this only ever worked behind specific CDNs (Cloudflare/Vercel/App Engine) that forward a
+// pre-resolved geo header -- deployed anywhere else (a plain VPS, or straight to this server
+// locally), none of those headers exist and every visit logged as "Unknown" no matter how many
+// real visits came in. geoip-lite ships its own bundled, offline IP-to-country database (updated
+// with the npm package itself, no network call per lookup) -- still never sends a visitor's IP to
+// any third party, just checked here as a fallback when no CDN header is already free and
+// zero-maintenance to use. Loopback/private IPs (127.0.0.1, local dev) genuinely can't be
+// geolocated by anything and correctly resolve to null here -- that's expected on localhost, not
+// a bug; real visitor IPs in production resolve correctly.
 function approxLocation(req){
-  return req.get('cf-ipcountry')||req.get('x-vercel-ip-country')||req.get('x-appengine-country')||req.get('x-geo-country')||'Unknown';
+  const header=req.get('cf-ipcountry')||req.get('x-vercel-ip-country')||req.get('x-appengine-country')||req.get('x-geo-country');
+  if(header)return header;
+  const looked=req.ip&&geoip.lookup(req.ip);
+  return looked?.country||'Unknown';
 }
 async function passwordHash(password,salt=randomBytes(16).toString('hex')){
   return {salt,hash:(await scrypt(password,salt,64)).toString('hex')};
@@ -69,16 +95,21 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
   let site=JSON.parse(readFileSync(sitePath,'utf8'));
   // Upgrade older saved collections without replacing artwork or edited copy.
   const defaults=JSON.parse(readFileSync(resolve(root,'server/portfolio-seed.json'),'utf8'));
-  const DEFAULT_APPEARANCE={headingFont:'Manrope',bodyFont:'Manrope',textScale:1};
+  const DEFAULT_APPEARANCE={headingFont:'Manrope',bodyFont:'Manrope',textScale:1,customFonts:[],glassBlur:18};
   const DEFAULT_NOTICE={enabled:false,text:'',tone:'info'};
   const DEFAULT_VISIBILITY={navGallery:true,navAbout:true};
   const DEFAULT_LAYOUT={mobile:{},tablet:{},desktop:{}};
+  const DEFAULT_BRANDING={enabled:false,logoUrl:''};
   const upgraded={...site,
     details:{...defaults.details,...DEFAULT_APPEARANCE,...site.details},
     notice:{...DEFAULT_NOTICE,...site.notice},
     visibility:{...DEFAULT_VISIBILITY,...site.visibility},
     layoutOverrides:{...DEFAULT_LAYOUT,...site.layoutOverrides},
+    branding:{...DEFAULT_BRANDING,...site.branding},
+    elementStyles:{...site.elementStyles},
+    paperArtwork:undefined,
     images:site.images.map(project=>({id:project.slug,description:'',technologies:[],link:'',downloadable:true,...project}))};
+  delete upgraded.paperArtwork;
   if(JSON.stringify(upgraded)!==JSON.stringify(site)){
     upgraded.revision=(site.revision||0)+1;save(sitePath,upgraded);site=upgraded;
   }
@@ -246,6 +277,46 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
     const filename=randomUUID()+'.'+ext;writeFileSync(resolve(uploads,filename),b);
     res.status(201).json({src:'/uploads/'+filename});
   });
+  // Custom fonts (device-uploaded): same reasoning/idiom as the image route above -- magic bytes
+  // decide the real format, stored in the same uploads dir, publicly served the same way. The
+  // admin-supplied font-family NAME is validated separately in PUT /creator/portfolio (plain text,
+  // safe to drop into a stylesheet's font-family since it's never used to build a URL or a
+  // selector) -- this route only ever returns the file's own URL.
+  router.post('/creator/font-upload',express.raw({type:['font/woff2','font/woff','font/ttf','font/otf','application/font-woff','application/font-woff2','application/x-font-ttf','application/x-font-otf','application/octet-stream'],limit:'6mb'}),(req,res)=>{
+    const b=req.body;
+    if(!Buffer.isBuffer(b)||b.length<16) return fail(res,400,'Choose a WOFF2, WOFF, TTF, or OTF font file.');
+    const ext=sniffFontExt(b);
+    if(!ext) return fail(res,400,'The file is not a supported font format.');
+    const filename=randomUUID()+'.'+ext;writeFileSync(resolve(uploads,filename),b);
+    res.status(201).json({src:'/uploads/'+filename});
+  });
+  // Embedded "describe an edit" assistant (Creator Portal). Operates ONLY on the admin's own
+  // in-memory draft, sent in the request body -- never the server's persisted `site` -- and never
+  // writes anything itself. The admin applies the returned patch to their draft client-side (same
+  // markDirty()/mutate path every other control uses) and still has to click Publish, which still
+  // runs through the exact same validation as every other edit above.
+  const CREATOR_SCHEMA_NOTES=`Editable top-level fields and their shapes:
+- details: {creatorName, tagline, portfolioTitle, portfolioIntro, contactTitle, contactIntro, openLabel, closeLabel, projectLabel, contactButton} (all short strings), plus headingFont/bodyFont (one of ${JSON.stringify(FONT_CHOICES)}, or a family already listed in details.customFonts), textScale (number 0.85-1.2), and glassBlur (number 0-40, the site's glass-panel blur intensity in pixels). Never invent a new customFonts entry -- only pick among ones already in the current draft.
+- elementStyles: object keyed by one of ${JSON.stringify(DRAGGABLE_IDS)}, value {font?, color?} (font must be an allowed font as above; color must be a 6-digit hex string like "#ff9438"). Only include keys/fields actually being changed.
+- notice: {enabled: boolean, text: string up to 220 chars, tone: "info"|"warning"}.
+- visibility: {navGallery: boolean, navAbout: boolean}.
+- branding: {enabled: boolean, logoUrl: string}. Never invent a new logoUrl -- only toggle enabled using the logoUrl already in the current draft.
+- folders: array of unique short strings.
+- images: array of {id, slug, title, cat (must be one of folders), description, technologies (array of strings), link, downloadable}. Never invent a new image's src/slug -- only edit fields of images already present in the current draft.`;
+  router.post('/creator/assistant',async(req,res)=>{
+    if(!rate(req,res,'creator-assistant',20)) return;
+    const instruction=text(req.body?.instruction,2000);
+    if(!instruction) return fail(res,400,'Describe the change you want.');
+    const draft=req.body?.draft;
+    if(!draft||typeof draft!=='object') return fail(res,400,'Missing the current draft to edit.');
+    if(!process.env.GEMINI_API_KEY) return fail(res,500,'Server is missing GEMINI_API_KEY -- see .env.example.');
+    try{
+      const patch=await proposeCreatorPatch({apiKey:process.env.GEMINI_API_KEY,instruction,draft,schemaNotes:CREATOR_SCHEMA_NOTES});
+      res.json({patch});
+    }catch(error){
+      fail(res,502,'The assistant could not process that request.');
+    }
+  });
   router.put('/creator/portfolio',(req,res)=>{
     const input=req.body;
     if(!input || input.revision!==site.revision) return fail(res,409,'This portfolio changed in another session. Reload before saving.');
@@ -257,11 +328,63 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
       details[key]=text(input.details?.[key],max);
       if(!details[key]) return fail(res,400,'Complete every portfolio text field.');
     }
-    // Typography (Part A): an allowlisted choice, not free text -- see FONT_CHOICES above.
-    details.headingFont=FONT_CHOICES.includes(input.details?.headingFont)?input.details.headingFont:'Manrope';
-    details.bodyFont=FONT_CHOICES.includes(input.details?.bodyFont)?input.details.bodyFont:'Manrope';
+    // Device-uploaded fonts (Part A extension): each entry names an already-uploaded font file --
+    // same "reject outright, don't silently drop" idiom as images[] below, same reused upload path.
+    const rawCustomFonts=Array.isArray(input.details?.customFonts)?input.details.customFonts:[];
+    if(rawCustomFonts.length>20) return fail(res,400,'Use up to 20 custom fonts.');
+    const customFonts=[];
+    for(const font of rawCustomFonts){
+      if(!font||typeof font!=='object') return fail(res,400,'Invalid custom font.');
+      const family=text(font.family,60);
+      if(!family||!/^[A-Za-z0-9 _-]+$/.test(family)) return fail(res,400,'Font names may only use letters, numbers, spaces, - and _.');
+      if(customFonts.some(f=>f.family===family)) return fail(res,400,'Each custom font needs a unique name.');
+      const url=text(font.url,300);
+      if(!/^\/uploads\/[a-f0-9-]{36}\.(woff2|woff|ttf|otf)$/.test(url)||!existsSync(resolve(uploads,url.split('/').pop()))) return fail(res,400,'Upload this font before saving.');
+      customFonts.push({family,url});
+    }
+    details.customFonts=customFonts;
+    // Typography (Part A): an allowlisted choice, not free text -- see FONT_CHOICES above, now
+    // extended with whatever this same save also includes as a valid custom font family.
+    const allowedFonts=[...FONT_CHOICES,...customFonts.map(f=>f.family)];
+    details.headingFont=allowedFonts.includes(input.details?.headingFont)?input.details.headingFont:'Manrope';
+    details.bodyFont=allowedFonts.includes(input.details?.bodyFont)?input.details.bodyFont:'Manrope';
     const scale=Number(input.details?.textScale);
     details.textScale=Number.isFinite(scale)?Math.min(1.2,Math.max(0.85,scale)):1;
+    // Glass-effect intensity: overrides the same --glass-blur custom property every glass surface
+    // on the public site already reads from (nav, tooltips, assistant panel, expand menu) -- one
+    // real, working knob, not a per-surface reimplementation.
+    const glassBlur=Number(input.details?.glassBlur);
+    details.glassBlur=Number.isFinite(glassBlur)?Math.min(40,Math.max(0,glassBlur)):18;
+    // Per-element font/color overrides (Creator Portal's floating property panel) -- keyed by the
+    // same DRAGGABLE_IDS allowlist as layoutOverrides above, same "reject unknown ids outright"
+    // idiom. A null/empty value means "use the site default", not "invalid".
+    const elementStyles={};
+    if(input.elementStyles&&typeof input.elementStyles==='object'){
+      for(const [id,style] of Object.entries(input.elementStyles)){
+        if(!DRAGGABLE_IDS.includes(id)) return fail(res,400,'Unknown styled element: '+id);
+        if(!style||typeof style!=='object') continue;
+        const clean={};
+        if(style.font){
+          if(!allowedFonts.includes(style.font)) return fail(res,400,'Unknown font for '+id+'.');
+          clean.font=style.font;
+        }
+        if(style.color){
+          const color=text(style.color,20);
+          if(!/^#[0-9a-fA-F]{6}$/.test(color)) return fail(res,400,'Colors must be a 6-digit hex value.');
+          clean.color=color;
+        }
+        if(Object.keys(clean).length) elementStyles[id]=clean;
+      }
+    }
+    // Studio branding logo (Creator Portal's own header only -- never the public site/hero).
+    const brandingLogoUrl=text(input.branding?.logoUrl,300);
+    const branding={enabled:!!input.branding?.enabled,logoUrl:''};
+    if(brandingLogoUrl){
+      const uploaded=/^\/uploads\/[a-f0-9-]{36}\.(png|jpg|webp)$/.test(brandingLogoUrl)&&existsSync(resolve(uploads,brandingLogoUrl.split('/').pop()));
+      if(!uploaded) return fail(res,400,'Upload the studio logo image before saving.');
+      branding.logoUrl=brandingLogoUrl;
+    }
+    if(branding.enabled&&!branding.logoUrl) return fail(res,400,'Upload a logo image before enabling it.');
     // Notice banner (Part A): a single site-wide announcement, plain text only (rendered as
     // textContent on the public page, never innerHTML -- see index.html's applySiteAppearance).
     const notice={enabled:!!input.notice?.enabled,text:text(input.notice?.text,220),tone:input.notice?.tone==='warning'?'warning':'info'};
@@ -279,8 +402,9 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
       if(src&&typeof src==='object'){
         for(const [id,pos] of Object.entries(src)){
           if(!DRAGGABLE_IDS.includes(id)) return fail(res,400,'Unknown layout element: '+id);
+          const bound=TEXT_DRAGGABLE_IDS.includes(id)?300:2000;
           const x=Number(pos?.x),y=Number(pos?.y),scale=pos?.scale===undefined?1:Number(pos.scale);
-          if(!Number.isFinite(x)||!Number.isFinite(y)||Math.abs(x)>2000||Math.abs(y)>2000) return fail(res,400,'Layout position out of range.');
+          if(!Number.isFinite(x)||!Number.isFinite(y)||Math.abs(x)>bound||Math.abs(y)>bound) return fail(res,400,'Layout position out of range.');
           if(!Number.isFinite(scale)||scale<0.5||scale>2.5) return fail(res,400,'Layout scale out of range.');
           clean[id]={x,y,scale};
         }
@@ -309,7 +433,7 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
         images.push({...original,...common});
       }
     }
-    const next={revision:site.revision+1,details,folders,images,notice,visibility,layoutOverrides};save(sitePath,next);site=next;res.json(site);
+    const next={revision:site.revision+1,details,folders,images,notice,visibility,layoutOverrides,branding,elementStyles};save(sitePath,next);site=next;res.json(site);
   });
   return {router,uploads};
 }

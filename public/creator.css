@@ -1,27 +1,241 @@
-:root{color-scheme:dark;--ink:#eee9e4;--muted:#b1a7b3;--line:#ffffff1b;--accent:#edc5a4;font-family:Inter,system-ui,sans-serif;background:#101016;color:var(--ink)}
-*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;background:radial-gradient(ellipse at 10% 0,#45303935,transparent 50%);min-height:100svh}a{color:var(--accent);text-decoration:none}header,main{max-width:1200px;margin:auto;padding:24px clamp(18px,4vw,48px)}header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);gap:16px}.brand{font-weight:750;font-size:24px;color:var(--ink)}.brand span{font-size:12px;font-weight:400;color:var(--muted);margin-left:12px}p{color:var(--muted);line-height:1.7}h1{font-size:clamp(28px,4vw,44px);letter-spacing:-.04em;margin:12px 0 16px;font-weight:550}h2{font-size:21px;font-weight:550;margin:0 0 12px}button,.upload{border:1px solid var(--line);border-radius:12px;background:#ffffff08;color:var(--ink);padding:11px 16px;min-height:44px;font:inherit;font-size:13px;cursor:pointer;transition:background .2s,transform .2s}button:hover{background:#ffffff13}button:active{transform:scale(.98)}button:disabled{opacity:.4;cursor:default}.primary{background:linear-gradient(135deg,#efccb0,#cbb3b5);color:#271c24;border-color:#ffffff3a;font-weight:650}.primary:hover{background:#f2d1b6}button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:3px}label{display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--muted)}input,textarea,select{width:100%;font:inherit;font-size:16px;line-height:1.5;border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:#0d0b12;color:var(--ink);min-width:0}textarea{min-height:95px;resize:vertical}form{display:grid;gap:20px}.panel{padding:clamp(22px,4vw,36px);border:1px solid var(--line);background:linear-gradient(135deg,#26212a80,#18161e80);border-radius:22px;margin:20px 0;box-shadow:inset 0 1px #ffffff0d}.login{max-width:520px;margin:9vh auto}.eyebrow{font:11px ui-monospace,monospace;text-transform:uppercase;letter-spacing:.15em;color:var(--accent)}.toolbar,.section-head,.inline{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}.toolbar{margin:8px 0 36px}.toolbar nav{display:flex;gap:6px}.toolbar nav button[aria-current]{border-color:#efc2a560;background:#efc2a512}.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}.grow{flex:1;min-width:120px}.inline{align-items:flex-end}.section-head p{margin-bottom:0}.section-head{margin-bottom:20px}.narrow{max-width:620px}.folder-row{display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid var(--line)}.folder-row input{flex:1}.folder-row button{padding:8px 12px}.image-list{display:grid;gap:14px}.image-row{display:grid;grid-template-columns:100px 1fr auto;gap:18px;align-items:center;padding:16px;background:#0002;border:1px solid var(--line);border-radius:16px}.image-row img{width:100px;height:130px;object-fit:contain;border-radius:8px;background:#08070b}.image-row .fields{display:grid;gap:10px}.actions{display:flex;gap:6px;flex-wrap:wrap}.image-row .actions{max-width:130px}.upload{position:relative;display:block;color:var(--accent)}.upload input{max-width:230px;font-size:12px;margin-top:8px;padding:0;border:0}.message{padding:24px;border:1px solid var(--line);border-radius:18px;background:#ffffff04;margin:14px 0}.message[data-status=new]{border-left:3px solid var(--accent)}.message h2{font-size:20px;overflow-wrap:anywhere}.message .body{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink);line-height:1.75}.message .byline{font-size:12px;color:var(--muted)}.message .actions{margin-top:20px}.empty{text-align:center;padding:50px 20px;border:1px dashed var(--line);border-radius:18px}.danger{color:#f5a7ab}#status{position:sticky;top:8px;z-index:10;max-width:1100px;margin:12px auto 0;padding:0 18px;color:var(--accent)}#status:not(:empty){padding:12px 18px;background:#29202df5;border:1px solid var(--line);border-radius:12px}#status[data-error=true]{color:#ffb4b4}@media(max-width:650px){.field-grid{grid-template-columns:1fr}.image-row{grid-template-columns:70px 1fr;gap:12px}.image-row img{width:70px;height:105px}.image-row .actions{grid-column:1/-1;max-width:none}.folder-row{flex-wrap:wrap}.folder-row input{flex-basis:100%}.toolbar nav{flex-wrap:wrap}header .brand span{display:none}.panel{padding:20px}}@media(prefers-reduced-motion:reduce){*{transition:none!important}}
-label.row{flex-direction:row;align-items:center;gap:10px;font-size:13px;color:var(--ink)}label.row input[type=checkbox]{width:auto;flex:none}
-.stat-grid{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:20px}.stat-grid .panel{flex:1;min-width:120px;text-align:center;padding:16px}.stat-grid h2{font-size:28px;margin:0 0 4px}.stat-grid p{margin:0;font-size:12px}
-table.visit-log{width:100%;border-collapse:collapse;font-size:12.5px}table.visit-log th,table.visit-log td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}table.visit-log th{color:var(--muted);font-weight:600;cursor:pointer;user-select:none}table.visit-log th:hover{color:var(--ink)}table.visit-log th[data-sorted]{color:var(--accent)}table.visit-log tbody{display:block;max-height:520px;overflow:auto}table.visit-log thead,table.visit-log tbody tr{display:table;width:100%;table-layout:fixed}
-
-/* ---- Part A/B/C: split-screen live preview ---- */
+:root{color-scheme:dark;--ink:#f3efe9;--muted:#aea5b0;--line:#ffffff1f;--accent:#f0c9a3;--amber:#FF9438;--glass-bg:linear-gradient(150deg,#ffffff14,#ffffff05 55%,#00000010);--glass-bg-heavy:linear-gradient(150deg,#ffffff1c,#ffffff08 60%);--glass-blur:blur(22px) saturate(150%);--glass-border:1px solid #ffffff26;--glass-shadow:0 20px 50px -12px #000000a0;--dock-h:82px;font-family:Inter,system-ui,sans-serif;background:#0a0a0f;color:var(--ink)}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;min-height:100svh;background:radial-gradient(ellipse 70% 50% at 12% -6%,#3d2a3540,transparent 60%),radial-gradient(ellipse 60% 45% at 100% 0%,#2a2f4530,transparent 55%),#0a0a0f}
+a{color:var(--accent);text-decoration:none}
 header,main{max-width:none}
-main{padding:24px clamp(18px,3vw,32px)}
-body:has(#studio:not([hidden])) main{max-width:none}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px clamp(18px,3vw,32px);position:sticky;top:0;z-index:20;background:#0c0c12cc;backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border-bottom:var(--glass-border)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:750;font-size:21px;color:var(--ink)}
+.brand img{height:28px;width:28px;object-fit:contain;border-radius:7px}
+.brand span{font-size:11.5px;font-weight:500;color:var(--muted);margin-left:6px;text-transform:uppercase;letter-spacing:.1em}
+p{color:var(--muted);line-height:1.7}
+h1{font-size:clamp(26px,3.6vw,40px);letter-spacing:-.03em;margin:10px 0 14px;font-weight:600}
+h2{font-size:19px;font-weight:600;margin:0 0 12px;letter-spacing:-.01em}
+button,.upload{border:var(--glass-border);border-radius:13px;background:var(--glass-bg);color:var(--ink);padding:11px 16px;min-height:44px;font:inherit;font-size:13px;cursor:pointer;transition:background .2s ease,transform .12s ease,box-shadow .2s ease;backdrop-filter:blur(8px)}
+button:hover{background:var(--glass-bg-heavy);box-shadow:0 4px 18px -6px #00000080}
+button:active{transform:scale(.97)}
+button:disabled{opacity:.4;cursor:default;transform:none}
+.primary{background:linear-gradient(135deg,#ffb27a,#f0a5c0);color:#241521;border-color:#ffffff45;font-weight:650;box-shadow:0 6px 22px -6px #ff943860}
+.primary:hover{background:linear-gradient(135deg,#ffc194,#f5b5cf);box-shadow:0 8px 26px -6px #ff943880}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--amber);outline-offset:3px;border-radius:4px}
+label{display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--muted)}
+label.row{flex-direction:row;align-items:center;gap:10px;font-size:13px;color:var(--ink)}
+label.row input[type=checkbox]{width:auto;flex:none;min-height:0}
+input,textarea,select{width:100%;font:inherit;font-size:15px;line-height:1.5;border:var(--glass-border);border-radius:11px;padding:11px 12px;background:#0d0b1290;color:var(--ink);min-width:0;transition:border-color .15s ease,background .15s ease}
+input:hover,textarea:hover,select:hover{border-color:#ffffff3a}
+textarea{min-height:95px;resize:vertical}
+form{display:grid;gap:20px}
+.panel{padding:clamp(20px,3.4vw,32px);border:var(--glass-border);background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border-radius:20px;margin:18px 0;box-shadow:var(--glass-shadow),inset 0 1px #ffffff14}
+.login{max-width:480px;margin:9vh auto}
+.eyebrow{font:11px ui-monospace,monospace;text-transform:uppercase;letter-spacing:.15em;color:var(--amber)}
+.section-head,.inline{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.section-head p{margin-bottom:0}
+.section-head{margin-bottom:20px}
+.inline{align-items:flex-end}
+.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grow{flex:1;min-width:160px}
+.narrow{max-width:620px}
+.folder-row{display:flex;align-items:center;gap:8px;padding:11px 0;border-bottom:1px solid var(--line)}
+.folder-row input{flex:1}
+.folder-row button{padding:8px 12px;min-height:36px}
+.layout-item{padding:14px 0;border-bottom:1px solid var(--line)}
+.layout-item h3{font-size:13px;margin:0 0 8px;color:var(--ink)}
+.layout-item-row{display:grid;grid-template-columns:70px repeat(3,1fr);gap:8px;align-items:center;margin-bottom:6px}
+.layout-item-row span{font-size:11px;color:var(--muted)}
+.layout-item-row input{padding:6px 8px;font-size:12px}
+.image-list{display:grid;gap:14px}
+.image-row{display:grid;grid-template-columns:100px 1fr auto;gap:18px;align-items:center;padding:16px;background:#00000030;border:var(--glass-border);border-radius:16px}
+.image-row img{width:100px;height:130px;object-fit:contain;border-radius:10px;background:#08070b}
+.image-row .fields{display:grid;gap:10px}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+.image-row .actions{max-width:130px}
+.upload{position:relative;display:block;color:var(--accent);text-align:center}
+.upload input{max-width:240px;font-size:12px;margin-top:8px;padding:0;border:0;background:none}
+.empty{text-align:center;padding:46px 20px;border:1px dashed var(--line);border-radius:18px;color:var(--muted)}
+.danger{color:#ffb0b6}
+/* Small top-left toast (near the wordmark) instead of a full-width bar -- auto-clears itself
+   (see status() in creator.js), this is just the fade transition for when it does. */
+#status{position:fixed;top:66px;left:16px;z-index:25;max-width:280px;pointer-events:none;
+  opacity:0;transform:translateY(-4px);transition:opacity .25s ease,transform .25s ease}
+#status:not(:empty){opacity:1;transform:translateY(0);padding:8px 14px;background:#241b28f0;
+  border:var(--glass-border);border-radius:11px;color:var(--accent);font-size:12px;
+  backdrop-filter:blur(10px);box-shadow:0 8px 24px -6px #0000008a}
+#status[data-error=true]{color:#ffb4b4}
+.stat-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-bottom:20px}
+.stat-grid .panel{flex:1 1 140px;max-width:180px;min-width:120px;text-align:center;padding:18px 14px;margin:0}
+.stat-grid h2{font-size:26px;margin:0 0 4px;background:linear-gradient(135deg,#ffb27a,#f0a5c0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.stat-grid p{margin:0;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em}
+/* ---- dashboard: compact corner stat cluster + centered preview as the primary focus ---- */
+/* Dashboard tab's sidebar copy is now a slim secondary block (Part D.10) -- the stat cluster
+   moved out entirely, see .stat-cluster below, which lives in #preview-pane instead. */
+#dashboard h1{font-size:clamp(18px,2.2vw,24px);margin:8px 0 12px}
+/* Centered above the live-preview panel (Part C), not the old sidebar cluster -- only shown for
+   the Dashboard tab (#split.dashboard-mode, toggled in creator.js), same "New messages" card also
+   opens the Messages popup (Part E). */
+.stat-cluster{display:none;justify-content:center;gap:10px;margin-bottom:12px}
+#split.dashboard-mode .stat-cluster{display:flex}
+.stat-cluster .panel{flex:none;width:96px;text-align:center;padding:12px 8px;margin:0;border-radius:16px}
+.stat-cluster button.panel{cursor:pointer;transition:transform .15s ease,box-shadow .2s ease}
+.stat-cluster button.panel:hover{transform:translateY(-2px);box-shadow:0 10px 26px -8px #ff943860}
+.stat-cluster h2{font-size:22px;margin:0 0 2px;background:linear-gradient(135deg,#ffb27a,#f0a5c0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.stat-cluster p{margin:0;font-size:10px;text-transform:uppercase;letter-spacing:.04em;line-height:1.2}
+/* Dashboard specifically narrows the sidebar and lets the preview take the visual lead, since
+   the point of landing here is to look at the site, not fill out a form -- every other tab keeps
+   the normal proportions (set via JS toggling this class on #split when Dashboard is active). */
+#split.dashboard-mode{grid-template-columns:minmax(220px,260px) 6px 1fr}
+#split.dashboard-mode #preview-viewport{max-width:960px;margin:0 auto;width:100%}
+@media(max-width:1000px){#split.dashboard-mode{grid-template-columns:1fr}}
+table.visit-log{width:100%;border-collapse:collapse;font-size:12.5px}
+table.visit-log th,table.visit-log td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.visit-log th{color:var(--muted);font-weight:600;cursor:pointer;user-select:none}
+table.visit-log th:hover{color:var(--ink)}
+table.visit-log th[data-sorted]{color:var(--amber)}
+table.visit-log tbody{display:block;max-height:520px;overflow:auto}
+table.visit-log thead,table.visit-log tbody tr{display:table;width:100%;table-layout:fixed}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---- click-to-edit sidebar-field highlight (see jumpToEditableField) ---- */
+@keyframes ka-jump-pulse{0%,100%{box-shadow:0 0 0 0 #ff943800}50%{box-shadow:0 0 0 4px #ff943850}}
+.ka-jump-highlight{animation:ka-jump-pulse 1.2s ease}
+
+/* ---- split-screen live preview ---- */
+main{padding:20px clamp(18px,3vw,32px) calc(var(--dock-h) + 24px)}
 /* --controls-w is read/written by public/creator.js's split-divider drag handler (and restored
    from localStorage on load) -- 420px here is just the pre-JS/first-ever-load default. */
 #split{display:grid;grid-template-columns:minmax(280px,var(--controls-w, 420px)) 6px 1fr;gap:20px;align-items:start}
-#controls-pane{min-width:0;max-height:calc(100vh - 48px);overflow-y:auto;padding-right:4px}
+#controls-pane{min-width:0;max-height:calc(100vh - 64px - var(--dock-h) - 24px);overflow-y:auto;padding-right:4px}
+/* Each tab reads as its own centered "screen" (cards centered within, not stretched edge to
+   edge) rather than a form filling whatever width the resizable split happens to be. */
+.view{max-width:640px;margin:0 auto}
 #split-divider{align-self:stretch;width:6px;border-radius:3px;background:var(--line);cursor:col-resize;touch-action:none}
-#split-divider:hover,#split-divider.dragging{background:var(--accent)}
+#split-divider:hover,#split-divider.dragging{background:var(--amber)}
 #split.dragging{cursor:col-resize;user-select:none}
 #split.dragging #preview-frame{pointer-events:none}
-#preview-pane{position:sticky;top:24px;display:flex;flex-direction:column;gap:12px;min-width:0;height:calc(100vh - 48px)}
-.preview-toolbar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:12px 16px;border:1px solid var(--line);border-radius:14px;background:#ffffff06}
+#preview-pane{position:sticky;top:64px;display:flex;flex-direction:column;gap:12px;min-width:0;height:calc(100vh - 64px - var(--dock-h) - 24px)}
+.preview-toolbar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:12px 16px;border:var(--glass-border);border-radius:14px;background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .preview-toolbar label{flex-direction:row;align-items:center;gap:8px;font-size:12px}
 .preview-toolbar select{width:auto;min-width:180px;padding:8px 10px;font-size:13px}
 #custom-size input{width:80px;padding:8px}
 #preview-selection{margin-left:auto}
-#preview-viewport{flex:1;min-height:0;overflow:auto;display:flex;justify-content:center;align-items:flex-start;background:repeating-conic-gradient(#151319 0% 25%,#100e14 0% 50%) 50%/22px 22px;border:1px solid var(--line);border-radius:16px;padding:20px}
-#preview-frame{border:0;background:#050506;transform-origin:top center;box-shadow:0 20px 60px #0009}
+#preview-viewport{flex:1;min-height:0;overflow:auto;display:flex;justify-content:center;align-items:flex-start;background:repeating-conic-gradient(#141218 0% 25%,#0f0d13 0% 50%) 50%/22px 22px;border:var(--glass-border);border-radius:18px;padding:20px}
+#preview-frame{border:0;background:#050506;transform-origin:top center;box-shadow:0 20px 60px #0009;border-radius:6px}
 @media(max-width:1000px){#split{grid-template-columns:1fr}#split-divider{display:none}#preview-pane{position:static;height:70vh}}
+
+/* ---- bottom dock: macOS-Dock-style hover-reveal + cursor magnification ---- */
+/* #dock-anchor is the always-present hit area (a tall invisible strip along the bottom edge) so
+   moving the cursor NEAR the edge -- not just directly over the thin collapsed dock -- triggers
+   the reveal. #dock itself is what actually slides/fades; JS (see creator.js) only ever touches
+   per-button --mag, never this show/hide, which is pure CSS so the "immediate open, delayed
+   close" feel needs no timers. */
+#dock-anchor{position:fixed;left:0;right:0;bottom:0;height:100px;z-index:30;display:flex;justify-content:center;align-items:flex-end;pointer-events:none}
+#dock-anchor,#dock-handle,#dock{pointer-events:auto}
+#dock-handle{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:100px;height:5px;border-radius:999px;
+  background:#ffffff30;border:0;padding:0;min-height:0;cursor:pointer;transition:opacity .2s ease,background .2s ease}
+#dock-handle:hover{background:#ffffff50}
+#dock{position:relative;margin-bottom:14px;display:flex;align-items:center;gap:14px;
+  max-width:calc(100vw - 24px);padding:8px 10px;border-radius:22px;border:var(--glass-border);
+  background:#15121ac2;backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);box-shadow:var(--glass-shadow);
+  transform:translateY(82%) scale(.94);opacity:0;transition:transform .3s cubic-bezier(.3,.9,.4,1) .38s,opacity .28s ease .38s}
+/* Desktop (real hover + fine pointer only -- see Part C.9): hovering the anchor reveals instantly
+   (no delay on the way in), collapses after the .38s delay declared above on the way out. */
+@media(hover:hover) and (pointer:fine){
+  #dock-anchor:hover #dock{transform:translateY(0) scale(1);opacity:1;transition:transform .26s cubic-bezier(.3,.9,.4,1),opacity .22s ease}
+  #dock-anchor:hover #dock-handle{opacity:0}
+}
+/* Touch/imprecise-pointer fallback (Part C.9): no hover to key off, so a tap toggles this class
+   (see creator.js) instead -- same reveal, no magnification (set below). */
+#dock-anchor.expanded #dock{transform:translateY(0) scale(1);opacity:1;transition:transform .26s cubic-bezier(.3,.9,.4,1),opacity .22s ease}
+#dock-anchor.expanded #dock-handle{opacity:0}
+/* [fix] overflow-x:auto paired with overflow-y:visible does NOT keep the y-axis visible -- per
+   the CSS Overflow spec, when one axis is non-visible the other's "visible" computes to "auto"
+   instead, so this was silently clipping every magnified icon at the box's top edge the moment it
+   scaled past it. Dropped the horizontal auto-scroll (the mobile breakpoint below already gives
+   narrow viewports a completely different column layout, so it wasn't earning its keep) so both
+   axes stay genuinely visible and icons can scale up freely above the dock's own bounds, same as
+   the real macOS Dock. */
+#dock nav{display:flex;align-items:flex-end;gap:3px;overflow:visible;max-width:calc(100vw - 220px)}
+#dock nav button{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:52px;min-width:52px;padding:7px 8px;
+  border:1px solid transparent;background:transparent;font-size:10px;white-space:nowrap;color:var(--muted);
+  transform:scale(var(--mag,1));transform-origin:bottom center;transition:transform .12s ease-out,color .15s ease,background .15s ease}
+#dock nav button svg{color:var(--muted);transition:color .15s ease}
+#dock nav button:hover{background:#ffffff0f;color:var(--ink)}
+#dock nav button[aria-current]{background:linear-gradient(160deg,#ff943830,#ff447815);border-color:#ff943850;color:var(--ink)}
+#dock nav button[aria-current] svg{color:var(--amber)}
+#dock nav button #unread:not(:empty){display:inline-block;min-width:15px;padding:0 4px;margin-left:2px;border-radius:999px;background:var(--amber);color:#241002;font-size:9px;font-weight:700;line-height:15px}
+/* Magnified: the label detaches into a floating tooltip above the icon (macOS Dock style)
+   instead of sitting permanently underneath it -- see creator.js's is-magnified toggle.
+   Direct-child selector only: the Messages button's label span also wraps a nested #unread
+   count badge span, which must keep its normal inline layout, not become a second tooltip. */
+#dock nav button>span{transition:opacity .15s ease,transform .15s ease}
+@media(hover:hover) and (pointer:fine){
+  #dock nav button>span{position:absolute;left:50%;bottom:calc(100% + 10px);transform:translateX(-50%) translateY(4px);
+    padding:5px 9px;border-radius:8px;background:#0d0b12ee;border:1px solid #ffffff22;color:var(--ink);
+    font-size:11px;opacity:0;pointer-events:none;white-space:nowrap}
+  #dock nav button.is-magnified>span{opacity:1;transform:translateX(-50%) translateY(0)}
+}
+#dock .actions{display:flex;gap:8px;flex:none;padding-left:10px;border-left:1px solid var(--line)}
+#dock .actions button{min-height:44px}
+@media(max-width:650px){
+  #dock-anchor{height:auto}
+  #dock{left:8px;right:8px;margin:0 0 8px;max-width:none;flex-direction:column;gap:8px;padding:10px}
+  #dock nav{max-width:100%;width:100%;justify-content:flex-start}
+  #dock nav button{transform:none!important}
+  #dock .actions{border-left:0;border-top:1px solid var(--line);padding-left:0;padding-top:8px;width:100%;justify-content:flex-end}
+}
+@media(prefers-reduced-motion:reduce){#dock nav button{transition:none}}
+
+/* ---- messages: compact row list + slide-in side drawer ---- */
+.message-row-list{display:grid;gap:8px}
+.message-row{display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;text-align:left;
+  padding:13px 16px;border-radius:14px;background:#00000024;border:var(--glass-border);min-height:0}
+.message-row:hover{background:#ffffff0c}
+.message-row.is-open{border-color:#ff943860;background:#ff943812}
+.message-row[data-status=new]{border-left:3px solid var(--amber)}
+.message-row-subject{font-size:14px;font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+.message-row-byline{font-size:11.5px;color:var(--muted)}
+/* ---- Messages popup (Part E): a real centered modal, not an inline tab -- opening/closing it
+   never touches #split/.view state. z-index sits just below the per-message drawer below, so
+   opening a message from inside this modal correctly layers the drawer on top of it. ---- */
+#messages-modal-wrap{position:fixed;inset:0;z-index:38;pointer-events:none;display:flex;align-items:center;justify-content:center;padding:24px}
+#messages-modal-backdrop{position:absolute;inset:0;background:#000000a0;opacity:0;transition:opacity .25s ease;backdrop-filter:blur(2px)}
+#messages-modal{position:relative;width:min(640px,100%);max-height:min(720px,85vh);padding:28px 26px;overflow-y:auto;
+  background:#171319f0;backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+  border:var(--glass-border);border-radius:22px;box-shadow:var(--glass-shadow);
+  transform:scale(.92) translateY(12px);opacity:0;transition:transform .25s cubic-bezier(.2,.9,.25,1),opacity .22s ease}
+#messages-modal-wrap.open{pointer-events:auto}
+#messages-modal-wrap.open #messages-modal-backdrop{opacity:1}
+#messages-modal-wrap.open #messages-modal{transform:scale(1) translateY(0);opacity:1}
+#messages-modal-close{position:absolute;top:18px;right:18px;width:36px;height:36px;min-height:0;padding:0;border-radius:50%;font-size:18px;line-height:1}
+#messages-modal .section-head{padding-right:40px}
+@media(max-width:650px){#messages-modal{padding:22px 18px}}
+#message-drawer-wrap{position:fixed;inset:0;z-index:40;pointer-events:none}
+#message-drawer-backdrop{position:absolute;inset:0;background:#000000a0;opacity:0;transition:opacity .25s ease;backdrop-filter:blur(2px)}
+#message-drawer-panel{position:absolute;top:0;right:0;bottom:0;width:min(440px,100%);padding:28px 26px;
+  background:#171319f0;backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+  border-left:var(--glass-border);box-shadow:-20px 0 50px -12px #000000a0;
+  transform:translateX(100%);transition:transform .3s cubic-bezier(.2,.9,.25,1);overflow-y:auto}
+#message-drawer-wrap.open{pointer-events:auto}
+#message-drawer-wrap.open #message-drawer-backdrop{opacity:1}
+#message-drawer-wrap.open #message-drawer-panel{transform:translateX(0)}
+#message-drawer-close{position:absolute;top:18px;right:18px;width:36px;height:36px;min-height:0;padding:0;border-radius:50%;font-size:18px;line-height:1}
+#message-drawer h2{padding-right:40px;font-size:20px;overflow-wrap:anywhere}
+#message-drawer .byline{font-size:12px;color:var(--muted);margin-bottom:18px}
+#message-drawer .body{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink);line-height:1.75;margin-bottom:24px}
+
+/* ---- floating property panel: appears beside/outside the preview "screen" itself when an
+   element in it is selected, so editing never requires switching away from what you're editing ---- */
+#property-panel{position:fixed;top:80px;right:16px;bottom:calc(var(--dock-h) + 32px);width:260px;z-index:32;
+  padding:18px;border-radius:18px;border:var(--glass-border);background:#15121ae6;
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);box-shadow:var(--glass-shadow);
+  overflow-y:auto;transform:translateX(calc(100% + 32px));transition:transform .25s cubic-bezier(.2,.9,.25,1);pointer-events:none}
+#property-panel.open{transform:translateX(0);pointer-events:auto}
+#property-panel h2{font-size:15px}
+#property-panel-close{position:absolute;top:14px;right:14px;width:30px;height:30px;min-height:0;padding:0;border-radius:50%;font-size:16px;line-height:1}
+#property-panel-body{display:grid;gap:14px;padding-right:30px}
+#property-panel-body label{gap:6px}
+#property-panel-body .row{display:flex;gap:8px;align-items:center}
+#property-panel-body input[type=color]{width:44px;height:44px;padding:2px;flex:none;cursor:pointer}
+#property-panel-body .row button{flex:1;min-height:38px;font-size:12px}
+#property-panel-body .empty{padding:14px;font-size:11.5px;text-align:left}
+@media(max-width:1300px){#property-panel{width:220px}}
+@media(max-width:1000px){#property-panel{position:static;width:auto;transform:none;margin-top:16px;display:none}#property-panel.open{display:block}}
+@media(max-width:650px){.field-grid{grid-template-columns:1fr}.image-row{grid-template-columns:70px 1fr;gap:12px}.image-row img{width:70px;height:105px}.image-row .actions{grid-column:1/-1;max-width:none}.folder-row{flex-wrap:wrap}.folder-row input{flex-basis:100%}header .brand span{display:none}.panel{padding:20px}#message-drawer-panel{width:100%}}

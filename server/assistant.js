@@ -111,6 +111,42 @@ export async function streamAssistantReply({ apiKey, knowledge, locale, messages
   }
 }
 
+// Powers the Creator Portal's embedded "describe an edit" panel (server/creator.js's
+// POST /creator/assistant). Deliberately returns a PATCH -- only the top-level fields that
+// should change -- rather than letting the model regenerate the whole site object: the admin
+// applies the patch to their own in-memory draft (same mutate+markDirty path every other control
+// uses) and still publishes through the existing, independently-validated PUT /creator/portfolio.
+// A bad or nonsensical patch just fails that validation like any other bad manual edit -- this
+// function never writes anything itself.
+export async function proposeCreatorPatch({ apiKey, instruction, draft, schemaNotes }){
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const system = `You help edit a JSON "site" object for a portfolio admin tool, from a short
+plain-language instruction. Respond with ONLY a JSON object -- no prose, no markdown fences --
+containing exactly the top-level fields that should change, using the exact same shape those
+fields already have in the current draft below. Omit every field that shouldn't change. Never
+invent a field that isn't already part of the schema described below. If the instruction is
+unclear, unsafe, or asks for something outside this schema, respond with {}.
+
+${schemaNotes}
+
+Current draft (for shape/context only -- copy structure, don't just echo values back):
+${JSON.stringify(draft)}`;
+
+  const model = genAI.getGenerativeModel({
+    model: MODEL,
+    systemInstruction: system,
+    generationConfig: { maxOutputTokens: 1200, responseMimeType: "application/json" },
+  });
+  const result = await model.generateContent(instruction);
+  let patch;
+  try {
+    patch = JSON.parse(result.response.text());
+  } catch {
+    return {};
+  }
+  return patch && typeof patch === "object" && !Array.isArray(patch) ? patch : {};
+}
+
 // ==================================================================== ROADMAP HOOKS ==
 // Structural stubs only, per spec -- wired up later without touching the streaming pipeline
 // above. Each is called from server/index.js at the point it would need to intervene.
