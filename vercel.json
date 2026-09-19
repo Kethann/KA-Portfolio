@@ -1,0 +1,1 @@
+{"rewrites":[{"source":"/api/(.*)","destination":"https://ka-portfolio-ddnf.onrender.com/api/$1"}]}
