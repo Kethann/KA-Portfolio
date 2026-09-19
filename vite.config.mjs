@@ -1,9 +1,13 @@
 import {defineConfig} from 'vite';
 import {fileURLToPath} from 'node:url';
-import {readFileSync} from 'node:fs';
+import {readFileSync,writeFileSync,cpSync} from 'node:fs';
 const local=path=>fileURLToPath(new URL(path,import.meta.url));
 export default defineConfig({
-  plugins:[{name:'local-crystal-runtime',generateBundle(){this.emitFile({type:'asset',fileName:'assets/three-r128.min.js',source:readFileSync(local('./public/three-r128.min.js'))});}}],
+  plugins:[{name:'stage-crystal-homepage',apply:'build',closeBundle(){
+    // Vercel serves dist/ only: publish the crystal homepage (root index.html) as dist/index.html, as server/app.js does locally.
+    writeFileSync(local('./dist/index.html'),readFileSync(local('./index.html'),'utf8').replaceAll('./dist/assets/','./assets/'));
+    cpSync(local('./images'),local('./dist/images'),{recursive:true});
+  }},{name:'local-crystal-runtime',generateBundle(){this.emitFile({type:'asset',fileName:'assets/three-r128.min.js',source:readFileSync(local('./public/three-r128.min.js'))});}}],
   root:'client',
   build:{
     outDir:'../dist',emptyOutDir:true,
