@@ -3,10 +3,10 @@ import {FolderScene,type FolderHandle} from './FolderScene';
 import {FolderCover} from './FolderCover';
 import {Preview} from './Preview';
 import type {Portfolio,Project} from './types';
-export type GalleryOptions={category?:string;slugs?:string[];initialProjects:Project[];onBack?:()=>void};
+export type GalleryOptions={category?:string;slugs?:string[];initialProjects:Project[];initialPortfolio?:Portfolio;onBack?:()=>void};
 const normalize=(p:Project):Project=>({...p,id:p.id||p.slug,description:p.description||'',technologies:p.technologies||[],link:p.link||''});
-export function Gallery({category,slugs,initialProjects,onBack}:GalleryOptions){
-  const [data,setData]=useState<Portfolio|null>(null),[pending,setPending]=useState<Portfolio|null>(null);
+export function Gallery({category,slugs,initialProjects,initialPortfolio,onBack}:GalleryOptions){
+  const [data,setData]=useState<Portfolio|null>(initialPortfolio||null),[pending,setPending]=useState<Portfolio|null>(null);
   const [folder,setFolder]=useState(category||''),[page,setPage]=useState(0),[state,setState]=useState('closed');
   const [preview,setPreview]=useState<Project|null>(null),[fallback,setFallback]=useState(false);
   const scene=useRef<FolderHandle>(null),shelf=useRef<HTMLDivElement>(null),leaving=useRef(false),lastFolder=useRef('');
@@ -14,11 +14,22 @@ export function Gallery({category,slugs,initialProjects,onBack}:GalleryOptions){
   useEffect(()=>()=>{if(returnTimer.current!==null)clearTimeout(returnTimer.current);},[]);
   useEffect(()=>{if(pending&&state==='closed'){setData(pending);setPending(null);}},[pending,state]);
   useEffect(()=>{
+    function update(event:Event){
+      const site=(event as CustomEvent<Portfolio>).detail;
+      if(!site||!Array.isArray(site.images)||!Array.isArray(site.folders))return;
+      setData({...site,images:site.images.map(normalize)});setPending(null);setPage(0);setPreview(null);
+      if(folder&&!site.folders.includes(folder)){setFolder('');setState('closed');}
+    }
+    window.addEventListener('ka-portfolio-updated',update);
+    return()=>window.removeEventListener('ka-portfolio-updated',update);
+  },[folder]);
+  useEffect(()=>{
+    if(initialPortfolio)return;
     const controller=new AbortController();
     fetch('/api/portfolio',{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Offline');return r.json();}).then((site:Portfolio)=>{
       if(Array.isArray(site.images)&&Array.isArray(site.folders))setPending({...site,images:site.images.map(normalize)});
     }).catch(()=>{});return()=>controller.abort();
-  },[]);
+  },[initialPortfolio]);
   const all=useMemo(()=>data?.images||initialProjects.map(normalize),[data,initialProjects]);
   const folders=data?.folders||Array.from(new Set(all.map(p=>p.cat)));
   const collection=useMemo(()=>all.filter(p=>p.cat===folder&&(!slugs||slugs.includes(p.slug))),[all,folder,slugs]);

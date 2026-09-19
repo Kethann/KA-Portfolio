@@ -1,7 +1,7 @@
 // Execute the complete hero script, including asset callbacks and frame scheduling.
 // Renderer/canvas are stubs: this catches integration exceptions, not shader/visual errors.
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
-const THREE=require(path.resolve(__dirname,'../../../Portfolio-main/node_modules/three/build/three.cjs'));
+const THREE=require(path.resolve(__dirname,'../../node_modules/three/build/three.cjs'));
 const html=fs.readFileSync(path.resolve(__dirname,'../../index.html'),'utf8');
 const source=[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]).find(s=>s.includes('const MANIFEST'));
 const noop=()=>{},gradient={addColorStop:noop};
@@ -45,8 +45,9 @@ console.log('PASS: complete hero startup, first paint, fragment assembly and fin
 const hero=context.heroTest;
 assert.equal(hero.phase,'held');assert(seenReveal);
 assert(!/buildLogoGlass|createLogoParticleSystem|DISSOLVE_IDLE_MS|pDissolved|uBlast/.test(source));
-assert.match(hero.particles.mesh.material.fragmentShader,/vec3\(0\.0\)/);
-assert.equal(hero.particles.mesh.material.blending,context.THREE.NormalBlending);
+assert.match(hero.particles.mesh.material.fragmentShader,/vAlpha<=0\./,'expired sparks must be discarded');
+assert.match(hero.particles.mesh.material.fragmentShader,/gl_FragColor=vec4\(col,vAlpha\*/,'colored sparks must retain their fading alpha');
+assert.equal(hero.particles.mesh.material.blending,context.THREE.AdditiveBlending);
 assert(hero.trails.slots.length>0&&hero.trails.slots.length<=6);
 assert(hero.trails.slots.every(slot=>slot.shard.glowTier>=2));
 assert(!/attribute vec3 instanceColor/.test(hero.trails.mesh.material.vertexShader),'r128 injects this attribute; duplicate declarations break WebGL');
@@ -115,7 +116,7 @@ for(const hz of [30,60,120,144]){
 assert(Math.max(...matrices)-Math.min(...matrices)<.001,'refresh rate changes trail length');
 hero.trails.slots.forEach(slot=>slot.shard.lt=1);hero.updateCometTrails(2000);assert(!hero.trails.mesh.visible,'landed shards must have no trails');
 hero.setReduced(true);hero.updateCometTrails(2100);assert(!hero.trails.mesh.visible);
-console.log('PASS: solid logo stays opaque for 30s; no old states or post-reveal sweep; black outward particles; mouse/touch/pen; UI exclusion; reduced motion; bounded Tier 2/3 tails and refresh-rate parity.');
+console.log('PASS: solid logo stays opaque for 30s; no old states or post-reveal sweep; fading colored sparks; mouse/touch/pen; UI exclusion; reduced motion; bounded Tier 2/3 tails and refresh-rate parity.');
 
 hero.advanceFinalGlow(0,false,false);
 let level=1;

@@ -5,11 +5,12 @@
   "type": "module",
   "description": "KA crystal-logo hero + portfolio gallery, with a small Node backend for the portfolio AI assistant.",
   "scripts": {
+    "prestart": "npm run build",
     "start": "node server/index.js",
-    "dev": "node server/index.js",
-    "build": "tsc --noEmit && vite build && node --test tests/gallery-build.test.mjs tests/delivery.test.mjs && node generator/scripts/verify_startup.cjs",
+    "dev": "npm start",
+    "build": "node generator/scripts/verify_scripts.cjs && tsc --noEmit && vite build && node --test tests/gallery-build.test.mjs tests/delivery.test.mjs && node generator/scripts/verify_startup.cjs",
     "frontend": "vite",
-    "test": "node --test tests/creator.test.mjs tests/folder.test.mjs tests/gallery.test.mjs tests/folder-shelf.test.mjs tests/poster.test.mjs tests/panda.test.mjs"
+    "test": "node --test tests/creator.test.mjs tests/creator-ui.test.mjs tests/folder.test.mjs tests/gallery.test.mjs tests/folder-shelf.test.mjs tests/poster.test.mjs tests/panda.test.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",

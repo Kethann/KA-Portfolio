@@ -77,7 +77,8 @@ _executor = ThreadPoolExecutor(max_workers=1)
 
 _bg_upsampler = None
 _codeformer_net = None
-_face_helper_factory = None  # FaceRestoreHelper is stateful per-image; build a fresh one per request
+_face_helper = None  # Models are reused; per-image state is cleared between serialized requests.
+_inflight = None
 _model_error = None
 _device = None
 _model_label = "Real-ESRGAN"  # updated to include CodeFormer once a face is actually restored
@@ -95,7 +96,7 @@ def _pick_half(device_str: str) -> bool:
 
 @app.on_event("startup")
 async def load_models_at_startup():
-    global _bg_upsampler, _codeformer_net, _model_error, _device
+    global _bg_upsampler, _codeformer_net, _model_error, _device, _face_helper
     if not os.path.isfile(REALESRGAN_WEIGHTS):
         _model_error = f"Missing weights file: {REALESRGAN_WEIGHTS}"
         log.error(_model_error)
@@ -134,14 +135,8 @@ async def load_models_at_startup():
         net.eval()
         _codeformer_net = net
 
-        # FaceRestoreHelper's face-detector (~104MB) and face-parser (~81MB) weights download and
-        # load lazily on first use, not at construction -- left alone, that ~10s one-time cost
-        # would land inside the FIRST real request's inference timeout instead of the startup log,
-        # exactly the "silent stall on whichever visitor is first" failure mode this whole
-        # load-once-at-startup pattern exists to avoid. Building one here (and immediately
-        # discarding it) forces that download/load to happen now, visibly, so every real request
-        # after startup only ever pays actual inference time.
-        _make_face_helper()
+        # Load detector/parser once and reuse them in the single inference thread.
+        _face_helper = _make_face_helper()
 
         log.info(
             "Models loaded successfully in %.2fs. Real-ESRGAN=RealESRGAN_x4plus (half=%s), "
@@ -178,11 +173,16 @@ def _make_face_helper():
     )
 
 
-def _run_pipeline(bgr_img):
+@torch.inference_mode()
+def _restore_faces(bgr_img, bg_img):
     """Synchronous, GPU-bound. Runs in the thread pool so the event loop stays responsive and the
     request can still be cancelled cleanly by the timeout wrapper in the endpoint below."""
-    face_helper = _make_face_helper()
+    face_helper = _face_helper
+    face_helper.clean_all()
     face_helper.read_image(bgr_img)
+    # The vendored helper enlarges small images to a 512px minimum side.
+    # Keep original coordinates so pasting does not enlarge the 4x output again.
+    face_helper.input_img = bgr_img
     num_faces = face_helper.get_face_landmarks_5(only_center_face=False, resize=640, eye_dist_threshold=5)
     face_helper.align_warp_face()
 
@@ -205,22 +205,62 @@ def _run_pipeline(bgr_img):
         restored_face = restored_face.astype("uint8")
         face_helper.add_restored_face(restored_face, cropped_face)
 
-    # Background pass always runs -- with 0 faces detected this IS the entire output (general
-    # enhancement, automatically, no separate code path), matching the automatic-fallback
-    # requirement from the brief.
-    bg_img = _bg_upsampler.enhance(bgr_img, outscale=SCALE)[0]
-
     if num_faces > 0:
         face_helper.get_inverse_affine(None)
-        restored_img = face_helper.paste_faces_to_input_image(upsample_img=bg_img)
+        try:
+            restored_img = face_helper.paste_faces_to_input_image(upsample_img=bg_img)
+        except (MemoryError, torch.cuda.OutOfMemoryError):
+            # General enhancement already succeeded. Preserve it if the optional
+            # face compositor cannot allocate its full-image masks on this host.
+            log.warning("Insufficient memory for face compositing; returning Real-ESRGAN enhancement without face restoration.")
+            return bg_img, 0
     else:
         restored_img = bg_img
 
     return restored_img, num_faces
 
 
+@torch.inference_mode()
+def _run_pipeline(bgr_img):
+    # Complete general enhancement before allocating the face-restoration workspaces.
+    # This also gives every optional face stage a usable fallback under memory pressure.
+    bg_img = _bg_upsampler.enhance(bgr_img, outscale=SCALE)[0]
+    _bg_upsampler.img = None
+    _bg_upsampler.output = None
+    if _device == "cuda":
+        torch.cuda.empty_cache()
+    try:
+        return _restore_faces(bgr_img, bg_img)
+    except (MemoryError, torch.cuda.OutOfMemoryError):
+        log.warning("Insufficient memory for face restoration; returning Real-ESRGAN enhancement.")
+        return bg_img, 0
+
+
+def _run_pipeline_clean(bgr_img):
+    try:
+        return _run_pipeline(bgr_img)
+    finally:
+        _face_helper.clean_all()
+        _face_helper.input_img = None
+        _bg_upsampler.img = None
+        _bg_upsampler.output = None
+        if _device == "cuda":
+            torch.cuda.empty_cache()
+
+
+def _release_job(job):
+    global _inflight
+    if _inflight is job:
+        _inflight = None
+    if not job.cancelled():
+        job.exception()  # Retrieve failures even if the HTTP request already timed out.
+
+
 @app.post("/enhance")
 async def enhance(request: Request):
+    global _inflight
+    if _inflight is not None and not _inflight.done():
+        raise HTTPException(status_code=503, detail="Another image is being enhanced. Please retry when it finishes.")
     if _codeformer_net is None or _bg_upsampler is None:
         raise HTTPException(status_code=503, detail=f"The enhancement model isn't loaded ({_model_error or 'still starting'}).")
 
@@ -232,6 +272,8 @@ async def enhance(request: Request):
 
     try:
         img = Image.open(io.BytesIO(body))
+        if img.width * img.height > 16_000_000:
+            raise HTTPException(status_code=413, detail="Choose an image under 16 megapixels.")
         img.load()
     except UnidentifiedImageError:
         raise HTTPException(status_code=400, detail="That file isn't a readable image.")
@@ -249,9 +291,13 @@ async def enhance(request: Request):
 
     t0 = time.time()
     loop = asyncio.get_event_loop()
+    if _inflight is not None and not _inflight.done():
+        raise HTTPException(status_code=503, detail="Another image is being enhanced. Please retry when it finishes.")
+    _inflight = loop.run_in_executor(_executor, _run_pipeline_clean, bgr)
+    _inflight.add_done_callback(_release_job)
     try:
         restored_img, faces_found = await asyncio.wait_for(
-            loop.run_in_executor(_executor, _run_pipeline, bgr),
+            asyncio.shield(_inflight),
             timeout=INFERENCE_TIMEOUT_SECONDS,
         )
     except asyncio.TimeoutError:

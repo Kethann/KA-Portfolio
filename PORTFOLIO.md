@@ -20,17 +20,16 @@ From this directory, run:
 
 ```sh
 npm install
-npm run build
 npm start
 ```
 
-Open `http://127.0.0.1:8787` to use the complete crystal portfolio and embedded folders. Build again after frontend edits. `npm run frontend` runs the standalone folder development page; it is not the public homepage. Use the backend URL to verify the integration.
+Open `http://127.0.0.1:8787` to use the complete crystal portfolio and embedded folders. Startup builds automatically; restart after frontend edits. `npm run frontend` runs the standalone folder development page; it is not the public homepage. Use the backend URL to verify the integration.
 
 ## Private creator access
 
 Manually visit `http://127.0.0.1:8787/creator`. There is no public login link. On first startup, set `CREATOR_PASSWORD` in the server environment (at least 12 characters), or read the generated starter password in the private `server/data/creator-access.txt` file. Change it in Settings; changing it removes the starter file and invalidates sessions. An existing saved password takes precedence over the environment setting.
 
-The dashboard manages folders, ordered projects, image uploads, editable content and button labels, and contact messages. Portfolio changes are drafts until **Save changes**. Image uploads and inbox actions save immediately. Refresh the public page to see saved changes. Each folder displays batches of up to five cards; close the folder to change collections or batches.
+The dashboard manages folders, ordered projects, image uploads, editable content and button labels, and contact messages. Portfolio changes are drafts until **Publish changes**. Image uploads and inbox actions save immediately. Refresh the public page to see saved changes. Each folder displays batches of up to five cards; close the folder to change collections or batches.
 
 ## Persistence and hosting
 

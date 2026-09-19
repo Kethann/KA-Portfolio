@@ -128,9 +128,16 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
     if(v.count>max){res.set('Retry-After','900');fail(res,429,'Please wait a few minutes before trying again.');return false;}
     return true;
   }
+  // Behind a TLS-terminating proxy (Render) req.protocol reads "http" while the browser's Origin is
+  // "https", so compare hosts only: a cross-site Origin still has a different host and is rejected.
+  function originHost(origin){try{return new URL(origin).host;}catch{return null;}}
+  function sameHost(req,origin){
+    const host=req.get('host');
+    return originHost(origin)===host || (req.app.get('trust proxy') && req.get('x-forwarded-host') && originHost(origin)===req.get('x-forwarded-host'));
+  }
   function sameOrigin(req,res,next){
     const origin=req.get('origin');
-    if(req.get('sec-fetch-site')==='cross-site' || (origin && origin!==`${req.protocol}://${req.get('host')}`)) return fail(res,403,'This request must come from this website.');
+    if(req.get('sec-fetch-site')==='cross-site' || (origin && !sameHost(req,origin))) return fail(res,403,'This request must come from this website.');
     next();
   }
   // Same as sameOrigin above, but also accepts the configured ALLOWED_ORIGIN(s) (see
@@ -143,7 +150,7 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
     const origin=req.get('origin');
     const selfOrigin=`${req.protocol}://${req.get('host')}`;
     if(origin && allowedOrigins.includes(origin)) return next();
-    if(req.get('sec-fetch-site')==='cross-site' || (origin && origin!==selfOrigin)) return fail(res,403,'This request must come from this website.');
+    if(req.get('sec-fetch-site')==='cross-site' || (origin && !sameHost(req,origin))) return fail(res,403,'This request must come from this website.');
     next();
   }
   function auth(req,res,next){
@@ -250,12 +257,14 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
     if(typeof to==='string'&&to) filtered=filtered.filter(e=>e.at<=(to.length===10?to+'T23:59:59.999Z':to));
     res.json({count:visitors.count,log:filtered.slice(-200).reverse(),byDevice,byDay,byLocation});
   });
-  router.get('/creator/assets',(req,res)=>res.json(readdirSync(uploads).filter(name=>/^[a-f0-9-]{36}\.(png|jpg|webp)$/.test(name)).map(name=>({src:'/uploads/'+name,bytes:statSync(resolve(uploads,name)).size,used:site.images.some(image=>image.src==='/uploads/'+name)}))));
+  const assetUsed=src=>site.images.some(image=>image.src===src)||site.branding?.logoUrl===src;
+  router.get('/creator/assets',(req,res)=>res.json(readdirSync(uploads).filter(name=>/^[a-f0-9-]{36}\.(png|jpg|webp)$/.test(name)).map(name=>({src:'/uploads/'+name,bytes:statSync(resolve(uploads,name)).size,used:assetUsed('/uploads/'+name)}))));
   router.delete('/creator/assets/:name',(req,res)=>{
     if(!/^[a-f0-9-]{36}\.(png|jpg|webp)$/.test(req.params.name)) return fail(res,400,'Invalid image.');
-    if(site.images.some(image=>image.src==='/uploads/'+req.params.name)) return fail(res,409,'Remove this image from published projects before deleting it.');
+    if(assetUsed('/uploads/'+req.params.name)) return fail(res,409,'Remove this image from published projects and studio branding before archiving it.');
     const file=resolve(uploads,req.params.name);if(!existsSync(file))return fail(res,404,'Image not found.');
-    unlinkSync(file);res.json({ok:true});
+    const archive=resolve(dataDir,'archived-uploads');mkdirSync(archive,{recursive:true});
+    renameSync(file,resolve(archive,Date.now()+'-'+req.params.name));res.json({ok:true});
   });
   router.patch('/creator/messages/:id',(req,res)=>{
     if(!['new','read','archived'].includes(req.body?.status)) return fail(res,400,'Invalid message status.');

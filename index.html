@@ -1695,6 +1695,7 @@ var nebulaMat = new THREE.ShaderMaterial({
     'void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader:
     SIMPLEX_GLSL +
+    'float kaDither(){ return fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(0.06711056,0.00583715)))) - 0.5; }' +
     'uniform float uTime, uIntro;' +
     'varying vec2 vUv;' +
     'void main(){' +
@@ -1732,7 +1733,13 @@ var nebulaMat = new THREE.ShaderMaterial({
     // logic below), so the cosmic backdrop visibly "comes alive" as its own beat rather than
     // being at full brightness from the very first frame.
     '  float alpha = clamp(density, 0.0, 1.0) * 0.72 * uIntro;' +
-    '  gl_FragColor = vec4(color, alpha);' +
+    // [banding fix] the final additive contribution (color*alpha) is a very dark, very smooth float
+    // gradient; quantizing it to 8 bits produces visible stepped rings. Add <=1 LSB of
+    // interleaved-gradient noise (mean zero) before the write so the steps dissolve into fine grain.
+    // Gated on alpha so the blob edges / empty space are left exactly as before.
+    '  vec3 lit = color * alpha;' +
+    '  lit += kaDither() / 255.0 * step(0.0002, alpha);' +
+    '  gl_FragColor = vec4(lit, 1.0);' +
     '}',
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
 });
@@ -1747,7 +1754,7 @@ scene.add(farGroup);
 // (drawn once on an offscreen canvas), reused across instances with per-instance tint/scale/
 // position, rather than a texture per galaxy.
 function makeGalaxyTexture(){
-  var size = 128;
+  var size = 256; // was 128: same gradient, but no 2x+ upscale blockiness when the sprite is stretched
   var c = document.createElement('canvas'); c.width = c.height = size;
   var ctx = c.getContext('2d');
   var g = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
@@ -1771,6 +1778,13 @@ for (var gI = 0; gI < GALAXY_COUNT; gI++){
     transparent: true, opacity: gBaseOpacity,
     blending: THREE.AdditiveBlending, depthWrite: false,
   });
+  // [banding fix] sprite alpha = 8-bit texture alpha x ~0.1 opacity => only ~25 distinct levels across
+  // the whole falloff (visible rings). Dither the alpha by <=1 LSB, gated so fully transparent
+  // pixels stay exactly transparent.
+  gMat.onBeforeCompile = function(shader){
+    shader.fragmentShader = shader.fragmentShader.replace('#include <fog_fragment>',
+      '#include <fog_fragment>\n  gl_FragColor.a +=(fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(0.06711056,0.00583715)))) - 0.5) / 255.0 * step(0.0005, gl_FragColor.a);');
+  };
   var sprite = new THREE.Sprite(gMat);
   var gAng = Math.random() * Math.PI * 2, gR = 180 + Math.random() * 260;
   sprite.position.set(Math.cos(gAng) * gR, Math.sin(gAng) * gR * 0.6, -260 - Math.random() * 220);
@@ -6002,6 +6016,7 @@ function mountFolderGallery(container, posters, opts){
     if (disposed) return;
     teardown = module.mount(container, {
       initialProjects: posters,
+      initialPortfolio: window.__kaLastPortfolioData,
       category: opts.category,
       slugs: opts.slugs,
       onBack: opts.onBack
@@ -6096,6 +6111,7 @@ var NAV_ITEMS = [
   { name:"gallery", label:"Gallery" },
   { name:"about", label:"About" }
 ];
+var ALL_NAV_ITEMS = NAV_ITEMS.slice();
 var navVisibleStart = 0; // index of the first item currently shown in the bar
 var mobileNavQuery = window.matchMedia("(max-width:600px)");
 function navSlotCount(){ return mobileNavQuery.matches ? 3 : 4; }
@@ -6648,8 +6664,9 @@ function allContactFieldsValid(){
     return CONTACT_RULES[key].test(CONTACT_RULES[key].el.value.trim());
   });
 }
+var contactSending = false;
 function updateContactSubmitState(){
-  contactForm.querySelector(".contact-submit").disabled = !allContactFieldsValid();
+  contactForm.querySelector(".contact-submit").disabled = contactSending || !allContactFieldsValid();
 }
 Object.keys(CONTACT_RULES).forEach(function(key){
   var rule = CONTACT_RULES[key];
@@ -6663,6 +6680,7 @@ Object.keys(CONTACT_RULES).forEach(function(key){
 updateContactSubmitState();
 contactForm.addEventListener("submit", function(e){
   e.preventDefault();
+  if(contactSending)return;
   var submitBtn = contactForm.querySelector(".contact-submit");
   var data = new FormData(contactForm);
   var payload = {
@@ -6681,6 +6699,7 @@ contactForm.addEventListener("submit", function(e){
     CONTACT_RULES.name.el.form.querySelector('[aria-invalid="true"]').focus();
     return;
   }
+  contactSending = true;
   submitBtn.disabled = true;
   contactStatus.textContent = "Sending…";
   contactStatus.dataset.state = "";
@@ -6703,6 +6722,7 @@ contactForm.addEventListener("submit", function(e){
     contactStatus.textContent = err.message || "Something went wrong -- please try again, or reach out via Behance.";
     contactStatus.dataset.state = "error";
   }).finally(function(){
+    contactSending = false;
     updateContactSubmitState();
   });
 });
@@ -6734,6 +6754,12 @@ function applyPortfolioData(data){
   favFilter = "all";
   buildFolders();
   if (data.details){
+    if(data.details.creatorName)document.title=data.details.creatorName+' · '+data.details.portfolioTitle;
+    var aboutHeading=document.getElementById('about-headline');
+    if(aboutHeading&&data.details.creatorName)aboutHeading.textContent=data.details.creatorName+' — '+data.details.tagline;
+    var copyright=document.querySelector('.footer-copyright');
+    if(copyright&&data.details.creatorName)copyright.textContent='© '+new Date().getFullYear()+' '+data.details.creatorName;
+    if(data.details.contactButton)contactForm.querySelector('.contact-submit').textContent=data.details.contactButton;
     var pTitle = folderShelf.querySelector(".gallery-head h2");
     var pIntro = folderShelf.querySelector(".gallery-head p");
     if (pTitle && data.details.portfolioTitle) pTitle.textContent = data.details.portfolioTitle;
@@ -6744,12 +6770,13 @@ function applyPortfolioData(data){
     if (cIntro && data.details.contactIntro) cIntro.textContent = data.details.contactIntro;
   }
   applySiteAppearance(data);
+  window.dispatchEvent(new CustomEvent('ka-portfolio-updated',{detail:data}));
 }
 function loadPortfolioFromAPI(){
   fetch(kaApiUrl("/api/portfolio")).then(function(res){
     if (!res.ok) throw new Error("portfolio API unavailable");
     return res.json();
-  }).then(applyPortfolioData).catch(function(){
+  }).then(function(data){if(!window.__kaPreviewDraftReceived)applyPortfolioData(data);}).catch(function(){
     // no API (static view, server down, etc.) -- the hardcoded fallback already built above stays as-is
   });
 }
@@ -6810,7 +6837,8 @@ function applySiteAppearance(data){
     // one dismissal per distinct notice message -- editing the text (or re-enabling it later)
     // shows it again, rather than a dismissal from weeks ago silently suppressing new content.
     var dismissKey = "ka_notice_dismissed";
-    var dismissed = sessionStorage.getItem(dismissKey) === data.notice.text;
+    var dismissed = false;
+    try{dismissed = window.parent === window && sessionStorage.getItem(dismissKey) === data.notice.text;}catch(e){}
     if (!dismissed){
       noticeText.textContent = data.notice.text;
       noticeEl.dataset.tone = data.notice.tone === "warning" ? "warning" : "info";
@@ -6824,12 +6852,12 @@ function applySiteAppearance(data){
     noticeEl.hidden = true;
   }
   if (data.visibility && typeof NAV_ITEMS !== "undefined"){
-    var filtered = NAV_ITEMS.filter(function(item){
+    var filtered = ALL_NAV_ITEMS.filter(function(item){
       if (item.name === "gallery" && data.visibility.navGallery === false) return false;
       if (item.name === "about" && data.visibility.navAbout === false) return false;
       return true;
     });
-    if (filtered.length !== NAV_ITEMS.length){
+    if (filtered.map(function(item){return item.name;}).join(',') !== NAV_ITEMS.map(function(item){return item.name;}).join(',')){
       NAV_ITEMS = filtered;
       navVisibleStart = 0;
       renderNavItems();
@@ -6992,10 +7020,11 @@ document.addEventListener("DOMContentLoaded", function(){
   });
 });
 window.addEventListener("message", function(e){
-  if (e.origin !== window.location.origin) return;
+  if (window.parent === window || e.source !== window.parent || e.origin !== window.location.origin) return;
   var msg = e.data;
   if (!msg || typeof msg !== "object") return;
   if (msg.type === "ka-preview-data"){
+    window.__kaPreviewDraftReceived = true;
     applyPortfolioData(msg.data); // sets window.__kaLastPortfolioData itself -- see its own definition above
   } else if (msg.type === "ka-preview-edit-mode"){
     kaPreviewSetEditMode(!!msg.enabled);
@@ -7371,7 +7400,7 @@ function sendMessage(text){
       projectId: window.__kaCurrentProject || null,
     }),
   }).then(function(res){
-    if (!res.body || !res.ok){
+    if (!res.body || !res.ok || !(res.headers.get('content-type')||'').includes('text/event-stream')){
       return res.json().catch(function(){ return {}; }).then(function(data){
         typing.remove();
         addMessage("bot", (data && data.error) || (data && data.text) || "Something went wrong -- please try again.");

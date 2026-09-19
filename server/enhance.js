@@ -16,6 +16,7 @@ const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 90_000;
 
 export function startEnhanceService({ root }) {
+  if(process.env.ENHANCE_ENABLED==='0')return {router:buildRouter(()=>false,()=> 'Image enhancement is disabled on this server.'),stop(){}};
   const venvDir = resolve(root, "server/gfpgan-venv");
   const pythonBin = process.platform === "win32"
     ? resolve(venvDir, "Scripts/python.exe")
@@ -29,6 +30,7 @@ export function startEnhanceService({ root }) {
   let child = null;
   let ready = false;
   let restarting = false;
+  let stopped=false,restartCount=0,restartTimer=null;
   let lastFailureReason = null; // populated from the Python process's own log lines when startup fails
 
   // Logging defaults to ON (opt OUT with ENHANCE_SERVICE_LOGS=0) -- an earlier build gated this
@@ -38,10 +40,12 @@ export function startEnhanceService({ root }) {
   const logsEnabled = process.env.ENHANCE_SERVICE_LOGS !== "0";
 
   function spawnService(){
+    if(stopped)return;
     ready = false;
     child = spawn(pythonBin, ["-m", "uvicorn", "upscale_service_codeformer:app", "--host", "127.0.0.1", "--port", String(PYTHON_PORT)], {
       cwd: resolve(root, "server"),
       stdio: ["ignore", "pipe", "pipe"],
+      windowsHide:true,
       // KMP_DUPLICATE_LIB_OK also set inside upscale_service.py itself (belt and suspenders --
       // it must be set before torch/cv2 import, which the module-level code there guarantees
       // regardless of how this process ends up launched).
@@ -64,16 +68,19 @@ export function startEnhanceService({ root }) {
     child.on("exit", (code, signal) => {
       ready = false;
       if (!lastFailureReason) lastFailureReason = `service process exited unexpectedly (code=${code}, signal=${signal})`;
-      if (restarting) return; // our own intentional respawn below already accounted for this
+      if (stopped || restarting || restartCount>=1) return;
       console.error(`[enhance] Python service exited (code=${code}, signal=${signal}) -- restarting once in 3s. Last known cause: ${lastFailureReason}`);
       restarting = true;
-      setTimeout(() => { restarting = false; spawnService(); }, 3000);
+      restartCount++;
+      restartTimer=setTimeout(() => { restarting = false; spawnService(); }, 3000);
     });
+    child.on('error',error=>{ready=false;lastFailureReason=error.message;console.error('[enhance] Unable to start worker:',error.message);});
   }
   spawnService();
-  process.on("exit", () => { try { child?.kill(); } catch {} });
+  function stop(){stopped=true;ready=false;clearTimeout(restartTimer);try{child?.kill();}catch{}process.removeListener('exit',stop);}
+  process.once("exit", stop);
 
-  return { router: buildRouter(() => ready, () => lastFailureReason) };
+  return { router: buildRouter(() => ready, () => lastFailureReason),stop };
 }
 
 function buildRouter(isReady, getFailureReason){
@@ -110,16 +117,16 @@ function buildRouter(isReady, getFailureReason){
       return res.status(413).json({ error: "Please choose an image smaller than 12 MB." });
     }
 
+    let timer;
     try{
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
       const upstream = await fetch(`${PYTHON_BASE_URL}/enhance`, {
         method: "POST",
         headers: { "Content-Type": req.get("content-type") || "application/octet-stream" },
         body,
         signal: controller.signal,
       });
-      clearTimeout(timer);
 
       if (!upstream.ok){
         let detail = "The enhancement service couldn't process this image.";
@@ -143,6 +150,8 @@ function buildRouter(isReady, getFailureReason){
           ? "This is taking longer than expected. Please try a smaller image or try again."
           : "Could not reach the enhancement service. Please try again in a moment.",
       });
+    }finally{
+      clearTimeout(timer);
     }
   });
 

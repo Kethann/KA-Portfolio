@@ -36,4 +36,7 @@ test('project detail uses the full image and metadata without a nested dialog',a
   assert(html.includes('https://example.com/project'));
   assert(!html.includes('<dialog'));
   assert(html.includes('Close project'));
+  assert(html.includes('Download image'));
+  const privateDownload=renderToStaticMarkup(React.createElement(Preview,{project:{...projects[0],widths:[480],full:480,technologies:[],downloadable:false},label:'View project',onClose(){}}));
+  assert(!privateDownload.includes('Download image'));
 });

@@ -25,6 +25,11 @@ test('the running portfolio serves the homepage, lazy panda and all built assets
       else assert.match(response.headers.get('cache-control'),/immutable/);
     }
     const portfolio=await fetch(base+'/api/portfolio');assert.equal(portfolio.status,200);assert(Array.isArray((await portfolio.json()).images));
+    for(const file of ['creator.js','creator.css']){
+      const response=await fetch(base+'/assets/'+file);assert.equal(response.status,200);
+      assert.equal(response.headers.get('cache-control'),'no-cache','creator assets must not be cached immutably');
+    }
+    const missing=await fetch(base+'/api/not-a-route');assert.equal(missing.status,404);assert.equal(typeof (await missing.json()).error,'string');
   }finally{
     if(server)await new Promise(resolve=>server.close(resolve));
     assert(dataDir.startsWith(testRoot+sep));await rm(dataDir,{recursive:true,force:true});

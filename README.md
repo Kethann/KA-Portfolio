@@ -30,25 +30,27 @@ edges of the screen, colliding and locking together to reconstruct the
 
 ## Run it locally
 
-`index.html` is fully self-contained (all JS/CSS inlined, Three.js loaded
-from a CDN) — you just need any local static file server, since opening it
-directly via `file://` can be blocked by the browser for some asset loads.
+Run the complete application from this directory (or run `npm start` from the parent workspace):
 
-**Option A — VS Code Live Server (easiest)**
-1. Open this folder in VS Code (`code .`).
-2. Install the "Live Server" extension (by Ritwick Dey) if you don't have it.
-3. Right-click `index.html` → "Open with Live Server".
-4. It opens at `http://127.0.0.1:5500` (or similar) in your browser.
+```sh
+npm install
+npm start
+```
 
-**Option B — command line**
-```
-npx serve .
-```
-or
-```
-python -m http.server 8080
-```
-then open the printed localhost URL in your browser.
+Startup builds the frontend, checks its delivery, and serves the homepage, creator studio,
+contact inbox, gallery, and APIs through **http://127.0.0.1:8787**.
+Open **http://127.0.0.1:8787/creator** for the private studio.
+`npm run dev` uses this same startup. Restart after frontend edits.
+
+Vite preview, Live Server, and Python static servers cannot run the Node APIs.
+`npm run frontend` remains an optional standalone gallery development tool, not the complete app.
+The optional Python image worker uses loopback port 8799 internally; all browser requests
+still go through 8787. Set `ENHANCE_ENABLED=0` to disable that worker.
+Do not run a second app process against the same data directory.
+
+Existing files are preserved. Builds keep older generated assets; unused uploaded images
+are moved to private `server/data/archived-uploads/` instead of permanently deleted.
+See [AUDIT.md](AUDIT.md) for findings and validation limits.
 
 ## Folder contents
 

@@ -9,8 +9,9 @@ export default defineConfig({
     cpSync(local('./images'),local('./dist/images'),{recursive:true});
   }},{name:'local-crystal-runtime',generateBundle(){this.emitFile({type:'asset',fileName:'assets/three-r128.min.js',source:readFileSync(local('./public/three-r128.min.js'))});}}],
   root:'client',
+  preview:{host:'127.0.0.1',strictPort:true},
   build:{
-    outDir:'../dist',emptyOutDir:true,
+    outDir:'../dist',emptyOutDir:false,
     rollupOptions:{
       // The crystal homepage imports mount() at runtime, outside Vite's HTML graph.
       preserveEntrySignatures:'strict',

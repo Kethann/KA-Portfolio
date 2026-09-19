@@ -19,6 +19,7 @@ export function Preview({project,onClose,label}:{project:Project;onClose:()=>voi
         {project.description&&<p>{project.description}</p>}
         {project.technologies.length>0&&<ul className="tags">{project.technologies.map((technology,i)=><li key={i}>{technology}</li>)}</ul>}
         {project.link&&<a className="project-link" href={project.link} target="_blank" rel="noopener noreferrer">{label||'View project'} ↗</a>}
+        {project.downloadable!==false&&<a className="project-link" href={imageUrl(project,true)} download>Download image</a>}
       </div>
     </div>
   </section>;

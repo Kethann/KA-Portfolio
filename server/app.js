@@ -39,6 +39,7 @@ app.use(express.json({ limit: "512kb" }));
 const allowedOrigins = (process.env.ALLOWED_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
 if (allowedOrigins.length){
   app.use('/api', (req, res, next) => {
+    if(req.path==='/creator'||req.path.startsWith('/creator/'))return next();
     const origin = req.get('origin');
     if (origin && allowedOrigins.includes(origin)){
       res.set('Access-Control-Allow-Origin', origin);
@@ -57,18 +58,19 @@ const creator = await createCreatorRouter({root,dataDir:options.dataDir,password
 app.use('/api',creator.router);
 if(options.startServices !== false){
   const enhance = startEnhanceService({root});
+  app.locals.stopServices=enhance.stop;
   app.use('/api', enhance.router);
 }
 // Explicit public paths keep inbox, credentials, source, and backups private.
 app.get(['/', '/index.html'],(req,res)=>res.sendFile(resolve(root,'index.html')));
 app.get('/crystal',(req,res)=>res.sendFile(resolve(root,'index.html')));
+app.get(['/assets/creator.js','/assets/creator.css'],(req,res)=>{res.set('Cache-Control','no-cache');res.sendFile(resolve(root,'public',req.path.split('/').pop()));});
 app.use('/assets',express.static(resolve(root,'dist/assets'),{index:false,maxAge:'1y',immutable:true,setHeaders(res,file){
   // Entry URLs are stable; only content-hashed dependencies can be cached immutably.
   if(/[/\\](gallery|poster|panda)\.js$/.test(file))res.setHeader('Cache-Control','no-cache');
 }}));
 app.use('/dist/assets',express.static(resolve(root,'dist/assets'),{index:false,maxAge:0}));
 app.get(['/creator','/creator/'],(req,res)=>{res.set('Cache-Control','no-store');res.sendFile(resolve(root,'public/creator.html'));});
-app.get(['/assets/creator.js','/assets/creator.css'],(req,res)=>res.sendFile(resolve(root,'public',req.path.split('/').pop())));
 app.use('/images',express.static(resolve(root,'images'),{index:false}));
 app.use('/uploads',express.static(creator.uploads,{index:false,setHeaders:res=>res.setHeader('X-Content-Type-Options','nosniff')}));
 
@@ -123,6 +125,7 @@ app.post("/api/assistant", async (req, res) => {
   });
 });
 
+app.use('/api',(req,res)=>res.status(404).json({error:'This API endpoint does not exist.'}));
 app.use((err,req,res,next)=>{
   if(res.headersSent) return next(err);
   const status=err.type==='entity.too.large'?413:err instanceof SyntaxError?400:500;
