@@ -57,7 +57,7 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
      picks it, without a page reload. Google Fonts only actually downloads a family's font files
      once something on the page is rendered in it, so having unused choices listed costs one small
      CSS response, not extra font-file bytes. -->
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Poppins:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400..700&family=Sora:wght@400..700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Poppins:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --ground:#050506;
@@ -78,11 +78,11 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
   --dur-slow: 0.9s;
 
   /* ---- one glass material system, shared by nav / assistant panel / lightbox chrome ---- */
-  --glass-bg:linear-gradient(135deg,rgba(255,246,232,.13),rgba(255,255,255,.025) 38%,rgba(255,174,120,.045) 78%,rgba(255,240,218,.09)),rgba(26,23,29,.25);
-  --glass-bg-heavy:linear-gradient(140deg,rgba(255,246,232,.10),rgba(255,255,255,.018) 44%,rgba(255,177,126,.035)),rgba(19,17,24,.40);
+  --glass-bg: linear-gradient(145deg,rgba(255,244,230,.075),rgba(255,255,255,.015) 48%),rgba(23,19,25,0.3575);
+  --glass-bg-heavy: linear-gradient(145deg,rgba(255,244,230,.065),transparent 58%),rgba(18,16,23,0.5395);
   --glass-blur: blur(16.2px) saturate(135%);
   --glass-border: 1px solid rgba(255, 255, 255, 0.16);
-  --glass-highlight: inset 0 1px 0 rgba(255,249,237,.32), inset 1px 0 0 rgba(255,244,229,.09), inset 0 -1px 0 rgba(255,198,156,.10);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.3);
   --glass-shadow: 0 10px 36px rgba(0, 0, 0, 0.4);
   --accent-glass: linear-gradient(180deg, rgba(255,130,70,0.58), rgba(255,60,26,0.42));
   /* [standing rule, v20 A.2] the blur radius above is a static value, never itself animated --
@@ -105,7 +105,7 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
   /* ---- creator-panel typography controls (Part A) -- overwritten inline on <html> by
      applySiteAppearance() once /api/portfolio responds; these are just the pre-API/no-JS
      defaults, matching the site's original look exactly. ---- */
-  --font-heading: 'Fraunces';
+  --font-heading: 'Manrope';
   --font-body: 'Manrope';
   --text-scale: 1;
 }
@@ -411,115 +411,6 @@ html{ -webkit-tap-highlight-color:transparent; }
   from{ transform:translate(-2%, -1%) scale(1); }
   to{ transform:translate(2%, 2%) scale(1.06); }
 }
-
-/* ---- per-section ambient glows (same soft, blurred colour-wash as the Contact glow above, each in its
-   own colour, shape and position). Purely decorative, behind the content, no pointer events. The slow
-   drift uses transform; the scroll parallax uses the separate `translate` property so they never fight. ---- */
-#section-portfolio::after, #section-about::after, #about-work-block::before{
-  content:""; position:absolute; z-index:-1; pointer-events:none; left:-8%; right:-8%;
-  filter:blur(46px); translate:0 var(--gy, 0px); will-change:transform;
-}
-/* Portfolio: violet + magenta wash from the top-left, a blue pool low on the right */
-#section-portfolio::after{
-  top:0; height:min(940px, 130vh);
-  background:
-    radial-gradient(46% 40% at 15% 16%, rgba(140,84,255,0.26), transparent 72%),
-    radial-gradient(36% 32% at 86% 30%, rgba(236,72,153,0.17), transparent 72%),
-    radial-gradient(54% 28% at 55% 90%, rgba(59,130,246,0.15), transparent 74%);
-  animation:portfolioGlowDrift 19s ease-in-out infinite alternate;
-}
-@keyframes portfolioGlowDrift{
-  from{ transform:translate(-2.5%, -1%) scale(1); }
-  to{ transform:translate(2%, 2.5%) scale(1.07); }
-}
-/* About: cool blue + teal column on the right, warm gold edge at the top, teal pool on the left */
-#section-about::after{
-  top:0; height:min(980px, 135vh);
-  background:
-    radial-gradient(28% 44% at 87% 20%, rgba(56,189,248,0.22), transparent 72%),
-    radial-gradient(44% 34% at 10% 60%, rgba(45,212,191,0.15), transparent 72%),
-    radial-gradient(34% 24% at 56% 6%, rgba(255,180,90,0.13), transparent 74%);
-  animation:aboutGlowDrift 23s ease-in-out infinite alternate;
-}
-@keyframes aboutGlowDrift{
-  from{ transform:translate(2%, -1.5%) scale(1.03); }
-  to{ transform:translate(-2.5%, 2%) scale(1); }
-}
-/* About > Featured Work: a second, lower wash (rose + violet) so the long page keeps its atmosphere */
-#about-work-block{ position:relative; }
-#about-work-block::before{
-  top:-6%; height:110%;
-  background:
-    radial-gradient(40% 36% at 78% 30%, rgba(244,114,182,0.16), transparent 72%),
-    radial-gradient(38% 30% at 16% 74%, rgba(129,140,248,0.16), transparent 72%);
-  animation:aboutGlowDrift 27s ease-in-out infinite alternate-reverse;
-}
-/* keep the washes (and their drift) from ever widening the page */
-#section-portfolio, #section-about{ overflow-x:clip; }
-/* the old fixed orange/red blobs in About are replaced by the washes above */
-.about-glow{ display:none !important; }
-@media (max-width:760px){
-  #section-portfolio::after, #section-about::after, #about-work-block::before{ filter:blur(34px); }
-  #section-portfolio::after{ height:min(720px, 100vh); }
-  #section-about::after{ height:min(760px, 104vh); }
-}
-@media (prefers-reduced-motion: reduce){
-  #section-portfolio::after, #section-about::after, #about-work-block::before{ animation:none; translate:none; }
-}
-
-/* ---- text that writes itself in while you scroll (KaInk) ---- */
-.ink-w{ display:inline-block; white-space:nowrap; }
-.ink-l{ display:inline-block; }
-html.ink-on .about-headline, html.ink-on .about-bio-text{ opacity:1; transform:none; animation:none !important; }
-
-/* ============================================================ TYPOGRAPHY SYSTEM (v2) ============================
-   Three roles: DISPLAY (headings, --font-heading, set in the Creator: default Fraunces), TEXT (--font-body, Manrope)
-   and LABEL (small technical captions, --font-mono, JetBrains Mono). A compact scale takes over on small screens.
-   The Creator's Type style presets (Editorial / Modern / Technical / Classic) just swap the display + text fonts. */
-:root{
-  --font-mono: 'JetBrains Mono';
-  --ink-dim: rgba(237,235,232,0.68);                 /* was .55: secondary text is easier to read */
-  --heading-weight: 500;
-}
-html{ -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; text-rendering:optimizeLegibility; }
-body{ font-feature-settings:"kern" 1, "liga" 1, "calt" 1; line-height:1.6; }
-h1,h2,h3{
-  font-family:var(--font-heading), ui-serif, Georgia, "Times New Roman", serif;
-  font-optical-sizing:auto; font-weight:var(--heading-weight);
-  letter-spacing:-0.022em; line-height:1.06; text-wrap:balance;
-}
-p, li{ text-wrap:pretty; }
-.gallery-head h2, #contact-title, .about-headline, .contact-wrap h2{ font-weight:var(--heading-weight); letter-spacing:-0.022em; line-height:1.04; }
-.about-headline{ letter-spacing:-0.026em; }
-.about-bio-text, .contact-wrap > p{ line-height:1.75; }
-/* small technical captions: one role, easier to read (a touch larger, higher contrast, steady tracking) */
-.gallery-head p, .about-caption, .fav-chip, .field-error, .contact-form label, .contact-status,
-.footer-copyright, .site-footer a, .nav-item, .contact-submit{
-  font-family:var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
-}
-.gallery-head p{ font-size:11.5px; letter-spacing:0.13em; color:rgba(237,235,232,0.74); line-height:1.7; }
-.about-caption{ letter-spacing:0.16em; }
-.contact-form label{ color:rgba(237,235,232,0.78); }
-.contact-form input, .contact-form textarea{ font-family:var(--font-body), ui-sans-serif, system-ui, sans-serif; font-size:15px; }
-/* compact scale on small screens: tighter display sizes, calmer line lengths */
-@media (max-width:640px){
-  :root{
-    --step-4: clamp(2.5rem, 2rem + 4.2vw, 3.3rem);
-    --step-3: clamp(1.95rem, 1.6rem + 2.2vw, 2.5rem);
-    --step-2: clamp(1.4rem, 1.25rem + 1.1vw, 1.75rem);
-  }
-  .about-bio-text, .contact-wrap > p{ line-height:1.68; font-size:1rem; }
-  h1,h2,h3{ letter-spacing:-0.02em; }
-}
-@media (min-width:1500px){ :root{ --step-0: clamp(1.05rem, 0.98rem + 0.18vw, 1.2rem); } }
-
-/* ============================================================ CLEAN BACKDROP ================================
-   The black feather behind each section is gone, and so is the dead empty glass bar under the Portfolio title.
-   Instead of the sections covering the crystal hero, the hero itself fades out as you scroll into the content
-   (--hero-fade, set by the scroll script), so the nebula and the coloured glows show through behind the text. */
-.site-section::before{ background:none; }
-#folder-grid, .folder-grid{ display:none !important; }
-#stage{ opacity:var(--hero-fade, 1); }
 .contact-wrap h2{ font-size:var(--step-4); margin:0 0 12px; }
 .contact-wrap > p{ color:var(--ink-dim); margin:0 0 40px; }
 
@@ -583,55 +474,6 @@ p, li{ text-wrap:pretty; }
 .contact-status:not(:empty){ padding:12px 16px; }
 .contact-status[data-state="ok"]{ color:#8fe0a8; background:rgba(143,224,168,0.08); border:1px solid rgba(143,224,168,0.18); }
 .contact-status[data-state="error"]{ color:#ff9c9c; background:rgba(255,156,156,0.08); border:1px solid rgba(255,156,156,0.18); }
-/* ---- contact send: paper rocket + 3D card turn (see KaRocket in the contact script) ---- */
-.contact-card{ perspective:1600px; }
-.cc-flip{ position:relative; z-index:1; transform-style:preserve-3d; }
-.cc-face{ -webkit-backface-visibility:hidden; backface-visibility:hidden; border-radius:20px; }
-.cc-back{
-  position:absolute; inset:0; transform:rotateY(180deg); pointer-events:none;
-  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
-  padding:clamp(20px,4vw,40px); text-align:center;
-}
-.contact-card.is-flipped .cc-flip{ transform:rotateY(180deg); }
-.contact-card.is-flipped .cc-back{ pointer-events:auto; }
-.cc-icon{
-  width:68px; height:68px; border-radius:50%; display:grid; place-items:center; margin-bottom:4px;
-  border:1px solid currentColor; background:color-mix(in srgb, currentColor 12%, transparent);
-  box-shadow:0 0 34px -6px currentColor;
-}
-.cc-icon svg{ width:34px; height:34px; fill:none; stroke:currentColor; stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round; }
-.cc-icon .cc-check, .cc-icon .cc-cross{ stroke-dasharray:40; stroke-dashoffset:40; }
-.cc-back[data-state="success"]{ color:#8fe0a8; }
-.cc-back[data-state="error"]{ color:#ff9c9c; }
-.cc-back[data-state="success"] .cc-cross, .cc-back[data-state="error"] .cc-check{ display:none; }
-.contact-card.is-flipped .cc-check, .contact-card.is-flipped .cc-cross{ animation:ccDraw .5s .35s var(--ease-standard) forwards; }
-@keyframes ccDraw{ to{ stroke-dashoffset:0; } }
-.cc-result-title{ margin:0; font-family:var(--font-heading), ui-sans-serif, system-ui, sans-serif; font-size:var(--step-2); font-weight:600; color:var(--ink); outline:none; }
-.cc-result-text{ margin:0; max-width:46ch; color:var(--ink-dim); line-height:1.6; font-size:14.5px; }
-.cc-action{ margin-top:12px; }
-.cc-action::after{ content:none; }
-.contact-form.is-sending{ pointer-events:none; }
-.contact-submit.is-launched, .contact-submit.is-launched:disabled{ background:none; border-color:transparent; box-shadow:none; color:transparent; opacity:1; transition:none; }
-.contact-submit.is-launched::after{ opacity:0; }
-.contact-submit.is-sending{ opacity:.6; }
-/* Reduced motion: no rocket, no 3D turn -- a plain cross-fade between the form and the result. */
-.contact-card.cc-plain .cc-flip{ transform:none !important; transform-style:flat; }
-.contact-card.cc-plain .cc-back{ transform:none; opacity:0; visibility:hidden; transition:opacity .2s ease; }
-.contact-card.cc-plain .cc-front{ transition:opacity .2s ease; }
-.contact-card.cc-plain.is-flipped .cc-front{ opacity:0; visibility:hidden; }
-.contact-card.cc-plain.is-flipped .cc-back{ opacity:1; visibility:visible; }
-.contact-card.cc-plain .cc-check, .contact-card.cc-plain .cc-cross{ animation:none !important; stroke-dashoffset:0; }
-.rk-layer{ position:fixed; inset:0; z-index:85; pointer-events:none; overflow:hidden; }
-.rk-trail{ position:absolute; inset:0; width:100%; height:100%; }
-.rk-rocket{ position:absolute; left:0; top:0; will-change:transform,opacity; }
-.rk-rocket svg{ display:block; overflow:visible; }
-.rk-ring{
-  position:absolute; width:60px; height:60px; margin:-30px 0 0 -30px; border-radius:50%;
-  border:2px solid rgba(255,190,130,0.95); box-shadow:0 0 24px 4px rgba(255,120,60,0.55), inset 0 0 18px rgba(255,150,80,0.45);
-  will-change:transform,opacity;
-}
-.rk-spark{ position:absolute; width:6px; height:6px; margin:-3px 0 0 -3px; border-radius:50%;
-  background:radial-gradient(circle, #fff3dc, #ff9a52 60%, transparent 72%); will-change:transform,opacity; }
 .field-error{
   display:none; font-family:'Manrope', ui-sans-serif, sans-serif; font-size:11.5px;
   letter-spacing:normal; text-transform:none; color:#ff9c9c; min-height:0;
@@ -977,7 +819,7 @@ footer.site-footer{
 :root{
   --ink-dim:rgba(237,235,232,.72);
   --ink-faint:rgba(237,235,232,.5);
-  --glass-bg:linear-gradient(135deg,rgba(255,246,232,.13),rgba(255,255,255,.025) 38%,rgba(255,174,120,.045) 78%,rgba(255,240,218,.09)),rgba(26,23,29,.25);
+  --glass-bg:linear-gradient(145deg,rgba(255,244,230,.075),rgba(255,255,255,.015) 48%),rgba(29,25,29,0.3770);
   --glass-blur:blur(16.2px) saturate(135%);
   --glass-border:1px solid rgba(255,242,226,.2);
   --accent-glass:linear-gradient(145deg,rgba(255,241,221,.28),rgba(229,181,149,.13) 48%,rgba(190,211,234,.12));
@@ -1154,8 +996,6 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
     <h2 id="contact-title" data-ka-editable="contactTitle">Contact</h2>
     <p id="contact-intro" data-ka-editable="contactIntro">Have a project, collaboration, or an idea in mind? Leave a note and I'll get back to you.</p>
     <div class="contact-card" id="contact-card">
-     <div class="cc-flip" id="cc-flip">
-      <div class="cc-face cc-front">
       <form class="contact-form" id="contact-form" novalidate>
         <label for="contact-name">Name
           <input type="text" id="contact-name" name="name" autocomplete="name" required minlength="3" maxlength="100" placeholder="Your name" aria-describedby="err-name">
@@ -1177,16 +1017,6 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
         <button class="contact-submit field-full" type="submit">Send message</button>
         <p class="contact-status field-full" id="contact-status" role="status" aria-live="polite"></p>
       </form>
-      </div>
-      <div class="cc-face cc-back" id="cc-back" aria-hidden="true" data-state="success">
-        <span class="cc-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path class="cc-check" d="M5 12.5l4.2 4.2L19 7"/><path class="cc-cross" d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>
-        </span>
-        <h3 class="cc-result-title" tabindex="-1"></h3>
-        <p class="cc-result-text" role="status" aria-live="polite"></p>
-        <button type="button" class="contact-submit cc-action" id="cc-action"></button>
-      </div>
-     </div>
     </div>
   </div>
 </section>
@@ -1741,7 +1571,7 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
 var container = document.getElementById('nebula-bg');
 if (!container || typeof THREE === 'undefined') return;
 var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-var isMobile = window.matchMedia('(max-width: 1024px), (pointer: coarse)').matches;
+var isMobile = window.matchMedia('(max-width: 760px)').matches || /Mobi|Android/i.test(navigator.userAgent);
 // [adaptive quality] the isMobile/desktop split below was the only tier that existed -- a
 // genuinely low-end device (little RAM, few cores) that still happens to match "mobile" gets a
 // further reduction on top of it, rather than only ever choosing between exactly two fixed
@@ -1804,7 +1634,7 @@ var starMat = new THREE.ShaderMaterial({
     'void main(){' +
     // a gentle per-star glitter -- each star's own phase/frequency, kept subtle (0.7..1.0 of
     // its own base brightness) so it reads as a sparkle, not a flicker
-    '  float twinkle = 0.85 + 0.15 * sin(uTime * aTwinkleFreq + aTwinkle);' +
+    '  float twinkle = 0.7 + 0.3 * sin(uTime * aTwinkleFreq + aTwinkle);' +
     '  vBright = aBright * twinkle;' +
     '  vec4 mv = modelViewMatrix * vec4(position, 1.0);' +
     '  gl_Position = projectionMatrix * mv;' +
@@ -1817,8 +1647,8 @@ var starMat = new THREE.ShaderMaterial({
     '  vec2 c = gl_PointCoord - 0.5;' +
     '  float d = length(c) * 2.0;' +
     '  if (d > 1.0) discard;' +
-    '  float core = (1.0 - smoothstep(0.0, 1.0, d));' +
-    '  float glow = (1.0 - smoothstep(0.0, 1.0, d)) * 0.5 + pow(1.0 - d, 4.0) * 0.5;' +
+    '  float core = smoothstep(1.0, 0.0, d);' +
+    '  float glow = smoothstep(1.0, 0.0, d) * 0.5 + pow(1.0 - d, 4.0) * 0.5;' +
     '  gl_FragColor = vec4(vec3(1.0, 0.98, 0.94) * glow, glow * vBright * uIntro);' +
     '}',
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -1947,18 +1777,15 @@ for (var gI = 0; gI < GALAXY_COUNT; gI++){
   var gBaseOpacity = 0.10 + Math.random() * 0.10;
   var gMat = new THREE.SpriteMaterial({
     map: galaxyTex, color: GALAXY_COLORS[gI % GALAXY_COLORS.length],
-    transparent: true, opacity: gBaseOpacity * nebulaMat.uniforms.uIntro.value * (isMobile ? 0.65 : 1),
+    transparent: true, opacity: gBaseOpacity,
     blending: THREE.AdditiveBlending, depthWrite: false,
   });
   // [banding fix] sprite alpha = 8-bit texture alpha x ~0.1 opacity => only ~25 distinct levels across
   // the whole falloff (visible rings). Dither the alpha by <=1 LSB, gated so fully transparent
   // pixels stay exactly transparent.
   gMat.onBeforeCompile = function(shader){
-    // Analytic falloff avoids enlarging a quantized canvas gradient into visible rings.
-    shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>',
-      'float radius=length(vUv-vec2(0.5))*2.0; diffuseColor.a *= exp(-6.0*radius*radius)*(1.0-smoothstep(0.55,1.0,radius));');
     shader.fragmentShader = shader.fragmentShader.replace('#include <fog_fragment>',
-      '#include <fog_fragment>\n gl_FragColor.a=max(0.0,gl_FragColor.a+(fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(0.06711056,0.00583715))))-0.5)/255.0*step(0.0005,gl_FragColor.a));');
+      '#include <fog_fragment>\n  gl_FragColor.a +=(fract(52.9829189*fract(dot(gl_FragCoord.xy, vec2(0.06711056,0.00583715)))) - 0.5) / 255.0 * step(0.0005, gl_FragColor.a);');
   };
   var sprite = new THREE.Sprite(gMat);
   var gAng = Math.random() * Math.PI * 2, gR = 180 + Math.random() * 260;
@@ -2028,7 +1855,6 @@ var parallaxCurrent = { x: 0, y: 0 };
 var NEAR_STRENGTH = 26, FAR_STRENGTH = 8;
 if (!reducedMotion){
   window.addEventListener('pointermove', function(e){
-    if(e.pointerType==='touch')return;
     parallaxTarget.x = (e.clientX / kaLayoutW() - 0.5);
     parallaxTarget.y = (e.clientY / kaLayoutH() - 0.5);
   }, { passive: true });
@@ -2040,7 +1866,6 @@ if (!reducedMotion){
 
 function resize(){
   var w = kaLayoutW(), h = kaLayoutH();
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,isMobile?1:1.5,Math.sqrt((isMobile?900000:2200000)/Math.max(1,w*h))));
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h, false);
@@ -2057,24 +1882,22 @@ function clamp01(x){ return x < 0 ? 0 : x > 1 ? 1 : x; }
 function smootherStep(x){ x = clamp01(x); return x*x*x*(x*(x*6-15)+10); }
 
 var clock = { last: 0, elapsed: 0 };
-var rafId = 0, contextLost = false;
+var rafId = 0;
 function frame(now){
-  rafId = 0;
-  if (document.hidden || reducedMotion || contextLost) return;
   rafId = requestAnimationFrame(frame);
-  if (clock.last && now-clock.last < 1000/30) return;
+  if (document.hidden) return;
   var dt = clock.last ? Math.min(now - clock.last, 100) : 16.7;
   clock.last = now; clock.elapsed += dt;
-  parallaxCurrent.x += (parallaxTarget.x - parallaxCurrent.x) * (1-Math.exp(-dt/360));
-  parallaxCurrent.y += (parallaxTarget.y - parallaxCurrent.y) * (1-Math.exp(-dt/360));
+  parallaxCurrent.x += (parallaxTarget.x - parallaxCurrent.x) * 0.045;
+  parallaxCurrent.y += (parallaxTarget.y - parallaxCurrent.y) * 0.045;
   nearGroup.position.x = parallaxCurrent.x * NEAR_STRENGTH;
   nearGroup.position.y = -parallaxCurrent.y * NEAR_STRENGTH;
   farGroup.position.x = parallaxCurrent.x * FAR_STRENGTH;
   farGroup.position.y = -parallaxCurrent.y * FAR_STRENGTH;
   // barely-perceptible constant drift, independent of parallax -- stars feel alive even with
   // the pointer resting still
-  stars.rotation.y = Math.sin(clock.elapsed * 0.000035) * 0.045;
-  stars.rotation.x = Math.sin(clock.elapsed * 0.000025) * 0.025;
+  stars.rotation.y += dt * 0.0000045;
+  stars.rotation.x += dt * 0.0000018;
   nebulaMat.uniforms.uTime.value = clock.elapsed * 0.00003;
   starMat.uniforms.uTime.value = clock.elapsed;
   // drifting crystal shards -- slow linear travel with wraparound, plus a gentle twinkle and a
@@ -2091,19 +1914,11 @@ function frame(now){
   }
   renderer.render(scene, camera);
 }
-function syncBackground(){
-  cancelAnimationFrame(rafId);rafId=0;clock.last=0;
-  if(document.hidden||contextLost)return;
-  renderer.render(scene,camera);
-  if(!reducedMotion)rafId=requestAnimationFrame(frame);
-}
-document.addEventListener('visibilitychange',syncBackground);
-window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',function(event){reducedMotion=event.matches;syncBackground();});
-renderer.domElement.addEventListener('webglcontextlost',function(event){event.preventDefault();contextLost=true;renderer.domElement.style.visibility='hidden';syncBackground();});
-renderer.domElement.addEventListener('webglcontextrestored',function(){contextLost=false;renderer.domElement.style.visibility='';syncBackground();});
-window.addEventListener('pagehide',function(){cancelAnimationFrame(rafId);rafId=0;});
-window.addEventListener('pageshow',syncBackground);
-syncBackground();
+document.addEventListener('visibilitychange', function(){
+  if (!document.hidden) clock.last = 0; // avoid one huge dt after a long background tab
+});
+renderer.render(scene, camera); // one immediate frame so there's never a blank gap before RAF's first tick
+if (!reducedMotion) rafId = requestAnimationFrame(frame);
 })();
 </script>
 <script>
@@ -6374,7 +6189,20 @@ function renderExpandMenu(){
   document.getElementById("expand-trigger").classList.toggle("is-empty", parked.length === 0);
 }
 
-// Specular response is owned by the shared liquid-glass controller below.
+// ---- v22: pointer-tracked specular highlight -- a fixed top-centered highlight (the CSS
+// default) is correct and sufficient on touch/no-pointer devices, so this only wires up on
+// pointer input that can actually report a hover position.
+nav.addEventListener("pointermove", function(e){
+  if (e.pointerType === "touch") return;
+  var rect = nav.getBoundingClientRect();
+  nav.style.setProperty("--spec-x", ((e.clientX - rect.left) / rect.width) * 100 + "%");
+  nav.style.setProperty("--spec-y", ((e.clientY - rect.top) / rect.height) * 100 + "%");
+});
+nav.addEventListener("pointerleave", function(){
+  nav.style.setProperty("--spec-x", "50%");
+  nav.style.setProperty("--spec-y", "0%");
+});
+
 // ---- v22: expand "more" menu ----
 var expandTrigger = document.getElementById("expand-trigger");
 var expandPanel = document.getElementById("expand-panel");
@@ -6830,391 +6658,6 @@ if (reducedMotion){
   window.buildAboutWorkStrip = buildAboutWorkStrip;
 })();
 
-// ==================================================================== CONTACT: PAPER-ROCKET SEND ==
-// FORM -> SEND -> LAUNCH -> CURVED/WAVE FLIGHT (API request runs meanwhile) -> RETURN -> IMPACT ->
-// 3D FLIP -> SUCCESS / ERROR. The rocket is decoration only: the card turns to whatever the API
-// actually answered, and never earlier than the API answered.
-// Every timing/shape value below can be overridden without editing this file, e.g.
-//   window.KA_ROCKET_CONFIG = { launchMs: 600, wave: { amp: 22 }, easing: { return: "easeInOutCubic" } };
-// (set it in a script before this one, or in the console before sending). Fold stages: cfg.fold.
-var KaRocket = (function(){
-  var DEFAULTS = {
-    fold: { compressMs: 80, creaseMs: 100, narrowMs: 100, length: 40 },   // the button folding into the plane: press flat, fold the corners, narrow to the plane (ms); plane length (px)
-    launchMs: 360,               // folded plane -> onto the holding loop
-    minFlightMs: 560,            // the plane always flies at least this long (from take-off) before turning back
-    returnMs: 400,               // loop -> impact on the form
-    impactMs: 140,               // rocket dissolve at the hit
-    flipMs: 540,                 // 3D card turn
-    flipEasing: "cubic-bezier(.22,.8,.24,1)",
-    loopPeriodMs: 1500,          // one lap of the holding loop while the API is still answering
-    orbit: { rx: 0.30, ry: 0.20, tiltDeg: -14 },   // loop radii as a fraction of viewport width / height
-    launchAngleDeg: -74,         // initial heading: 0 = right, -90 = straight up
-    wave: { amp: 3.5, freq: 1.2 },                  // sideways wobble: px, cycles per launch / return
-    rotation: { bankDeg: 12, follow: 0.2 },       // roll into turns; heading smoothing per 60fps frame (0..1)
-    scale: { start: 1, peak: 1.2, end: 0.85 },     // depth: plane size at take-off, biggest at the far side of the loop, smaller as it lands
-    trail: { ms: 380, size: 1.05 },
-    easing: { launch: "easeInQuad", "return": "linear" },   // names from EASE below, or a function(t)
-    timeoutMs: 20000             // stop waiting for the API after this long (then it counts as an error)
-  };
-  var EASE = {
-    linear: function(t){ return t; },
-    easeInQuad: function(t){ return t * t; },
-    easeInCubic: function(t){ return t * t * t; },
-    easeOutCubic: function(t){ return 1 - Math.pow(1 - t, 3); },
-    easeInOutCubic: function(t){ return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; },
-    easeInOutSine: function(t){ return -(Math.cos(Math.PI * t) - 1) / 2; },
-    easeOutBack: function(t){ var c = 1.70158; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); }
-  };
-  var glowSprite = null;
-
-  function merge(base, over){
-    var out = {};
-    Object.keys(base).forEach(function(k){
-      var b = base[k], o = over ? over[k] : undefined;
-      out[k] = (b && typeof b === "object" && !Array.isArray(b)) ? merge(b, o && typeof o === "object" ? o : null) : (o !== undefined ? o : b);
-    });
-    return out;
-  }
-  function config(){ return merge(DEFAULTS, window.KA_ROCKET_CONFIG || null); }
-  function ease(spec){ return typeof spec === "function" ? spec : (EASE[spec] || EASE.linear); }
-  function reduced(){ return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }
-  function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
-  function angDiff(a, b){ var d = (a - b) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; }
-  function bez(a, b, c, d, t){
-    var u = 1 - t, w0 = u * u * u, w1 = 3 * u * u * t, w2 = 3 * u * t * t, w3 = t * t * t;
-    return { x: w0 * a.x + w1 * b.x + w2 * c.x + w3 * d.x, y: w0 * a.y + w1 * b.y + w2 * c.y + w3 * d.y };
-  }
-  function bezD(a, b, c, d, t){
-    var u = 1 - t;
-    return { x: 3 * u * u * (b.x - a.x) + 6 * u * t * (c.x - b.x) + 3 * t * t * (d.x - c.x),
-             y: 3 * u * u * (b.y - a.y) + 6 * u * t * (c.y - b.y) + 3 * t * t * (d.y - c.y) };
-  }
-  function getGlow(){
-    if (glowSprite) return glowSprite;
-    var c = document.createElement("canvas"); c.width = c.height = 64;
-    var g = c.getContext("2d"), r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-    r.addColorStop(0, "rgba(255,244,222,1)"); r.addColorStop(.28, "rgba(255,170,88,.62)");
-    r.addColorStop(.6, "rgba(255,72,32,.2)"); r.addColorStop(1, "rgba(255,40,20,0)");
-    g.fillStyle = r; g.fillRect(0, 0, 64, 64);
-    return (glowSprite = c);
-  }
-  // The point on the form the rocket hits: centre of the part of the card that is actually on screen.
-  function impactPoint(card){
-    var r = card.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
-    var l = Math.max(r.left, 0), rt = Math.min(r.right, vw), tp = Math.max(r.top, 0), bt = Math.min(r.bottom, vh);
-    if (rt <= l || bt <= tp) return { x: vw / 2, y: vh / 2 };
-    return { x: (l + rt) / 2, y: (tp + bt) / 2 };
-  }
-
-  // The button's own look, read from the live element, so the folding shape is visibly the same object.
-  function buttonPaint(button){
-    var cs = getComputedStyle(button), stops = (cs.backgroundImage || "").match(/rgba?\([^)]*\)/g) || [];
-    return { top: stops[0] || "rgba(255,130,70,.58)", bottom: stops[1] || stops[0] || "rgba(255,60,26,.42)",
-             edge: cs.borderTopColor && cs.borderTopColor !== "rgba(0, 0, 0, 0)" ? cs.borderTopColor : "rgba(255,170,120,.5)" };
-  }
-  // Twelve points in every stage, so the pill can morph point-for-point into the plane.
-  //   A pill -> B pressed flat -> C both right-hand corners folded in to a pointed nose -> E paper plane (nose right, notched tail)
-  function foldStages(W, H, L){
-    var cx = W / 2, cy = H / 2, r = H / 2, k = .293 * r, sq = .78, hh = H * sq / 2;
-    var A = [[r, 0], [cx, 0], [W - r, 0], [W - k, k], [W, r], [W - k, H - k], [W - r, H], [cx, H], [r, H], [k, H - k], [0, r], [k, k]];
-    var B = A.map(function(p){ return [p[0], cy + (p[1] - cy) * sq]; });
-    var C = [[r, cy - hh], [cx, cy - hh], [W - H * 1.05, cy - hh], [W - H * .55, cy - hh * .42], [W, cy], [W - H * .55, cy + hh * .42],
-             [W - H * 1.05, cy + hh], [cx, cy + hh], [r, cy + hh], [k, cy + hh - k * .7], [0, cy], [k, cy - hh + k * .7]];
-    var hp = L * .3, T1 = [cx - L / 2, cy - hp], N = [cx + L / 2, cy], T2 = [cx - L / 2, cy + hp], K = [cx - L / 2 + L * .26, cy];
-    function on(a, b, f){ return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; }
-    var E = [T1, on(T1, N, .4), on(T1, N, .78), on(T1, N, .93), N, on(T2, N, .93), on(T2, N, .78), on(T2, N, .4), T2, on(T2, K, .5), K, on(K, T1, .5)];
-    return { A: A, B: B, C: C, E: E, cy: cy };
-  }
-  function mixShape(a, b, f){ return a.map(function(p, i){ return [p[0] + (b[i][0] - p[0]) * f, p[1] + (b[i][1] - p[1]) * f]; }); }
-  function pointsAttr(pts){ return pts.map(function(p){ return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" "); }
-  // "rgba(255, 130, 70, 0.58)" -> [255,130,70,0.58]
-  function rgbaParts(c){ var m = /rgba?\(([^)]+)\)/.exec(c || ""); if (!m) return [255, 120, 60, .5]; var p = m[1].split(",").map(parseFloat); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; }
-  function rgbaStr(parts, a){ return "rgba(" + Math.round(parts[0]) + "," + Math.round(parts[1]) + "," + Math.round(parts[2]) + "," + a.toFixed(3) + ")"; }
-  var SVGNS = "http://www.w3.org/2000/svg";
-  function svgEl(name, attrs){ var e = document.createElementNS(SVGNS, name); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
-
-  // Rocket flight. The button itself folds into a paper plane (a real 12-point shape morph), then that
-  // same plane flies. Resolves with the API outcome at the moment of impact.
-  function fly(button, card, request){
-    var cfg = config();
-    return new Promise(function(resolve, reject){
-      var vw = window.innerWidth, vh = window.innerHeight, small = vw < 600;
-      var dpr = 1;
-      var pixelBudget = (navigator.deviceMemory||4)<=2 ? 1500000 : 4000000;
-      var br = button.getBoundingClientRect(), W = Math.max(60, Math.round(br.width)), H = Math.max(24, Math.round(br.height));
-      var paint = buttonPaint(button), L = cfg.fold.length * (small ? .85 : 1);
-      var stages = foldStages(W, H, L), cy = stages.cy;
-      var layer = document.createElement("div"); layer.className = "rk-layer"; layer.setAttribute("aria-hidden", "true");
-      var canvas = document.createElement("canvas"); canvas.className = "rk-trail";
-      var rocket = document.createElement("div"); rocket.className = "rk-rocket";
-      rocket.style.width = W + "px"; rocket.style.height = H + "px";
-      var svg = svgEl("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H });
-      var defs = svgEl("defs", {}), grad = svgEl("linearGradient", { id: "rkg", x1: 0, y1: 0, x2: 0, y2: 1 });
-      // starts as exactly the button's own translucent gradient, then firms up to solid "paper" as it folds
-      var topC = rgbaParts(paint.top), botC = rgbaParts(paint.bottom);
-      var stopT = svgEl("stop", { offset: "0", "stop-color": rgbaStr(topC, topC[3]) }), stopB = svgEl("stop", { offset: "1", "stop-color": rgbaStr(botC, botC[3]) });
-      grad.appendChild(stopT); grad.appendChild(stopB);
-      var clip = svgEl("clipPath", { id: "rkc" }), clipPoly = svgEl("polygon", {}); clip.appendChild(clipPoly);
-      defs.appendChild(grad); defs.appendChild(clip); svg.appendChild(defs);
-      var body = svgEl("polygon", { fill: "url(#rkg)", stroke: paint.edge, "stroke-width": "1", "stroke-linejoin": "round" });
-      var lit = svgEl("rect", { x: 0, y: 0, width: W, height: cy, fill: "rgba(255,255,255,.3)", "clip-path": "url(#rkc)", opacity: 0 });
-      var shade = svgEl("rect", { x: 0, y: cy, width: W, height: H - cy, fill: "rgba(0,0,0,.28)", "clip-path": "url(#rkc)", opacity: 0 });
-      var crease = svgEl("line", { x1: 0, y1: cy, x2: W, y2: cy, stroke: "rgba(255,240,225,.75)", "stroke-width": "1", "clip-path": "url(#rkc)", opacity: 0 });
-      var flapT = svgEl("polygon", { fill: "rgba(255,255,255,.38)", opacity: 0 }), flapB = svgEl("polygon", { fill: "rgba(0,0,0,.3)", opacity: 0 });
-      [body, lit, shade, crease, flapT, flapB].forEach(function(n){ svg.appendChild(n); });
-      rocket.appendChild(svg);
-      layer.appendChild(canvas); layer.appendChild(rocket); document.body.appendChild(layer);
-      var ctx = canvas.getContext("2d");
-      if(!ctx){layer.remove();reject(new Error("Canvas unavailable"));return;}
-      function fit(){
-        vw = window.innerWidth; vh = window.innerHeight;
-        dpr = Math.min(window.devicePixelRatio||1,3,Math.sqrt(pixelBudget/Math.max(1,vw*vh)));
-        canvas.width = Math.round(vw * dpr); canvas.height = Math.round(vh * dpr);
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      }
-      fit();
-      var outcome = null;
-      request.then(function(o){ outcome = o; });
-      var sprite = getGlow();
-
-      function foldAt(p){   // p in 0..1 across the whole fold
-        var f = cfg.fold, total = f.compressMs + f.creaseMs + f.narrowMs, t = p * total, pts, crease01, flap01, seg;
-        if (t < f.compressMs){ seg = EASE.easeOutCubic(t / f.compressMs); pts = mixShape(stages.A, stages.B, seg); crease01 = 0; flap01 = 0; }
-        else if (t < f.compressMs + f.creaseMs){ seg = EASE.easeInOutCubic((t - f.compressMs) / f.creaseMs); pts = mixShape(stages.B, stages.C, seg); crease01 = seg * .5; flap01 = seg; }
-        else { seg = EASE.easeInOutCubic((t - f.compressMs - f.creaseMs) / f.narrowMs); pts = mixShape(stages.C, stages.E, seg); crease01 = .5 + seg * .5; flap01 = 1 - seg; }
-        var solid = EASE.easeInOutCubic(p);
-        stopT.setAttribute("stop-color", rgbaStr(topC, topC[3] + (.96 - topC[3]) * solid));
-        stopB.setAttribute("stop-color", rgbaStr(botC, botC[3] + (.9 - botC[3]) * solid));
-        var s = pointsAttr(pts);
-        body.setAttribute("points", s); clipPoly.setAttribute("points", s);
-        lit.setAttribute("opacity", crease01.toFixed(2)); shade.setAttribute("opacity", crease01.toFixed(2)); crease.setAttribute("opacity", (crease01 * .9).toFixed(2));
-        // the two folded-over corner flaps, at the pointed end
-        var nose = pts[4], a = pts[2], b = pts[6], m = pts[3], n = pts[5];
-        flapT.setAttribute("points", pointsAttr([a, nose, [m[0], (a[1] + nose[1]) / 2 + 1]])); flapT.setAttribute("opacity", (flap01 * .9).toFixed(2));
-        flapB.setAttribute("points", pointsAttr([b, nose, [n[0], (b[1] + nose[1]) / 2 - 1]])); flapB.setAttribute("opacity", (flap01 * .9).toFixed(2));
-      }
-      foldAt(0);
-
-      // --- geometry: launch curve S -> P0 (tangent-matched onto the loop), loop around O, return curve -> F ---
-      var S = { x: br.left + br.width / 2, y: br.top + br.height / 2 };   // the button's own centre
-      var side = S.x < vw / 2 ? 1 : -1;                       // loop bulges towards the roomier side
-      var dir = -side;                                        // loop direction that leaves the entry point heading that way
-      var rx = clamp(vw * cfg.orbit.rx, 70, 340), ry = clamp(vh * cfg.orbit.ry, 60, 230);
-      var tilt = cfg.orbit.tiltDeg * Math.PI / 180 * side, ct = Math.cos(tilt), st = Math.sin(tilt);
-      var O = { x: clamp(S.x + side * rx * 1.05, rx + 16, vw - rx - 16),
-                y: clamp(S.y - ry * 1.5 - 30, ry + 30, Math.max(ry + 30, vh - ry - 30)) };
-      function orbitPoint(th){
-        var lx = rx * Math.cos(th), ly = ry * Math.sin(th);
-        return { x: O.x + lx * ct - ly * st, y: O.y + lx * st + ly * ct };
-      }
-      function orbitTangent(th){
-        var lx = -rx * Math.sin(th) * dir, ly = ry * Math.cos(th) * dir;
-        return { x: lx * ct - ly * st, y: lx * st + ly * ct };
-      }
-      var lx0 = (S.x - O.x) * ct + (S.y - O.y) * st, ly0 = -(S.x - O.x) * st + (S.y - O.y) * ct;
-      var th0 = Math.atan2(ly0 / ry, lx0 / rx);
-      var P0 = orbitPoint(th0), T0 = orbitTangent(th0), T0n = Math.hypot(T0.x, T0.y) || 1;
-      var span = Math.hypot(P0.x - S.x, P0.y - S.y) || 1;
-      var h0 = cfg.launchAngleDeg * Math.PI / 180;
-      var C1 = { x: S.x + Math.cos(h0) * span * .55, y: S.y + Math.sin(h0) * span * .55 };
-      var C2 = { x: P0.x - T0.x / T0n * span * .45, y: P0.y - T0.y / T0n * span * .45 };
-      var easeLaunch = ease(cfg.easing.launch), easeReturn = ease(cfg.easing["return"]);
-      // hold the loop at roughly the speed the launch curve ended with, so the hand-over has no jolt
-      var endV = bezD(S, C1, C2, P0, 1), endSpeed = Math.hypot(endV.x, endV.y) *
-                     ((easeLaunch(1) - easeLaunch(.99)) / .01) / cfg.launchMs;
-      var omega = clamp(endSpeed / T0n, Math.PI * 2 / (cfg.loopPeriodMs * 1.7), Math.PI * 2 / (cfg.loopPeriodMs * .55)) * dir;
-
-      // --- state ---
-      var foldMs = cfg.fold.compressMs + cfg.fold.creaseMs + cfg.fold.narrowMs;
-      var phase = "fold", phaseStart = 0, flightStart = 0, started = 0, last = 0, raf = 0, done = false;
-      var heading = 0, bank = 0, prev = { x: S.x, y: S.y }, pos = { x: S.x, y: S.y }, zN = 0;
-      var trail = [], R0 = null, R1 = null, R2 = null, F = null, giveUp = 0;
-      var thNow = th0, baseScale = 1, returnDepth = 0, frameDt = 16.7, lastTrailTime = -Infinity;
-      giveUp = setTimeout(function(){ if (!outcome) outcome = { ok: false, message: "The request timed out -- please try again." }; }, cfg.timeoutMs + 1500);
-
-      function wave(t, dirVec, amp){
-        var n = Math.hypot(dirVec.x, dirVec.y) || 1, env = Math.sin(Math.PI * clamp(t, 0, 1));
-        var w = Math.sin(Math.PI * 2 * cfg.wave.freq * t) * amp * env * env * (small ? .8 : 1);
-        return { x: -dirVec.y / n * w, y: dirVec.x / n * w };
-      }
-      function cleanup(delay){
-        clearTimeout(giveUp); cancelAnimationFrame(raf);
-        setTimeout(function(){ if (layer.parentNode) layer.parentNode.removeChild(layer); }, delay || 0);
-      }
-      function impact(){
-        done = true; F = impactPoint(card);
-        rocket.animate([{ opacity: 1 }, { opacity: 0 }], { duration: cfg.impactMs, fill: "forwards", easing: "ease-out" });
-        var ring = document.createElement("div"); ring.className = "rk-ring"; ring.style.left = F.x + "px"; ring.style.top = F.y + "px";
-        layer.appendChild(ring);
-        ring.animate([{ transform: "scale(.25)", opacity: .95 }, { transform: "scale(3.4)", opacity: 0 }], { duration: 520, easing: "cubic-bezier(.16,1,.3,1)", fill: "forwards" });
-        for (var i = 0; i < 9; i++){
-          var sp = document.createElement("div"); sp.className = "rk-spark"; sp.style.left = F.x + "px"; sp.style.top = F.y + "px";
-          layer.appendChild(sp);
-          var a = Math.PI * 2 * i / 9 + Math.random() * .5, d = 60 + Math.random() * 70;
-          sp.animate([{ transform: "translate3d(0,0,0) scale(1)", opacity: 1 }, { transform: "translate3d(" + Math.cos(a) * d + "px," + Math.sin(a) * d + "px,0) scale(.2)", opacity: 0 }],
-            { duration: 460 + Math.random() * 160, easing: "cubic-bezier(.16,1,.3,1)", fill: "forwards" });
-        }
-        ctx.clearRect(0, 0, vw, vh);
-        cleanup(720);
-        resolve(outcome);
-      }
-      function beginReturn(now){
-        phase = "return"; phaseStart = now; returnDepth = zN;
-        R0 = { x: pos.x, y: pos.y };
-        var v = { x: pos.x - prev.x, y: pos.y - prev.y }, vn = Math.hypot(v.x, v.y) || 1;
-        F = impactPoint(card);
-        var dist = Math.hypot(F.x - R0.x, F.y - R0.y) || 1;
-        var lead = clamp(vn / frameDt * cfg.returnMs / 3, dist * .08, dist * .6);
-        R1 = { x: R0.x + v.x / vn * lead, y: R0.y + v.y / vn * lead };
-        // approach the form on an arc rather than a straight line
-        var bx = R0.x - F.x, by = R0.y - F.y, bn = Math.hypot(bx, by) || 1, rot = dir * .7, cr = Math.cos(rot), sr = Math.sin(rot);
-        R2 = { x: F.x + (bx * cr - by * sr) / bn * dist * .38, y: F.y + (bx * sr + by * cr) / bn * dist * .38 };
-      }
-      function place(scale){
-        rocket.style.transform = "translate3d(" + (pos.x - W / 2).toFixed(1) + "px," + (pos.y - H / 2).toFixed(1) + "px,0) perspective(520px) rotate(" +
-          heading.toFixed(4) + "rad) rotateX(" + (bank * 57.2958).toFixed(1) + "deg) scale(" + scale.toFixed(3) + ")";
-      }
-      function tick(now){
-        if (done) return;
-        if (!started){ started = now; phaseStart = now; last = now; }
-        var dt = Math.min(64, now - last) || 16; last = now; frameDt = dt;
-        if (window.innerWidth !== vw || window.innerHeight !== vh){done=true;cleanup(0);request.then(resolve,reject);return;}
-        if (phase === "fold"){
-          var fp = clamp((now - phaseStart) / foldMs, 0, 1);
-          foldAt(fp);
-          // Keep the folding copy at the exact button size; no squash or backward kick.
-          place(1);
-          ctx.clearRect(0, 0, vw, vh);
-          if (fp >= 1){ phase = "launch"; phaseStart = now; flightStart = now; }
-          raf = requestAnimationFrame(safeTick);
-          return;
-        }
-        var el = now - phaseStart, p;
-        if (phase === "launch"){
-          var t = clamp(el / cfg.launchMs, 0, 1), tt = easeLaunch(t);
-          p = bez(S, C1, C2, P0, tt);
-          var d1 = bezD(S, C1, C2, P0, tt), w = wave(t, d1, cfg.wave.amp);
-          p.x += w.x; p.y += w.y; zN = tt; thNow = th0;
-          if (t >= 1){ phase = "loop"; phaseStart = now; }
-        } else if (phase === "loop"){
-          if (outcome && now - flightStart >= cfg.minFlightMs){ beginReturn(now); p = pos; }
-          else {
-            thNow = th0 + omega * el;
-            p = orbitPoint(thNow);
-            var ww = Math.sin(el / 210) * cfg.wave.amp * .35; var tg = orbitTangent(thNow), tn = Math.hypot(tg.x, tg.y) || 1;
-            p.x += -tg.y / tn * ww; p.y += tg.x / tn * ww;
-            var orbitDepth = .62 + .38 * Math.sin(thNow * dir - 1.1);
-            zN = 1 + (orbitDepth-1) * EASE.easeInOutSine(clamp(el/240,0,1));
-          }
-        }
-        if (phase === "return"){
-          var rt = clamp((now - phaseStart) / cfg.returnMs, 0, 1), rr = easeReturn(rt);
-          F = impactPoint(card);
-          // keep the far control point glued to the (possibly scrolling) form
-          var shiftX = F.x - (R2.fx === undefined ? F.x : R2.fx), shiftY = F.y - (R2.fy === undefined ? F.y : R2.fy);
-          R2.x += shiftX; R2.y += shiftY; R2.fx = F.x; R2.fy = F.y;
-          p = bez(R0, R1, R2, F, rr);
-          var d2 = bezD(R0, R1, R2, F, rr), w2 = wave(rt, d2, cfg.wave.amp * .7);
-          p.x += w2.x; p.y += w2.y; zN = returnDepth * (1 - EASE.easeInOutSine(rt));
-          if (rt >= 1){ pos = { x: F.x, y: F.y }; place(cfg.scale.end * baseScale); impact(); return; }
-        }
-        // orientation: follow the path, roll into turns
-        if (Math.hypot(p.x - pos.x, p.y - pos.y) > .05){
-          var target = Math.atan2(p.y - pos.y, p.x - pos.x), diff = angDiff(target, heading);
-          var k = 1 - Math.pow(1 - cfg.rotation.follow, dt / 16.7);
-          heading += diff * k;
-          var rate = diff / Math.max(dt, 1) * 16.7;
-          bank += (clamp(rate * 2, -1, 1) * cfg.rotation.bankDeg * Math.PI / 180 - bank) * (1-Math.exp(-dt/110));
-        }
-        prev = pos; pos = { x: p.x, y: p.y };
-        var scale = cfg.scale.start + (cfg.scale.peak - cfg.scale.start) * zN;
-        if (phase === "return") scale += (cfg.scale.end - scale) * Math.pow(clamp((now - phaseStart) / cfg.returnMs, 0, 1), 2);
-        scale *= baseScale;
-        place(scale);
-        // trail: glowing points shed from the tail, fading with age
-        var tail = L * scale * .42;
-        if(now-lastTrailTime>=1000/60){
-          trail.push({ x: pos.x - Math.cos(heading) * tail, y: pos.y - Math.sin(heading) * tail, s: scale, t: now });lastTrailTime=now;
-        }
-        while (trail.length && now - trail[0].t > cfg.trail.ms) trail.shift();
-        ctx.clearRect(0, 0, vw, vh);
-        ctx.globalCompositeOperation = "lighter";
-        for (var i = 0; i < trail.length; i++){
-          var age = (now - trail[i].t) / cfg.trail.ms, a = Math.pow(1 - age, 1.7) * .8, rad = L * trail[i].s * cfg.trail.size * (.55 + (1 - age) * .55);
-          ctx.globalAlpha = a; ctx.drawImage(sprite, trail[i].x - rad, trail[i].y - rad, rad * 2, rad * 2);
-        }
-        var head = L * scale * 1.15;
-        ctx.globalAlpha = .55; ctx.drawImage(sprite, pos.x - head, pos.y - head, head * 2, head * 2);
-        ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
-        raf = requestAnimationFrame(safeTick);
-      }
-      function safeTick(now){try{tick(now);}catch(error){done=true;cleanup(0);reject(error);}}
-      try { raf = requestAnimationFrame(safeTick); } catch (e) { cleanup(0); reject(e); }
-    });
-  }
-
-  function setInert(el, on){
-    if (!el) return;
-    if (on) el.setAttribute("aria-hidden", "true"); else el.removeAttribute("aria-hidden");
-    if ("inert" in el) el.inert = !!on;
-  }
-  // Turn the card to its result face. `content` = { ok, message }.
-  function flip(card, content){
-    var cfg = config(), front = card.querySelector(".cc-front"), back = card.querySelector(".cc-back"), flipEl = card.querySelector(".cc-flip");
-    var state = content.ok ? "success" : "error";
-    back.dataset.state = state; card.dataset.state = state;
-    back.querySelector(".cc-result-title").textContent = content.ok ? "Message sent" : "Couldn’t send your message";
-    back.querySelector(".cc-result-text").textContent = content.message || "";
-    back.querySelector(".cc-action").textContent = content.ok ? "Send another message" : "Try again";
-    var plain = reduced();
-    card.classList.toggle("cc-plain", plain);
-    function settle(){
-      card.classList.add("is-flipped");
-      setInert(front, true); setInert(back, false);
-      var heading = back.querySelector(".cc-result-title"); if (heading) heading.focus({ preventScroll: true });
-    }
-    if (plain || !flipEl.animate){ settle(); return Promise.resolve(); }
-    return new Promise(function(resolve){
-      var a = flipEl.animate([
-        { transform: "rotateY(0deg) scale(1)" },
-        { transform: "rotateY(180deg) scale(1)" }
-      ], { duration: cfg.flipMs, easing: cfg.flipEasing, fill: "forwards" });
-      a.onfinish = a.oncancel = function(){ a.onfinish = a.oncancel = null; settle(); try { a.cancel(); } catch (e) {} resolve(); };
-    });
-  }
-  function flipBack(card){
-    var cfg = config(), front = card.querySelector(".cc-front"), back = card.querySelector(".cc-back"), flipEl = card.querySelector(".cc-flip");
-    function settle(){
-      card.classList.remove("is-flipped"); delete card.dataset.state;
-      setInert(back, true); setInert(front, false);
-    }
-    if (card.classList.contains("cc-plain") || reduced() || !flipEl.animate){ settle(); return Promise.resolve(); }
-    return new Promise(function(resolve){
-      var a = flipEl.animate([{ transform: "rotateY(180deg)" }, { transform: "rotateY(0deg)" }],
-        { duration: Math.round(cfg.flipMs * .8), easing: cfg.flipEasing, fill: "forwards" });
-      a.onfinish = a.oncancel = function(){ a.onfinish = a.oncancel = null; settle(); try { a.cancel(); } catch (e) {} resolve(); };
-    });
-  }
-  // Public entry: run the whole sequence for one submission. Resolves with the API outcome once the card has turned.
-  function send(button, card, request){
-    card.querySelector(".contact-form").classList.add("is-sending");
-    if (reduced() || !window.requestAnimationFrame){
-      button.classList.add("is-sending");        // no fold, no flight: the button just reads as busy while "Sending…" shows below
-      return request.then(function(outcome){ return flip(card, outcome).then(function(){ return outcome; }); });
-    }
-    var flight = fly(button, card, request);     // measures the live button and puts the folding copy exactly on top of it...
-    button.classList.add("is-launched");         // ...then the real button hides its own paint (it stays a real, focusable <button>)
-    return flight.then(function(outcome){
-      return flip(card, outcome).then(function(){ return outcome; });
-    }).catch(function(){
-      // animation failed for any reason: the API result still wins, shown without the flourish
-      button.classList.remove("is-launched");
-      return request.then(function(outcome){ outcome.fallback = true; return outcome; });
-    });
-  }
-  return { send: send, flip: flip, flipBack: flipBack, config: config, defaults: DEFAULTS };
-})();
-
 // ==================================================================== CONTACT FORM ==
 var contactForm = document.getElementById("contact-form");
 var contactMessage=document.getElementById("contact-message");
@@ -7289,57 +6732,27 @@ contactForm.addEventListener("submit", function(e){
   submitBtn.disabled = true;
   contactStatus.textContent = "Sending…";
   contactStatus.dataset.state = "";
-  var card = document.getElementById("contact-card");
-  var controller = ("AbortController" in window) ? new AbortController() : null;
-  var abortTimer = controller ? setTimeout(function(){ controller.abort(); }, KaRocket.config().timeoutMs) : 0;
-  // The API answer is the only thing that decides success or error; the rocket never does.
-  var request = fetch(kaApiUrl("/api/contact"), {
+  fetch(kaApiUrl("/api/contact"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-    signal: controller ? controller.signal : undefined,
   }).then(function(res){
     return res.json().then(function(body){ return { ok: res.ok, body: body }; });
   }).then(function(result){
     if (!result.ok) throw new Error((result.body && result.body.error) || "Something went wrong -- please try again.");
-    return { ok: true, message: "Thanks for reaching out -- I'll get back to you soon." };
+    contactForm.reset();
+    Object.keys(CONTACT_RULES).forEach(function(key){
+      CONTACT_RULES[key].el.removeAttribute("aria-invalid");
+      CONTACT_RULES[key].err.classList.remove("show");
+    });
+    contactStatus.textContent = "Message sent -- thanks for reaching out, I'll get back to you soon.";
+    contactStatus.dataset.state = "ok";
   }).catch(function(err){
-    var message = (err && err.name === "AbortError") ? "The request took too long -- please try again." :
-      ((err && err.message) || "Something went wrong -- please try again, or reach out via Behance.");
-    return { ok: false, message: message };
-  }).then(function(outcome){ clearTimeout(abortTimer); return outcome; });
-  KaRocket.send(submitBtn, card, request).then(function(outcome){
-    contactStatus.textContent = outcome.ok ? "Message sent -- thanks for reaching out, I'll get back to you soon." : outcome.message;
-    contactStatus.dataset.state = outcome.ok ? "ok" : "error";
-    if (outcome.fallback) {                      // no card turn happened: reset here like before
-      if (outcome.ok) resetContactForm();
-      submitBtn.classList.remove("is-launched", "is-sending");
-      contactForm.classList.remove("is-sending");
-    }
-  }).then(function(){
+    contactStatus.textContent = err.message || "Something went wrong -- please try again, or reach out via Behance.";
+    contactStatus.dataset.state = "error";
+  }).finally(function(){
     contactSending = false;
     updateContactSubmitState();
-  });
-});
-// Result-face button: "Send another message" (after success) / "Try again" (after an error) turns the card back to the form.
-function resetContactForm(){
-  contactForm.reset();
-  Object.keys(CONTACT_RULES).forEach(function(key){
-    CONTACT_RULES[key].el.removeAttribute("aria-invalid");
-    CONTACT_RULES[key].err.classList.remove("show");
-  });
-}
-document.getElementById("cc-action").addEventListener("click", function(){
-  var card = document.getElementById("contact-card"), wasSuccess = card.dataset.state === "success";
-  if (contactSending) return;
-  if (wasSuccess) resetContactForm();
-  contactStatus.textContent = ""; contactStatus.dataset.state = "";
-  KaRocket.flipBack(card).then(function(){
-    contactForm.classList.remove("is-sending");
-    contactForm.querySelector(".contact-submit").classList.remove("is-launched", "is-sending");
-    updateContactSubmitState();
-    var target = wasSuccess ? CONTACT_RULES.name.el : contactForm.querySelector(".contact-submit");
-    if (target && !target.disabled) target.focus({ preventScroll: true }); else CONTACT_RULES.name.el.focus({ preventScroll: true });
   });
 });
 
@@ -8180,8 +7593,14 @@ schedulePanda();
 (function(){
 "use strict";
 var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-// Touch, pen and mouse share the paint trail; coarse devices skip ambient DOM embers.
+// [pen/stylus support] this used to test the PRIMARY pointer ("pointer: coarse"/"pointer: fine"),
+// which reports touch on any tablet -- including ones with a stylus (Surface, iPad+Pencil,
+// Galaxy Tab+S-Pen), silently disabling this entire script on those devices even though the pen
+// itself is a perfectly fine pointer. "any-pointer: fine" asks the right question instead: does
+// ANY input mechanism this device has (not just the primary/most-used one) support a fine
+// pointer. Only a device with no mouse and no stylus at all (a plain phone) now hard-skips.
 var anyFinePointer = window.matchMedia("(any-pointer: fine)").matches;
+if (!anyFinePointer) return; // device capability, not a live preference -- doesn't change mid-session, safe to hard-skip
 
 // ---- Native pointer and short-lived paint trail. Never obscure buttons or fields. ----
 var brushOuter = document.getElementById("brush-cursor");
@@ -8189,7 +7608,6 @@ brushOuter.hidden = true;
 document.body.style.cursor = "";
 var trailCanvas = document.getElementById("brush-trail");
 var tctx = trailCanvas.getContext("2d");
-if(!tctx)return;
 var trailPoints = [], cursorFrame = 0, cursorLoopActive = false;
 var finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
 var TRAIL_LIFETIME = 850;
@@ -8288,10 +7706,13 @@ function stopCursorLoop(){
   cancelAnimationFrame(cursorFrame);cursorFrame=0;cursorLoopActive=false;trailPoints=[];havePointer=false;lastPushTime=0;
   document.body.style.cursor="";tctx.clearRect(0,0,kaLayoutW(),kaLayoutH());
 }
-function trackTrailPointer(event){
-  // Observe gestures passively; never capture pointers or prevent native scrolling.
-  if(reducedMotion || event.isPrimary===false)return;
-  if(event.pointerType==='touch' && activeTrailTouch!==event.pointerId)return;
+window.addEventListener("pointermove",function(event){
+  // [pen/stylus support] gate on THIS event's own pointerType, not the device's static primary-
+  // pointer media query -- finger touch is excluded here (so nav-drag/tap on tablets keeps
+  // behaving exactly as before, untouched by this trail), but 'pen' now reaches the same drawing
+  // path as 'mouse' does, so a stylus on a tablet gets the identical smooth trail a desktop mouse
+  // gets. event.pointerType is '' only on ancient non-Pointer-Events browsers; treat that as mouse.
+  if(reducedMotion || event.pointerType==="touch")return;
   // [trail scope fix] this used to also match any <canvas>, which silently disabled the trail
   // over the full-viewport WebGL hero canvas (#stage) -- the single biggest area of the page --
   // leaving it visible only over plain DOM sections. Real interactive controls (buttons/links/
@@ -8306,26 +7727,7 @@ function trackTrailPointer(event){
   if(interactive){stopCursorLoop();return;}
   rawX=event.clientX; rawY=event.clientY; rawTime=performance.now(); havePointer=true;
   startCursorLoop();
-}
-var activeTrailTouch=null;
-window.addEventListener('pointerdown',function(event){
-  if(event.pointerType!=='touch')return;
-  if(event.isPrimary===false){activeTrailTouch=null;stopCursorLoop();return;}
-  stopCursorLoop();activeTrailTouch=event.pointerId;trackTrailPointer(event);
 },{passive:true});
-window.addEventListener('pointermove',trackTrailPointer,{passive:true});
-// Browsers cancel Pointer Events when native scrolling starts; passive Touch Events
-// keep the visual following the finger without taking over scrolling or pinch zoom.
-window.addEventListener('touchmove',function(event){
-  if(event.touches.length!==1){activeTrailTouch=null;stopCursorLoop();return;}
-  var touch=event.touches[0];
-  trackTrailPointer({pointerType:'touch',pointerId:activeTrailTouch,isPrimary:true,clientX:touch.clientX,clientY:touch.clientY,composedPath:function(){return event.composedPath();}});
-},{passive:true});
-window.addEventListener('touchend',function(){activeTrailTouch=null;havePointer=false;},{passive:true});
-window.addEventListener('touchcancel',function(){activeTrailTouch=null;stopCursorLoop();},{passive:true});
-window.addEventListener('pointerup',function(event){if(event.pointerId===activeTrailTouch){activeTrailTouch=null;havePointer=false;}},{passive:true});
-window.addEventListener('pointercancel',function(event){if(event.pointerId===activeTrailTouch){activeTrailTouch=null;stopCursorLoop();}},{passive:true});
-window.addEventListener('blur',stopCursorLoop);
 window.addEventListener("resize",resizeTrail);
 document.addEventListener("visibilitychange",function(){if(document.hidden)stopCursorLoop();});
 finePointer.addEventListener("change",stopCursorLoop);
@@ -8335,12 +7737,12 @@ resizeTrail();
 // drifts across the whole page, not just inside the hero's WebGL canvas) but the same
 // delta-time correction rule applies: every position increment is scaled by dt/16.67, never
 // a fixed per-tick step. Capped at 12 instances for draw/paint cost. ----
-var EMBER_COUNT = anyFinePointer ? 12 : 0;
+var EMBER_COUNT = 12;
 var layer = document.getElementById("ember-layer");
 var embers = [];
 function resetEmber(e){
   e.x = Math.random() * kaLayoutW();
-  e.y = Math.random() * kaLayoutH();
+  e.y = kaLayoutH() + 20 + Math.random() * 200;
   e.vy = -(6 + Math.random() * 10) / 1000; // px per ms, upward
   e.swayFreq = 0.0007 + Math.random() * 0.0006;
   e.swaySeed = Math.random() * Math.PI * 2;
@@ -8365,21 +7767,19 @@ function updateEmbers(now){
   emberFrame=0;
   if (reducedMotion || document.hidden){ emberLoopActive = false; return; }
   emberFrame=requestAnimationFrame(updateEmbers);
-  var dt = Math.min(100, now - lastEmberT); lastEmberT = now;
+  var dt = now - lastEmberT; lastEmberT = now;
   embers.forEach(function(e){
     e.life += dt;
-    e.life %= e.maxLife;
+    if (e.life >= e.maxLife){ resetEmber(e); return; }
     e.y += e.vy * dt;
-    if(e.y < 0)e.y += kaLayoutH();
     var sway = Math.sin(now * e.swayFreq + e.swaySeed) * e.swayAmp;
-    // Continuous glow with independent phases; never expire below the screen.
-    var glow = .48 + .18 * Math.sin(e.life/e.maxLife*Math.PI*2);
-    e.el.style.opacity = String(glow);
-    e.el.style.transform = "translate3d(" + (Math.max(2,Math.min(kaLayoutW()-2,e.x+sway))) + "px," + e.y + "px,0)";
+    var edgeFade = Math.min(1, e.life / 600) * Math.min(1, (e.maxLife - e.life) / 800);
+    e.el.style.opacity = String(0.7 * edgeFade);
+    e.el.style.transform = "translate3d(" + (e.x + sway) + "px," + e.y + "px,0)";
   });
 }
 function startEmberLoop(){
-  if (!embers.length || emberLoopActive || reducedMotion || document.hidden) return;
+  if (emberLoopActive || reducedMotion || document.hidden) return;
   emberLoopActive = true;
   lastEmberT = performance.now();
   emberFrame=requestAnimationFrame(updateEmbers);
@@ -8497,331 +7897,3 @@ footer.site-footer{border:0;box-shadow:none;flex-wrap:wrap;gap:16px 24px;backgro
 @media(max-width:600px){.assistant-panel{top:auto;max-height:calc(100dvh - max(16px,env(safe-area-inset-bottom)) - 190px);}}
 @media(max-height:500px){.assistant-panel{top:96px;bottom:8px;max-height:calc(100dvh - 104px);min-height:0;}.assistant-messages{min-height:0;}}
 </style>
-
-<style>
-/* Mobile and tablet interaction overrides, after the older chat breakpoints. */
-.assistant-messages{min-height:0;overscroll-behavior:contain;overflow-wrap:anywhere}
-.assistant-head,.assistant-input-row{flex-shrink:0}
-.assistant-input-row textarea{min-width:0}
-.assistant-close,.upscaler-close{min-width:44px;min-height:44px}
-@media (pointer:coarse), (max-width:760px){
-  input,textarea,select,.assistant-input-row textarea{font-size:16px}
-  .assistant-chip,.assistant-send{min-height:44px}
-  .site-section{scroll-margin-top:88px}
-  .contact-form,.contact-card{min-width:0}
-  .upscaler-card{max-height:calc(var(--ka-visible-height,100dvh) - 24px);padding:24px 16px}
-}
-@media(max-width:760px), (max-height:500px) and (pointer:coarse){
-  .assistant-panel{
-    top:calc(var(--ka-visible-top,0px) + max(8px,env(safe-area-inset-top)));
-    left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));bottom:auto;
-    width:auto;min-height:0;height:calc(var(--ka-visible-height,100dvh) - max(8px,env(safe-area-inset-top)) - max(8px,env(safe-area-inset-bottom)));
-    max-height:calc(var(--ka-visible-height,100dvh) - max(8px,env(safe-area-inset-top)) - max(8px,env(safe-area-inset-bottom)));
-  }
-  .assistant-chips{flex-wrap:nowrap;overflow-x:auto;flex-shrink:0;padding-bottom:8px}
-  .assistant-chip{flex:0 0 auto}
-  .assistant-head{padding:10px 14px}
-}
-</style>
-<script>
-(function(){
-  var viewport=window.visualViewport,frame=0;
-  if(!viewport)return;
-  function sync(){
-    frame=0;
-    // Pinch zoom must remain native; only keyboard/browser-chrome changes resize the sheet.
-    if(viewport.scale>1.05)return;
-    document.documentElement.style.setProperty('--ka-visible-height',viewport.height+'px');
-    document.documentElement.style.setProperty('--ka-visible-top',viewport.offsetTop+'px');
-  }
-  function schedule(){if(!frame)frame=requestAnimationFrame(sync);}
-  viewport.addEventListener('resize',schedule,{passive:true});
-  viewport.addEventListener('scroll',schedule,{passive:true});
-  window.addEventListener('pageshow',schedule);
-  sync();
-})();
-</script>
-
-<style>
-/* Shared optical surface: live backdrop, stationary rim, no animated blur layers. */
-#site-nav{background:var(--glass-bg);border:var(--glass-border);box-shadow:var(--glass-highlight),var(--glass-shadow)}
-.glass-panel,.assistant-panel,.assistant-launcher{background-clip:padding-box}
-.assistant-panel{filter:none;transform:translateY(8px) scale(.98);transform-origin:bottom right}
-.assistant-panel.open{filter:none;transform:translateY(0) scale(1);transition:opacity .22s ease,transform .28s cubic-bezier(.22,.8,.24,1)}
-.assistant-panel.closing{filter:none;transform:translateY(6px) scale(.98);transition:opacity .18s ease,transform .2s ease}
-@media(hover:hover) and (pointer:fine){
-  .assistant-launcher:hover{box-shadow:var(--glass-highlight),0 8px 28px #0005,0 0 18px #ffb47718}
-}
-@media(prefers-reduced-motion:reduce){
-  .assistant-panel,.assistant-panel.open,.assistant-panel.closing{transform:none;transition:none}
-}
-@media(prefers-reduced-transparency:reduce),(prefers-contrast:more){
-  :root{--glass-bg:#211d24;--glass-bg-heavy:#17151d;--glass-blur:none!important;--glass-border:1px solid #a99b93}
-  .assistant-panel{border-color:#a99b93}
-}
-</style>
-
-<script>
-// ==================================================================== KaInk: SCROLL-DRIVEN TEXT + GLOW PARALLAX ==
-// 1) Headings write themselves in letter by letter, like handwriting, as they scroll into view.
-//    How fast depends on scroll speed: scroll quickly and the pen races, scroll slowly (or stop) and it
-//    writes at a calm pace. A heading that leaves the screen resets, so it writes again next time.
-// 2) Small texts (intro lines, captions) emerge from a coloured blur into sharp type, in order.
-// 3) The soft section glows drift a little with the scroll.
-// Reduced motion: nothing here runs; all text and glows are simply shown.
-// Tuning knobs are at the top of the IIFE.
-// The crystal hero fades away as you scroll down into the content (instead of the sections covering it
-// with a black backdrop), so the nebula and the coloured glows show cleanly behind the text.
-(function(){
-  var root = document.documentElement, queued = false;
-  function update(){
-    queued = false;
-    var vh = window.innerHeight || 1, p = Math.min(1, Math.max(0, window.scrollY / (vh * 0.62)));
-    root.style.setProperty("--hero-fade", Math.pow(1 - p, 1.35).toFixed(3));
-  }
-  window.addEventListener("scroll", function(){ if (!queued){ queued = true; requestAnimationFrame(update); } }, { passive: true });
-  window.addEventListener("resize", update);
-  update();
-})();
-(function(){
-  "use strict";
-  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  if (!("IntersectionObserver" in window) || !window.requestAnimationFrame) return;
-
-  var CFG = {
-    writeMs: 1150,          // calm-pace time to write a whole heading
-    emergeMs: 900,          // calm-pace time for a small text to resolve out of the blur
-    speedGain: 0.0007,      // extra progress per ms for every px/ms of scroll speed (faster scroll = faster pen)
-    startAt: 0.94,          // element top, as a fraction of viewport height, where it starts appearing
-    doneAt: 0.58,           // ...and where scrolling alone would have finished it
-    dwellMs: 420,           // if you stop scrolling, it finishes by itself after this long in view
-    exitAt: 0.10,           // small texts start to blur out when their bottom edge is this far (of the viewport) from the top...
-    exitSpan: 0.22,         // ...and are fully blurred out over this much scrolling
-    stretch: 2.6,           // how many letters are "in the pen" at once
-    inkSelector: ".gallery-head h2, #contact-title, #about-headline",
-    emergeSelector: ".gallery-head p, .fav-filter, #contact-intro, .about-caption, .about-bio-text, .footer-copyright",
-    glow: { portfolio: "150,110,255", contact: "255,150,70", about: "90,190,255", other: "255,170,100" }
-  };
-  var clamp = function(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); };
-  var easeOut = function(t){ return 1 - Math.pow(1 - t, 3); };
-  var items = [], raf = 0, last = 0, vel = 0, lastY = window.scrollY, lastT = performance.now(), busy = false;
-
-  function glowFor(el){
-    var sec = el.closest(".site-section, .site-footer"), id = sec && sec.id ? sec.id.replace("section-", "") : "other";
-    return CFG.glow[id] || CFG.glow.other;
-  }
-  function makeItem(el, kind){
-    var it = { el: el, kind: kind, r: 0, vis: false, since: 0, letters: [], rots: [], shown: [], text: "", delay: 0, glow: glowFor(el) };
-    // a text handled here must not also be handled by the older fade-in helper
-    el.classList.remove("reveal-fade", "is-visible");
-    if (window.scrollRevealObserver) try { window.scrollRevealObserver.unobserve(el); } catch (e) {}
-    build(it);
-    items.push(it);
-    return it;
-  }
-  function build(it){
-    var el = it.el;
-    if (it.kind === "ink"){
-      if (el.children.length && !el.querySelector(".ink-w")) { it.kind = "emerge"; }   // rich markup: fall back to the blur-in
-    }
-    if (it.kind === "ink"){
-      var text = el.textContent; it.text = text;
-      busy = true;
-      el.setAttribute("aria-label", text.replace(/\s+/g, " ").trim());
-      el.textContent = "";
-      it.letters = []; it.rots = []; it.shown = [];
-      text.split(/(\s+)/).forEach(function(tok){
-        if (!tok) return;
-        if (/^\s+$/.test(tok)){ el.appendChild(document.createTextNode(" ")); return; }
-        var w = document.createElement("span"); w.className = "ink-w"; w.setAttribute("aria-hidden", "true");
-        Array.prototype.forEach.call(tok, function(ch){
-          var l = document.createElement("span"); l.className = "ink-l"; l.textContent = ch; l.style.opacity = "0";
-          w.appendChild(l); it.letters.push(l); it.rots.push((Math.random() * 2 - 1) * 4); it.shown.push(-1);
-        });
-        el.appendChild(w);
-      });
-      busy = false;
-      it.text = el.textContent;
-    } else {
-      it.text = el.textContent;
-      el.style.opacity = "0";
-    }
-    it.delay = it.kind === "emerge" ? 260 : 0;
-    it.r = 0;
-  }
-  function render(it){
-    var r = it.r;
-    if (it.kind === "ink"){
-      var n = it.letters.length, span = n + CFG.stretch;
-      for (var i = 0; i < n; i++){
-        var li = clamp((r * span - i) / CFG.stretch, 0, 1);
-        if (li === it.shown[i]) continue;
-        it.shown[i] = li;
-        var s = it.letters[i].style;
-        if (li >= 1){ s.cssText = ""; continue; }             // finished letters carry no inline styling at all
-        if (li <= 0){ s.cssText = "opacity:0"; continue; }
-        var e = easeOut(li), pen = li * (1 - li) * 4;         // 0..1..0: brightest while the letter is being drawn
-        s.opacity = String(clamp(li * 2.6, 0, 1));
-        s.clipPath = "inset(-20% " + ((1 - e) * 100).toFixed(1) + "% -20% -10%)";
-        s.transform = "translate3d(" + ((1 - e) * -.09).toFixed(3) + "em," + ((1 - e) * .05).toFixed(3) + "em,0) rotate(" + ((1 - e) * it.rots[i]).toFixed(2) + "deg)";
-        s.textShadow = "0 0 " + (pen * .5).toFixed(2) + "em rgba(" + it.glow + "," + (pen * .85).toFixed(2) + ")";
-      }
-    } else {
-      var p = easeOut(r), s2 = it.el.style;
-      if (p >= 1){ s2.opacity = ""; s2.filter = ""; s2.transform = ""; s2.textShadow = ""; return; }
-      s2.opacity = p.toFixed(3);
-      s2.filter = "blur(" + ((1 - p) * 10).toFixed(2) + "px)";
-      s2.transform = "translate3d(0," + ((1 - p) * 12).toFixed(2) + "px,0)";
-      s2.textShadow = "0 0 " + ((1 - p) * 26).toFixed(1) + "px rgba(" + it.glow + "," + ((1 - p) * .95).toFixed(2) + ")";
-    }
-  }
-  function reset(it){ it.r = 0; if (it.kind === "ink"){ it.shown.fill(-1); } render(it); }
-
-  function tick(now){
-    raf = 0;
-    var dt = Math.min(64, now - last) || 16; last = now;
-    var vh = window.innerHeight, moving = false;
-    vel *= Math.pow(.9, dt / 16.7);                      // scroll speed fades out once you stop
-    for (var k = 0; k < items.length; k++){
-      var it = items[k];
-      if (!it.vis) continue;
-      var emerge = it.kind === "emerge";
-      if (!emerge && it.r >= 1) continue;
-      var rect = it.el.getBoundingClientRect();
-      var tp = clamp((vh * CFG.startAt - rect.top) / (vh * (CFG.startAt - CFG.doneAt)), 0, 1);   // where the scroll position says it should be
-      var dwell = (now - it.since) > (CFG.dwellMs + it.delay) ? 1 : 0;
-      var target = Math.max(tp, dwell);
-      // small texts also blur back out as they slide off the top of the screen (and as they sink back down)
-      if (emerge) target = Math.min(target, clamp((rect.bottom - vh * CFG.exitAt) / (vh * CFG.exitSpan), 0, 1));
-      var rate = 1 / (emerge ? CFG.emergeMs : CFG.writeMs) + vel * CFG.speedGain;
-      var nr = emerge ? it.r + clamp(target - it.r, -rate * dt * 1.4, rate * dt) : Math.min(target, it.r + rate * dt);
-      if (nr !== it.r){ it.r = nr; render(it); }
-      if (Math.abs(target - it.r) > 0.002 && (emerge || it.r < 1)) moving = true;
-    }
-    if (moving) raf = requestAnimationFrame(tick);
-  }
-  function kick(){ if (!raf){ last = performance.now(); raf = requestAnimationFrame(tick); } }
-
-  var io = new IntersectionObserver(function(entries){
-    entries.forEach(function(en){
-      var it = en.target.__ink; if (!it) return;
-      if (en.isIntersecting){ if (!it.vis){ it.vis = true; it.since = performance.now(); } kick(); }
-      else if (it.vis){ it.vis = false; reset(it); }      // off screen: back to unwritten, ready to write again
-    });
-  }, { rootMargin: "0px 0px -6% 0px", threshold: 0.01 });
-
-  // scroll speed (px/ms), smoothed; also nudges the section glows
-  var glowQueued = false;
-  function updateGlows(){
-    glowQueued = false;
-    ["section-portfolio", "section-about"].forEach(function(id){
-      var sec = document.getElementById(id); if (!sec || sec.hidden) return;
-      var top = sec.getBoundingClientRect().top;
-      sec.style.setProperty("--gy", clamp(-top * .06, -70, 70).toFixed(1) + "px");
-    });
-  }
-  window.addEventListener("scroll", function(){
-    var now = performance.now(), y = window.scrollY, dt = Math.max(1, now - lastT);
-    var v = Math.abs(y - lastY) / dt; vel = vel * .6 + v * .4; lastY = y; lastT = now;
-    kick();
-    if (!glowQueued){ glowQueued = true; requestAnimationFrame(updateGlows); }
-  }, { passive: true });
-
-  function attach(sel, kind){
-    Array.prototype.forEach.call(document.querySelectorAll(sel), function(el){
-      if (el.__ink) return;
-      var it = makeItem(el, kind); el.__ink = it; io.observe(el);
-      // creator edits / live preview replace the text: rebuild so the new words write in too
-      new MutationObserver(function(){
-        if (busy) return;
-        if (el.textContent === it.text && (it.kind !== "ink" || el.querySelector(".ink-w"))) return;
-        el.classList.remove("reveal-fade", "is-visible");
-        var was = it.vis; build(it); if (was){ it.since = performance.now(); kick(); }
-      }).observe(el, { childList: true, characterData: true, subtree: true });
-    });
-  }
-  try {
-    document.documentElement.classList.add("ink-on");
-    attach(CFG.inkSelector, "ink");
-    attach(CFG.emergeSelector, "emerge");
-    // the old blur-fade wrapped the first .gallery-head as a whole; its children animate themselves now
-    var gh = document.querySelector(".gallery-head"); if (gh) gh.classList.remove("reveal-fade", "is-visible");
-    updateGlows();
-  } catch (err) {
-    // never leave text hidden if anything above goes wrong
-    document.documentElement.classList.remove("ink-on");
-    Array.prototype.forEach.call(document.querySelectorAll(".ink-l"), function(l){ l.style.cssText = ""; });
-    items.forEach(function(it){ it.el.style.opacity = ""; it.el.style.filter = ""; it.el.style.transform = ""; });
-    if (window.console) console.warn("KaInk disabled:", err);
-  }
-})();
-</script>
-
-<style>
-/* Optical overlay moves independently: text and layout never stretch. */
-#site-nav.ka-liquid::before{display:none}
-.ka-liquid-skin{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none;contain:paint;z-index:0;box-shadow:inset 0 1px 0 #fff5,inset 1px 0 0 #fff1,inset -1px -1px 0 #ffc99a20}
-.ka-liquid-light{position:absolute;inset:-45%;pointer-events:none;background:radial-gradient(ellipse at 28% 18%,#fff7,transparent 33%),linear-gradient(122deg,transparent 25%,#ffe9ca26 43%,#ffffff24 46%,transparent 61%);opacity:.18;transform:translate3d(0,0,0);transition:opacity .24s ease,transform .4s cubic-bezier(.22,.8,.24,1)}
-.ka-liquid.is-liquid-active>.ka-liquid-skin>.ka-liquid-light{will-change:transform;transition:opacity .18s ease}
-.ka-liquid.is-liquid-pressed>.ka-liquid-skin{box-shadow:inset 0 1px 1px #fff6,inset 0 -2px 5px #ffc99a30}
-@media(prefers-reduced-motion:reduce){.ka-liquid-light{transition:none!important}}
-@media(prefers-reduced-transparency:reduce),(prefers-contrast:more),(forced-colors:active){.ka-liquid-skin{display:none}}
-</style>
-<script>
-// KA liquid glass: one active surface, bounded work, no idle animation or extra GPU context.
-(function kaLiquidGlass(){
-  var motion=matchMedia('(prefers-reduced-motion: reduce)'),clarity=matchMedia('(prefers-reduced-transparency: reduce)'),contrast=matchMedia('(prefers-contrast: more)'),forced=matchMedia('(forced-colors: active)');
-  var coarse=matchMedia('(pointer: coarse)').matches;
-  var economy=coarse||(navigator.deviceMemory||8)<=4||(navigator.hardwareConcurrency||8)<=4;
-  var interval=1000/(economy?30:60),frame=0,last=0,active=null,x=0,y=0,tx=0,ty=0,pressed=false;
-  var surfaces=new Map();
-  document.querySelectorAll('#site-nav,.assistant-launcher,.assistant-panel,#expand-panel').forEach(function(el){
-    var skin=document.createElement('span'),light=document.createElement('span');
-    skin.className='ka-liquid-skin';light.className='ka-liquid-light';skin.setAttribute('aria-hidden','true');
-    skin.appendChild(light);el.appendChild(skin);el.classList.add('ka-liquid');surfaces.set(el,light);
-  });
-  function blocked(){return motion.matches||clarity.matches||contrast.matches||forced.matches||document.hidden;}
-  function reset(){
-    cancelAnimationFrame(frame);frame=0;last=0;pressed=false;
-    if(active){active.classList.remove('is-liquid-active','is-liquid-pressed');var light=surfaces.get(active);light.style.transform='';light.style.opacity='';}
-    active=null;x=y=tx=ty=0;
-  }
-  function tick(now){
-    frame=0;if(!active||blocked()||!active.isConnected){reset();return;}
-    var elapsed=last?now-last:interval;
-    if(elapsed<interval-.5){frame=requestAnimationFrame(tick);return;}
-    last=now;var blend=1-Math.exp(-Math.min(elapsed,64)/85);
-    x+=(tx-x)*blend;y+=(ty-y)*blend;
-    var stretch=pressed?(economy?1.025:1.045):1;
-    var light=surfaces.get(active);
-    light.style.transform='translate3d('+x.toFixed(2)+'px,'+y.toFixed(2)+'px,0) scale('+stretch+','+(pressed?.985:1)+')';
-    light.style.opacity=pressed?'.34':'.26';
-    if(Math.abs(tx-x)+Math.abs(ty-y)>.08)frame=requestAnimationFrame(tick);
-    else active.classList.remove('is-liquid-active');
-  }
-  function track(event){
-    if(blocked()||event.isPrimary===false)return;
-    if(event.pointerType==='touch'&&event.type!=='pointerdown')return;
-    var el=event.target.closest?.('.ka-liquid');if(!surfaces.has(el))return;
-    // Ignore nested menus/mascot speech that extend outside their glass surface.
-    var rect=el.getBoundingClientRect();
-    if(!rect.width||!rect.height||event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)return;
-    if(active!==el){reset();active=el;}
-    pressed=event.type==='pointerdown'||pressed;
-    var strength=economy?7:13;
-    tx=((event.clientX-rect.left)/rect.width-.5)*strength*2;
-    ty=((event.clientY-rect.top)/rect.height-.5)*strength;
-    active.classList.add('is-liquid-active');active.classList.toggle('is-liquid-pressed',pressed);
-    if(!frame){last=0;frame=requestAnimationFrame(tick);}
-  }
-  document.addEventListener('pointermove',track,{passive:true});
-  document.addEventListener('pointerdown',track,{passive:true});
-  document.addEventListener('pointerup',reset,{passive:true});
-  document.addEventListener('pointercancel',reset,{passive:true});
-  document.addEventListener('pointerout',function(e){if(active&&!active.contains(e.relatedTarget))reset();},{passive:true});
-  document.addEventListener('visibilitychange',reset);
-  window.addEventListener('blur',reset);window.addEventListener('pagehide',reset);
-  window.addEventListener('scroll',reset,{passive:true});
-  [motion,clarity,contrast,forced].forEach(function(m){m.addEventListener('change',reset);});
-})();
-</script>

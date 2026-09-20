@@ -1,0 +1,21 @@
+warning: in the working copy of 'vite.config.mjs', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/vite.config.mjs b/vite.config.mjs[m
+[1mindex 9291d62..fbd180b 100644[m
+[1m--- a/vite.config.mjs[m
+[1m+++ b/vite.config.mjs[m
+[36m@@ -1,9 +1,13 @@[m
+ import {defineConfig} from 'vite';[m
+ import {fileURLToPath} from 'node:url';[m
+[31m-import {readFileSync} from 'node:fs';[m
+[32m+[m[32mimport {readFileSync,writeFileSync,cpSync} from 'node:fs';[m
+ const local=path=>fileURLToPath(new URL(path,import.meta.url));[m
+ export default defineConfig({[m
+[31m-  plugins:[{name:'local-crystal-runtime',generateBundle(){this.emitFile({type:'asset',fileName:'assets/three-r128.min.js',source:readFileSync(local('./public/three-r128.min.js'))});}}],[m
+[32m+[m[32m  plugins:[{name:'stage-crystal-homepage',apply:'build',closeBundle(){[m
+[32m+[m[32m    // Vercel serves dist/ only: publish the crystal homepage (root index.html) as dist/index.html, as server/app.js does locally.[m
+[32m+[m[32m    writeFileSync(local('./dist/index.html'),readFileSync(local('./index.html'),'utf8').replaceAll('./dist/assets/','./assets/'));[m
+[32m+[m[32m    cpSync(local('./images'),local('./dist/images'),{recursive:true});[m
+[32m+[m[32m  }},{name:'local-crystal-runtime',generateBundle(){this.emitFile({type:'asset',fileName:'assets/three-r128.min.js',source:readFileSync(local('./public/three-r128.min.js'))});}}],[m
+   root:'client',[m
+   build:{[m
+     outDir:'../dist',emptyOutDir:true,[m

@@ -12,7 +12,7 @@ const save=(path,data)=>{writeFileSync(path+'.tmp',JSON.stringify(data,null,2),{
 // A small allowlisted set rather than free-text: the creator panel picks a font, it never types
 // raw CSS -- this is what makes it safe to drop the value straight into a stylesheet on the
 // public page (see index.html's applySiteAppearance) with no injection risk.
-export const FONT_CHOICES=['Fraunces','Manrope','Sora','Poppins','Playfair Display','Space Grotesk','system-ui'];
+export const FONT_CHOICES=['Manrope','Poppins','Playfair Display','Space Grotesk','system-ui'];
 // Lightweight drag-and-drop (Part C, scoped down deliberately): only elements that were ALREADY
 // free-floating (position:fixed, nothing else laid out relative to them) are draggable -- the
 // site's actual structural layout (nav, grid, cards) stays exactly as hand-tuned, untouched by
@@ -95,25 +95,21 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
   let site=JSON.parse(readFileSync(sitePath,'utf8'));
   // Upgrade older saved collections without replacing artwork or edited copy.
   const defaults=JSON.parse(readFileSync(resolve(root,'server/portfolio-seed.json'),'utf8'));
-  const DEFAULT_APPEARANCE={headingFont:'Fraunces',bodyFont:'Manrope',textScale:1,customFonts:[],glassBlur:18};
+  const DEFAULT_APPEARANCE={headingFont:'Manrope',bodyFont:'Manrope',textScale:1,customFonts:[],glassBlur:18};
   const DEFAULT_NOTICE={enabled:false,text:'',tone:'info'};
   const DEFAULT_VISIBILITY={navGallery:true,navAbout:true};
-  const DEFAULT_STACKS={loop:true,covers:{}};
   const DEFAULT_LAYOUT={mobile:{},tablet:{},desktop:{}};
   const DEFAULT_BRANDING={enabled:false,logoUrl:''};
   const upgraded={...site,
     details:{...defaults.details,...DEFAULT_APPEARANCE,...site.details},
     notice:{...DEFAULT_NOTICE,...site.notice},
     visibility:{...DEFAULT_VISIBILITY,...site.visibility},
-    stacks:{...DEFAULT_STACKS,...site.stacks},
     layoutOverrides:{...DEFAULT_LAYOUT,...site.layoutOverrides},
     branding:{...DEFAULT_BRANDING,...site.branding},
     elementStyles:{...site.elementStyles},
     paperArtwork:undefined,
     images:site.images.map(project=>({id:project.slug,description:'',technologies:[],link:'',downloadable:true,...project}))};
   delete upgraded.paperArtwork;
-  // Type system v2: collections saved with the old default display font move to the new one, once.
-  if(!site.typeV2){upgraded.typeV2=true;if(upgraded.details.headingFont==='Manrope')upgraded.details.headingFont='Fraunces';}
   if(JSON.stringify(upgraded)!==JSON.stringify(site)){
     upgraded.revision=(site.revision||0)+1;save(sitePath,upgraded);site=upgraded;
   }
@@ -137,7 +133,7 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
   function originHost(origin){try{return new URL(origin).host;}catch{return null;}}
   function sameHost(req,origin){
     const host=req.get('host');
-    return originHost(origin)===host || (req.app.get('trust proxy') && req.get('x-forwarded-host') && originHost(origin)===req.get('x-forwarded-host'));
+    return originHost(origin)===host || (req.get('x-forwarded-host') && originHost(origin)===req.get('x-forwarded-host'));
   }
   function sameOrigin(req,res,next){
     const origin=req.get('origin');
@@ -261,14 +257,12 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
     if(typeof to==='string'&&to) filtered=filtered.filter(e=>e.at<=(to.length===10?to+'T23:59:59.999Z':to));
     res.json({count:visitors.count,log:filtered.slice(-200).reverse(),byDevice,byDay,byLocation});
   });
-  const assetUsed=src=>site.images.some(image=>image.src===src)||site.branding?.logoUrl===src;
-  router.get('/creator/assets',(req,res)=>res.json(readdirSync(uploads).filter(name=>/^[a-f0-9-]{36}\.(png|jpg|webp)$/.test(name)).map(name=>({src:'/uploads/'+name,bytes:statSync(resolve(uploads,name)).size,used:assetUsed('/uploads/'+name)}))));
+  router.get('/creator/assets',(req,res)=>res.json(readdirSync(uploads).filter(name=>/^[a-f0-9-]{36}\.(png|jpg|webp)$/.test(name)).map(name=>({src:'/uploads/'+name,bytes:statSync(resolve(uploads,name)).size,used:site.images.some(image=>image.src==='/uploads/'+name)}))));
   router.delete('/creator/assets/:name',(req,res)=>{
     if(!/^[a-f0-9-]{36}\.(png|jpg|webp)$/.test(req.params.name)) return fail(res,400,'Invalid image.');
-    if(assetUsed('/uploads/'+req.params.name)) return fail(res,409,'Remove this image from published projects and studio branding before archiving it.');
+    if(site.images.some(image=>image.src==='/uploads/'+req.params.name)) return fail(res,409,'Remove this image from published projects before deleting it.');
     const file=resolve(uploads,req.params.name);if(!existsSync(file))return fail(res,404,'Image not found.');
-    const archive=resolve(dataDir,'archived-uploads');mkdirSync(archive,{recursive:true});
-    renameSync(file,resolve(archive,Date.now()+'-'+req.params.name));res.json({ok:true});
+    unlinkSync(file);res.json({ok:true});
   });
   router.patch('/creator/messages/:id',(req,res)=>{
     if(!['new','read','archived'].includes(req.body?.status)) return fail(res,400,'Invalid message status.');
@@ -359,7 +353,7 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
     // Typography (Part A): an allowlisted choice, not free text -- see FONT_CHOICES above, now
     // extended with whatever this same save also includes as a valid custom font family.
     const allowedFonts=[...FONT_CHOICES,...customFonts.map(f=>f.family)];
-    details.headingFont=allowedFonts.includes(input.details?.headingFont)?input.details.headingFont:'Fraunces';
+    details.headingFont=allowedFonts.includes(input.details?.headingFont)?input.details.headingFont:'Manrope';
     details.bodyFont=allowedFonts.includes(input.details?.bodyFont)?input.details.bodyFont:'Manrope';
     const scale=Number(input.details?.textScale);
     details.textScale=Number.isFinite(scale)?Math.min(1.2,Math.max(0.85,scale)):1;
@@ -446,16 +440,7 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
         images.push({...original,...common});
       }
     }
-    // Work panel (stacks): one global coverflow-looping switch, plus an optional cover image per stack.
-    // A cover only counts if it names an image that is currently inside that same folder; anything else
-    // is dropped so the public panel falls back to the stack's first image.
-    const stacks={loop:input.stacks?.loop!==false,covers:{}};
-    if(input.stacks?.covers&&typeof input.stacks.covers==='object'){
-      for(const [folder,slug] of Object.entries(input.stacks.covers)){
-        if(folders.includes(folder)&&images.some(i=>i.slug===slug&&i.cat===folder)) stacks.covers[folder]=slug;
-      }
-    }
-    const next={revision:site.revision+1,typeV2:true,details,folders,images,notice,visibility,stacks,layoutOverrides,branding,elementStyles};save(sitePath,next);site=next;res.json(site);
+    const next={revision:site.revision+1,details,folders,images,notice,visibility,layoutOverrides,branding,elementStyles};save(sitePath,next);site=next;res.json(site);
   });
   return {router,uploads};
 }

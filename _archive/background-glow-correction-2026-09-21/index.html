@@ -489,7 +489,7 @@ h1,h2,h3{
   letter-spacing:-0.022em; line-height:1.06; text-wrap:balance;
 }
 p, li{ text-wrap:pretty; }
-.gallery-head h2, #contact-title, .about-headline, .contact-wrap h2{ font-weight:var(--heading-weight); letter-spacing:-0.022em; line-height:1.04; }
+.gallery-head h2, #contact-title, .about-headline, .contact-wrap h2{ font-weight:var(--heading-weight); letter-spacing:-0.028em; line-height:1.03; }
 .about-headline{ letter-spacing:-0.026em; }
 .about-bio-text, .contact-wrap > p{ line-height:1.75; }
 /* small technical captions: one role, easier to read (a touch larger, higher contrast, steady tracking) */
@@ -518,7 +518,7 @@ p, li{ text-wrap:pretty; }
    Instead of the sections covering the crystal hero, the hero itself fades out as you scroll into the content
    (--hero-fade, set by the scroll script), so the nebula and the coloured glows show through behind the text. */
 .site-section::before{ background:none; }
-#folder-grid, .folder-grid{ display:none !important; }
+.folder-grid{ display:none; }
 #stage{ opacity:var(--hero-fade, 1); }
 .contact-wrap h2{ font-size:var(--step-4); margin:0 0 12px; }
 .contact-wrap > p{ color:var(--ink-dim); margin:0 0 40px; }
@@ -1804,7 +1804,7 @@ var starMat = new THREE.ShaderMaterial({
     'void main(){' +
     // a gentle per-star glitter -- each star's own phase/frequency, kept subtle (0.7..1.0 of
     // its own base brightness) so it reads as a sparkle, not a flicker
-    '  float twinkle = 0.85 + 0.15 * sin(uTime * aTwinkleFreq + aTwinkle);' +
+    '  float twinkle = 0.7 + 0.3 * sin(uTime * aTwinkleFreq + aTwinkle);' +
     '  vBright = aBright * twinkle;' +
     '  vec4 mv = modelViewMatrix * vec4(position, 1.0);' +
     '  gl_Position = projectionMatrix * mv;' +
@@ -2073,8 +2073,8 @@ function frame(now){
   farGroup.position.y = -parallaxCurrent.y * FAR_STRENGTH;
   // barely-perceptible constant drift, independent of parallax -- stars feel alive even with
   // the pointer resting still
-  stars.rotation.y = Math.sin(clock.elapsed * 0.000035) * 0.045;
-  stars.rotation.x = Math.sin(clock.elapsed * 0.000025) * 0.025;
+  stars.rotation.y += dt * 0.0000045;
+  stars.rotation.x += dt * 0.0000018;
   nebulaMat.uniforms.uTime.value = clock.elapsed * 0.00003;
   starMat.uniforms.uTime.value = clock.elapsed;
   // drifting crystal shards -- slow linear travel with wraparound, plus a gentle twinkle and a
@@ -8193,6 +8193,33 @@ if(!tctx)return;
 var trailPoints = [], cursorFrame = 0, cursorLoopActive = false;
 var finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
 var TRAIL_LIFETIME = 850;
+var pendingTrailSample=false, trailStars=[], starAnchor=null;
+var starSprite=document.createElement('canvas');starSprite.width=starSprite.height=48;
+var starCtx=starSprite.getContext('2d');
+if(starCtx){
+  var halo=starCtx.createRadialGradient(24,24,0,24,24,24);
+  halo.addColorStop(0,'rgba(255,245,220,.9)');halo.addColorStop(.24,'rgba(255,197,115,.45)');halo.addColorStop(1,'rgba(255,150,70,0)');
+  starCtx.fillStyle=halo;starCtx.fillRect(0,0,48,48);
+  starCtx.beginPath();
+  for(var si=0;si<8;si++){var angle=si*Math.PI/4-Math.PI/2,r=si%2?2.4:13;
+    var sx=24+Math.cos(angle)*r,sy=24+Math.sin(angle)*r;
+    if(si===0)starCtx.moveTo(sx,sy);else starCtx.lineTo(sx,sy);
+  }
+  starCtx.closePath();starCtx.fillStyle='#fff5df';starCtx.fill();
+}
+function seedTrailStars(now){
+  var dx=starAnchor?rawX-starAnchor.x:0,dy=starAnchor?rawY-starAnchor.y:0,dist=Math.hypot(dx,dy);
+  if(starAnchor&&now-starAnchor.time<160&&dist<9)return;
+  var linked=starAnchor&&now-starAnchor.time<160&&dist<240;
+  var count=linked?Math.min(8,Math.max(1,Math.floor(dist/12))):1;
+  for(var i=1;i<=count;i++){
+    var f=i/count;
+    trailStars.push({x:linked?starAnchor.x+dx*f:rawX,y:linked?starAnchor.y+dy*f:rawY,time:now,
+      vx:dist?dx/dist*10:0,vy:dist?dy/dist*10:0,size:12+Math.random()*7});
+  }
+  if(trailStars.length>48)trailStars.splice(0,trailStars.length-48);
+  starAnchor={x:rawX,y:rawY,time:now};
+}
 var rawX = 0, rawY = 0, rawTime = 0, havePointer = false, lastPushTime = 0;
 function resizeTrail(){
   var pixels = kaLayoutW() * kaLayoutH();
@@ -8200,7 +8227,7 @@ function resizeTrail(){
   trailCanvas.width = Math.round(kaLayoutW()*dpr);
   trailCanvas.height = Math.round(kaLayoutH()*dpr);
   tctx.setTransform(dpr,0,0,dpr,0,0);
-  trailPoints = [];
+  trailPoints = [];trailStars=[];starAnchor=null;
 }
 // [smooth trail fix] the old draw pass stroked one straight, independently-alpha'd segment per
 // raw pointermove sample -- at typical event spacing (or worse, the coalesced/bursty spacing
@@ -8226,12 +8253,13 @@ function smoothTrailPath(ctx, pts){
 function updateCursor(now){
   cursorFrame = 0;
   tctx.clearRect(0,0,kaLayoutW(),kaLayoutH());
-  if(reducedMotion || document.hidden){trailPoints=[];cursorLoopActive=false;return;}
+  if(reducedMotion || document.hidden){stopCursorLoop();return;}
   // sample the latest known pointer position at a steady per-frame rate (rather than reacting
   // directly to pointermove's own irregular cadence) -- this is what keeps point spacing along
   // the path uniform, which the smoothing/gradient pass below depends on to look continuous.
   if (havePointer && cursorLoopActive){
-    if (now - rawTime < 60){
+    if (pendingTrailSample || now - rawTime < 60){
+      if(pendingTrailSample){seedTrailStars(now);pendingTrailSample=false;}
       // still getting fresh pointermove events -- keep sampling at a steady per-frame rate
       if (!lastPushTime || now - lastPushTime >= 10){
         trailPoints.push({x:rawX,y:rawY,time:now});
@@ -8277,7 +8305,15 @@ function updateCursor(now){
     smoothTrailPath(tctx, trailPoints);
     tctx.stroke();
   }
-  if (trailPoints.length || havePointer) cursorFrame=requestAnimationFrame(updateCursor);
+  trailStars=trailStars.filter(function(s){return now-s.time<650;});
+  if(starCtx){
+    trailStars.forEach(function(s){var age=(now-s.time)/650,fade=(1-age)*(1-age),size=s.size*(1-age*.35);
+      tctx.globalAlpha=fade*.88;
+      tctx.drawImage(starSprite,s.x+s.vx*age-size/2,s.y+s.vy*age+age*age*7-size/2,size,size);
+    });
+    tctx.globalAlpha=1;
+  }
+  if (trailPoints.length || trailStars.length || havePointer) cursorFrame=requestAnimationFrame(updateCursor);
   else cursorLoopActive=false;
 }
 function startCursorLoop(){
@@ -8285,25 +8321,19 @@ function startCursorLoop(){
   cursorLoopActive=true;cursorFrame=requestAnimationFrame(updateCursor);
 }
 function stopCursorLoop(){
-  cancelAnimationFrame(cursorFrame);cursorFrame=0;cursorLoopActive=false;trailPoints=[];havePointer=false;lastPushTime=0;
+  cancelAnimationFrame(cursorFrame);cursorFrame=0;cursorLoopActive=false;trailPoints=[];trailStars=[];starAnchor=null;pendingTrailSample=false;havePointer=false;lastPushTime=0;
   document.body.style.cursor="";tctx.clearRect(0,0,kaLayoutW(),kaLayoutH());
 }
 function trackTrailPointer(event){
   // Observe gestures passively; never capture pointers or prevent native scrolling.
   if(reducedMotion || event.isPrimary===false)return;
   if(event.pointerType==='touch' && activeTrailTouch!==event.pointerId)return;
-  // [trail scope fix] this used to also match any <canvas>, which silently disabled the trail
-  // over the full-viewport WebGL hero canvas (#stage) -- the single biggest area of the page --
-  // leaving it visible only over plain DOM sections. Real interactive controls (buttons/links/
-  // form fields) still hide it so it never obscures something clickable -- except the nav bar,
-  // which hides it as a whole block (the gaps between its buttons aren't covered by the button
-  // hitbox, so a per-element check let the trail smear behind the pill), and the chat launcher,
-  // which explicitly wants the trail to keep drawing under/around it.
-  var path=event.composedPath();
-  var overNav=path.some(function(el){return el.closest && el.closest("#site-nav");});
-  if(overNav){stopCursorLoop();return;}
-  var interactive=path.some(function(el){return el.matches && el.id!=="assistant-launcher" && el.matches("button,a,input,textarea,select,[role='button']");});
-  if(interactive){stopCursorLoop();return;}
+  var path=event.composedPath?event.composedPath():[event.target];
+  var editing=path.some(function(el){return el.matches&&el.matches('input,textarea,select,[contenteditable="true"],[role="textbox"]');});
+  if(editing){havePointer=false;pendingTrailSample=false;starAnchor=null;return;}
+  // Avoid a connecting streak when re-entering after a pause or excluded field.
+  if(!havePointer||performance.now()-rawTime>160){trailPoints=[];starAnchor=null;lastPushTime=0;}
+  pendingTrailSample=true;
   rawX=event.clientX; rawY=event.clientY; rawTime=performance.now(); havePointer=true;
   startCursorLoop();
 }
@@ -8326,6 +8356,7 @@ window.addEventListener('touchcancel',function(){activeTrailTouch=null;stopCurso
 window.addEventListener('pointerup',function(event){if(event.pointerId===activeTrailTouch){activeTrailTouch=null;havePointer=false;}},{passive:true});
 window.addEventListener('pointercancel',function(event){if(event.pointerId===activeTrailTouch){activeTrailTouch=null;stopCursorLoop();}},{passive:true});
 window.addEventListener('blur',stopCursorLoop);
+window.addEventListener('pointerout',function(e){if(!e.relatedTarget){havePointer=false;pendingTrailSample=false;starAnchor=null;}},{passive:true});
 window.addEventListener("resize",resizeTrail);
 document.addEventListener("visibilitychange",function(){if(document.hidden)stopCursorLoop();});
 finePointer.addEventListener("change",stopCursorLoop);
@@ -8340,7 +8371,7 @@ var layer = document.getElementById("ember-layer");
 var embers = [];
 function resetEmber(e){
   e.x = Math.random() * kaLayoutW();
-  e.y = Math.random() * kaLayoutH();
+  e.y = kaLayoutH() + 20 + Math.random() * 200;
   e.vy = -(6 + Math.random() * 10) / 1000; // px per ms, upward
   e.swayFreq = 0.0007 + Math.random() * 0.0006;
   e.swaySeed = Math.random() * Math.PI * 2;
@@ -8365,17 +8396,15 @@ function updateEmbers(now){
   emberFrame=0;
   if (reducedMotion || document.hidden){ emberLoopActive = false; return; }
   emberFrame=requestAnimationFrame(updateEmbers);
-  var dt = Math.min(100, now - lastEmberT); lastEmberT = now;
+  var dt = now - lastEmberT; lastEmberT = now;
   embers.forEach(function(e){
     e.life += dt;
-    e.life %= e.maxLife;
+    if (e.life >= e.maxLife){ resetEmber(e); return; }
     e.y += e.vy * dt;
-    if(e.y < 0)e.y += kaLayoutH();
     var sway = Math.sin(now * e.swayFreq + e.swaySeed) * e.swayAmp;
-    // Continuous glow with independent phases; never expire below the screen.
-    var glow = .48 + .18 * Math.sin(e.life/e.maxLife*Math.PI*2);
-    e.el.style.opacity = String(glow);
-    e.el.style.transform = "translate3d(" + (Math.max(2,Math.min(kaLayoutW()-2,e.x+sway))) + "px," + e.y + "px,0)";
+    var edgeFade = Math.min(1, e.life / 600) * Math.min(1, (e.maxLife - e.life) / 800);
+    e.el.style.opacity = String(0.7 * edgeFade);
+    e.el.style.transform = "translate3d(" + (e.x + sway) + "px," + e.y + "px,0)";
   });
 }
 function startEmberLoop(){

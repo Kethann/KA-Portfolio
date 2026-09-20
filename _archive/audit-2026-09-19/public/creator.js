@@ -4,9 +4,7 @@ let csrf='',site=null,messages=[],dirty=false;
 // Mirrors server/creator.js's FONT_CHOICES exactly -- kept in sync by hand since this file is a
 // plain script (no bundler/shared-module step) rather than pulled in dynamically, matching how
 // every other constant in this small admin UI is already duplicated rather than imported.
-const FONT_CHOICES=['Fraunces','Manrope','Sora','Poppins','Playfair Display','Space Grotesk','system-ui'];
-// Type style presets: each just sets the display + text fonts together.
-const TYPE_PRESETS={editorial:['Fraunces','Manrope'],modern:['Sora','Manrope'],technical:['Space Grotesk','Manrope'],classic:['Playfair Display','Manrope']};
+const FONT_CHOICES=['Manrope','Poppins','Playfair Display','Space Grotesk','system-ui'];
 // [fix] this never actually auto-dismissed -- it only ever set text/error state, nothing anywhere
 // cleared either back out, so the last message (e.g. "Signed in.") just sat there permanently.
 // Error messages stay put (the admin needs to actually read and act on those); success/info
@@ -28,12 +26,11 @@ async function api(path,options={}){
     // validation error to fix in the form.
     throw new Error('Could not reach the server. Check that it is running, then try again.');
   }
-  let body;try{body=await response.json();}catch{throw new Error('The server returned an unexpected response. Open the studio from the main application server and retry.');}if(!response.ok) {if(response.status===401)showLogin();throw new Error(body.error||'Unable to complete this request.');}return body;
+  const body=await response.json();if(!response.ok) {if(response.status===401)showLogin();throw new Error(body.error||'Unable to complete this request.');}return body;
 }
 function el(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;}
 function button(label,action,cls){const b=el('button',label,cls);b.type='button';b.addEventListener('click',()=>Promise.resolve().then(action).catch(e=>status(e.message,true)));return b;}
-let draftVersion=0;
-function markDirty(){dirty=true;draftVersion++;$('#save').textContent='Publish changes';syncPreview();}
+function markDirty(){dirty=true;$('#save').textContent='Publish changes';syncPreview();}
 function showLogin(){csrf='';$('#studio').hidden=true;$('#login-view').hidden=false;}
 function field(label,value,onChange){const wrap=el('label',label),input=el('input');input.value=value;input.maxLength=label==='Project URL'?2000:label.startsWith('Technologies')?1200:160;input.addEventListener('change',()=>{onChange(input.value.trim());markDirty();});wrap.append(input);return wrap;}
 async function loadStudio(){
@@ -42,7 +39,6 @@ async function loadStudio(){
   for(const input of $('#details').elements) if(input.name)input.value=site.details[input.name]||'';
   site.notice=site.notice||{enabled:false,text:'',tone:'info'};
   site.visibility=site.visibility||{navGallery:true,navAbout:true};
-  site.stacks=site.stacks||{loop:true,covers:{}};site.stacks.covers=site.stacks.covers||{};
   site.layoutOverrides=site.layoutOverrides||{mobile:{},tablet:{},desktop:{}};
   site.details.customFonts=site.details.customFonts||[];
   if(site.details.glassBlur===undefined)site.details.glassBlur=18;
@@ -50,7 +46,7 @@ async function loadStudio(){
   site.elementStyles=site.elementStyles||{};
   renderTypography();renderNoticeForm();renderVisibilityForm();renderLayoutPanel();renderBranding();
   renderInbox();renderFolders();renderImages(); // renderInbox() already calls renderOverview() itself
-  setupPreview();syncPreview();
+  setupPreview();
 }
 // Centered above the live-preview panel (Part C) rather than the old cramped sidebar cluster --
 // see #overview's new position in creator.html, right before .preview-toolbar. The "New messages"
@@ -91,7 +87,7 @@ function setupPreview(){
   window.addEventListener('message',event=>{
     if(event.origin!==location.origin||event.source!==frame.contentWindow)return;
     const msg=event.data;if(!msg||typeof msg!=='object')return;
-    if(msg.type==='ka-preview-ready'){previewReady=true;syncPreview();postToPreview({type:'ka-preview-edit-mode',enabled:$('#edit-layout-toggle').checked});}
+    if(msg.type==='ka-preview-ready'){previewReady=true;syncPreview();}
     else if(msg.type==='ka-preview-selected'){$('#preview-selection').textContent='Editing: '+msg.id;openPropertyPanel(msg);}
     else if(msg.type==='ka-preview-moved'){
       site.layoutOverrides[msg.breakpoint]=site.layoutOverrides[msg.breakpoint]||{};
@@ -103,8 +99,7 @@ function setupPreview(){
   $('#device-preset').addEventListener('change',applyDevicePreset);
   $('#apply-custom').addEventListener('click',()=>{
     const w=Number($('#custom-w').value),h=Number($('#custom-h').value);
-    if(Number.isFinite(w)&&Number.isFinite(h)&&w>=240&&h>=240&&w<=3840&&h<=3840)setPreviewSize(w,h);
-    else status('Choose a width and height between 240 and 3840 pixels.',true);
+    if(w>=240&&h>=240)setPreviewSize(w,h);
   });
   $('#edit-layout-toggle').addEventListener('change',e=>{
     $('#preview-selection').textContent=e.target.checked?'Click an element to select it, drag to move, drag its corner dot to resize.':'';
@@ -231,7 +226,7 @@ function setPreviewSize(w,h){
   }
   frame.style.width=w+'px';frame.style.height=h+'px';
   const pad=40,availW=viewport.clientWidth-pad,availH=viewport.clientHeight-pad;
-  const scale=Math.max(0.05,Math.min(1,availW/w,availH/h));
+  const scale=Math.min(1,availW/w,availH/h);
   frame.style.transform=scale<1?'scale('+scale+')':'none';
 }
 window.addEventListener('resize',()=>{if($('#device-preset').value!=='responsive')applyDevicePreset();});
@@ -245,14 +240,8 @@ function renderTypography(){
       site.details.customFonts.forEach(font=>{const opt=el('option',font.family);opt.value=font.family;group.append(opt);});
       select.append(group);
     }
-    select.value=site.details[name]||(name==='headingFont'?'Fraunces':'Manrope');
-    select.onchange=()=>{site.details[name]=select.value;markDirty();renderTypography();};
-  }
-  const preset=form.elements.typePreset;
-  if(preset){
-    const current=Object.entries(TYPE_PRESETS).find(([,f])=>f[0]===site.details.headingFont&&f[1]===site.details.bodyFont);
-    preset.value=current?current[0]:'custom';
-    preset.onchange=()=>{const f=TYPE_PRESETS[preset.value];if(!f)return;site.details.headingFont=f[0];site.details.bodyFont=f[1];markDirty();renderTypography();};
+    select.value=site.details[name]||'Manrope';
+    select.onchange=()=>{site.details[name]=select.value;markDirty();};
   }
   form.elements.textScale.value=site.details.textScale||1;
   form.elements.textScale.onchange=()=>{site.details.textScale=Number(form.elements.textScale.value);markDirty();};
@@ -269,9 +258,8 @@ function renderCustomFonts(){
     row.append(button('Remove',()=>{
       const wasSelected=name=>site.details[name]===font.family;
       site.details.customFonts.splice(i,1);
-      if(wasSelected('headingFont'))site.details.headingFont='Fraunces';
+      if(wasSelected('headingFont'))site.details.headingFont='Manrope';
       if(wasSelected('bodyFont'))site.details.bodyFont='Manrope';
-      for(const style of Object.values(site.elementStyles))if(style.font===font.family)delete style.font;
       markDirty();renderTypography();
     },'danger'));
     root.append(row);
@@ -279,7 +267,6 @@ function renderCustomFonts(){
 }
 $('#custom-font-upload').addEventListener('change',async event=>{
   const file=event.target.files[0];const nameInput=$('#custom-font-name');
-  if(!file)return;
   const family=nameInput.value.trim();
   if(!family||!/^[A-Za-z0-9 _-]+$/.test(family)){event.target.value='';return status('Name the font first (letters, numbers, spaces, - and _ only).',true);}
   if(site.details.customFonts.some(f=>f.family===family)){event.target.value='';return status('A font with that name already exists.',true);}
@@ -354,10 +341,9 @@ function renderLayoutPanel(){
 }
 function renderVisibilityForm(){
   const form=$('#visibility-form');
-  site.stacks=site.stacks||{loop:true,covers:{}};
-  form.elements.coverflowLoop.checked=site.stacks.loop!==false;
+  form.elements.navGallery.checked=site.visibility.navGallery!==false;
   form.elements.navAbout.checked=site.visibility.navAbout!==false;
-  form.elements.coverflowLoop.onchange=()=>{site.stacks.loop=form.elements.coverflowLoop.checked;markDirty();};
+  form.elements.navGallery.onchange=()=>{site.visibility.navGallery=form.elements.navGallery.checked;markDirty();};
   form.elements.navAbout.onchange=()=>{site.visibility.navAbout=form.elements.navAbout.checked;markDirty();};
 }
 // SVG bar chart -- no charting library pulled in for three small bar charts in an internal admin
@@ -466,13 +452,11 @@ function openMessageDrawer(message){
   actions.append(button('Delete',async()=>{if(!confirm('Permanently delete this message?'))return;await api('/creator/messages/'+message.id,{method:'DELETE'});messages=messages.filter(m=>m!==message);closeMessageDrawer();renderInbox();},'danger'));
   drawer.append(actions);
   $('#message-drawer-wrap').classList.add('open');
-  $('#message-drawer-close').focus();
   renderInbox();
 }
 function closeMessageDrawer(){
   openMessageId=null;
   $('#message-drawer-wrap').classList.remove('open');
-  if($('#messages-modal-wrap').classList.contains('open'))$('#messages-modal-close').focus();
 }
 $('#message-drawer-close').addEventListener('click',closeMessageDrawer);
 $('#message-drawer-backdrop').addEventListener('click',closeMessageDrawer);
@@ -481,47 +465,29 @@ $('#message-drawer-backdrop').addEventListener('click',closeMessageDrawer);
 // showing underneath is exactly what's still showing once this closes. The per-message detail
 // still uses the existing slide-in drawer (openMessageDrawer above), which layers on top fine
 // (higher z-index -- see creator.css) since both are independent fixed overlays.
-let messagesReturnFocus=null;
 function openMessagesModal(){
-  messagesReturnFocus=document.activeElement;
   renderInbox();
   $('#messages-modal-wrap').classList.add('open');
-  $('#messages-modal-close').focus();
   document.addEventListener('keydown',onMessagesModalKeydown);
 }
 function closeMessagesModal(){
   $('#messages-modal-wrap').classList.remove('open');
   closeMessageDrawer();
   document.removeEventListener('keydown',onMessagesModalKeydown);
-  messagesReturnFocus?.focus();
 }
-function onMessagesModalKeydown(e){
-  if(e.key==='Escape'){e.preventDefault();if($('#message-drawer-wrap').classList.contains('open'))closeMessageDrawer();else closeMessagesModal();}
-  if(e.key==='Tab'){
-    const panel=$('#message-drawer-wrap').classList.contains('open')?$('#message-drawer-panel'):$('#messages-modal');
-    const focusable=[...panel.querySelectorAll('button:not(:disabled),a[href],input,select,textarea,[tabindex="0"]')];
-    const first=focusable[0],last=focusable.at(-1);
-    if(e.shiftKey&&(document.activeElement===first||!panel.contains(document.activeElement))){e.preventDefault();last?.focus();}
-    else if(!e.shiftKey&&(document.activeElement===last||!panel.contains(document.activeElement))){e.preventDefault();first?.focus();}
-  }
-}
+function onMessagesModalKeydown(e){if(e.key==='Escape')closeMessagesModal();}
 $('#messages-modal-close').addEventListener('click',closeMessagesModal);
 $('#messages-modal-backdrop').addEventListener('click',closeMessagesModal);
 document.querySelector('[data-action="messages"]').addEventListener('click',openMessagesModal);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#message-drawer-wrap').classList.contains('open'))closeMessageDrawer();});
 function reorder(array,index,delta){const target=index+delta;if(target<0||target>=array.length)return;[array[index],array[target]]=[array[target],array[index]];markDirty();}
 function renderFolders(){
   const root=$('#folders');root.replaceChildren();
   site.folders.forEach((name,i)=>{
     const row=el('div',undefined,'folder-row'),input=el('input');input.value=name;input.maxLength=70;input.setAttribute('aria-label','Folder name');
-    input.addEventListener('change',()=>{const next=input.value.trim();if(!next||site.folders.some((f,j)=>j!==i&&f===next)){input.value=name;return status('Use a unique, nonempty folder name.',true);}site.folders[i]=next;site.images.forEach(image=>{if(image.cat===name)image.cat=next;});site.stacks.covers=site.stacks.covers||{};if(site.stacks.covers[name]){site.stacks.covers[next]=site.stacks.covers[name];delete site.stacks.covers[name];}markDirty();renderFolders();renderImages();});
-    row.append(input,button('↑',()=>{reorder(site.folders,i,-1);renderFolders();}),button('↓',()=>{reorder(site.folders,i,1);renderFolders();}),button('Remove',()=>{const inside=site.images.filter(image=>image.cat===name).length;if(!confirm(inside?'Delete the stack “'+name+'” and its '+inside+' image'+(inside===1?'':'s')+'? This can’t be undone.':'Delete the stack “'+name+'”? This can’t be undone.'))return;if(inside)site.images=site.images.filter(image=>image.cat!==name);delete (site.stacks.covers||{})[name];site.folders.splice(i,1);markDirty();renderFolders();renderImages();},'danger'));
-    row.querySelectorAll('button')[0].setAttribute('aria-label','Move '+name+' up');row.querySelectorAll('button')[1].setAttribute('aria-label','Move '+name+' down');
-    const coverLabel=el('label','Stack cover'),cover=el('select');cover.setAttribute('aria-label','Cover image for '+name);
-    const first=el('option','First image (default)');first.value='';cover.append(first);
-    site.images.filter(image=>image.cat===name).forEach(image=>{const o=el('option',image.title||image.slug);o.value=image.slug;cover.append(o);});
-    cover.value=(site.stacks.covers||{})[name]&&site.images.some(image=>image.slug===site.stacks.covers[name]&&image.cat===name)?site.stacks.covers[name]:'';
-    cover.addEventListener('change',()=>{site.stacks.covers=site.stacks.covers||{};if(cover.value)site.stacks.covers[name]=cover.value;else delete site.stacks.covers[name];markDirty();});
-    coverLabel.append(cover);row.append(coverLabel);root.append(row);
+    input.addEventListener('change',()=>{const next=input.value.trim();if(!next||site.folders.some((f,j)=>j!==i&&f===next)){input.value=name;return status('Use a unique, nonempty folder name.',true);}site.folders[i]=next;site.images.forEach(image=>{if(image.cat===name)image.cat=next;});markDirty();renderFolders();renderImages();});
+    row.append(input,button('↑',()=>{reorder(site.folders,i,-1);renderFolders();}),button('↓',()=>{reorder(site.folders,i,1);renderFolders();}),button('Remove',()=>{if(site.images.some(image=>image.cat===name))return status('Move this folder’s images to another folder first.',true);if(!confirm('Delete the folder “'+name+'”? This can’t be undone.'))return;site.folders.splice(i,1);markDirty();renderFolders();},'danger'));
+    row.querySelectorAll('button')[0].setAttribute('aria-label','Move '+name+' up');row.querySelectorAll('button')[1].setAttribute('aria-label','Move '+name+' down');root.append(row);
   });
 }
 function renderImages(){
@@ -532,7 +498,7 @@ function renderImages(){
     const fields=el('div',undefined,'fields');fields.append(field('Title',image.title,value=>image.title=value));
     const description=el('label','Description'),area=el('textarea');area.value=image.description||'';area.maxLength=4000;area.addEventListener('change',()=>{image.description=area.value;markDirty();});description.append(area);fields.append(description);
     fields.append(field('Technologies (comma separated)',(image.technologies||[]).join(', '),value=>image.technologies=value.split(',').map(v=>v.trim()).filter(Boolean)),field('Project URL',image.link||'',value=>image.link=value));
-    const label=el('label','Folder'),select=el('select');site.folders.forEach(name=>{const option=el('option',name);option.value=name;select.append(option);});select.value=image.cat;select.addEventListener('change',()=>{image.cat=select.value;markDirty();renderFolders();});label.append(select);fields.append(label);
+    const label=el('label','Folder'),select=el('select');site.folders.forEach(name=>{const option=el('option',name);option.value=name;select.append(option);});select.value=image.cat;select.addEventListener('change',()=>{image.cat=select.value;markDirty();});label.append(select);fields.append(label);
     const replace=el('label','Replace image'),file=el('input');file.type='file';file.accept='image/png,image/jpeg,image/webp';file.addEventListener('change',async()=>{if(!file.files[0])return;file.disabled=true;try{const result=await uploadFile(file.files[0]);image.src=result.src;markDirty();renderImages();status('Image replaced in draft. Save portfolio to publish.');}catch(error){status(error.message,true);}finally{file.disabled=false;}});replace.append(file);fields.append(replace);
     const downloadRow=el('label','','row'),downloadBox=el('input');downloadBox.type='checkbox';downloadBox.checked=image.downloadable!==false;downloadBox.addEventListener('change',()=>{image.downloadable=downloadBox.checked;markDirty();});downloadRow.append(downloadBox,document.createTextNode('Visitors can download this image'));fields.append(downloadRow);
     const actions=el('div',undefined,'actions');actions.append(button('Move up',()=>{reorder(site.images,i,-1);renderImages();}),button('Move down',()=>{reorder(site.images,i,1);renderImages();}),button('Remove',()=>{if(!confirm('Remove “'+(image.title||'this image')+'” from the portfolio? This can’t be undone.'))return;site.images.splice(i,1);markDirty();renderImages();},'danger'));row.append(img,fields,actions);root.append(row);
@@ -581,8 +547,7 @@ document.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener(
 $('#split').classList.toggle('dashboard-mode',document.querySelector('[data-tab][aria-current]')?.dataset.tab==='dashboard');
 $('#message-filter').addEventListener('change',renderInbox);
 $('#refresh').addEventListener('click',async()=>{try{messages=await api('/creator/messages');renderInbox();status('Inbox updated.');}catch(error){status(error.message,true);}});
-$('#details').addEventListener('input',()=>{Object.assign(site.details,Object.fromEntries(new FormData($('#details'))));markDirty();});$('#details').addEventListener('submit',e=>e.preventDefault());
-for(const form of document.querySelectorAll('#typography,#notice-form,#visibility-form,#branding-form'))form.addEventListener('submit',event=>event.preventDefault());
+$('#details').addEventListener('input',markDirty);$('#details').addEventListener('submit',e=>e.preventDefault());
 $('#add-folder').addEventListener('submit',event=>{event.preventDefault();const name=event.target.elements.name.value.trim();if(!name||site.folders.includes(name))return status('Choose a unique folder name.',true);site.folders.push(name);event.target.reset();markDirty();renderFolders();});
 $('#upload').addEventListener('change',async event=>{
   if(!site.folders.length){event.target.value='';return status('Add a folder first.',true);}
@@ -596,7 +561,7 @@ $('#upload').addEventListener('change',async event=>{
 });
 $('#save').addEventListener('click',async()=>{
   if(!$('#details').checkValidity()){document.querySelector('[data-tab="content"]').click();$('#details').reportValidity();return;}const b=$('#save');b.disabled=true;
-  try{site.details=Object.assign({},site.details,Object.fromEntries(new FormData($('#details'))));const version=draftVersion;const saved=await api('/creator/portfolio',{method:'PUT',body:JSON.stringify(site)});if(version===draftVersion){site=saved;dirty=false;syncPreview();status('Published. Your public page now uses these changes.');}else{site.revision=saved.revision;status('Published. Newer edits remain in your draft; publish again when ready.');}b.textContent='Publish changes';}
+  try{site.details=Object.assign({},site.details,Object.fromEntries(new FormData($('#details'))));site=await api('/creator/portfolio',{method:'PUT',body:JSON.stringify(site)});dirty=false;b.textContent='Publish changes';status('Published. Your public page now uses these changes.');}
   catch(error){status(error.message,true);}finally{b.disabled=false;}
 });
 $('#password').addEventListener('submit',async event=>{event.preventDefault();try{await api('/creator/password',{method:'PUT',body:JSON.stringify({password:new FormData(event.target).get('password')})});event.target.reset();showLogin();status('Password changed. Sign in with your new password.');}catch(error){status(error.message,true);}});
@@ -606,7 +571,7 @@ async function uploadFile(file){if(file.size>12*1024*1024)throw new Error('Choos
 async function renderAssets(){
   const assets=await api('/creator/assets'),root=$('#assets');root.replaceChildren();
   if(!assets.length)root.append(el('p','No uploaded images yet. Original project images remain in the collection.','empty'));
-  assets.forEach(asset=>{const row=el('div',undefined,'image-row'),image=el('img');image.src=asset.src;image.alt='Uploaded artwork';image.loading='lazy';const link=el('a','Preview full image ↗');link.href=asset.src;link.target='_blank';link.rel='noopener';const info=el('div');info.append(el('p',Math.round(asset.bytes/1024)+' KB · '+(asset.used?'Used in portfolio':'Unused')),link);const draftUsed=site.images.some(image=>image.src===asset.src)||site.branding?.logoUrl===asset.src;const remove=button('Archive unused',async()=>{await api('/creator/assets/'+asset.src.split('/').pop(),{method:'DELETE'});await renderAssets();status('Unused image archived.');});remove.disabled=asset.used||draftUsed;row.append(image,info,remove);root.append(row);});
+  assets.forEach(asset=>{const row=el('div',undefined,'image-row'),image=el('img');image.src=asset.src;image.alt='Uploaded artwork';image.loading='lazy';const link=el('a','Preview full image ↗');link.href=asset.src;link.target='_blank';link.rel='noopener';const info=el('div');info.append(el('p',Math.round(asset.bytes/1024)+' KB · '+(asset.used?'Used in portfolio':'Unused')),link);const remove=button('Delete unused',async()=>{await api('/creator/assets/'+asset.src.split('/').pop(),{method:'DELETE'});await renderAssets();status('Unused image deleted.');});remove.disabled=asset.used;row.append(image,info,remove);root.append(row);});
 }
 $('#refresh-assets').addEventListener('click',()=>renderAssets().catch(error=>status(error.message,true)));
 document.querySelector('[data-tab="asset-view"]').addEventListener('click',()=>renderAssets().catch(error=>status(error.message,true)));

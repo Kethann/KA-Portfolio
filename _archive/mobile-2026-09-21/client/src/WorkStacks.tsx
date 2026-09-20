@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import type {KeyboardEvent as ReactKeyboardEvent,MouseEvent as ReactMouseEvent,PointerEvent as ReactPointerEvent} from 'react';
-import {imageUrl,type Project} from './types';
+import type {Project} from './types';
 
 export type StacksSettings={loop?:boolean;covers?:Record<string,string>};
 export type WorkStacksProps={folders:string[];images:Project[];stacks?:StacksSettings;/** Distinguishes panels (Portfolio, About) so each plays its own entrance once. */id?:string};
@@ -74,175 +74,6 @@ function StackGrid({id,stacks,reduced,onOpen}:{id:string;stacks:Stack[];reduced:
   </div>;
 }
 
-/* ============================================================ download button ===== */
-// Icon-only button. On click the button's own circle folds into a small paper plane (a real 12-point shape
-// morph, same idea as the contact "send" button), the plane drops into a tray beneath it, and the button
-// re-forms as a check once the file has actually been fetched and saved. The download result is
-// authoritative: the check only appears after it succeeds; a failure shows a cross instead.
-const DL_DEFAULTS={pressMs:60,foldMs:150,dropMs:230,landMs:80,resetMs:1900,plane:28,drop:44};
-type DlState='idle'|'busy'|'done'|'error';
-function dlConfig(){return {...DL_DEFAULTS,...((window as unknown as {KA_DL_CONFIG?:Partial<typeof DL_DEFAULTS>}).KA_DL_CONFIG||{})};}
-const ease=(t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
-const easeOut=(t:number)=>1-Math.pow(1-t,3);
-const easeIn=(t:number)=>t*t*t;
-type Pt=[number,number];
-const mixPts=(a:Pt[],b:Pt[],f:number):Pt[]=>a.map((p,i)=>[p[0]+(b[i][0]-p[0])*f,p[1]+(b[i][1]-p[1])*f]);
-const ptsAttr=(pts:Pt[])=>pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-function planeShapes(L:number){
-  const cx=24,cy=24,R=23.5,hp=L*.3;
-  // circle -> plane use the same 12 points in the same order, so the morph is point-for-point
-  const A:Pt[]=Array.from({length:12},(_,i)=>{const t=(-45+30*i)*Math.PI/180;return [cx+R*Math.cos(t),cy+R*Math.sin(t)] as Pt;});
-  const B:Pt[]=A.map(p=>[p[0],cy+(p[1]-cy)*.8] as Pt);
-  const T1:Pt=[cx-L/2,cy-hp],N:Pt=[cx+L/2,cy],T2:Pt=[cx-L/2,cy+hp],K:Pt=[cx-L/2+L*.26,cy];
-  const on=(a:Pt,b:Pt,f:number):Pt=>[a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f];
-  const right:Pt[]=[T1,on(T1,N,.4),on(T1,N,.78),on(T1,N,.93),N,on(T2,N,.93),on(T2,N,.78),on(T2,N,.4),T2,on(T2,K,.5),K,on(K,T1,.5)];
-  const E:Pt[]=right.map(p=>[cx-(p[1]-cy),cy+(p[0]-cx)] as Pt);   // turn the right-pointing plane to point down
-  return {A,B,E};
-}
-function fileName(p:Project,url:string){
-  const ext=(/\.(webp|png|jpe?g|avif)(\?|$)/i.exec(url)?.[1]||'webp').toLowerCase().replace('jpeg','jpg');
-  const base=(p.title||p.slug||'image').trim().replace(/[^\w\- ]+/g,'').replace(/\s+/g,'-').slice(0,80)||'image';
-  return `${base}.${ext}`;
-}
-async function fetchFile(p:Project){
-  const url=p.src||imageUrl(p,true);
-  const res=await fetch(url);if(!res.ok)throw new RangeError('HTTP '+res.status);   // a real server error: not worth retrying as a link
-  return {blob:await res.blob(),name:fileName(p,url)};
-}
-function saveBlob(file:{blob:Blob;name:string}){
-  const a=document.createElement('a');a.href=URL.createObjectURL(file.blob);a.download=file.name;a.style.display='none';
-  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
-}
-function saveLink(p:Project){
-  const a=document.createElement('a');a.href=p.src||imageUrl(p,true);a.download=fileName(p,a.href);a.rel='noopener';a.style.display='none';
-  document.body.appendChild(a);a.click();a.remove();
-}
-function DownloadButton({project,reduced}:{project:Project;reduced:boolean}){
-  const [state,setState]=useState<DlState>('idle');
-  const stateRef=useRef<DlState>('idle');
-  const raf=useRef(0),timer=useRef(0);
-  const refs=useRef<{body?:SVGPolygonElement;lit?:SVGRectElement;shade?:SVGRectElement;c1?:SVGLineElement;c2?:SVGLineElement;tray?:SVGPathElement;plane?:SVGGElement;stopT?:SVGStopElement;stopB?:SVGStopElement;clip?:SVGPolygonElement}>({});
-  const set=(s:DlState)=>{stateRef.current=s;setState(s);};
-  const cfg=useMemo(dlConfig,[]);
-  const shapes=useMemo(()=>planeShapes(cfg.plane),[cfg.plane]);
-  useEffect(()=>()=>{cancelAnimationFrame(raf.current);clearTimeout(timer.current);},[]);
-  // a different image: back to idle
-  useEffect(()=>{cancelAnimationFrame(raf.current);clearTimeout(timer.current);stateRef.current='idle';setState('idle');},[project.slug]);
-  function frame(t:number){
-    const r=refs.current,{pressMs,foldMs,dropMs,landMs}=cfg;
-    let pts:Pt[],fold=0,dy=0,rot=0,sway=0,scale=1,opacity=1,tray=0,solid=0;
-    if(t<pressMs){const k=easeOut(t/pressMs);pts=mixPts(shapes.A,shapes.B,k);scale=1-.04*Math.sin(k*Math.PI);}
-    else if(t<pressMs+foldMs){const k=ease((t-pressMs)/foldMs);pts=mixPts(shapes.B,shapes.E,k);fold=k;solid=k;tray=k;}
-    else if(t<pressMs+foldMs+dropMs){const k=(t-pressMs-foldMs)/dropMs,d=easeIn(k)*.85+k*.15;pts=shapes.E;fold=1;solid=1;tray=1;dy=cfg.drop*d;rot=Math.sin(k*Math.PI)*9;sway=Math.sin(k*Math.PI*2)*2.5;scale=1-.08*k;}
-    else{const k=easeOut(Math.min(1,Math.max(0,(t-pressMs-foldMs-dropMs)/landMs)));pts=shapes.E;fold=1;solid=1;tray=1;dy=cfg.drop+4*k;scale=.92-.4*k;opacity=1-k;}
-    const s=ptsAttr(pts);
-    r.body?.setAttribute('points',s);r.clip?.setAttribute('points',s);
-    const to=(a:number,b:number)=>(a+(b-a)*solid).toFixed(3);
-    r.stopT?.setAttribute('stop-color',`rgba(255,241,221,${to(.28,.96)})`);
-    r.stopB?.setAttribute('stop-color',`rgba(190,211,234,${to(.14,.9)})`);
-    const crease=Math.sin(Math.min(1,fold)*Math.PI);           // fold lines show while the corners fold in
-    r.c1?.setAttribute('opacity',(crease*.85).toFixed(2));r.c2?.setAttribute('opacity',(crease*.85).toFixed(2));
-    r.lit?.setAttribute('opacity',(fold*.9).toFixed(2));r.shade?.setAttribute('opacity',(fold*.9).toFixed(2));
-    r.tray?.setAttribute('opacity',tray.toFixed(2));
-    r.plane?.setAttribute('transform',`translate(${sway.toFixed(1)} ${dy.toFixed(1)}) rotate(${rot.toFixed(1)} 24 24) translate(24 24) scale(${scale.toFixed(3)}) translate(-24 -24)`);
-    r.plane?.setAttribute('opacity',opacity.toFixed(2));
-  }
-  function finish(ok:boolean){
-    set(ok?'done':'error');
-    clearTimeout(timer.current);timer.current=window.setTimeout(()=>{stateRef.current='idle';setState('idle');},cfg.resetMs);
-  }
-  async function click(){
-    if(stateRef.current!=='idle')return;
-    set('busy');
-    const pending=fetchFile(project);      // starts immediately; the animation never decides the outcome
-    pending.catch(()=>undefined);
-    const settle=async()=>{
-      try{saveBlob(await pending);finish(true);}
-      catch(err){
-        // the request itself could not be made as a blob (e.g. cross-origin): hand the plain link to the browser instead.
-        // A genuine HTTP error (missing file) is reported as a failure, never as a success.
-        if(err instanceof TypeError){try{saveLink(project);finish(true);}catch{finish(false);}}else finish(false);
-      }
-    };
-    if(reduced||!('animate' in Element.prototype)){await settle();return;}
-    const total=cfg.pressMs+cfg.foldMs+cfg.dropMs+cfg.landMs,t0=performance.now();
-    const tick=(now:number)=>{
-      const t=now-t0;frame(Math.min(t,total));
-      if(t<total)raf.current=requestAnimationFrame(tick);else void settle();
-    };
-    frame(0);raf.current=requestAnimationFrame(tick);
-  }
-  const label=state==='busy'?'Downloading…':state==='done'?'Download started':state==='error'?'Download failed, try again':`Download ${project.title}`;
-  return <span className="dl">
-    <button type="button" className="dl-btn" data-state={state} onClick={click} aria-label={label} aria-busy={state==='busy'} title={state==='idle'?'Download':label}>
-      <svg className="i-dl" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.2-4.2M12 15l4.2-4.2M5 19.5h14"/></svg>
-      <svg className="i-ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.8l4.2 4.2L18.5 8"/></svg>
-      <svg className="i-err" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg>
-    </button>
-    <svg className="dl-fx" viewBox="0 0 48 96" aria-hidden="true" focusable="false">
-      <defs>
-        <linearGradient id="dlg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="rgba(255,241,221,.28)" ref={el=>{refs.current.stopT=el||undefined;}}/>
-          <stop offset="1" stopColor="rgba(190,211,234,.14)" ref={el=>{refs.current.stopB=el||undefined;}}/>
-        </linearGradient>
-        <clipPath id="dlc"><polygon ref={el=>{refs.current.clip=el||undefined;}}/></clipPath>
-      </defs>
-      <path ref={el=>{refs.current.tray=el||undefined;}} d="M6 68v11q0 7 7 7h22q7 0 7-7V68" fill="none" stroke="rgba(255,225,190,.85)" strokeWidth="2" strokeLinecap="round" opacity="0"/>
-      <g ref={el=>{refs.current.plane=el||undefined;}} opacity="0">
-        <polygon ref={el=>{refs.current.body=el||undefined;}} fill="url(#dlg)" stroke="rgba(255,170,120,.55)" strokeWidth="1" strokeLinejoin="round"/>
-        <rect ref={el=>{refs.current.lit=el||undefined;}} x="0" y="0" width="24" height="96" fill="rgba(255,255,255,.34)" clipPath="url(#dlc)" opacity="0"/>
-        <rect ref={el=>{refs.current.shade=el||undefined;}} x="24" y="0" width="24" height="96" fill="rgba(0,0,0,.3)" clipPath="url(#dlc)" opacity="0"/>
-        <line ref={el=>{refs.current.c1=el||undefined;}} x1="5" y1="14" x2="24" y2="34" stroke="rgba(255,240,225,.8)" strokeWidth="1" opacity="0"/>
-        <line ref={el=>{refs.current.c2=el||undefined;}} x1="43" y1="14" x2="24" y2="34" stroke="rgba(255,240,225,.8)" strokeWidth="1" opacity="0"/>
-      </g>
-    </svg>
-    <span className="sr" role="status" aria-live="polite">{state==='busy'?'Downloading…':state==='done'?'Download started':state==='error'?'Download failed. Try again.':''}</span>
-  </span>;
-}
-
-/* ============================================================ full image viewer ===== */
-function Viewer({p,stackName,index,n,atStart,atEnd,onPrev,onNext,onBack,reduced,origin}:{p:Project;stackName:string;index:number;n:number;atStart:boolean;atEnd:boolean;onPrev:()=>void;onNext:()=>void;onBack:()=>void;reduced:boolean;origin:DOMRect|null}){
-  const rootRef=useRef<HTMLDivElement>(null),frameRef=useRef<HTMLDivElement>(null),infoRef=useRef<HTMLDivElement>(null),first=useRef(true);
-  const [hi,setHi]=useState(false);
-  useEffect(()=>{setHi(false);},[p.slug]);
-  useEffect(()=>{rootRef.current?.focus({preventScroll:true});},[]);
-  // Fly the picture out of the carousel card into the viewer (transform only), then bring the text in.
-  useLayoutEffect(()=>{
-    if(!first.current)return;first.current=false;
-    const f=frameRef.current,info=infoRef.current;if(reduced||!f||!f.animate)return;
-    if(origin){
-      const to=f.getBoundingClientRect();
-      if(to.width&&to.height){
-        const s=origin.width/to.width,dx=origin.left+origin.width/2-(to.left+to.width/2),dy=origin.top+origin.height/2-(to.top+to.height/2);
-        f.animate([{transform:`translate3d(${dx}px,${dy}px,0) scale(${s})`},{transform:'translate3d(0,0,0) scale(1)'}],{duration:420,easing:'cubic-bezier(.2,.9,.25,1)'});
-      }
-    }
-    info?.animate([{opacity:0,transform:'translate3d(24px,0,0)'},{opacity:1,transform:'translate3d(0,0,0)'}],{duration:380,delay:110,easing:'cubic-bezier(.2,.9,.25,1)',fill:'backwards'});
-  },[]);// eslint-disable-line react-hooks/exhaustive-deps
-  const desc=(p.description||'').trim(),tech=(p.technologies||[]).filter(Boolean);
-  return <div className="vw" ref={rootRef} tabIndex={-1} role="group" aria-roledescription="image viewer" aria-label={p.title}>
-    <div className="vw-media">
-      <button type="button" className="vw-nav prev" onClick={onPrev} disabled={atStart||n<2} aria-label="Previous image">‹</button>
-      <div className="vw-frame" ref={frameRef} key={p.slug}>
-        <img className="lo" src={sized(p,1080)} alt={p.title} draggable={false}/>
-        <img className={'hi'+(hi?' is-in':'')} src={sized(p,1600)} alt="" aria-hidden="true" draggable={false} onLoad={()=>setHi(true)}/>
-      </div>
-      <button type="button" className="vw-nav next" onClick={onNext} disabled={atEnd||n<2} aria-label="Next image">›</button>
-    </div>
-    <div className="vw-info" ref={infoRef} key={'i'+p.slug}>
-      <p className="vw-kicker">{stackName} <span>{index+1} / {n}</span></p>
-      <h3 className="vw-title">{p.title}</h3>
-      {tech.length>0&&<ul className="vw-tags" aria-label="Tools">{tech.map(t=><li key={t}>{t}</li>)}</ul>}
-      {desc&&<div className="vw-desc"><p>{desc}</p></div>}
-      <div className="vw-actions">
-        {p.downloadable!==false&&<DownloadButton project={p} reduced={reduced}/>}
-        {p.link&&<a className="vw-link" href={p.link} target="_blank" rel="noopener noreferrer">View project ↗</a>}
-      </div>
-    </div>
-    <button type="button" className="vw-back" onClick={onBack} aria-label="Back to the carousel">✕</button>
-  </div>;
-}
-
 /* ============================================================ magnetic coverflow ===== */
 const VISIBLE=3;
 function Coverflow({stack,loop,reduced,canHover,onClose}:{stack:Stack;loop:boolean;reduced:boolean;canHover:boolean;onClose:()=>void}){
@@ -253,8 +84,6 @@ function Coverflow({stack,loop,reduced,canHover,onClose}:{stack:Stack;loop:boole
   const stageRef=useRef<HTMLDivElement>(null),cardRefs=useRef<(HTMLDivElement|null)[]>([]),magRefs=useRef<(HTMLDivElement|null)[]>([]),shadowRefs=useRef<(HTMLSpanElement|null)[]>([]);
   const st=useRef({pos:0,vel:0,target:0,dragging:false,moved:false,raf:0,last:0,cw:280,px:0,py:0,inside:false,startX:0,startPos:0,samples:[] as {t:number,p:number}[],pointerId:-1,mags:[] as {x:number,y:number,s:number,o:number}[]});
   const [active,setActive]=useState(0);
-  const [viewing,setViewing]=useState(false);
-  const viewingRef=useRef(false),originRect=useRef<DOMRect|null>(null);
   const activeRef=useRef(0);
   const cfg=useRef({loop,reduced,canHover,n,slots});cfg.current={loop,reduced,canHover,n,slots};
 
@@ -277,7 +106,6 @@ function Coverflow({stack,loop,reduced,canHover,onClose}:{stack:Stack;loop:boole
       el.style.opacity=String(clamp(VISIBLE+.4-ad,0,1));
       el.style.zIndex=String(100-Math.round(ad*10));
       el.tabIndex=el.dataset.dup==='1'?-1:0;
-      el.dataset.c=ad<.35?'1':'0';
     }
   },[]);
 
@@ -331,7 +159,7 @@ function Coverflow({stack,loop,reduced,canHover,onClose}:{stack:Stack;loop:boole
   // Measure the stage, size the cards, and keep them centred through resizes.
   useLayoutEffect(()=>{
     const stage=stageRef.current;if(!stage)return;
-    const fit=()=>{const w=stage.clientWidth;st.current.cw=Math.round(Math.max(80,Math.min(w*.56,320,(stage.clientHeight-32)/1.5)));stage.style.setProperty('--cw',st.current.cw+'px');layout();};
+    const fit=()=>{const w=stage.clientWidth;st.current.cw=Math.round(clamp(w*.56,150,320));stage.style.setProperty('--cw',st.current.cw+'px');layout();};
     fit();const ro=new ResizeObserver(fit);ro.observe(stage);
     return()=>ro.disconnect();
   },[layout,slots]);
@@ -339,43 +167,31 @@ function Coverflow({stack,loop,reduced,canHover,onClose}:{stack:Stack;loop:boole
   // Turning looping off while parked outside 0..n-1 must not leave the carousel past its ends.
   useEffect(()=>{if(!loop){const s=st.current;s.target=clamp(Math.round(s.target),0,n-1);s.pos=clamp(s.pos,0,n-1);report();kick();}},[loop,n]);// eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>{
-    // Escape steps back one level: image viewer -> carousel -> all stacks.
-    const onKey=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();if(viewingRef.current)closeViewer();else onClose();}};
+    const onKey=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();onClose();}};
     document.addEventListener('keydown',onKey);return()=>document.removeEventListener('keydown',onKey);
-  },[onClose]);// eslint-disable-line react-hooks/exhaustive-deps
+  },[onClose]);
   useEffect(()=>{stageRef.current?.focus({preventScroll:true});},[]);
 
   const go=useCallback((delta:number)=>{
     const s=st.current,next=clampTarget(Math.round(s.target)+delta);if(next===Math.round(s.target)&&!loop)return;
     s.target=next;report();kick();
   },[kick,loop]);// eslint-disable-line react-hooks/exhaustive-deps
-  const openViewer=useCallback(()=>{
-    const s=st.current;let best:HTMLElement|null=null,bd=9;
-    for(let i=0;i<cfg.current.slots;i++){let d=i-s.pos;if(cfg.current.loop)d=mod(d+cfg.current.slots/2,cfg.current.slots)-cfg.current.slots/2;if(Math.abs(d)<bd){bd=Math.abs(d);best=magRefs.current[i];}}
-    originRect.current=best?best.getBoundingClientRect():null;   // where the picture flies out from
-    viewingRef.current=true;setViewing(true);
-  },[]);
-  function closeViewer(){viewingRef.current=false;setViewing(false);requestAnimationFrame(()=>{layout();kick();stageRef.current?.focus({preventScroll:true});});}
   const centre=useCallback((slot:number)=>{
     const s=st.current;let d=slot-s.pos;if(cfg.current.loop)d=mod(d+cfg.current.slots/2,cfg.current.slots)-cfg.current.slots/2;
-    const next=clampTarget(Math.round(s.pos+d));
-    if(next===Math.round(s.target)){if(Math.abs(s.pos-s.target)<.2)openViewer();return;}   // the centred picture opens full-size
+    const next=clampTarget(Math.round(s.pos+d));if(next===Math.round(s.target))return;
     s.target=next;report();kick();
-  },[kick,openViewer]);// eslint-disable-line react-hooks/exhaustive-deps
+  },[kick]);// eslint-disable-line react-hooks/exhaustive-deps
 
   /* Drag-to-scrub: 1:1 while held (mouse, touch and pen through pointer events), momentum + spring snap on release. */
   const unit=()=>Math.max(60,st.current.cw*.55);
-  const startY=useRef(0);
   function down(e:ReactPointerEvent<HTMLDivElement>){
-    if(!e.isPrimary||(e.pointerType==='mouse'&&e.button!==0))return;
-    startY.current=e.clientY;
+    if(e.pointerType==='mouse'&&e.button!==0)return;
     const s=st.current;s.startX=e.clientX;s.startPos=s.pos;s.moved=false;s.pointerId=e.pointerId;s.samples=[{t:performance.now(),p:s.pos}];
   }
   function move(e:ReactPointerEvent<HTMLDivElement>){
     const s=st.current;s.px=e.clientX;s.py=e.clientY;
     if(s.pointerId===e.pointerId&&(e.pointerType!=='mouse'||e.buttons!==0)){
       const dx=e.clientX-s.startX;
-      if(!s.dragging&&Math.abs(e.clientY-startY.current)>Math.max(6,Math.abs(dx))){s.pointerId=-1;return;}
       if(!s.dragging&&Math.abs(dx)>6){s.dragging=true;s.moved=true;stageRef.current?.setPointerCapture(e.pointerId);stageRef.current?.classList.add('is-dragging');}
       if(s.dragging){
         let p=s.startPos-dx/unit();if(!cfg.current.loop)p=clamp(p,0,cfg.current.n-1);
@@ -395,13 +211,6 @@ function Coverflow({stack,loop,reduced,canHover,onClose}:{stack:Stack;loop:boole
     s.target=clampTarget(Math.round(s.pos+flick));s.vel=cfg.current.reduced?0:clamp(v,-14,14);report();kick();
   }
   function leave(){const s=st.current;s.inside=false;kick();}
-  function cancel(e:ReactPointerEvent<HTMLDivElement>){
-    const s=st.current;if(s.pointerId!==e.pointerId)return;
-    s.pointerId=-1;s.dragging=false;s.moved=true;s.vel=0;s.samples=[];
-    s.target=clampTarget(Math.round(s.pos));stageRef.current?.classList.remove('is-dragging');
-    try{stageRef.current?.releasePointerCapture(e.pointerId);}catch{/* already released */}
-    report();kick();
-  }
   function stageClick(e:ReactMouseEvent<HTMLDivElement>){
     if(st.current.moved){st.current.moved=false;return;}
     if(e.target===e.currentTarget||(e.target as HTMLElement).classList.contains('cf-track'))onClose();
@@ -425,21 +234,19 @@ function Coverflow({stack,loop,reduced,canHover,onClose}:{stack:Stack;loop:boole
       </div>
     </div>);
   }
-  return <div className="cf-view" onKeyDown={key}>
+  return <div className="cf-view">
     <div className="cf-head">
       <div><h3>{stack.name}</h3><p aria-live="polite">{items[active]?.title} <span className="cf-count">{active+1} / {n}</span></p></div>
-      {!viewing&&<button type="button" className="cf-close" onClick={onClose} aria-label="Close and return to all stacks">Close ✕</button>}
+      <button type="button" className="cf-close" onClick={onClose} aria-label="Close and return to all stacks">Close ✕</button>
     </div>
     <div className={'cf-stage'+(reduced?' is-reduced':'')} ref={stageRef} tabIndex={0} role="region" aria-roledescription="carousel" aria-label={`${stack.name} images. Use the left and right arrow keys to browse, Escape to close.`}
-      onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={cancel} onLostPointerCapture={cancel} onPointerLeave={leave} onClick={stageClick} style={viewing?{display:'none'}:undefined}>
+      onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onPointerLeave={leave} onClick={stageClick} onKeyDown={key}>
       <div className="cf-track">{cards}</div>
     </div>
-    {viewing&&<Viewer p={items[active]} stackName={stack.name} index={active} n={n} atStart={atStart} atEnd={atEnd} onPrev={()=>go(-1)} onNext={()=>go(1)} onBack={closeViewer} reduced={reduced} origin={originRect.current}/>}
-    <div className="cf-controls" style={viewing?{display:'none'}:undefined}>
+    <div className="cf-controls">
       <button type="button" onClick={()=>go(-1)} disabled={atStart||n<2} aria-label="Previous image">‹</button>
       <button type="button" onClick={()=>go(1)} disabled={atEnd||n<2} aria-label="Next image">›</button>
     </div>
-    {!viewing&&<p className="cf-hint">Tap the centre image to view it full size</p>}
   </div>;
 }
 

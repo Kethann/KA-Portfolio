@@ -489,7 +489,7 @@ h1,h2,h3{
   letter-spacing:-0.022em; line-height:1.06; text-wrap:balance;
 }
 p, li{ text-wrap:pretty; }
-.gallery-head h2, #contact-title, .about-headline, .contact-wrap h2{ font-weight:var(--heading-weight); letter-spacing:-0.022em; line-height:1.04; }
+.gallery-head h2, #contact-title, .about-headline, .contact-wrap h2{ font-weight:var(--heading-weight); letter-spacing:-0.028em; line-height:1.03; }
 .about-headline{ letter-spacing:-0.026em; }
 .about-bio-text, .contact-wrap > p{ line-height:1.75; }
 /* small technical captions: one role, easier to read (a touch larger, higher contrast, steady tracking) */
@@ -518,7 +518,7 @@ p, li{ text-wrap:pretty; }
    Instead of the sections covering the crystal hero, the hero itself fades out as you scroll into the content
    (--hero-fade, set by the scroll script), so the nebula and the coloured glows show through behind the text. */
 .site-section::before{ background:none; }
-#folder-grid, .folder-grid{ display:none !important; }
+.folder-grid{ display:none; }
 #stage{ opacity:var(--hero-fade, 1); }
 .contact-wrap h2{ font-size:var(--step-4); margin:0 0 12px; }
 .contact-wrap > p{ color:var(--ink-dim); margin:0 0 40px; }
@@ -1804,7 +1804,7 @@ var starMat = new THREE.ShaderMaterial({
     'void main(){' +
     // a gentle per-star glitter -- each star's own phase/frequency, kept subtle (0.7..1.0 of
     // its own base brightness) so it reads as a sparkle, not a flicker
-    '  float twinkle = 0.85 + 0.15 * sin(uTime * aTwinkleFreq + aTwinkle);' +
+    '  float twinkle = 0.7 + 0.3 * sin(uTime * aTwinkleFreq + aTwinkle);' +
     '  vBright = aBright * twinkle;' +
     '  vec4 mv = modelViewMatrix * vec4(position, 1.0);' +
     '  gl_Position = projectionMatrix * mv;' +
@@ -2073,8 +2073,8 @@ function frame(now){
   farGroup.position.y = -parallaxCurrent.y * FAR_STRENGTH;
   // barely-perceptible constant drift, independent of parallax -- stars feel alive even with
   // the pointer resting still
-  stars.rotation.y = Math.sin(clock.elapsed * 0.000035) * 0.045;
-  stars.rotation.x = Math.sin(clock.elapsed * 0.000025) * 0.025;
+  stars.rotation.y += dt * 0.0000045;
+  stars.rotation.x += dt * 0.0000018;
   nebulaMat.uniforms.uTime.value = clock.elapsed * 0.00003;
   starMat.uniforms.uTime.value = clock.elapsed;
   // drifting crystal shards -- slow linear travel with wraparound, plus a gentle twinkle and a
@@ -8340,7 +8340,7 @@ var layer = document.getElementById("ember-layer");
 var embers = [];
 function resetEmber(e){
   e.x = Math.random() * kaLayoutW();
-  e.y = Math.random() * kaLayoutH();
+  e.y = kaLayoutH() + 20 + Math.random() * 200;
   e.vy = -(6 + Math.random() * 10) / 1000; // px per ms, upward
   e.swayFreq = 0.0007 + Math.random() * 0.0006;
   e.swaySeed = Math.random() * Math.PI * 2;
@@ -8365,17 +8365,15 @@ function updateEmbers(now){
   emberFrame=0;
   if (reducedMotion || document.hidden){ emberLoopActive = false; return; }
   emberFrame=requestAnimationFrame(updateEmbers);
-  var dt = Math.min(100, now - lastEmberT); lastEmberT = now;
+  var dt = now - lastEmberT; lastEmberT = now;
   embers.forEach(function(e){
     e.life += dt;
-    e.life %= e.maxLife;
+    if (e.life >= e.maxLife){ resetEmber(e); return; }
     e.y += e.vy * dt;
-    if(e.y < 0)e.y += kaLayoutH();
     var sway = Math.sin(now * e.swayFreq + e.swaySeed) * e.swayAmp;
-    // Continuous glow with independent phases; never expire below the screen.
-    var glow = .48 + .18 * Math.sin(e.life/e.maxLife*Math.PI*2);
-    e.el.style.opacity = String(glow);
-    e.el.style.transform = "translate3d(" + (Math.max(2,Math.min(kaLayoutW()-2,e.x+sway))) + "px," + e.y + "px,0)";
+    var edgeFade = Math.min(1, e.life / 600) * Math.min(1, (e.maxLife - e.life) / 800);
+    e.el.style.opacity = String(0.7 * edgeFade);
+    e.el.style.transform = "translate3d(" + (e.x + sway) + "px," + e.y + "px,0)";
   });
 }
 function startEmberLoop(){

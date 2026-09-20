@@ -33,6 +33,7 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
     pointer={x:event.clientX,y:event.clientY,moved:true};
   },{passive:true,signal});
   if(panel){
+    document.body.appendChild(host);host.classList.add('panda-traveler');
     thread=document.createElementNS('http://www.w3.org/2000/svg','svg');thread.classList.add('panda-thread');thread.setAttribute('aria-hidden','true');
     rope=document.createElementNS('http://www.w3.org/2000/svg','path');thread.appendChild(rope);
     loose=document.createElementNS('http://www.w3.org/2000/svg','path');thread.appendChild(loose);document.body.appendChild(thread);
@@ -53,19 +54,13 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
     if(travel.stage!=='idle'||media.matches)greetingAge=-1;
     if(greetingAge>=0)greetingAge+=dt;
     greeting?.classList.toggle('show',greetingAge>=0&&greetingAge<2.8);
-    // Idle mascot shares the launcher's containing block, clipping and native zoom.
-    // Detach only while travelling to/from the open conversation.
-    const travelling=travel.stage!=='idle';
-    const parent=travelling?document.body:launcher;
-    if(host.parentElement!==parent)parent.appendChild(host);
-    host.classList.toggle('panda-traveler',travelling);
     const launch=launcher.getBoundingClientRect(),rect=host.getBoundingClientRect();
     const width=host.offsetWidth||rect.width,height=host.offsetHeight||rect.height;
     if(travel.open&&!panel.hidden){const bounds=panel.getBoundingClientRect();lastPerch={x:bounds.left+bounds.width/2-width/2,y:Math.max(4,bounds.top-height-8)};}
     const home={x:launch.left+launch.width/2-width/2,y:launch.bottom-height-(compact?30:26)};
-    const pose=travelPose(travel,lastPerch,home,(window.visualViewport?.offsetTop||0)+(window.visualViewport?.height||innerHeight),height);
+    const pose=travelPose(travel,lastPerch,home,window.visualViewport?.height||innerHeight,height);
     lastPosition={x:pose.x,y:pose.y};
-    host.style.transform=travelling?`translate3d(${pose.x}px,${pose.y}px,0) rotate(${pose.rotation}deg)`:'translateX(-50%)';
+    host.style.transform=`translate3d(${pose.x}px,${pose.y}px,0) rotate(${pose.rotation}deg)`;
     host.style.opacity=String(pose.opacity);host.dataset.travel=travel.stage;
     if(thread&&rope&&loose){
       const returning=travel.stage==='return';

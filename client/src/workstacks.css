@@ -1,3 +1,8 @@
+/* Work panel (inherits the site font roles from the page):
+ */
+:host{font-family:var(--font-body,"Manrope"),ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.vw-title,.cf-head h3{font-family:var(--font-heading,"Fraunces"),ui-serif,Georgia,serif;font-weight:500;letter-spacing:-.02em;text-wrap:balance}
+.vw-kicker,.vw-tags li,.meta small,.cf-hint,.cf-count{font-family:var(--font-mono,"JetBrains Mono"),ui-monospace,monospace}
 /* Work panel: organized stacks + magnetic coverflow. Transform and opacity only in motion paths. */
 .work-stacks{position:relative;width:100%;max-width:1200px;margin:0 auto;padding:8px 16px 72px;color:#e9e7e0;overflow-x:clip;box-sizing:border-box}
 .ws-empty{margin:0;padding:80px 24px;text-align:center;color:#b1bbca;font-size:13px}
@@ -46,4 +51,75 @@
   .stack{--sw:calc(50% - 16px)}
   .cf-stage{height:clamp(340px,60vh,520px)}
   .cf-head{flex-wrap:wrap}
+}
+.cf-head>div{min-width:0;overflow-wrap:anywhere}.cf-close{flex-shrink:0}
+.meta strong{overflow-wrap:anywhere}
+.cf-stage{touch-action:pan-y pinch-zoom}
+@media(pointer:coarse){
+  .stack:hover .l1{transform:translate3d(10px,-8px,0) rotate(3.6deg)}
+  .stack:hover .l2{transform:translate3d(-11px,-13px,0) rotate(-4.4deg)}
+  .cf-shadow{display:none}
+}
+@media(max-width:640px){.cf-stage{height:clamp(280px,60svh,520px)}}
+@media(max-height:500px){.cf-stage{height:clamp(220px,65svh,360px)}}
+
+/* ---- full-size image viewer (opens from the centred carousel card) ---- */
+.cf-hint{margin:2px 0 0;text-align:center;font-size:12px;color:#8d8b96}
+.cf-card[data-c="1"]{cursor:zoom-in}
+.vw{position:relative;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:clamp(22px,4.5vw,56px);align-items:center;min-height:clamp(380px,66vh,660px);padding:8px 4px;outline:none}
+.vw-media{position:relative;display:flex;align-items:center;justify-content:center;min-width:0}
+.vw-frame{position:relative;display:block;max-width:100%;border-radius:14px;overflow:hidden;border:1px solid #ffffff24;background:#15141a;box-shadow:0 24px 60px -18px #000c;will-change:transform}
+.vw-frame img{display:block;max-width:100%;max-height:min(72vh,720px);width:auto;height:auto;object-fit:contain;user-select:none;-webkit-user-select:none;-webkit-user-drag:none}
+.vw-frame .hi{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity .3s ease}
+.vw-frame .hi.is-in{opacity:1}
+.vw-nav{position:absolute;top:50%;z-index:2;width:44px;height:44px;margin-top:-22px;border:1px solid #ffffff30;border-radius:50%;background:#0d0b12b8;color:#f2ede6;font:inherit;font-size:22px;line-height:1;cursor:pointer;transition:background .2s ease,opacity .2s ease}
+.vw-nav.prev{left:8px}.vw-nav.next{right:8px}
+.vw-nav:hover:not(:disabled){background:#1d1a26}
+.vw-nav:disabled{opacity:.28;cursor:default}
+.vw-nav:focus-visible,.vw-back:focus-visible,.vw-link:focus-visible,.dl-btn:focus-visible{outline:2px solid #ffb37a;outline-offset:3px}
+.vw-back{position:absolute;top:0;right:0;z-index:3;width:40px;height:40px;border:1px solid #ffffff2b;border-radius:50%;background:#ffffff0d;color:inherit;font:inherit;font-size:15px;cursor:pointer;transition:background .2s ease}
+.vw-back:hover{background:#ffffff1c}
+.vw-info{display:flex;flex-direction:column;gap:14px;min-width:0;padding-right:8px;will-change:transform,opacity}
+.vw-kicker{margin:0;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#ffb37a}
+.vw-kicker span{margin-left:8px;color:#8d8b96;letter-spacing:.06em;font-variant-numeric:tabular-nums}
+.vw-title{margin:0;font-size:clamp(24px,3.4vw,38px);line-height:1.15;font-weight:600;overflow-wrap:anywhere}
+.vw-tags{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
+.vw-tags li{padding:5px 11px;border:1px solid #ffffff26;border-radius:999px;font-size:12px;color:#d4d1da;background:#ffffff08}
+.vw-desc{max-height:min(34vh,260px);overflow:auto;padding-right:6px}
+.vw-desc p{margin:0;color:#b7b5bf;line-height:1.7;font-size:15px;white-space:pre-line;overflow-wrap:anywhere}
+.vw-actions{display:flex;align-items:flex-start;gap:16px;margin-top:6px;margin-bottom:44px;min-height:48px}
+.vw-link{align-self:center;color:#e9e7e0;text-decoration:none;font-size:14px;padding:11px 18px;border:1px solid #ffffff2b;border-radius:999px;background:#ffffff0a;transition:background .2s ease}
+.vw-link:hover{background:#ffffff1a}
+
+/* ---- download button: icon only; folds into a plane and drops into a tray ---- */
+.dl{position:relative;display:inline-block;width:48px;height:48px;flex:none}
+.dl-btn{position:absolute;inset:0;display:grid;place-items:center;padding:0;border-radius:50%;border:1px solid rgba(255,170,120,.5);color:#f2ede6;cursor:pointer;
+  background:linear-gradient(145deg,rgba(255,241,221,.28),rgba(229,181,149,.13) 48%,rgba(190,211,234,.12));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 0 20px 2px rgba(255,110,60,.22);
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1),box-shadow .25s ease,color .2s ease,border-color .2s ease;-webkit-tap-highlight-color:transparent}
+.dl-btn:hover{transform:translateY(-2px);box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 8px 26px -4px rgba(255,110,60,.4)}
+.dl-btn:active{transform:scale(.94)}
+.dl-btn svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;grid-area:1/1}
+.dl-btn .i-ok,.dl-btn .i-err{display:none}
+/* while folding, the real button hides its own paint (it stays a real, focusable <button>) */
+.dl-btn[data-state="busy"]{background:none;border-color:transparent;box-shadow:none;transform:none;transition:none}
+.dl-btn[data-state="busy"] svg{opacity:0}
+.dl-btn[data-state="done"]{color:#8fe0a8;border-color:rgba(143,224,168,.55);animation:dlPop .24s cubic-bezier(.34,1.56,.64,1)}
+.dl-btn[data-state="done"] .i-dl,.dl-btn[data-state="error"] .i-dl{display:none}
+.dl-btn[data-state="done"] .i-ok,.dl-btn[data-state="error"] .i-err{display:block}
+.dl-btn[data-state="error"]{color:#ff9c9c;border-color:rgba(255,156,156,.55);animation:dlShake .32s ease}
+@keyframes dlPop{0%{transform:scale(.55);opacity:.4}60%{transform:scale(1.12);opacity:1}100%{transform:scale(1)}}
+@keyframes dlShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}50%{transform:translateX(4px)}75%{transform:translateX(-2px)}}
+.dl-fx{position:absolute;left:0;top:0;width:48px;height:96px;overflow:visible;pointer-events:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.dl-btn[data-state="busy"]~.dl-fx{}
+@media (max-width:760px){
+  .vw{grid-template-columns:1fr;gap:18px;min-height:0}
+  .vw-frame img{max-height:52vh}
+  .vw-info{padding-right:0}
+  .vw-desc{max-height:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .dl-btn,.dl-btn[data-state="done"],.dl-btn[data-state="error"]{animation:none;transition:none}
+  .vw-frame .hi{transition:none}
 }

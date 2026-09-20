@@ -1,0 +1,49 @@
+/* Work panel: organized stacks + magnetic coverflow. Transform and opacity only in motion paths. */
+.work-stacks{position:relative;width:100%;max-width:1200px;margin:0 auto;padding:8px 16px 72px;color:#e9e7e0;overflow-x:clip;box-sizing:border-box}
+.ws-empty{margin:0;padding:80px 24px;text-align:center;color:#b1bbca;font-size:13px}
+.stack-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:44px 40px;padding:26px 14px 10px}
+.stack-grid.is-pending .stack{opacity:0}
+.stack{--sw:clamp(150px,19vw,230px);width:var(--sw);padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;display:block;-webkit-tap-highlight-color:transparent;will-change:transform,opacity}
+.stack:focus{outline:none}
+.stack:focus-visible .deck{outline:2px solid #ffb37a;outline-offset:8px;border-radius:14px}
+.deck{position:relative;display:block;aspect-ratio:2/3;transition:transform .45s cubic-bezier(.34,1.3,.64,1)}
+.stack:hover .deck,.stack:focus-visible .deck{transform:translate3d(0,-6px,0)}
+.deck .layer,.deck .front{position:absolute;inset:0;border-radius:12px;overflow:hidden;background:#15141a;border:1px solid #ffffff1f;box-shadow:0 10px 26px #0008}
+.deck .layer{transition:transform .45s cubic-bezier(.34,1.3,.64,1)}
+.deck .layer img{filter:brightness(.62) saturate(.9)}
+.deck .l1{transform:translate3d(10px,-8px,0) rotate(3.6deg)}
+.deck .l2{transform:translate3d(-11px,-13px,0) rotate(-4.4deg)}
+.stack:hover .l1,.stack:focus-visible .l1{transform:translate3d(20px,-10px,0) rotate(7deg)}
+.stack:hover .l2,.stack:focus-visible .l2{transform:translate3d(-22px,-16px,0) rotate(-8deg)}
+.deck img,.cf-mag img{display:block;width:100%;height:100%;object-fit:cover;user-select:none;-webkit-user-select:none;-webkit-user-drag:none}
+.meta{display:flex;flex-direction:column;gap:2px;margin-top:16px;padding:0 4px}
+.meta strong{font-size:14px;font-weight:600;letter-spacing:.02em}
+.meta small{font-size:12px;color:#a9a7b1}
+
+.cf-view{display:flex;flex-direction:column;gap:14px}
+.cf-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:0 6px}
+.cf-head h3{margin:0;font-size:clamp(20px,3.2vw,28px);font-weight:600}
+.cf-head p{margin:4px 0 0;font-size:13px;color:#b7b5bf}
+.cf-count{margin-left:8px;color:#8d8b96;font-variant-numeric:tabular-nums}
+.cf-close,.cf-controls button{min-height:44px;padding:0 18px;border:1px solid #ffffff2b;border-radius:999px;background:#ffffff0d;color:inherit;font:inherit;font-size:14px;cursor:pointer;transition:background .2s ease,border-color .2s ease,opacity .2s ease}
+.cf-close:hover,.cf-controls button:hover:not(:disabled){background:#ffffff1c;border-color:#ffffff4d}
+.cf-close:focus-visible,.cf-controls button:focus-visible,.cf-stage:focus-visible{outline:2px solid #ffb37a;outline-offset:3px}
+.cf-controls{display:flex;justify-content:center;gap:14px}
+.cf-controls button{width:56px;padding:0;font-size:24px;line-height:1}
+.cf-controls button:disabled{opacity:.3;cursor:default}
+.cf-stage{position:relative;height:clamp(380px,66vh,640px);overflow:hidden;touch-action:pan-y;cursor:grab;outline:none;border-radius:16px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.cf-stage.is-dragging{cursor:grabbing}
+.cf-track{position:absolute;inset:0;perspective:1400px;perspective-origin:50% 45%}
+.cf-card{position:absolute;left:50%;top:50%;width:var(--cw,280px);aspect-ratio:2/3;margin:calc(var(--cw,280px)*-.75) 0 0 calc(var(--cw,280px)*-.5);will-change:transform,opacity;cursor:pointer;outline:none}
+.cf-card:focus-visible .cf-mag{outline:2px solid #ffb37a;outline-offset:4px}
+.cf-mag{position:absolute;inset:0;border-radius:12px;overflow:hidden;background:#15141a;border:1px solid #ffffff22;will-change:transform}
+.cf-shadow{position:absolute;inset:6% 4% -4%;border-radius:16px;background:radial-gradient(closest-side,#000d,#0000);filter:blur(14px);opacity:0;will-change:transform,opacity;pointer-events:none}
+.cf-stage.is-reduced .cf-card{transition:transform .16s ease,opacity .16s ease}
+.cf-stage.is-reduced.is-dragging .cf-card{transition:none}
+@media (max-width:640px){
+  .work-stacks{padding:4px 12px 56px}
+  .stack-grid{gap:34px 22px;padding:22px 10px 6px}
+  .stack{--sw:calc(50% - 16px)}
+  .cf-stage{height:clamp(340px,60vh,520px)}
+  .cf-head{flex-wrap:wrap}
+}

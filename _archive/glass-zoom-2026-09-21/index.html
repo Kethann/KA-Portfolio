@@ -57,7 +57,7 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
      picks it, without a page reload. Google Fonts only actually downloads a family's font files
      once something on the page is rendered in it, so having unused choices listed costs one small
      CSS response, not extra font-file bytes. -->
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Poppins:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400..700&family=Sora:wght@400..700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Poppins:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --ground:#050506;
@@ -78,11 +78,11 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
   --dur-slow: 0.9s;
 
   /* ---- one glass material system, shared by nav / assistant panel / lightbox chrome ---- */
-  --glass-bg:linear-gradient(135deg,rgba(255,246,232,.13),rgba(255,255,255,.025) 38%,rgba(255,174,120,.045) 78%,rgba(255,240,218,.09)),rgba(26,23,29,.25);
-  --glass-bg-heavy:linear-gradient(140deg,rgba(255,246,232,.10),rgba(255,255,255,.018) 44%,rgba(255,177,126,.035)),rgba(19,17,24,.40);
+  --glass-bg: linear-gradient(145deg,rgba(255,244,230,.0525),rgba(255,255,255,.0105) 48%),rgba(23,19,25,0.25025);
+  --glass-bg-heavy: linear-gradient(145deg,rgba(255,244,230,.0455),transparent 58%),rgba(18,16,23,0.37765);
   --glass-blur: blur(16.2px) saturate(135%);
   --glass-border: 1px solid rgba(255, 255, 255, 0.16);
-  --glass-highlight: inset 0 1px 0 rgba(255,249,237,.32), inset 1px 0 0 rgba(255,244,229,.09), inset 0 -1px 0 rgba(255,198,156,.10);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.3);
   --glass-shadow: 0 10px 36px rgba(0, 0, 0, 0.4);
   --accent-glass: linear-gradient(180deg, rgba(255,130,70,0.58), rgba(255,60,26,0.42));
   /* [standing rule, v20 A.2] the blur radius above is a static value, never itself animated --
@@ -105,7 +105,7 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
   /* ---- creator-panel typography controls (Part A) -- overwritten inline on <html> by
      applySiteAppearance() once /api/portfolio responds; these are just the pre-API/no-JS
      defaults, matching the site's original look exactly. ---- */
-  --font-heading: 'Fraunces';
+  --font-heading: 'Manrope';
   --font-body: 'Manrope';
   --text-scale: 1;
 }
@@ -411,115 +411,6 @@ html{ -webkit-tap-highlight-color:transparent; }
   from{ transform:translate(-2%, -1%) scale(1); }
   to{ transform:translate(2%, 2%) scale(1.06); }
 }
-
-/* ---- per-section ambient glows (same soft, blurred colour-wash as the Contact glow above, each in its
-   own colour, shape and position). Purely decorative, behind the content, no pointer events. The slow
-   drift uses transform; the scroll parallax uses the separate `translate` property so they never fight. ---- */
-#section-portfolio::after, #section-about::after, #about-work-block::before{
-  content:""; position:absolute; z-index:-1; pointer-events:none; left:-8%; right:-8%;
-  filter:blur(46px); translate:0 var(--gy, 0px); will-change:transform;
-}
-/* Portfolio: violet + magenta wash from the top-left, a blue pool low on the right */
-#section-portfolio::after{
-  top:0; height:min(940px, 130vh);
-  background:
-    radial-gradient(46% 40% at 15% 16%, rgba(140,84,255,0.26), transparent 72%),
-    radial-gradient(36% 32% at 86% 30%, rgba(236,72,153,0.17), transparent 72%),
-    radial-gradient(54% 28% at 55% 90%, rgba(59,130,246,0.15), transparent 74%);
-  animation:portfolioGlowDrift 19s ease-in-out infinite alternate;
-}
-@keyframes portfolioGlowDrift{
-  from{ transform:translate(-2.5%, -1%) scale(1); }
-  to{ transform:translate(2%, 2.5%) scale(1.07); }
-}
-/* About: cool blue + teal column on the right, warm gold edge at the top, teal pool on the left */
-#section-about::after{
-  top:0; height:min(980px, 135vh);
-  background:
-    radial-gradient(28% 44% at 87% 20%, rgba(56,189,248,0.22), transparent 72%),
-    radial-gradient(44% 34% at 10% 60%, rgba(45,212,191,0.15), transparent 72%),
-    radial-gradient(34% 24% at 56% 6%, rgba(255,180,90,0.13), transparent 74%);
-  animation:aboutGlowDrift 23s ease-in-out infinite alternate;
-}
-@keyframes aboutGlowDrift{
-  from{ transform:translate(2%, -1.5%) scale(1.03); }
-  to{ transform:translate(-2.5%, 2%) scale(1); }
-}
-/* About > Featured Work: a second, lower wash (rose + violet) so the long page keeps its atmosphere */
-#about-work-block{ position:relative; }
-#about-work-block::before{
-  top:-6%; height:110%;
-  background:
-    radial-gradient(40% 36% at 78% 30%, rgba(244,114,182,0.16), transparent 72%),
-    radial-gradient(38% 30% at 16% 74%, rgba(129,140,248,0.16), transparent 72%);
-  animation:aboutGlowDrift 27s ease-in-out infinite alternate-reverse;
-}
-/* keep the washes (and their drift) from ever widening the page */
-#section-portfolio, #section-about{ overflow-x:clip; }
-/* the old fixed orange/red blobs in About are replaced by the washes above */
-.about-glow{ display:none !important; }
-@media (max-width:760px){
-  #section-portfolio::after, #section-about::after, #about-work-block::before{ filter:blur(34px); }
-  #section-portfolio::after{ height:min(720px, 100vh); }
-  #section-about::after{ height:min(760px, 104vh); }
-}
-@media (prefers-reduced-motion: reduce){
-  #section-portfolio::after, #section-about::after, #about-work-block::before{ animation:none; translate:none; }
-}
-
-/* ---- text that writes itself in while you scroll (KaInk) ---- */
-.ink-w{ display:inline-block; white-space:nowrap; }
-.ink-l{ display:inline-block; }
-html.ink-on .about-headline, html.ink-on .about-bio-text{ opacity:1; transform:none; animation:none !important; }
-
-/* ============================================================ TYPOGRAPHY SYSTEM (v2) ============================
-   Three roles: DISPLAY (headings, --font-heading, set in the Creator: default Fraunces), TEXT (--font-body, Manrope)
-   and LABEL (small technical captions, --font-mono, JetBrains Mono). A compact scale takes over on small screens.
-   The Creator's Type style presets (Editorial / Modern / Technical / Classic) just swap the display + text fonts. */
-:root{
-  --font-mono: 'JetBrains Mono';
-  --ink-dim: rgba(237,235,232,0.68);                 /* was .55: secondary text is easier to read */
-  --heading-weight: 500;
-}
-html{ -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; text-rendering:optimizeLegibility; }
-body{ font-feature-settings:"kern" 1, "liga" 1, "calt" 1; line-height:1.6; }
-h1,h2,h3{
-  font-family:var(--font-heading), ui-serif, Georgia, "Times New Roman", serif;
-  font-optical-sizing:auto; font-weight:var(--heading-weight);
-  letter-spacing:-0.022em; line-height:1.06; text-wrap:balance;
-}
-p, li{ text-wrap:pretty; }
-.gallery-head h2, #contact-title, .about-headline, .contact-wrap h2{ font-weight:var(--heading-weight); letter-spacing:-0.022em; line-height:1.04; }
-.about-headline{ letter-spacing:-0.026em; }
-.about-bio-text, .contact-wrap > p{ line-height:1.75; }
-/* small technical captions: one role, easier to read (a touch larger, higher contrast, steady tracking) */
-.gallery-head p, .about-caption, .fav-chip, .field-error, .contact-form label, .contact-status,
-.footer-copyright, .site-footer a, .nav-item, .contact-submit{
-  font-family:var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
-}
-.gallery-head p{ font-size:11.5px; letter-spacing:0.13em; color:rgba(237,235,232,0.74); line-height:1.7; }
-.about-caption{ letter-spacing:0.16em; }
-.contact-form label{ color:rgba(237,235,232,0.78); }
-.contact-form input, .contact-form textarea{ font-family:var(--font-body), ui-sans-serif, system-ui, sans-serif; font-size:15px; }
-/* compact scale on small screens: tighter display sizes, calmer line lengths */
-@media (max-width:640px){
-  :root{
-    --step-4: clamp(2.5rem, 2rem + 4.2vw, 3.3rem);
-    --step-3: clamp(1.95rem, 1.6rem + 2.2vw, 2.5rem);
-    --step-2: clamp(1.4rem, 1.25rem + 1.1vw, 1.75rem);
-  }
-  .about-bio-text, .contact-wrap > p{ line-height:1.68; font-size:1rem; }
-  h1,h2,h3{ letter-spacing:-0.02em; }
-}
-@media (min-width:1500px){ :root{ --step-0: clamp(1.05rem, 0.98rem + 0.18vw, 1.2rem); } }
-
-/* ============================================================ CLEAN BACKDROP ================================
-   The black feather behind each section is gone, and so is the dead empty glass bar under the Portfolio title.
-   Instead of the sections covering the crystal hero, the hero itself fades out as you scroll into the content
-   (--hero-fade, set by the scroll script), so the nebula and the coloured glows show through behind the text. */
-.site-section::before{ background:none; }
-#folder-grid, .folder-grid{ display:none !important; }
-#stage{ opacity:var(--hero-fade, 1); }
 .contact-wrap h2{ font-size:var(--step-4); margin:0 0 12px; }
 .contact-wrap > p{ color:var(--ink-dim); margin:0 0 40px; }
 
@@ -977,7 +868,7 @@ footer.site-footer{
 :root{
   --ink-dim:rgba(237,235,232,.72);
   --ink-faint:rgba(237,235,232,.5);
-  --glass-bg:linear-gradient(135deg,rgba(255,246,232,.13),rgba(255,255,255,.025) 38%,rgba(255,174,120,.045) 78%,rgba(255,240,218,.09)),rgba(26,23,29,.25);
+  --glass-bg:linear-gradient(145deg,rgba(255,244,230,.0525),rgba(255,255,255,.0105) 48%),rgba(29,25,29,0.2639);
   --glass-blur:blur(16.2px) saturate(135%);
   --glass-border:1px solid rgba(255,242,226,.2);
   --accent-glass:linear-gradient(145deg,rgba(255,241,221,.28),rgba(229,181,149,.13) 48%,rgba(190,211,234,.12));
@@ -1804,7 +1695,7 @@ var starMat = new THREE.ShaderMaterial({
     'void main(){' +
     // a gentle per-star glitter -- each star's own phase/frequency, kept subtle (0.7..1.0 of
     // its own base brightness) so it reads as a sparkle, not a flicker
-    '  float twinkle = 0.85 + 0.15 * sin(uTime * aTwinkleFreq + aTwinkle);' +
+    '  float twinkle = 0.7 + 0.3 * sin(uTime * aTwinkleFreq + aTwinkle);' +
     '  vBright = aBright * twinkle;' +
     '  vec4 mv = modelViewMatrix * vec4(position, 1.0);' +
     '  gl_Position = projectionMatrix * mv;' +
@@ -2073,8 +1964,8 @@ function frame(now){
   farGroup.position.y = -parallaxCurrent.y * FAR_STRENGTH;
   // barely-perceptible constant drift, independent of parallax -- stars feel alive even with
   // the pointer resting still
-  stars.rotation.y = Math.sin(clock.elapsed * 0.000035) * 0.045;
-  stars.rotation.x = Math.sin(clock.elapsed * 0.000025) * 0.025;
+  stars.rotation.y += dt * 0.0000045;
+  stars.rotation.x += dt * 0.0000018;
   nebulaMat.uniforms.uTime.value = clock.elapsed * 0.00003;
   starMat.uniforms.uTime.value = clock.elapsed;
   // drifting crystal shards -- slow linear travel with wraparound, plus a gentle twinkle and a
@@ -6374,7 +6265,20 @@ function renderExpandMenu(){
   document.getElementById("expand-trigger").classList.toggle("is-empty", parked.length === 0);
 }
 
-// Specular response is owned by the shared liquid-glass controller below.
+// ---- v22: pointer-tracked specular highlight -- a fixed top-centered highlight (the CSS
+// default) is correct and sufficient on touch/no-pointer devices, so this only wires up on
+// pointer input that can actually report a hover position.
+nav.addEventListener("pointermove", function(e){
+  if (e.pointerType === "touch") return;
+  var rect = nav.getBoundingClientRect();
+  nav.style.setProperty("--spec-x", ((e.clientX - rect.left) / rect.width) * 100 + "%");
+  nav.style.setProperty("--spec-y", ((e.clientY - rect.top) / rect.height) * 100 + "%");
+});
+nav.addEventListener("pointerleave", function(){
+  nav.style.setProperty("--spec-x", "50%");
+  nav.style.setProperty("--spec-y", "0%");
+});
+
 // ---- v22: expand "more" menu ----
 var expandTrigger = document.getElementById("expand-trigger");
 var expandPanel = document.getElementById("expand-panel");
@@ -8340,7 +8244,7 @@ var layer = document.getElementById("ember-layer");
 var embers = [];
 function resetEmber(e){
   e.x = Math.random() * kaLayoutW();
-  e.y = Math.random() * kaLayoutH();
+  e.y = kaLayoutH() + 20 + Math.random() * 200;
   e.vy = -(6 + Math.random() * 10) / 1000; // px per ms, upward
   e.swayFreq = 0.0007 + Math.random() * 0.0006;
   e.swaySeed = Math.random() * Math.PI * 2;
@@ -8365,17 +8269,15 @@ function updateEmbers(now){
   emberFrame=0;
   if (reducedMotion || document.hidden){ emberLoopActive = false; return; }
   emberFrame=requestAnimationFrame(updateEmbers);
-  var dt = Math.min(100, now - lastEmberT); lastEmberT = now;
+  var dt = now - lastEmberT; lastEmberT = now;
   embers.forEach(function(e){
     e.life += dt;
-    e.life %= e.maxLife;
+    if (e.life >= e.maxLife){ resetEmber(e); return; }
     e.y += e.vy * dt;
-    if(e.y < 0)e.y += kaLayoutH();
     var sway = Math.sin(now * e.swayFreq + e.swaySeed) * e.swayAmp;
-    // Continuous glow with independent phases; never expire below the screen.
-    var glow = .48 + .18 * Math.sin(e.life/e.maxLife*Math.PI*2);
-    e.el.style.opacity = String(glow);
-    e.el.style.transform = "translate3d(" + (Math.max(2,Math.min(kaLayoutW()-2,e.x+sway))) + "px," + e.y + "px,0)";
+    var edgeFade = Math.min(1, e.life / 600) * Math.min(1, (e.maxLife - e.life) / 800);
+    e.el.style.opacity = String(0.7 * edgeFade);
+    e.el.style.transform = "translate3d(" + (e.x + sway) + "px," + e.y + "px,0)";
   });
 }
 function startEmberLoop(){
@@ -8539,289 +8441,5 @@ footer.site-footer{border:0;box-shadow:none;flex-wrap:wrap;gap:16px 24px;backgro
   viewport.addEventListener('scroll',schedule,{passive:true});
   window.addEventListener('pageshow',schedule);
   sync();
-})();
-</script>
-
-<style>
-/* Shared optical surface: live backdrop, stationary rim, no animated blur layers. */
-#site-nav{background:var(--glass-bg);border:var(--glass-border);box-shadow:var(--glass-highlight),var(--glass-shadow)}
-.glass-panel,.assistant-panel,.assistant-launcher{background-clip:padding-box}
-.assistant-panel{filter:none;transform:translateY(8px) scale(.98);transform-origin:bottom right}
-.assistant-panel.open{filter:none;transform:translateY(0) scale(1);transition:opacity .22s ease,transform .28s cubic-bezier(.22,.8,.24,1)}
-.assistant-panel.closing{filter:none;transform:translateY(6px) scale(.98);transition:opacity .18s ease,transform .2s ease}
-@media(hover:hover) and (pointer:fine){
-  .assistant-launcher:hover{box-shadow:var(--glass-highlight),0 8px 28px #0005,0 0 18px #ffb47718}
-}
-@media(prefers-reduced-motion:reduce){
-  .assistant-panel,.assistant-panel.open,.assistant-panel.closing{transform:none;transition:none}
-}
-@media(prefers-reduced-transparency:reduce),(prefers-contrast:more){
-  :root{--glass-bg:#211d24;--glass-bg-heavy:#17151d;--glass-blur:none!important;--glass-border:1px solid #a99b93}
-  .assistant-panel{border-color:#a99b93}
-}
-</style>
-
-<script>
-// ==================================================================== KaInk: SCROLL-DRIVEN TEXT + GLOW PARALLAX ==
-// 1) Headings write themselves in letter by letter, like handwriting, as they scroll into view.
-//    How fast depends on scroll speed: scroll quickly and the pen races, scroll slowly (or stop) and it
-//    writes at a calm pace. A heading that leaves the screen resets, so it writes again next time.
-// 2) Small texts (intro lines, captions) emerge from a coloured blur into sharp type, in order.
-// 3) The soft section glows drift a little with the scroll.
-// Reduced motion: nothing here runs; all text and glows are simply shown.
-// Tuning knobs are at the top of the IIFE.
-// The crystal hero fades away as you scroll down into the content (instead of the sections covering it
-// with a black backdrop), so the nebula and the coloured glows show cleanly behind the text.
-(function(){
-  var root = document.documentElement, queued = false;
-  function update(){
-    queued = false;
-    var vh = window.innerHeight || 1, p = Math.min(1, Math.max(0, window.scrollY / (vh * 0.62)));
-    root.style.setProperty("--hero-fade", Math.pow(1 - p, 1.35).toFixed(3));
-  }
-  window.addEventListener("scroll", function(){ if (!queued){ queued = true; requestAnimationFrame(update); } }, { passive: true });
-  window.addEventListener("resize", update);
-  update();
-})();
-(function(){
-  "use strict";
-  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  if (!("IntersectionObserver" in window) || !window.requestAnimationFrame) return;
-
-  var CFG = {
-    writeMs: 1150,          // calm-pace time to write a whole heading
-    emergeMs: 900,          // calm-pace time for a small text to resolve out of the blur
-    speedGain: 0.0007,      // extra progress per ms for every px/ms of scroll speed (faster scroll = faster pen)
-    startAt: 0.94,          // element top, as a fraction of viewport height, where it starts appearing
-    doneAt: 0.58,           // ...and where scrolling alone would have finished it
-    dwellMs: 420,           // if you stop scrolling, it finishes by itself after this long in view
-    exitAt: 0.10,           // small texts start to blur out when their bottom edge is this far (of the viewport) from the top...
-    exitSpan: 0.22,         // ...and are fully blurred out over this much scrolling
-    stretch: 2.6,           // how many letters are "in the pen" at once
-    inkSelector: ".gallery-head h2, #contact-title, #about-headline",
-    emergeSelector: ".gallery-head p, .fav-filter, #contact-intro, .about-caption, .about-bio-text, .footer-copyright",
-    glow: { portfolio: "150,110,255", contact: "255,150,70", about: "90,190,255", other: "255,170,100" }
-  };
-  var clamp = function(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); };
-  var easeOut = function(t){ return 1 - Math.pow(1 - t, 3); };
-  var items = [], raf = 0, last = 0, vel = 0, lastY = window.scrollY, lastT = performance.now(), busy = false;
-
-  function glowFor(el){
-    var sec = el.closest(".site-section, .site-footer"), id = sec && sec.id ? sec.id.replace("section-", "") : "other";
-    return CFG.glow[id] || CFG.glow.other;
-  }
-  function makeItem(el, kind){
-    var it = { el: el, kind: kind, r: 0, vis: false, since: 0, letters: [], rots: [], shown: [], text: "", delay: 0, glow: glowFor(el) };
-    // a text handled here must not also be handled by the older fade-in helper
-    el.classList.remove("reveal-fade", "is-visible");
-    if (window.scrollRevealObserver) try { window.scrollRevealObserver.unobserve(el); } catch (e) {}
-    build(it);
-    items.push(it);
-    return it;
-  }
-  function build(it){
-    var el = it.el;
-    if (it.kind === "ink"){
-      if (el.children.length && !el.querySelector(".ink-w")) { it.kind = "emerge"; }   // rich markup: fall back to the blur-in
-    }
-    if (it.kind === "ink"){
-      var text = el.textContent; it.text = text;
-      busy = true;
-      el.setAttribute("aria-label", text.replace(/\s+/g, " ").trim());
-      el.textContent = "";
-      it.letters = []; it.rots = []; it.shown = [];
-      text.split(/(\s+)/).forEach(function(tok){
-        if (!tok) return;
-        if (/^\s+$/.test(tok)){ el.appendChild(document.createTextNode(" ")); return; }
-        var w = document.createElement("span"); w.className = "ink-w"; w.setAttribute("aria-hidden", "true");
-        Array.prototype.forEach.call(tok, function(ch){
-          var l = document.createElement("span"); l.className = "ink-l"; l.textContent = ch; l.style.opacity = "0";
-          w.appendChild(l); it.letters.push(l); it.rots.push((Math.random() * 2 - 1) * 4); it.shown.push(-1);
-        });
-        el.appendChild(w);
-      });
-      busy = false;
-      it.text = el.textContent;
-    } else {
-      it.text = el.textContent;
-      el.style.opacity = "0";
-    }
-    it.delay = it.kind === "emerge" ? 260 : 0;
-    it.r = 0;
-  }
-  function render(it){
-    var r = it.r;
-    if (it.kind === "ink"){
-      var n = it.letters.length, span = n + CFG.stretch;
-      for (var i = 0; i < n; i++){
-        var li = clamp((r * span - i) / CFG.stretch, 0, 1);
-        if (li === it.shown[i]) continue;
-        it.shown[i] = li;
-        var s = it.letters[i].style;
-        if (li >= 1){ s.cssText = ""; continue; }             // finished letters carry no inline styling at all
-        if (li <= 0){ s.cssText = "opacity:0"; continue; }
-        var e = easeOut(li), pen = li * (1 - li) * 4;         // 0..1..0: brightest while the letter is being drawn
-        s.opacity = String(clamp(li * 2.6, 0, 1));
-        s.clipPath = "inset(-20% " + ((1 - e) * 100).toFixed(1) + "% -20% -10%)";
-        s.transform = "translate3d(" + ((1 - e) * -.09).toFixed(3) + "em," + ((1 - e) * .05).toFixed(3) + "em,0) rotate(" + ((1 - e) * it.rots[i]).toFixed(2) + "deg)";
-        s.textShadow = "0 0 " + (pen * .5).toFixed(2) + "em rgba(" + it.glow + "," + (pen * .85).toFixed(2) + ")";
-      }
-    } else {
-      var p = easeOut(r), s2 = it.el.style;
-      if (p >= 1){ s2.opacity = ""; s2.filter = ""; s2.transform = ""; s2.textShadow = ""; return; }
-      s2.opacity = p.toFixed(3);
-      s2.filter = "blur(" + ((1 - p) * 10).toFixed(2) + "px)";
-      s2.transform = "translate3d(0," + ((1 - p) * 12).toFixed(2) + "px,0)";
-      s2.textShadow = "0 0 " + ((1 - p) * 26).toFixed(1) + "px rgba(" + it.glow + "," + ((1 - p) * .95).toFixed(2) + ")";
-    }
-  }
-  function reset(it){ it.r = 0; if (it.kind === "ink"){ it.shown.fill(-1); } render(it); }
-
-  function tick(now){
-    raf = 0;
-    var dt = Math.min(64, now - last) || 16; last = now;
-    var vh = window.innerHeight, moving = false;
-    vel *= Math.pow(.9, dt / 16.7);                      // scroll speed fades out once you stop
-    for (var k = 0; k < items.length; k++){
-      var it = items[k];
-      if (!it.vis) continue;
-      var emerge = it.kind === "emerge";
-      if (!emerge && it.r >= 1) continue;
-      var rect = it.el.getBoundingClientRect();
-      var tp = clamp((vh * CFG.startAt - rect.top) / (vh * (CFG.startAt - CFG.doneAt)), 0, 1);   // where the scroll position says it should be
-      var dwell = (now - it.since) > (CFG.dwellMs + it.delay) ? 1 : 0;
-      var target = Math.max(tp, dwell);
-      // small texts also blur back out as they slide off the top of the screen (and as they sink back down)
-      if (emerge) target = Math.min(target, clamp((rect.bottom - vh * CFG.exitAt) / (vh * CFG.exitSpan), 0, 1));
-      var rate = 1 / (emerge ? CFG.emergeMs : CFG.writeMs) + vel * CFG.speedGain;
-      var nr = emerge ? it.r + clamp(target - it.r, -rate * dt * 1.4, rate * dt) : Math.min(target, it.r + rate * dt);
-      if (nr !== it.r){ it.r = nr; render(it); }
-      if (Math.abs(target - it.r) > 0.002 && (emerge || it.r < 1)) moving = true;
-    }
-    if (moving) raf = requestAnimationFrame(tick);
-  }
-  function kick(){ if (!raf){ last = performance.now(); raf = requestAnimationFrame(tick); } }
-
-  var io = new IntersectionObserver(function(entries){
-    entries.forEach(function(en){
-      var it = en.target.__ink; if (!it) return;
-      if (en.isIntersecting){ if (!it.vis){ it.vis = true; it.since = performance.now(); } kick(); }
-      else if (it.vis){ it.vis = false; reset(it); }      // off screen: back to unwritten, ready to write again
-    });
-  }, { rootMargin: "0px 0px -6% 0px", threshold: 0.01 });
-
-  // scroll speed (px/ms), smoothed; also nudges the section glows
-  var glowQueued = false;
-  function updateGlows(){
-    glowQueued = false;
-    ["section-portfolio", "section-about"].forEach(function(id){
-      var sec = document.getElementById(id); if (!sec || sec.hidden) return;
-      var top = sec.getBoundingClientRect().top;
-      sec.style.setProperty("--gy", clamp(-top * .06, -70, 70).toFixed(1) + "px");
-    });
-  }
-  window.addEventListener("scroll", function(){
-    var now = performance.now(), y = window.scrollY, dt = Math.max(1, now - lastT);
-    var v = Math.abs(y - lastY) / dt; vel = vel * .6 + v * .4; lastY = y; lastT = now;
-    kick();
-    if (!glowQueued){ glowQueued = true; requestAnimationFrame(updateGlows); }
-  }, { passive: true });
-
-  function attach(sel, kind){
-    Array.prototype.forEach.call(document.querySelectorAll(sel), function(el){
-      if (el.__ink) return;
-      var it = makeItem(el, kind); el.__ink = it; io.observe(el);
-      // creator edits / live preview replace the text: rebuild so the new words write in too
-      new MutationObserver(function(){
-        if (busy) return;
-        if (el.textContent === it.text && (it.kind !== "ink" || el.querySelector(".ink-w"))) return;
-        el.classList.remove("reveal-fade", "is-visible");
-        var was = it.vis; build(it); if (was){ it.since = performance.now(); kick(); }
-      }).observe(el, { childList: true, characterData: true, subtree: true });
-    });
-  }
-  try {
-    document.documentElement.classList.add("ink-on");
-    attach(CFG.inkSelector, "ink");
-    attach(CFG.emergeSelector, "emerge");
-    // the old blur-fade wrapped the first .gallery-head as a whole; its children animate themselves now
-    var gh = document.querySelector(".gallery-head"); if (gh) gh.classList.remove("reveal-fade", "is-visible");
-    updateGlows();
-  } catch (err) {
-    // never leave text hidden if anything above goes wrong
-    document.documentElement.classList.remove("ink-on");
-    Array.prototype.forEach.call(document.querySelectorAll(".ink-l"), function(l){ l.style.cssText = ""; });
-    items.forEach(function(it){ it.el.style.opacity = ""; it.el.style.filter = ""; it.el.style.transform = ""; });
-    if (window.console) console.warn("KaInk disabled:", err);
-  }
-})();
-</script>
-
-<style>
-/* Optical overlay moves independently: text and layout never stretch. */
-#site-nav.ka-liquid::before{display:none}
-.ka-liquid-skin{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none;contain:paint;z-index:0;box-shadow:inset 0 1px 0 #fff5,inset 1px 0 0 #fff1,inset -1px -1px 0 #ffc99a20}
-.ka-liquid-light{position:absolute;inset:-45%;pointer-events:none;background:radial-gradient(ellipse at 28% 18%,#fff7,transparent 33%),linear-gradient(122deg,transparent 25%,#ffe9ca26 43%,#ffffff24 46%,transparent 61%);opacity:.18;transform:translate3d(0,0,0);transition:opacity .24s ease,transform .4s cubic-bezier(.22,.8,.24,1)}
-.ka-liquid.is-liquid-active>.ka-liquid-skin>.ka-liquid-light{will-change:transform;transition:opacity .18s ease}
-.ka-liquid.is-liquid-pressed>.ka-liquid-skin{box-shadow:inset 0 1px 1px #fff6,inset 0 -2px 5px #ffc99a30}
-@media(prefers-reduced-motion:reduce){.ka-liquid-light{transition:none!important}}
-@media(prefers-reduced-transparency:reduce),(prefers-contrast:more),(forced-colors:active){.ka-liquid-skin{display:none}}
-</style>
-<script>
-// KA liquid glass: one active surface, bounded work, no idle animation or extra GPU context.
-(function kaLiquidGlass(){
-  var motion=matchMedia('(prefers-reduced-motion: reduce)'),clarity=matchMedia('(prefers-reduced-transparency: reduce)'),contrast=matchMedia('(prefers-contrast: more)'),forced=matchMedia('(forced-colors: active)');
-  var coarse=matchMedia('(pointer: coarse)').matches;
-  var economy=coarse||(navigator.deviceMemory||8)<=4||(navigator.hardwareConcurrency||8)<=4;
-  var interval=1000/(economy?30:60),frame=0,last=0,active=null,x=0,y=0,tx=0,ty=0,pressed=false;
-  var surfaces=new Map();
-  document.querySelectorAll('#site-nav,.assistant-launcher,.assistant-panel,#expand-panel').forEach(function(el){
-    var skin=document.createElement('span'),light=document.createElement('span');
-    skin.className='ka-liquid-skin';light.className='ka-liquid-light';skin.setAttribute('aria-hidden','true');
-    skin.appendChild(light);el.appendChild(skin);el.classList.add('ka-liquid');surfaces.set(el,light);
-  });
-  function blocked(){return motion.matches||clarity.matches||contrast.matches||forced.matches||document.hidden;}
-  function reset(){
-    cancelAnimationFrame(frame);frame=0;last=0;pressed=false;
-    if(active){active.classList.remove('is-liquid-active','is-liquid-pressed');var light=surfaces.get(active);light.style.transform='';light.style.opacity='';}
-    active=null;x=y=tx=ty=0;
-  }
-  function tick(now){
-    frame=0;if(!active||blocked()||!active.isConnected){reset();return;}
-    var elapsed=last?now-last:interval;
-    if(elapsed<interval-.5){frame=requestAnimationFrame(tick);return;}
-    last=now;var blend=1-Math.exp(-Math.min(elapsed,64)/85);
-    x+=(tx-x)*blend;y+=(ty-y)*blend;
-    var stretch=pressed?(economy?1.025:1.045):1;
-    var light=surfaces.get(active);
-    light.style.transform='translate3d('+x.toFixed(2)+'px,'+y.toFixed(2)+'px,0) scale('+stretch+','+(pressed?.985:1)+')';
-    light.style.opacity=pressed?'.34':'.26';
-    if(Math.abs(tx-x)+Math.abs(ty-y)>.08)frame=requestAnimationFrame(tick);
-    else active.classList.remove('is-liquid-active');
-  }
-  function track(event){
-    if(blocked()||event.isPrimary===false)return;
-    if(event.pointerType==='touch'&&event.type!=='pointerdown')return;
-    var el=event.target.closest?.('.ka-liquid');if(!surfaces.has(el))return;
-    // Ignore nested menus/mascot speech that extend outside their glass surface.
-    var rect=el.getBoundingClientRect();
-    if(!rect.width||!rect.height||event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)return;
-    if(active!==el){reset();active=el;}
-    pressed=event.type==='pointerdown'||pressed;
-    var strength=economy?7:13;
-    tx=((event.clientX-rect.left)/rect.width-.5)*strength*2;
-    ty=((event.clientY-rect.top)/rect.height-.5)*strength;
-    active.classList.add('is-liquid-active');active.classList.toggle('is-liquid-pressed',pressed);
-    if(!frame){last=0;frame=requestAnimationFrame(tick);}
-  }
-  document.addEventListener('pointermove',track,{passive:true});
-  document.addEventListener('pointerdown',track,{passive:true});
-  document.addEventListener('pointerup',reset,{passive:true});
-  document.addEventListener('pointercancel',reset,{passive:true});
-  document.addEventListener('pointerout',function(e){if(active&&!active.contains(e.relatedTarget))reset();},{passive:true});
-  document.addEventListener('visibilitychange',reset);
-  window.addEventListener('blur',reset);window.addEventListener('pagehide',reset);
-  window.addEventListener('scroll',reset,{passive:true});
-  [motion,clarity,contrast,forced].forEach(function(m){m.addEventListener('change',reset);});
 })();
 </script>

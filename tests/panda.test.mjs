@@ -171,9 +171,17 @@ test('live panda controller tears, casts a fresh thread, greets once, and cancel
   document,window:{visualViewport:{height:640}},matchMedia:()=>media,navigator:{hardwareConcurrency:8},devicePixelRatio:1,crypto:{getRandomValues:a=>a.fill(12)},AbortController,ResizeObserver:Observer,IntersectionObserver:Observer,
   requestAnimationFrame:fn=>{frames.set(++id,fn);return id;},cancelAnimationFrame:id=>frames.delete(id)});
  const dispose=await exported.mountPanda(host,launcher);
+ assert.equal(host.parentElement,launcher,'idle panda must zoom and pan with the chat button');
+ assert(!host.classes.has('panda-traveler'));
+ assert.equal(host.style.transform,'translateX(-50%)');
  const step=seconds=>{for(let i=0;i<Math.ceil(seconds*60);i++){now+=1000/60;const pending=[...frames.values()];frames.clear();pending.forEach(fn=>fn(now));}};
  const change=open=>{panel.hidden=!open;const event=new Event('ka-chat-state');event.detail={open};document.dispatchEvent(event);};
+ launcher.rect={left:-150,top:900,width:120,height:120,bottom:1020};
+ step(.1);assert.equal(host.parentElement,launcher,'zoom/pan must not leave an independent floating panda');
+ assert.equal(host.style.transform,'translateX(-50%)');
+ launcher.rect={left:400,top:560,width:60,height:60,bottom:620};
  change(true);step(2.4);assert.equal(host.dataset.travel,'perched');
+ assert.equal(host.parentElement,document.body,'travelling panda can leave the launcher');
  const svg=document.body.children.find(el=>el.classes.has('panda-thread')),upper=svg.children[0],lower=svg.children[1];
  const move=new Event('pointermove');move.clientX=295;move.clientY=20;document.dispatchEvent(move);step(.1);
  assert(upper.attrs.d.includes(' L '));
@@ -183,6 +191,9 @@ test('live panda controller tears, casts a fresh thread, greets once, and cancel
  assert.equal(points[1],727.6,'panda stays below the viewport while casting');
  assert(points.at(-1)<points[1],'comeback web extends upward toward panda');
  step(2.2);assert.equal(host.dataset.travel,'idle');
+ assert.equal(host.parentElement,launcher,'return reattaches panda to the zoomed button');
+ assert(!host.classes.has('panda-traveler'));
+ assert.equal(host.style.transform,'translateX(-50%)');
  const greeting=launcher.children.find(el=>el.className?.includes('panda-return-greeting'));
  assert.equal(greeting.textContent,"Hi, I'm back!");assert(greeting.classes.has('show'));assert(waves.some(t=>t>=0));
  step(3);assert(!greeting.classes.has('show'));step(2);assert(!greeting.classes.has('show'),'greeting repeats while idle');
