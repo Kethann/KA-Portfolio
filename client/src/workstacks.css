@@ -123,3 +123,8 @@
   .dl-btn,.dl-btn[data-state="done"],.dl-btn[data-state="error"]{animation:none;transition:none}
   .vw-frame .hi{transition:none}
 }
+
+/* kicker + hint fonts follow the site's role fonts */
+.vw-kicker{font-family:var(--font-kicker,'Sora'),var(--font-body,'Manrope'),ui-sans-serif,system-ui,sans-serif;font-weight:500;letter-spacing:.2em;font-size:11px}
+.cf-hint{font-family:var(--font-sub,'Fraunces'),ui-serif,Georgia,serif;font-style:italic;font-size:14px;letter-spacing:0;color:#a9a7b1}
+.meta small,.cf-count{letter-spacing:.04em}

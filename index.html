@@ -520,6 +520,46 @@ p, li{ text-wrap:pretty; }
 .site-section::before{ background:none; }
 #folder-grid, .folder-grid{ display:none !important; }
 #stage{ opacity:var(--hero-fade, 1); }
+
+/* ============================================================ SUB-HEADINGS + KICKERS (v3) =====================
+   Sub-headings are set in an italic display serif in normal sentence case (much easier to read than tracked
+   mono capitals); tiny captions ("kickers") use a clean geometric sans; the mono role stays for UI labels. */
+:root{ --font-sub: 'Fraunces'; --font-kicker: 'Sora'; }
+.gallery-head p, #contact-intro, .contact-wrap > p{
+  font-family:var(--font-sub), ui-serif, Georgia, serif; font-style:italic; font-weight:400; font-optical-sizing:auto;
+  font-size:clamp(1.02rem, 0.96rem + 0.42vw, 1.28rem); letter-spacing:0; text-transform:none; line-height:1.5;
+  color:rgba(237,235,232,0.82);
+}
+.about-caption{
+  font-family:var(--font-kicker), var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  font-weight:500; font-size:0.72rem; letter-spacing:0.26em; text-transform:uppercase;
+}
+.ew{ display:inline; }
+.ew-w{ display:inline-block; white-space:nowrap; }
+.ghost-txt{ display:inline; }
+
+/* ============================================================ CONTACT GLASS (v3) ==============================
+   More see-through, so the warm glow behind it blends in and refracts (saturate + a touch of brightness), with a
+   soft light reflection that slides over the surface with the scroll and the cursor (--sheen, --sx, --sy). */
+.contact-card{
+  background:
+    linear-gradient(135deg, rgba(255,246,232,0.11), rgba(255,246,232,0.025) 42%, rgba(255,150,90,0.06) 100%),
+    rgba(18,14,16,0.34);
+  -webkit-backdrop-filter:var(--glass-blur) brightness(1.07); backdrop-filter:var(--glass-blur) brightness(1.07);
+  border:1px solid rgba(255,222,190,0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.36), inset 0 -1px 0 rgba(255,180,120,0.14), inset 0 0 70px rgba(255,140,80,0.06),
+    0 34px 80px -34px rgba(255,110,50,0.38), 0 12px 42px rgba(0,0,0,0.34);
+}
+.contact-card::after{
+  content:""; position:absolute; inset:0; border-radius:inherit; z-index:2; pointer-events:none; mix-blend-mode:screen; opacity:.9;
+  background:
+    radial-gradient(440px 270px at var(--sx, 24%) var(--sy, -8%), rgba(255,236,212,0.20), transparent 62%),
+    linear-gradient(112deg, transparent calc(var(--sheen, 30%) - 17%), rgba(255,255,255,0.10) var(--sheen, 30%), rgba(255,200,150,0.08) calc(var(--sheen, 30%) + 6%), transparent calc(var(--sheen, 30%) + 24%));
+}
+/* fields "ghost in" from inside the glass while the card scrolls into view (--gp 0 -> 1, set by KaInk) */
+.contact-form [data-ghost]{ opacity:var(--gp, 1); filter:blur(calc((1 - var(--gp, 1)) * 7px)); }
+@media (prefers-reduced-motion: reduce){ .contact-card::after{ opacity:.6; } }
 .contact-wrap h2{ font-size:var(--step-4); margin:0 0 12px; }
 .contact-wrap > p{ color:var(--ink-dim); margin:0 0 40px; }
 
@@ -8563,16 +8603,17 @@ footer.site-footer{border:0;box-shadow:none;flex-wrap:wrap;gap:16px 24px;backgro
 
 <script>
 // ==================================================================== KaInk: SCROLL-DRIVEN TEXT + GLOW PARALLAX ==
-// 1) Headings write themselves in letter by letter, like handwriting, as they scroll into view.
-//    How fast depends on scroll speed: scroll quickly and the pen races, scroll slowly (or stop) and it
-//    writes at a calm pace. A heading that leaves the screen resets, so it writes again next time.
-// 2) Small texts (intro lines, captions) emerge from a coloured blur into sharp type, in order.
-// 3) The soft section glows drift a little with the scroll.
-// Reduced motion: nothing here runs; all text and glows are simply shown.
-// Tuning knobs are at the top of the IIFE.
-// The crystal hero fades away as you scroll down into the content (instead of the sections covering it
-// with a black backdrop), so the nebula and the coloured glows show cleanly behind the text.
+// 1) Headings write themselves in letter by letter, like handwriting, as they scroll into view. The pen's
+//    speed follows your scroll speed. A heading that leaves the screen resets, so it writes again next time.
+// 2) Small texts (sub-headings, captions, paragraphs) come out of a coloured blur word by word in RANDOM order,
+//    and blur back out the same way as they leave. Scroll-linked in both directions.
+// 3) Contact form: the labels appear letter by letter at random, as if surfacing from inside the glass, and the
+//    fields "ghost in" from within it. A light reflection slides over the glass with the scroll and the cursor.
+// 4) The crystal hero fades out as you scroll into the content; the section glows drift a little with the scroll.
+// Reduced motion: nothing here except the hero fade runs; all text is simply shown.
+// Tuning knobs are at the top of the second IIFE.
 (function(){
+  // Instead of the sections covering the crystal hero with a black backdrop, the hero fades as you scroll down.
   var root = document.documentElement, queued = false;
   function update(){
     queued = false;
@@ -8590,28 +8631,35 @@ footer.site-footer{border:0;box-shadow:none;flex-wrap:wrap;gap:16px 24px;backgro
 
   var CFG = {
     writeMs: 1150,          // calm-pace time to write a whole heading
-    emergeMs: 900,          // calm-pace time for a small text to resolve out of the blur
-    speedGain: 0.0007,      // extra progress per ms for every px/ms of scroll speed (faster scroll = faster pen)
+    emergeMs: 1000,         // calm-pace time for small texts to resolve out of the blur
+    speedGain: 0.0007,      // extra progress per ms for every px/ms of scroll speed (faster scroll = faster reveal)
     startAt: 0.94,          // element top, as a fraction of viewport height, where it starts appearing
     doneAt: 0.58,           // ...and where scrolling alone would have finished it
     dwellMs: 420,           // if you stop scrolling, it finishes by itself after this long in view
     exitAt: 0.10,           // small texts start to blur out when their bottom edge is this far (of the viewport) from the top...
     exitSpan: 0.22,         // ...and are fully blurred out over this much scrolling
-    stretch: 2.6,           // how many letters are "in the pen" at once
+    stretch: 2.6,           // handwriting: how many letters are "in the pen" at once
+    wordSpan: 0.5,          // random reveal: how long (of the whole 0..1) each word takes to unblur
+    letterSpan: 0.55,       // ...and each letter (contact labels)
+    blurPx: 9,              // strength of the blur a word starts from
     inkSelector: ".gallery-head h2, #contact-title, #about-headline",
     emergeSelector: ".gallery-head p, .fav-filter, #contact-intro, .about-caption, .about-bio-text, .footer-copyright",
-    glow: { portfolio: "150,110,255", contact: "255,150,70", about: "90,190,255", other: "255,170,100" }
+    ghostLabelSelector: ".contact-form label",
+    ghostBoxSelector: ".contact-form input:not(.hp-field), .contact-form textarea, .contact-form .contact-submit",
+    glow: { portfolio: "150,110,255", contact: "255,160,90", about: "90,190,255", other: "255,170,100" }
   };
   var clamp = function(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); };
   var easeOut = function(t){ return 1 - Math.pow(1 - t, 3); };
   var items = [], raf = 0, last = 0, vel = 0, lastY = window.scrollY, lastT = performance.now(), busy = false;
 
-  function glowFor(el){
-    var sec = el.closest(".site-section, .site-footer"), id = sec && sec.id ? sec.id.replace("section-", "") : "other";
-    return CFG.glow[id] || CFG.glow.other;
+  function sectionOf(el){ return el.closest(".site-section, .site-footer"); }
+  function glowFor(el){ var sec = sectionOf(el), id = sec && sec.id ? sec.id.replace("section-", "") : "other"; return CFG.glow[id] || CFG.glow.other; }
+  function inkRGB(el){
+    var m = /rgba?\(([^)]+)\)/.exec(getComputedStyle(el).color || ""), p = m ? m[1].split(",").map(parseFloat) : [237, 235, 232];
+    return p[0] + "," + p[1] + "," + p[2];
   }
-  function makeItem(el, kind){
-    var it = { el: el, kind: kind, r: 0, vis: false, since: 0, letters: [], rots: [], shown: [], text: "", delay: 0, glow: glowFor(el) };
+  function makeItem(el, kind, order){
+    var it = { el: el, kind: kind, mode: "", r: 0, vis: false, since: 0, units: [], ts: [], span: .5, rots: [], shown: [], text: "", delay: 0, glow: glowFor(el), ink: "237,235,232", order: order || 0 };
     // a text handled here must not also be handled by the older fade-in helper
     el.classList.remove("reveal-fade", "is-visible");
     if (window.scrollRevealObserver) try { window.scrollRevealObserver.unobserve(el); } catch (e) {}
@@ -8619,13 +8667,35 @@ footer.site-footer{border:0;box-shadow:none;flex-wrap:wrap;gap:16px 24px;backgro
     items.push(it);
     return it;
   }
+  function wrapUnits(it, el, text, byLetter){
+    busy = true;
+    el.textContent = "";
+    it.units = []; it.ts = []; it.shown = []; it.rots = [];
+    var span = byLetter ? CFG.letterSpan : CFG.wordSpan; it.span = span;
+    text.split(/(\s+)/).forEach(function(tok){
+      if (!tok) return;
+      if (/^\s+$/.test(tok)){ el.appendChild(document.createTextNode(tok)); return; }
+      if (byLetter){
+        var w = document.createElement("span"); w.className = "ew-w";
+        Array.prototype.forEach.call(tok, function(ch){
+          var u = document.createElement("span"); u.className = "ew"; u.textContent = ch; u.style.color = "transparent";
+          w.appendChild(u); it.units.push(u); it.ts.push(Math.random() * (1 - span)); it.shown.push(-1);
+        });
+        el.appendChild(w);
+      } else {
+        var u2 = document.createElement("span"); u2.className = "ew"; u2.textContent = tok; u2.style.color = "transparent";
+        el.appendChild(u2); it.units.push(u2); it.ts.push(Math.random() * (1 - span)); it.shown.push(-1);
+      }
+    });
+    busy = false;
+    it.text = el.textContent;
+  }
   function build(it){
     var el = it.el;
+    it.ink = inkRGB(el);
+    if (it.kind === "ink" && el.children.length && !el.querySelector(".ink-w")) it.kind = "emerge";   // rich markup: fall back
     if (it.kind === "ink"){
-      if (el.children.length && !el.querySelector(".ink-w")) { it.kind = "emerge"; }   // rich markup: fall back to the blur-in
-    }
-    if (it.kind === "ink"){
-      var text = el.textContent; it.text = text;
+      var text = el.textContent;
       busy = true;
       el.setAttribute("aria-label", text.replace(/\s+/g, " ").trim());
       el.textContent = "";
@@ -8641,19 +8711,24 @@ footer.site-footer{border:0;box-shadow:none;flex-wrap:wrap;gap:16px 24px;backgro
         el.appendChild(w);
       });
       busy = false;
-      it.text = el.textContent;
+      it.text = el.textContent; it.mode = "ink";
+    } else if (it.kind === "box"){
+      it.mode = "box"; it.text = el.textContent;
+      el.setAttribute("data-ghost", "1"); el.style.setProperty("--gp", "0");
     } else {
+      // small text: random word-by-word (or letter-by-letter for short labels); rich markup stays whole
       it.text = el.textContent;
-      el.style.opacity = "0";
+      if (el.children.length){ it.mode = "whole"; el.style.opacity = "0"; }
+      else { it.mode = "units"; wrapUnits(it, el, it.text, it.kind === "ghost"); }
     }
-    it.delay = it.kind === "emerge" ? 260 : 0;
+    it.delay = it.kind === "ink" ? 0 : (it.kind === "ghost" || it.kind === "box" ? 160 + it.order * 110 : 260);
     it.r = 0;
   }
   function render(it){
-    var r = it.r;
-    if (it.kind === "ink"){
+    var r = it.r, i;
+    if (it.mode === "ink"){
       var n = it.letters.length, span = n + CFG.stretch;
-      for (var i = 0; i < n; i++){
+      for (i = 0; i < n; i++){
         var li = clamp((r * span - i) / CFG.stretch, 0, 1);
         if (li === it.shown[i]) continue;
         it.shown[i] = li;
@@ -8666,16 +8741,33 @@ footer.site-footer{border:0;box-shadow:none;flex-wrap:wrap;gap:16px 24px;backgro
         s.transform = "translate3d(" + ((1 - e) * -.09).toFixed(3) + "em," + ((1 - e) * .05).toFixed(3) + "em,0) rotate(" + ((1 - e) * it.rots[i]).toFixed(2) + "deg)";
         s.textShadow = "0 0 " + (pen * .5).toFixed(2) + "em rgba(" + it.glow + "," + (pen * .85).toFixed(2) + ")";
       }
+    } else if (it.mode === "units"){
+      // every word/letter unblurs at its own random moment: the text materialises out of a coloured haze
+      for (i = 0; i < it.units.length; i++){
+        var w = clamp((r - it.ts[i]) / it.span, 0, 1);
+        if (w === it.shown[i]) continue;
+        it.shown[i] = w;
+        var us = it.units[i].style;
+        if (w >= 1){ us.cssText = ""; continue; }
+        if (w <= 0){ us.cssText = "color:transparent"; continue; }
+        var ew = easeOut(w), b = (1 - ew) * CFG.blurPx;
+        us.color = "rgba(" + it.ink + "," + (ew * ew).toFixed(3) + ")";
+        us.textShadow = "0 0 " + b.toFixed(1) + "px rgba(" + it.ink + "," + ((1 - ew) * .75).toFixed(2) + "), 0 0 " + (b * 1.9).toFixed(1) + "px rgba(" + it.glow + "," + ((1 - ew) * .9).toFixed(2) + ")";
+      }
+    } else if (it.mode === "box"){
+      var p = easeOut(r);
+      if (p >= 1){ it.el.removeAttribute("data-ghost"); it.el.style.removeProperty("--gp"); }
+      else { it.el.setAttribute("data-ghost", "1"); it.el.style.setProperty("--gp", p.toFixed(3)); }
     } else {
-      var p = easeOut(r), s2 = it.el.style;
-      if (p >= 1){ s2.opacity = ""; s2.filter = ""; s2.transform = ""; s2.textShadow = ""; return; }
-      s2.opacity = p.toFixed(3);
-      s2.filter = "blur(" + ((1 - p) * 10).toFixed(2) + "px)";
-      s2.transform = "translate3d(0," + ((1 - p) * 12).toFixed(2) + "px,0)";
-      s2.textShadow = "0 0 " + ((1 - p) * 26).toFixed(1) + "px rgba(" + it.glow + "," + ((1 - p) * .95).toFixed(2) + ")";
+      var q = easeOut(r), s2 = it.el.style;
+      if (q >= 1){ s2.opacity = ""; s2.filter = ""; s2.transform = ""; s2.textShadow = ""; return; }
+      s2.opacity = q.toFixed(3);
+      s2.filter = "blur(" + ((1 - q) * 10).toFixed(2) + "px)";
+      s2.transform = "translate3d(0," + ((1 - q) * 12).toFixed(2) + "px,0)";
+      s2.textShadow = "0 0 " + ((1 - q) * 26).toFixed(1) + "px rgba(" + it.glow + "," + ((1 - q) * .95).toFixed(2) + ")";
     }
   }
-  function reset(it){ it.r = 0; if (it.kind === "ink"){ it.shown.fill(-1); } render(it); }
+  function reset(it){ it.r = 0; if (it.shown.length) it.shown.fill(-1); render(it); }
 
   function tick(now){
     raf = 0;
@@ -8685,18 +8777,17 @@ footer.site-footer{border:0;box-shadow:none;flex-wrap:wrap;gap:16px 24px;backgro
     for (var k = 0; k < items.length; k++){
       var it = items[k];
       if (!it.vis) continue;
-      var emerge = it.kind === "emerge";
-      if (!emerge && it.r >= 1) continue;
+      var reversible = it.kind !== "ink";                // everything but handwriting also blurs back out
+      if (!reversible && it.r >= 1) continue;
       var rect = it.el.getBoundingClientRect();
       var tp = clamp((vh * CFG.startAt - rect.top) / (vh * (CFG.startAt - CFG.doneAt)), 0, 1);   // where the scroll position says it should be
       var dwell = (now - it.since) > (CFG.dwellMs + it.delay) ? 1 : 0;
       var target = Math.max(tp, dwell);
-      // small texts also blur back out as they slide off the top of the screen (and as they sink back down)
-      if (emerge) target = Math.min(target, clamp((rect.bottom - vh * CFG.exitAt) / (vh * CFG.exitSpan), 0, 1));
-      var rate = 1 / (emerge ? CFG.emergeMs : CFG.writeMs) + vel * CFG.speedGain;
-      var nr = emerge ? it.r + clamp(target - it.r, -rate * dt * 1.4, rate * dt) : Math.min(target, it.r + rate * dt);
+      if (reversible) target = Math.min(target, clamp((rect.bottom - vh * CFG.exitAt) / (vh * CFG.exitSpan), 0, 1));
+      var rate = 1 / (reversible ? CFG.emergeMs : CFG.writeMs) + vel * CFG.speedGain;
+      var nr = reversible ? it.r + clamp(target - it.r, -rate * dt * 1.4, rate * dt) : Math.min(target, it.r + rate * dt);
       if (nr !== it.r){ it.r = nr; render(it); }
-      if (Math.abs(target - it.r) > 0.002 && (emerge || it.r < 1)) moving = true;
+      if (Math.abs(target - it.r) > 0.002 && (reversible || it.r < 1)) moving = true;
     }
     if (moving) raf = requestAnimationFrame(tick);
   }
@@ -8706,12 +8797,12 @@ footer.site-footer{border:0;box-shadow:none;flex-wrap:wrap;gap:16px 24px;backgro
     entries.forEach(function(en){
       var it = en.target.__ink; if (!it) return;
       if (en.isIntersecting){ if (!it.vis){ it.vis = true; it.since = performance.now(); } kick(); }
-      else if (it.vis){ it.vis = false; reset(it); }      // off screen: back to unwritten, ready to write again
+      else if (it.vis){ it.vis = false; reset(it); }      // off screen: back to unwritten, ready to appear again
     });
   }, { rootMargin: "0px 0px -6% 0px", threshold: 0.01 });
 
-  // scroll speed (px/ms), smoothed; also nudges the section glows
-  var glowQueued = false;
+  // scroll speed (px/ms), smoothed; also nudges the section glows and the glass reflection
+  var glowQueued = false, card = null, mouse = { x: 24, y: -6, on: false };
   function updateGlows(){
     glowQueued = false;
     ["section-portfolio", "section-about"].forEach(function(id){
@@ -8719,6 +8810,12 @@ footer.site-footer{border:0;box-shadow:none;flex-wrap:wrap;gap:16px 24px;backgro
       var top = sec.getBoundingClientRect().top;
       sec.style.setProperty("--gy", clamp(-top * .06, -70, 70).toFixed(1) + "px");
     });
+    if (card && !card.closest("[hidden]")){
+      var r = card.getBoundingClientRect(), vh = window.innerHeight;
+      // the light streak crosses the glass as the card scrolls through the screen
+      card.style.setProperty("--sheen", clamp(96 - (r.top / vh) * 120, -20, 110).toFixed(1) + "%");
+      if (!mouse.on){ card.style.setProperty("--sx", clamp(70 - (r.top / vh) * 60, 10, 90).toFixed(1) + "%"); card.style.setProperty("--sy", "-8%"); }
+    }
   }
   window.addEventListener("scroll", function(){
     var now = performance.now(), y = window.scrollY, dt = Math.max(1, now - lastT);
@@ -8727,30 +8824,65 @@ footer.site-footer{border:0;box-shadow:none;flex-wrap:wrap;gap:16px 24px;backgro
     if (!glowQueued){ glowQueued = true; requestAnimationFrame(updateGlows); }
   }, { passive: true });
 
+  function observe(el, it){
+    el.__ink = it; io.observe(el);
+    // creator edits / live preview replace the text: rebuild so the new words come in too
+    new MutationObserver(function(){
+      if (busy) return;
+      var settled = it.mode === "box" || el.textContent === it.text;
+      if (settled && (it.mode !== "ink" || el.querySelector(".ink-w"))) return;
+      el.classList.remove("reveal-fade", "is-visible");
+      var was = it.vis; build(it); if (was){ it.since = performance.now(); kick(); }
+    }).observe(el, { childList: true, characterData: true, subtree: true });
+  }
   function attach(sel, kind){
-    Array.prototype.forEach.call(document.querySelectorAll(sel), function(el){
+    Array.prototype.forEach.call(document.querySelectorAll(sel), function(el, i){
       if (el.__ink) return;
-      var it = makeItem(el, kind); el.__ink = it; io.observe(el);
-      // creator edits / live preview replace the text: rebuild so the new words write in too
-      new MutationObserver(function(){
-        if (busy) return;
-        if (el.textContent === it.text && (it.kind !== "ink" || el.querySelector(".ink-w"))) return;
-        el.classList.remove("reveal-fade", "is-visible");
-        var was = it.vis; build(it); if (was){ it.since = performance.now(); kick(); }
-      }).observe(el, { childList: true, characterData: true, subtree: true });
+      observe(el, makeItem(el, kind, i));
+    });
+  }
+  // contact form labels: wrap the label's own words so they can surface from inside the glass on their own
+  function attachLabels(){
+    Array.prototype.forEach.call(document.querySelectorAll(CFG.ghostLabelSelector), function(label, i){
+      var node = label.firstChild;
+      if (!node || node.nodeType !== 3 || !node.nodeValue.trim()) return;
+      var span = document.createElement("span"); span.className = "ghost-txt"; span.textContent = node.nodeValue.trim();
+      label.replaceChild(span, node);
+      if (span.__ink) return;
+      observe(span, makeItem(span, "ghost", i));
+    });
+  }
+  function attachBoxes(){
+    Array.prototype.forEach.call(document.querySelectorAll(CFG.ghostBoxSelector), function(el, i){
+      if (el.__ink) return;
+      observe(el, makeItem(el, "box", i + 1));
     });
   }
   try {
     document.documentElement.classList.add("ink-on");
     attach(CFG.inkSelector, "ink");
     attach(CFG.emergeSelector, "emerge");
+    attachLabels();
+    attachBoxes();
     // the old blur-fade wrapped the first .gallery-head as a whole; its children animate themselves now
     var gh = document.querySelector(".gallery-head"); if (gh) gh.classList.remove("reveal-fade", "is-visible");
+    // glass reflection follows the cursor (desktop) over the contact card
+    card = document.getElementById("contact-card");
+    if (card && window.matchMedia("(hover: hover) and (pointer: fine)").matches){
+      var mq = false;
+      card.addEventListener("pointermove", function(e){
+        var r = card.getBoundingClientRect(); mouse.on = true;
+        mouse.x = (e.clientX - r.left) / r.width * 100; mouse.y = (e.clientY - r.top) / r.height * 100;
+        if (!mq){ mq = true; requestAnimationFrame(function(){ mq = false; card.style.setProperty("--sx", mouse.x.toFixed(1) + "%"); card.style.setProperty("--sy", mouse.y.toFixed(1) + "%"); }); }
+      }, { passive: true });
+      card.addEventListener("pointerleave", function(){ mouse.on = false; updateGlows(); });
+    }
     updateGlows();
   } catch (err) {
     // never leave text hidden if anything above goes wrong
     document.documentElement.classList.remove("ink-on");
-    Array.prototype.forEach.call(document.querySelectorAll(".ink-l"), function(l){ l.style.cssText = ""; });
+    Array.prototype.forEach.call(document.querySelectorAll(".ink-l, .ew"), function(l){ l.style.cssText = ""; });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-ghost]"), function(l){ l.removeAttribute("data-ghost"); l.style.removeProperty("--gp"); });
     items.forEach(function(it){ it.el.style.opacity = ""; it.el.style.filter = ""; it.el.style.transform = ""; });
     if (window.console) console.warn("KaInk disabled:", err);
   }
