@@ -1,9 +1,9 @@
 import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
-import type {KeyboardEvent as ReactKeyboardEvent,MouseEvent as ReactMouseEvent,PointerEvent as ReactPointerEvent} from 'react';
+import type {CSSProperties,KeyboardEvent as ReactKeyboardEvent,MouseEvent as ReactMouseEvent,PointerEvent as ReactPointerEvent} from 'react';
 import {imageUrl,type Project} from './types';
 
 export type StacksSettings={loop?:boolean;covers?:Record<string,string>};
-export type WorkStacksProps={folders:string[];images:Project[];stacks?:StacksSettings;/** Distinguishes panels (Portfolio, About) so each plays its own entrance once. */id?:string};
+export type WorkStacksProps={folders:string[];images:Project[];stacks?:StacksSettings;/** 'pinned' shows only pinned images (Portfolio ALL / PINNED chips). */filter?:'all'|'pinned';pinned?:string[];onPin?:(slug:string,on:boolean)=>void;/** Distinguishes panels (Portfolio, About) so each plays its own entrance once. */id?:string};
 type Stack={name:string;items:Project[];cover:Project};
 
 /** The scatter-to-organize entrance plays once per panel per page load, however often it re-renders or remounts. */
@@ -16,6 +16,16 @@ function sized(p:Project,min:number){
   if(p.src)return p.src;
   const widths=[...p.widths].sort((a,b)=>a-b),w=widths.find(x=>x>=min)||widths[widths.length-1];
   return w?`/images/${p.slug}-${w}.webp`:`/images/${p.slug}-full.webp`;
+}
+const dpr=()=>typeof window==='undefined'?1:Math.min(3,Math.max(1,window.devicePixelRatio||1));
+/** Width to ask for: the CSS size scaled by the screen's pixel density, capped. */
+const q=(base:number,cap:number)=>Math.min(cap,Math.round(base*dpr()));
+/** Like sized(), but reaches for the original when even the largest export is smaller than needed (5K / 4K TVs). */
+function sizedBest(p:Project,min:number){
+  if(p.src)return p.src;
+  const top=Math.max(0,...p.widths);
+  if(min>top&&p.full)return `/images/${p.slug}-full.webp`;
+  return sized(p,min);
 }
 function useMedia(query:string){
   const [matches,setMatches]=useState(()=>typeof matchMedia==='function'&&matchMedia(query).matches);
@@ -64,9 +74,9 @@ function StackGrid({id,stacks,reduced,onOpen}:{id:string;stacks:Stack[];reduced:
       const count=s.items.length,others=s.items.filter(i=>i.slug!==s.cover.slug);
       return <button type="button" className="stack" key={s.name} onClick={e=>onOpen(s.name,e.currentTarget)} aria-label={`${s.name}, ${count} ${count===1?'image':'images'}. Open`}>
         <span className="deck">
-          {count>2&&<span className="layer l2" aria-hidden="true"><img src={sized(others[1]||s.cover,480)} alt="" loading="lazy" decoding="async" draggable={false}/></span>}
-          {count>1&&<span className="layer l1" aria-hidden="true"><img src={sized(others[0]||s.cover,480)} alt="" loading="lazy" decoding="async" draggable={false}/></span>}
-          <span className="front"><img src={sized(s.cover,768)} alt={s.cover.title} loading="lazy" decoding="async" draggable={false}/></span>
+          {count>2&&<span className="layer l2" aria-hidden="true"><img src={sized(others[1]||s.cover,q(480,1080))} alt="" loading="lazy" decoding="async" draggable={false}/></span>}
+          {count>1&&<span className="layer l1" aria-hidden="true"><img src={sized(others[0]||s.cover,q(480,1080))} alt="" loading="lazy" decoding="async" draggable={false}/></span>}
+          <span className="front"><img src={sized(s.cover,q(768,1600))} alt={s.cover.title} loading="lazy" decoding="async" draggable={false}/></span>
         </span>
         <span className="meta"><strong>{s.name}</strong><small>{count} {count===1?'image':'images'}</small></span>
       </button>;
@@ -74,40 +84,28 @@ function StackGrid({id,stacks,reduced,onOpen}:{id:string;stacks:Stack[];reduced:
   </div>;
 }
 
-/* ============================================================ download button ===== */
-// Icon-only button. On click the button's own circle folds into a small paper plane (a real 12-point shape
-// morph, same idea as the contact "send" button), the plane drops into a tray beneath it, and the button
-// re-forms as a check once the file has actually been fetched and saved. The download result is
-// authoritative: the check only appears after it succeeds; a failure shows a cross instead.
-const DL_DEFAULTS={pressMs:60,foldMs:150,dropMs:230,landMs:80,resetMs:1900,plane:28,drop:44};
+/* ============================================================ download button (v2: progress ring) ===== */
+// Icon-only glass button, everything inside its own 48px circle. On click the arrow drops into the tray while a
+// ring around the button fills with the file's REAL download progress (bytes received / total); when the file is
+// saved the button resolves to a check with a soft burst. A failure turns the ring red and shakes a cross.
+// The animation never decides the outcome: the check only appears once the file was actually fetched and saved.
+const DL_DEFAULTS={minMs:700,resetMs:2000,style:'fill'};
 type DlState='idle'|'busy'|'done'|'error';
 function dlConfig(){return {...DL_DEFAULTS,...((window as unknown as {KA_DL_CONFIG?:Partial<typeof DL_DEFAULTS>}).KA_DL_CONFIG||{})};}
-const ease=(t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
-const easeOut=(t:number)=>1-Math.pow(1-t,3);
-const easeIn=(t:number)=>t*t*t;
-type Pt=[number,number];
-const mixPts=(a:Pt[],b:Pt[],f:number):Pt[]=>a.map((p,i)=>[p[0]+(b[i][0]-p[0])*f,p[1]+(b[i][1]-p[1])*f]);
-const ptsAttr=(pts:Pt[])=>pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-function planeShapes(L:number){
-  const cx=24,cy=24,R=23.5,hp=L*.3;
-  // circle -> plane use the same 12 points in the same order, so the morph is point-for-point
-  const A:Pt[]=Array.from({length:12},(_,i)=>{const t=(-45+30*i)*Math.PI/180;return [cx+R*Math.cos(t),cy+R*Math.sin(t)] as Pt;});
-  const B:Pt[]=A.map(p=>[p[0],cy+(p[1]-cy)*.8] as Pt);
-  const T1:Pt=[cx-L/2,cy-hp],N:Pt=[cx+L/2,cy],T2:Pt=[cx-L/2,cy+hp],K:Pt=[cx-L/2+L*.26,cy];
-  const on=(a:Pt,b:Pt,f:number):Pt=>[a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f];
-  const right:Pt[]=[T1,on(T1,N,.4),on(T1,N,.78),on(T1,N,.93),N,on(T2,N,.93),on(T2,N,.78),on(T2,N,.4),T2,on(T2,K,.5),K,on(K,T1,.5)];
-  const E:Pt[]=right.map(p=>[cx-(p[1]-cy),cy+(p[0]-cx)] as Pt);   // turn the right-pointing plane to point down
-  return {A,B,E};
-}
+const easeInOut=(t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
 function fileName(p:Project,url:string){
   const ext=(/\.(webp|png|jpe?g|avif)(\?|$)/i.exec(url)?.[1]||'webp').toLowerCase().replace('jpeg','jpg');
   const base=(p.title||p.slug||'image').trim().replace(/[^\w\- ]+/g,'').replace(/\s+/g,'-').slice(0,80)||'image';
   return `${base}.${ext}`;
 }
-async function fetchFile(p:Project){
-  const url=p.src||imageUrl(p,true);
+async function fetchFile(p:Project,onProgress:(v:number)=>void){
+  const url=p.src||imageUrl(p,true),name=fileName(p,url);
   const res=await fetch(url);if(!res.ok)throw new RangeError('HTTP '+res.status);   // a real server error: not worth retrying as a link
-  return {blob:await res.blob(),name:fileName(p,url)};
+  const total=Number(res.headers.get('content-length'))||0;
+  if(!res.body||!total){const blob=await res.blob();onProgress(1);return {blob,name};}
+  const reader=res.body.getReader(),chunks:Uint8Array[]=[];let got=0;
+  for(;;){const {done,value}=await reader.read();if(done)break;chunks.push(value);got+=value.length;onProgress(Math.min(1,got/total));}
+  return {blob:new Blob(chunks as BlobPart[],{type:res.headers.get('content-type')||''}),name};
 }
 function saveBlob(file:{blob:Blob;name:string}){
   const a=document.createElement('a');a.href=URL.createObjectURL(file.blob);a.download=file.name;a.style.display='none';
@@ -117,93 +115,227 @@ function saveLink(p:Project){
   const a=document.createElement('a');a.href=p.src||imageUrl(p,true);a.download=fileName(p,a.href);a.rel='noopener';a.style.display='none';
   document.body.appendChild(a);a.click();a.remove();
 }
+const BURST=[0,60,120,180,240,300].map(a=>({'--x':`${(Math.cos(a*Math.PI/180)*30).toFixed(1)}px`,'--y':`${(Math.sin(a*Math.PI/180)*30).toFixed(1)}px`}) as CSSProperties);
 function DownloadButton({project,reduced}:{project:Project;reduced:boolean}){
   const [state,setState]=useState<DlState>('idle');
   const stateRef=useRef<DlState>('idle');
+  const bar=useRef<SVGCircleElement>(null),arrow=useRef<SVGGElement>(null);
   const raf=useRef(0),timer=useRef(0);
-  const refs=useRef<{body?:SVGPolygonElement;lit?:SVGRectElement;shade?:SVGRectElement;c1?:SVGLineElement;c2?:SVGLineElement;tray?:SVGPathElement;plane?:SVGGElement;stopT?:SVGStopElement;stopB?:SVGStopElement;clip?:SVGPolygonElement}>({});
-  const set=(s:DlState)=>{stateRef.current=s;setState(s);};
   const cfg=useMemo(dlConfig,[]);
-  const shapes=useMemo(()=>planeShapes(cfg.plane),[cfg.plane]);
+  const set=(s:DlState)=>{stateRef.current=s;setState(s);};
+  function paint(dp:number){
+    bar.current?.setAttribute('stroke-dashoffset',(100-dp*100).toFixed(1));
+    arrow.current?.setAttribute('transform',`translate(0 ${(11.5*easeInOut(Math.min(1,dp*1.12))).toFixed(2)})`);
+  }
   useEffect(()=>()=>{cancelAnimationFrame(raf.current);clearTimeout(timer.current);},[]);
   // a different image: back to idle
-  useEffect(()=>{cancelAnimationFrame(raf.current);clearTimeout(timer.current);stateRef.current='idle';setState('idle');},[project.slug]);
-  function frame(t:number){
-    const r=refs.current,{pressMs,foldMs,dropMs,landMs}=cfg;
-    let pts:Pt[],fold=0,dy=0,rot=0,sway=0,scale=1,opacity=1,tray=0,solid=0;
-    if(t<pressMs){const k=easeOut(t/pressMs);pts=mixPts(shapes.A,shapes.B,k);scale=1-.04*Math.sin(k*Math.PI);}
-    else if(t<pressMs+foldMs){const k=ease((t-pressMs)/foldMs);pts=mixPts(shapes.B,shapes.E,k);fold=k;solid=k;tray=k;}
-    else if(t<pressMs+foldMs+dropMs){const k=(t-pressMs-foldMs)/dropMs,d=easeIn(k)*.85+k*.15;pts=shapes.E;fold=1;solid=1;tray=1;dy=cfg.drop*d;rot=Math.sin(k*Math.PI)*9;sway=Math.sin(k*Math.PI*2)*2.5;scale=1-.08*k;}
-    else{const k=easeOut(Math.min(1,Math.max(0,(t-pressMs-foldMs-dropMs)/landMs)));pts=shapes.E;fold=1;solid=1;tray=1;dy=cfg.drop+4*k;scale=.92-.4*k;opacity=1-k;}
-    const s=ptsAttr(pts);
-    r.body?.setAttribute('points',s);r.clip?.setAttribute('points',s);
-    const to=(a:number,b:number)=>(a+(b-a)*solid).toFixed(3);
-    r.stopT?.setAttribute('stop-color',`rgba(255,241,221,${to(.28,.96)})`);
-    r.stopB?.setAttribute('stop-color',`rgba(190,211,234,${to(.14,.9)})`);
-    const crease=Math.sin(Math.min(1,fold)*Math.PI);           // fold lines show while the corners fold in
-    r.c1?.setAttribute('opacity',(crease*.85).toFixed(2));r.c2?.setAttribute('opacity',(crease*.85).toFixed(2));
-    r.lit?.setAttribute('opacity',(fold*.9).toFixed(2));r.shade?.setAttribute('opacity',(fold*.9).toFixed(2));
-    r.tray?.setAttribute('opacity',tray.toFixed(2));
-    r.plane?.setAttribute('transform',`translate(${sway.toFixed(1)} ${dy.toFixed(1)}) rotate(${rot.toFixed(1)} 24 24) translate(24 24) scale(${scale.toFixed(3)}) translate(-24 -24)`);
-    r.plane?.setAttribute('opacity',opacity.toFixed(2));
-  }
+  useEffect(()=>{cancelAnimationFrame(raf.current);clearTimeout(timer.current);stateRef.current='idle';setState('idle');paint(0);},[project.slug]);// eslint-disable-line react-hooks/exhaustive-deps
   function finish(ok:boolean){
     set(ok?'done':'error');
-    clearTimeout(timer.current);timer.current=window.setTimeout(()=>{stateRef.current='idle';setState('idle');},cfg.resetMs);
+    clearTimeout(timer.current);timer.current=window.setTimeout(()=>{stateRef.current='idle';setState('idle');paint(0);},cfg.resetMs);
   }
   async function click(){
     if(stateRef.current!=='idle')return;
-    set('busy');
-    const pending=fetchFile(project);      // starts immediately; the animation never decides the outcome
-    pending.catch(()=>undefined);
-    const settle=async()=>{
-      try{saveBlob(await pending);finish(true);}
-      catch(err){
-        // the request itself could not be made as a blob (e.g. cross-origin): hand the plain link to the browser instead.
-        // A genuine HTTP error (missing file) is reported as a failure, never as a success.
-        if(err instanceof TypeError){try{saveLink(project);finish(true);}catch{finish(false);}}else finish(false);
-      }
-    };
-    if(reduced||!('animate' in Element.prototype)){await settle();return;}
-    const total=cfg.pressMs+cfg.foldMs+cfg.dropMs+cfg.landMs,t0=performance.now();
-    const tick=(now:number)=>{
-      const t=now-t0;frame(Math.min(t,total));
-      if(t<total)raf.current=requestAnimationFrame(tick);else void settle();
-    };
-    frame(0);raf.current=requestAnimationFrame(tick);
+    set('busy');paint(0);
+    let real=0,finished=false,failed=false;
+    const pending=fetchFile(project,v=>{real=v;});
+    pending.then(()=>{finished=true;},()=>{failed=true;});
+    if(!reduced&&'animate' in Element.prototype){
+      const t0=performance.now();let dp=0;
+      await new Promise<void>(resolve=>{
+        const tick=(now:number)=>{
+          const t=now-t0,timeP=Math.min(.92,t/cfg.minMs*.92);
+          // the ring follows the real progress, but never crawls: it also advances with time so it always reads as moving
+          const target=finished?1:Math.min(.96,Math.max(real*.96,timeP));
+          dp+=(target-dp)*.2;
+          if(failed){resolve();return;}
+          if(finished&&t>=cfg.minMs&&dp>.985){paint(1);resolve();return;}
+          paint(dp);raf.current=requestAnimationFrame(tick);
+        };
+        raf.current=requestAnimationFrame(tick);
+      });
+    }
+    try{saveBlob(await pending);finish(true);}
+    catch(err){
+      // the request itself could not be made as a blob (e.g. cross-origin): hand the plain link to the browser instead.
+      // A genuine HTTP error (missing file) is reported as a failure, never as a success.
+      if(err instanceof TypeError){try{saveLink(project);finish(true);}catch{finish(false);}}else finish(false);
+    }
   }
   const label=state==='busy'?'Downloading…':state==='done'?'Download started':state==='error'?'Download failed, try again':`Download ${project.title}`;
-  return <span className="dl">
-    <button type="button" className="dl-btn" data-state={state} onClick={click} aria-label={label} aria-busy={state==='busy'} title={state==='idle'?'Download':label}>
-      <svg className="i-dl" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4.2-4.2M12 15l4.2-4.2M5 19.5h14"/></svg>
-      <svg className="i-ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.8l4.2 4.2L18.5 8"/></svg>
-      <svg className="i-err" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg>
+  return <span className="dl2">
+    <button type="button" className="dl2-btn" data-state={state} onClick={click} aria-label={label} aria-busy={state==='busy'} title={state==='idle'?'Download':label}>
+      <svg className="dl2-ring" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <defs><linearGradient id="dl2g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffe6c9"/><stop offset="1" stopColor="#ff9a5a"/></linearGradient></defs>
+        <circle className="track" cx="24" cy="24" r="23"/>
+        <circle className="bar" ref={bar} cx="24" cy="24" r="23" pathLength="100" strokeDasharray="100" strokeDashoffset="100" transform="rotate(-90 24 24)"/>
+      </svg>
+      <svg className="dl2-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <defs><clipPath id="dl2c"><rect x="0" y="0" width="24" height="15.4"/></clipPath></defs>
+        <g clipPath="url(#dl2c)"><g className="arrow" ref={arrow}><path d="M12 4.2v10.2m0 0-4.2-4.2M12 14.4l4.2-4.2"/></g></g>
+        <path className="tray" d="M5.2 15.2v2.4a2.2 2.2 0 0 0 2.2 2.2h9.2a2.2 2.2 0 0 0 2.2-2.2v-2.4"/>
+      </svg>
+      <svg className="dl2-ok" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5.6 12.6l4.1 4.1L18.4 8"/></svg>
+      <svg className="dl2-err" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.2 7.2l9.6 9.6M16.8 7.2l-9.6 9.6"/></svg>
+      {BURST.map((s,i)=><i className="dl2-dot" style={s} key={i} aria-hidden="true"/>)}
     </button>
-    <svg className="dl-fx" viewBox="0 0 48 96" aria-hidden="true" focusable="false">
-      <defs>
-        <linearGradient id="dlg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="rgba(255,241,221,.28)" ref={el=>{refs.current.stopT=el||undefined;}}/>
-          <stop offset="1" stopColor="rgba(190,211,234,.14)" ref={el=>{refs.current.stopB=el||undefined;}}/>
-        </linearGradient>
-        <clipPath id="dlc"><polygon ref={el=>{refs.current.clip=el||undefined;}}/></clipPath>
-      </defs>
-      <path ref={el=>{refs.current.tray=el||undefined;}} d="M6 68v11q0 7 7 7h22q7 0 7-7V68" fill="none" stroke="rgba(255,225,190,.85)" strokeWidth="2" strokeLinecap="round" opacity="0"/>
-      <g ref={el=>{refs.current.plane=el||undefined;}} opacity="0">
-        <polygon ref={el=>{refs.current.body=el||undefined;}} fill="url(#dlg)" stroke="rgba(255,170,120,.55)" strokeWidth="1" strokeLinejoin="round"/>
-        <rect ref={el=>{refs.current.lit=el||undefined;}} x="0" y="0" width="24" height="96" fill="rgba(255,255,255,.34)" clipPath="url(#dlc)" opacity="0"/>
-        <rect ref={el=>{refs.current.shade=el||undefined;}} x="24" y="0" width="24" height="96" fill="rgba(0,0,0,.3)" clipPath="url(#dlc)" opacity="0"/>
-        <line ref={el=>{refs.current.c1=el||undefined;}} x1="5" y1="14" x2="24" y2="34" stroke="rgba(255,240,225,.8)" strokeWidth="1" opacity="0"/>
-        <line ref={el=>{refs.current.c2=el||undefined;}} x1="43" y1="14" x2="24" y2="34" stroke="rgba(255,240,225,.8)" strokeWidth="1" opacity="0"/>
-      </g>
-    </svg>
     <span className="sr" role="status" aria-live="polite">{state==='busy'?'Downloading…':state==='done'?'Download started':state==='error'?'Download failed. Try again.':''}</span>
   </span>;
 }
 
+/* ============================================================ download button (v3: liquid fill) ===== */
+// The glass circle is a vial. On click the arrow stays put while green liquid rises inside it, with bubbles floating up through it, level = the file's REAL
+// download progress (bytes received / total), with a live wavy surface. At 100% the liquid flashes, the arrow turns
+// into a check and a soft ring expands outward. A failure drains the vial red and shakes a cross. The animation never
+// decides the outcome: the check only appears after the file was actually fetched and saved.
+// Choose the older ring style with  window.KA_DL_CONFIG = { style: 'ring' }.
+function waveD(level:number,phase:number,amp:number){
+  const yL=46*(1-level)+1;let d=`M0 ${yL.toFixed(2)}`;
+  for(let x=0;x<=48;x+=3)d+=` L${x} ${(yL+amp*Math.sin(x/48*Math.PI*3+phase)).toFixed(2)}`;
+  return d+' L48 49 L0 49 Z';
+}
+// bubbles drifting up through the liquid: x, radius, rise speed, start offset
+const BUBBLES=[{x:11,r:1.7,s:.00019,o:0},{x:18,r:1.1,s:.00026,o:.4},{x:25,r:2.1,s:.00016,o:.7},{x:31,r:1.3,s:.00023,o:.2},{x:37,r:1.7,s:.0002,o:.55},{x:22,r:.9,s:.0003,o:.85},{x:14,r:1,s:.00028,o:.6},{x:34,r:.9,s:.00032,o:.1}];
+function DownloadFill({project,reduced}:{project:Project;reduced:boolean}){
+  const [state,setState]=useState<DlState>('idle');
+  const stateRef=useRef<DlState>('idle');
+  const w1=useRef<SVGPathElement>(null),w2=useRef<SVGPathElement>(null),bub=useRef<(SVGCircleElement|null)[]>([]);
+  const raf=useRef(0),timer=useRef(0);
+  const cfg=useMemo(dlConfig,[]);
+  const set=(s:DlState)=>{stateRef.current=s;setState(s);};
+  function paint(level:number,phase:number,time=0){
+    const amp=2.3*(1-Math.min(1,level)*.7);
+    w1.current?.setAttribute('d',waveD(level,phase,amp));
+    w2.current?.setAttribute('d',waveD(Math.max(0,level-.035),phase*1.3+1.7,amp*.8));
+    const surface=46*(1-level)+3;
+    BUBBLES.forEach((b,i)=>{
+      const c=bub.current[i];if(!c)return;
+      if(level<.07){c.setAttribute('opacity','0');return;}
+      const u=(time*b.s*1000/1000+b.o)%1,y=45-u*(45-surface);
+      c.setAttribute('cx',(b.x+Math.sin(time*.004+b.o*6.3)*1.4).toFixed(2));
+      c.setAttribute('cy',Math.max(surface,y).toFixed(2));
+      c.setAttribute('opacity',(.3+.55*Math.sin(Math.PI*u)).toFixed(2));
+    });
+  }
+  useEffect(()=>()=>{cancelAnimationFrame(raf.current);clearTimeout(timer.current);},[]);
+  useEffect(()=>{cancelAnimationFrame(raf.current);clearTimeout(timer.current);stateRef.current='idle';setState('idle');paint(0,0);},[project.slug]);// eslint-disable-line react-hooks/exhaustive-deps
+  function finish(ok:boolean){
+    set(ok?'done':'error');
+    clearTimeout(timer.current);timer.current=window.setTimeout(()=>{stateRef.current='idle';setState('idle');paint(0,0);},cfg.resetMs);
+  }
+  async function click(){
+    if(stateRef.current!=='idle')return;
+    set('busy');paint(0,0);
+    let real=0,finished=false,failed=false;
+    const pending=fetchFile(project,v=>{real=v;});
+    pending.then(()=>{finished=true;},()=>{failed=true;});
+    if(!reduced&&'animate' in Element.prototype){
+      const t0=performance.now();let lv=0,phase=0,last=t0;
+      await new Promise<void>(resolve=>{
+        const tick=(now:number)=>{
+          const t=now-t0,dt=Math.min(50,now-last);last=now;phase+=dt*.011;
+          const timeP=Math.min(.92,t/cfg.minMs*.92);
+          const target=finished?1:Math.min(.96,Math.max(real*.96,timeP));
+          lv+=(target-lv)*.16;
+          if(failed){resolve();return;}
+          if(finished&&t>=cfg.minMs&&lv>.985){paint(1,phase,t);resolve();return;}
+          paint(lv,phase,t);raf.current=requestAnimationFrame(tick);
+        };
+        raf.current=requestAnimationFrame(tick);
+      });
+    }
+    try{saveBlob(await pending);finish(true);}
+    catch(err){
+      if(err instanceof TypeError){try{saveLink(project);finish(true);}catch{finish(false);}}else finish(false);
+    }
+  }
+  const label=state==='busy'?'Downloading…':state==='done'?'Download started':state==='error'?'Download failed, try again':`Download ${project.title}`;
+  return <span className="dl3">
+    <button type="button" className="dl3-btn" data-state={state} onClick={click} aria-label={label} aria-busy={state==='busy'} title={state==='idle'?'Download':label}>
+      <svg className="dl3-vial" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <defs>
+          <clipPath id="dl3c"><circle cx="24" cy="24" r="23"/></clipPath>
+          <linearGradient id="dl3g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="rgba(196,255,214,.95)"/><stop offset="1" stopColor="rgba(38,190,108,.92)"/></linearGradient>
+        </defs>
+        <g clipPath="url(#dl3c)"><path className="wave b" ref={w2} d="M0 49 L48 49 L0 49Z"/><path className="wave a" ref={w1} d="M0 49 L48 49 L0 49Z"/>{BUBBLES.map((b,i)=><circle className="bub" key={i} ref={el=>{bub.current[i]=el;}} cx={b.x} cy="46" r={b.r} opacity="0"/>)}</g><path className="gloss" d="M9.5 15.5A16 16 0 0 1 19 8.4" />
+      </svg>
+      <svg className="dl3-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4.2v10.2m0 0-4.2-4.2M12 14.4l4.2-4.2"/><path d="M5.2 15.2v2.4a2.2 2.2 0 0 0 2.2 2.2h9.2a2.2 2.2 0 0 0 2.2-2.2v-2.4"/></svg>
+      <svg className="dl3-ok" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5.6 12.6l4.1 4.1L18.4 8"/></svg>
+      <svg className="dl3-err" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.2 7.2l9.6 9.6M16.8 7.2l-9.6 9.6"/></svg>
+      <i className="dl3-pulse" aria-hidden="true"/>
+    </button>
+    <span className="sr" role="status" aria-live="polite">{state==='busy'?'Downloading…':state==='done'?'Download started':state==='error'?'Download failed. Try again.':''}</span>
+  </span>;
+}
+/** The download control used by the viewer: liquid fill by default, ring style on request. */
+function DownloadControl(props:{project:Project;reduced:boolean}){
+  return dlConfig().style==='ring'?<DownloadButton {...props}/>:<DownloadFill {...props}/>;
+}
+
+/* ============================================================ share ===== */
+// Phones/tablets: the native share sheet (any app). Desktop: a small menu with Copy link and the common apps.
+// The link is a deep link (?image=<id>) that reopens exactly this image in the viewer.
+function shareUrl(slug:string){
+  const u=new URL(window.location.href);u.search='';u.hash='';u.searchParams.set('image',slug);return u.toString();
+}
+async function copyText(t:string){
+  try{await navigator.clipboard.writeText(t);return true;}
+  catch{
+    try{const ta=document.createElement('textarea');ta.value=t;ta.setAttribute('readonly','');ta.style.cssText='position:fixed;top:0;left:0;opacity:0';document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();return ok;}
+    catch{return false;}
+  }
+}
+function ShareButton({project,stackName}:{project:Project;stackName:string}){
+  const [open,setOpen]=useState(false),[note,setNote]=useState('');
+  const wrap=useRef<HTMLSpanElement>(null),btn=useRef<HTMLButtonElement>(null),timer=useRef(0);
+  const coarse=useMedia('(pointer: coarse)');
+  const url=useMemo(()=>shareUrl(project.slug),[project.slug]);
+  const text=`${project.title} — ${stackName}`;
+  const canNative=typeof navigator!=='undefined'&&typeof navigator.share==='function';
+  useEffect(()=>{setOpen(false);setNote('');},[project.slug]);
+  useEffect(()=>()=>clearTimeout(timer.current),[]);
+  useEffect(()=>{
+    if(!open)return;
+    const away=(e:PointerEvent)=>{if(!e.composedPath().includes(wrap.current as EventTarget))setOpen(false);};
+    const esc=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.stopImmediatePropagation();e.preventDefault();setOpen(false);btn.current?.focus({preventScroll:true});}};
+    document.addEventListener('pointerdown',away,true);document.addEventListener('keydown',esc,true);
+    (wrap.current?.querySelector('.vw-menu a,.vw-menu button') as HTMLElement|null)?.focus({preventScroll:true});
+    return()=>{document.removeEventListener('pointerdown',away,true);document.removeEventListener('keydown',esc,true);};
+  },[open]);
+  function tell(msg:string){setNote(msg);clearTimeout(timer.current);timer.current=window.setTimeout(()=>setNote(''),2000);}
+  async function nativeShare(){try{await navigator.share({title:project.title,text,url});}catch{/* the person closed the share sheet */}}
+  async function click(){
+    if(canNative&&coarse){await nativeShare();return;}     // touch devices: straight to the system share sheet
+    setOpen(o=>!o);
+  }
+  async function copy(){setOpen(false);tell((await copyText(url))?'Link copied':'Could not copy the link');btn.current?.focus({preventScroll:true});}
+  const enc=encodeURIComponent,items:{label:string;href:string;dot:string}[]=[
+    {label:'WhatsApp',href:`https://wa.me/?text=${enc(text+' '+url)}`,dot:'#25d366'},
+    {label:'X (Twitter)',href:`https://twitter.com/intent/tweet?text=${enc(text)}&url=${enc(url)}`,dot:'#e7e7ea'},
+    {label:'Facebook',href:`https://www.facebook.com/sharer/sharer.php?u=${enc(url)}`,dot:'#4c8dff'},
+    {label:'LinkedIn',href:`https://www.linkedin.com/sharing/share-offsite/?url=${enc(url)}`,dot:'#3b8fd6'},
+    {label:'Telegram',href:`https://t.me/share/url?url=${enc(url)}&text=${enc(text)}`,dot:'#39a7e0'},
+    {label:'Email',href:`mailto:?subject=${enc(project.title)}&body=${enc(text+'\n'+url)}`,dot:'#ffb37a'}
+  ];
+  return <span className="vw-share-wrap" ref={wrap}>
+    <button type="button" ref={btn} className="vw-share" onClick={click} aria-haspopup={canNative&&coarse?undefined:'menu'} aria-expanded={canNative&&coarse?undefined:open} aria-label={`Share ${project.title}`} title="Share">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="6.5" cy="12" r="2.6"/><circle cx="17.5" cy="5.6" r="2.6"/><circle cx="17.5" cy="18.4" r="2.6"/><path d="M8.8 10.8l6.4-3.8M8.8 13.2l6.4 3.8"/></svg>
+    </button>
+    {open&&<div className="vw-menu" role="menu" aria-label="Share this image">
+      <button type="button" role="menuitem" onClick={copy}><i className="d" style={{background:'#ffe2c4'}}/>Copy link</button>
+      {items.map(i=><a key={i.label} role="menuitem" href={i.href} target="_blank" rel="noopener noreferrer" onClick={()=>setOpen(false)}><i className="d" style={{background:i.dot}}/>{i.label}</a>)}
+      {canNative&&<button type="button" role="menuitem" onClick={()=>{setOpen(false);void nativeShare();}}><i className="d" style={{background:'#c9b8ff'}}/>More apps…</button>}
+    </div>}
+    {note&&<span className="vw-toast" aria-hidden="true">{note}</span>}
+    <span className="sr" role="status" aria-live="polite">{note}</span>
+  </span>;
+}
+
 /* ============================================================ full image viewer ===== */
-function Viewer({p,stackName,index,n,atStart,atEnd,onPrev,onNext,onBack,reduced,origin}:{p:Project;stackName:string;index:number;n:number;atStart:boolean;atEnd:boolean;onPrev:()=>void;onNext:()=>void;onBack:()=>void;reduced:boolean;origin:DOMRect|null}){
+function Viewer({p,stackName,index,n,atStart,atEnd,onPrev,onNext,onBack,reduced,origin,pinned,onPin}:{pinned:boolean;onPin?:()=>void;p:Project;stackName:string;index:number;n:number;atStart:boolean;atEnd:boolean;onPrev:()=>void;onNext:()=>void;onBack:()=>void;reduced:boolean;origin:DOMRect|null}){
   const rootRef=useRef<HTMLDivElement>(null),frameRef=useRef<HTMLDivElement>(null),infoRef=useRef<HTMLDivElement>(null),first=useRef(true);
   const [hi,setHi]=useState(false);
+  const hiMin=useMemo(()=>Math.min(3840,Math.max(q(1600,3840),Math.round(Math.min(window.innerWidth*.6,1000)*dpr()))),[]);
   useEffect(()=>{setHi(false);},[p.slug]);
   useEffect(()=>{rootRef.current?.focus({preventScroll:true});},[]);
   // Fly the picture out of the carousel card into the viewer (transform only), then bring the text in.
@@ -224,8 +356,8 @@ function Viewer({p,stackName,index,n,atStart,atEnd,onPrev,onNext,onBack,reduced,
     <div className="vw-media">
       <button type="button" className="vw-nav prev" onClick={onPrev} disabled={atStart||n<2} aria-label="Previous image">‹</button>
       <div className="vw-frame" ref={frameRef} key={p.slug}>
-        <img className="lo" src={sized(p,1080)} alt={p.title} draggable={false}/>
-        <img className={'hi'+(hi?' is-in':'')} src={sized(p,1600)} alt="" aria-hidden="true" draggable={false} onLoad={()=>setHi(true)}/>
+        <img className="lo" src={sized(p,q(1080,2400))} alt={p.title} draggable={false}/>
+        <img className={'hi'+(hi?' is-in':'')} src={sizedBest(p,hiMin)} alt="" aria-hidden="true" draggable={false} onLoad={()=>setHi(true)}/>
       </div>
       <button type="button" className="vw-nav next" onClick={onNext} disabled={atEnd||n<2} aria-label="Next image">›</button>
     </div>
@@ -235,7 +367,9 @@ function Viewer({p,stackName,index,n,atStart,atEnd,onPrev,onNext,onBack,reduced,
       {tech.length>0&&<ul className="vw-tags" aria-label="Tools">{tech.map(t=><li key={t}>{t}</li>)}</ul>}
       {desc&&<div className="vw-desc"><p>{desc}</p></div>}
       <div className="vw-actions">
-        {p.downloadable!==false&&<DownloadButton project={p} reduced={reduced}/>}
+        {p.downloadable!==false&&<DownloadControl project={p} reduced={reduced}/>}
+        <ShareButton project={p} stackName={stackName}/>
+        {onPin&&<button type="button" className={'vw-pin'+(pinned?' is-on':'')} onClick={onPin} aria-pressed={pinned} aria-label={pinned?'Unpin this image':'Pin this image'} title={pinned?'Unpin':'Pin to the Pinned filter'}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.5l6-.8z"/></svg></button>}
         {p.link&&<a className="vw-link" href={p.link} target="_blank" rel="noopener noreferrer">View project ↗</a>}
       </div>
     </div>
@@ -245,7 +379,7 @@ function Viewer({p,stackName,index,n,atStart,atEnd,onPrev,onNext,onBack,reduced,
 
 /* ============================================================ magnetic coverflow ===== */
 const VISIBLE=3;
-function Coverflow({stack,loop,reduced,canHover,onClose}:{stack:Stack;loop:boolean;reduced:boolean;canHover:boolean;onClose:()=>void}){
+function Coverflow({stack,loop,reduced,canHover,onClose,pins,onPin,startSlug}:{stack:Stack;loop:boolean;reduced:boolean;canHover:boolean;onClose:()=>void;pins:Set<string>;onPin?:(slug:string,on:boolean)=>void;startSlug?:string}){
   const items=stack.items,n=items.length;
   // Loop by modulo on the position. Short stacks are repeated (virtual slots) so the wrap point
   // always sits beyond the visible range and can never be seen as a seam.
@@ -328,10 +462,17 @@ function Coverflow({stack,loop,reduced,canHover,onClose}:{stack:Stack;loop:boole
   },[layout,magnet]);
   const kick=useCallback(()=>{if(!st.current.raf)st.current.raf=requestAnimationFrame(frame);},[frame]);
 
+  // Opened from a shared link: start on that image, already in the full viewer.
+  useLayoutEffect(()=>{
+    if(!startSlug)return;
+    const k=items.findIndex(x=>x.slug===startSlug);if(k<0)return;
+    st.current.pos=k;st.current.target=k;activeRef.current=k;setActive(k);
+    viewingRef.current=true;setViewing(true);
+  },[]);// eslint-disable-line react-hooks/exhaustive-deps
   // Measure the stage, size the cards, and keep them centred through resizes.
   useLayoutEffect(()=>{
     const stage=stageRef.current;if(!stage)return;
-    const fit=()=>{const w=stage.clientWidth;st.current.cw=Math.round(Math.max(80,Math.min(w*.56,320,(stage.clientHeight-32)/1.5)));stage.style.setProperty('--cw',st.current.cw+'px');layout();};
+    const fit=()=>{const w=stage.clientWidth;st.current.cw=Math.round(Math.max(80,Math.min(w*.56,Math.round(320*Math.min(1.9,Math.max(1,window.innerWidth/1440))),(stage.clientHeight-32)/1.5)));stage.style.setProperty('--cw',st.current.cw+'px');layout();};
     fit();const ro=new ResizeObserver(fit);ro.observe(stage);
     return()=>ro.disconnect();
   },[layout,slots]);
@@ -421,7 +562,7 @@ function Coverflow({stack,loop,reduced,canHover,onClose}:{stack:Stack;loop:boole
       onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();centre(i);}}}>
       <span className="cf-shadow" ref={el=>{shadowRefs.current[i]=el;}} aria-hidden="true"/>
       <div className="cf-mag" ref={el=>{magRefs.current[i]=el;}}>
-        <img alt={dup?'':it.title} data-src={sized(it,1080)} decoding="async" draggable={false}/>
+        <img alt={dup?'':it.title} data-src={sized(it,q(1080,2400))} decoding="async" draggable={false}/>
       </div>
     </div>);
   }
@@ -434,7 +575,7 @@ function Coverflow({stack,loop,reduced,canHover,onClose}:{stack:Stack;loop:boole
       onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={cancel} onLostPointerCapture={cancel} onPointerLeave={leave} onClick={stageClick} style={viewing?{display:'none'}:undefined}>
       <div className="cf-track">{cards}</div>
     </div>
-    {viewing&&<Viewer p={items[active]} stackName={stack.name} index={active} n={n} atStart={atStart} atEnd={atEnd} onPrev={()=>go(-1)} onNext={()=>go(1)} onBack={closeViewer} reduced={reduced} origin={originRect.current}/>}
+    {viewing&&<Viewer p={items[Math.min(active,n-1)]} pinned={pins.has(items[Math.min(active,n-1)].slug)} onPin={onPin?()=>{const c=items[Math.min(active,n-1)];onPin(c.slug,!pins.has(c.slug));}:undefined} stackName={stack.name} index={active} n={n} atStart={atStart} atEnd={atEnd} onPrev={()=>go(-1)} onNext={()=>go(1)} onBack={closeViewer} reduced={reduced} origin={originRect.current}/>}
     <div className="cf-controls" style={viewing?{display:'none'}:undefined}>
       <button type="button" onClick={()=>go(-1)} disabled={atStart||n<2} aria-label="Previous image">‹</button>
       <button type="button" onClick={()=>go(1)} disabled={atEnd||n<2} aria-label="Next image">›</button>
@@ -444,25 +585,38 @@ function Coverflow({stack,loop,reduced,canHover,onClose}:{stack:Stack;loop:boole
 }
 
 /* ============================================================ panel ===== */
-export function WorkStacks({folders,images,stacks:settings,id='work'}:WorkStacksProps){
+export function WorkStacks({folders,images,stacks:settings,id='work',filter='all',pinned,onPin}:WorkStacksProps){
   const reduced=useMedia('(prefers-reduced-motion: reduce)'),canHover=useMedia('(hover: hover) and (pointer: fine)');
+  const pinSet=useMemo(()=>new Set(pinned||[]),[pinned]);
   const stacks=useMemo<Stack[]>(()=>{
     const out:Stack[]=[];
+    const list=filter==='pinned'?images.filter(i=>pinSet.has(i.slug)):images;
     for(const name of folders){
-      const items=images.filter(i=>i.cat===name);if(!items.length)continue;
+      const items=list.filter(i=>i.cat===name);if(!items.length)continue;
       const wanted=settings?.covers?.[name];
       out.push({name,items,cover:items.find(i=>i.slug===wanted)||items[0]});
     }
     return out;
-  },[folders,images,settings?.covers]);
+  },[folders,images,settings?.covers,filter,pinSet]);
   const [open,setOpen]=useState<string|null>(null);
+  const [startSlug,setStartSlug]=useState('');
+  const rootRef=useRef<HTMLElement>(null),pendingLink=useRef<string>(id==='work'&&typeof window!=='undefined'?(new URLSearchParams(window.location.search).get('image')||''):'');
   const opener=useRef<HTMLElement|null>(null);
+  // A shared link (?image=<id>) opens that image once, as soon as it is in the data; the address is then tidied.
+  useEffect(()=>{
+    const slug=pendingLink.current;if(!slug)return;
+    const hit=images.find(x=>x.slug===slug);if(!hit)return;
+    pendingLink.current='';
+    setStartSlug(slug);setOpen(hit.cat);
+    try{const u=new URL(window.location.href);u.searchParams.delete('image');window.history.replaceState(null,'',u.pathname+u.search+u.hash);}catch{/* not critical */}
+    requestAnimationFrame(()=>rootRef.current?.scrollIntoView({behavior:'smooth',block:'start'}));
+  },[images]);
   const current=stacks.find(s=>s.name===open);
-  const close=useCallback(()=>{setOpen(null);const el=opener.current;if(el)requestAnimationFrame(()=>el.isConnected&&el.focus({preventScroll:true}));},[]);
-  if(!stacks.length)return <p className="ws-empty" role="status">No work to show yet.</p>;
-  return <section className="work-stacks" aria-label="Work">
+  const close=useCallback(()=>{setOpen(null);setStartSlug('');const el=opener.current;if(el)requestAnimationFrame(()=>el.isConnected&&el.focus({preventScroll:true}));},[]);
+  if(!stacks.length)return <p className="ws-empty" role="status">{filter==='pinned'?'Nothing pinned yet. Open any image and tap the pin to keep it here.':'No work to show yet.'}</p>;
+  return <section className="work-stacks" aria-label="Work" ref={rootRef}>
     {current
-      ?<Coverflow key={current.name} stack={current} loop={settings?.loop!==false} reduced={reduced} canHover={canHover} onClose={close}/>
+      ?<Coverflow key={current.name} stack={current} loop={settings?.loop!==false} reduced={reduced} canHover={canHover} onClose={close} pins={pinSet} onPin={onPin} startSlug={startSlug}/>
       :<StackGrid id={id} stacks={stacks} reduced={reduced} onOpen={(name,el)=>{opener.current=el;setOpen(name);}}/>}
   </section>;
 }

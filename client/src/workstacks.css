@@ -76,7 +76,7 @@
 .vw-nav.prev{left:8px}.vw-nav.next{right:8px}
 .vw-nav:hover:not(:disabled){background:#1d1a26}
 .vw-nav:disabled{opacity:.28;cursor:default}
-.vw-nav:focus-visible,.vw-back:focus-visible,.vw-link:focus-visible,.dl-btn:focus-visible{outline:2px solid #ffb37a;outline-offset:3px}
+.vw-nav:focus-visible,.vw-back:focus-visible,.vw-link:focus-visible,.dl2-btn:focus-visible{outline:2px solid #ffb37a;outline-offset:3px}
 .vw-back{position:absolute;top:0;right:0;z-index:3;width:40px;height:40px;border:1px solid #ffffff2b;border-radius:50%;background:#ffffff0d;color:inherit;font:inherit;font-size:15px;cursor:pointer;transition:background .2s ease}
 .vw-back:hover{background:#ffffff1c}
 .vw-info{display:flex;flex-direction:column;gap:14px;min-width:0;padding-right:8px;will-change:transform,opacity}
@@ -87,32 +87,11 @@
 .vw-tags li{padding:5px 11px;border:1px solid #ffffff26;border-radius:999px;font-size:12px;color:#d4d1da;background:#ffffff08}
 .vw-desc{max-height:min(34vh,260px);overflow:auto;padding-right:6px}
 .vw-desc p{margin:0;color:#b7b5bf;line-height:1.7;font-size:15px;white-space:pre-line;overflow-wrap:anywhere}
-.vw-actions{display:flex;align-items:flex-start;gap:16px;margin-top:6px;margin-bottom:44px;min-height:48px}
+.vw-actions{display:flex;align-items:center;gap:14px;margin-top:8px;min-height:48px;flex-wrap:wrap}
 .vw-link{align-self:center;color:#e9e7e0;text-decoration:none;font-size:14px;padding:11px 18px;border:1px solid #ffffff2b;border-radius:999px;background:#ffffff0a;transition:background .2s ease}
 .vw-link:hover{background:#ffffff1a}
 
-/* ---- download button: icon only; folds into a plane and drops into a tray ---- */
-.dl{position:relative;display:inline-block;width:48px;height:48px;flex:none}
-.dl-btn{position:absolute;inset:0;display:grid;place-items:center;padding:0;border-radius:50%;border:1px solid rgba(255,170,120,.5);color:#f2ede6;cursor:pointer;
-  background:linear-gradient(145deg,rgba(255,241,221,.28),rgba(229,181,149,.13) 48%,rgba(190,211,234,.12));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 0 20px 2px rgba(255,110,60,.22);
-  transition:transform .25s cubic-bezier(.34,1.56,.64,1),box-shadow .25s ease,color .2s ease,border-color .2s ease;-webkit-tap-highlight-color:transparent}
-.dl-btn:hover{transform:translateY(-2px);box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 8px 26px -4px rgba(255,110,60,.4)}
-.dl-btn:active{transform:scale(.94)}
-.dl-btn svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;grid-area:1/1}
-.dl-btn .i-ok,.dl-btn .i-err{display:none}
-/* while folding, the real button hides its own paint (it stays a real, focusable <button>) */
-.dl-btn[data-state="busy"]{background:none;border-color:transparent;box-shadow:none;transform:none;transition:none}
-.dl-btn[data-state="busy"] svg{opacity:0}
-.dl-btn[data-state="done"]{color:#8fe0a8;border-color:rgba(143,224,168,.55);animation:dlPop .24s cubic-bezier(.34,1.56,.64,1)}
-.dl-btn[data-state="done"] .i-dl,.dl-btn[data-state="error"] .i-dl{display:none}
-.dl-btn[data-state="done"] .i-ok,.dl-btn[data-state="error"] .i-err{display:block}
-.dl-btn[data-state="error"]{color:#ff9c9c;border-color:rgba(255,156,156,.55);animation:dlShake .32s ease}
-@keyframes dlPop{0%{transform:scale(.55);opacity:.4}60%{transform:scale(1.12);opacity:1}100%{transform:scale(1)}}
-@keyframes dlShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}50%{transform:translateX(4px)}75%{transform:translateX(-2px)}}
-.dl-fx{position:absolute;left:0;top:0;width:48px;height:96px;overflow:visible;pointer-events:none}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.dl-btn[data-state="busy"]~.dl-fx{}
 @media (max-width:760px){
   .vw{grid-template-columns:1fr;gap:18px;min-height:0}
   .vw-frame img{max-height:52vh}
@@ -120,7 +99,6 @@
   .vw-desc{max-height:none}
 }
 @media (prefers-reduced-motion:reduce){
-  .dl-btn,.dl-btn[data-state="done"],.dl-btn[data-state="error"]{animation:none;transition:none}
   .vw-frame .hi{transition:none}
 }
 
@@ -128,3 +106,152 @@
 .vw-kicker{font-family:var(--font-kicker,'Sora'),var(--font-body,'Manrope'),ui-sans-serif,system-ui,sans-serif;font-weight:500;letter-spacing:.2em;font-size:11px}
 .cf-hint{font-family:var(--font-sub,'Fraunces'),ui-serif,Georgia,serif;font-style:italic;font-size:14px;letter-spacing:0;color:#a9a7b1}
 .meta small,.cf-count{letter-spacing:.04em}
+
+/* pin button (next to download) */
+.vw-pin{width:48px;height:48px;flex:none;display:grid;place-items:center;padding:0;border-radius:50%;border:1px solid #ffffff2b;background:#ffffff0d;color:#e9e7e0;cursor:pointer;transition:background .2s ease,color .2s ease,border-color .2s ease,transform .25s cubic-bezier(.34,1.56,.64,1);-webkit-tap-highlight-color:transparent}
+.vw-pin svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
+.vw-pin:hover{background:#ffffff1c;transform:translateY(-2px)}
+.vw-pin:focus-visible{outline:2px solid #ffb37a;outline-offset:3px}
+.vw-pin.is-on{color:#ffb37a;border-color:#ffb37a88;background:#ffb37a1c}
+.vw-pin.is-on svg{fill:currentColor}
+
+/* big screens (desktop monitors, TVs): larger panel, cards and type instead of a small island in the middle */
+@media (min-width:1900px){
+  .work-stacks{max-width:1700px}
+  .stack{--sw:clamp(230px,13vw,340px)}
+  .vw{gap:72px}
+  .vw-frame img{max-height:min(74vh,900px)}
+  .vw-title{font-size:clamp(34px,2.6vw,56px)}
+  .vw-desc p{font-size:17px}
+  .cf-stage{height:clamp(520px,68vh,840px)}
+  .cf-head h3{font-size:clamp(28px,2vw,40px)}
+}
+@media (min-width:2500px){
+  .work-stacks{max-width:2200px}
+  .stack{--sw:clamp(300px,12vw,440px)}
+  .vw-desc p{font-size:19px}
+}
+
+/* ---- download button v2: glass circle with a progress ring; arrow drops into the tray; resolves to a check ---- */
+.dl2{position:relative;display:inline-block;width:48px;height:48px;flex:none}
+.dl2-btn{
+  position:absolute;inset:0;padding:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:#f3ede6;
+  border:1px solid rgba(255,255,255,.22);
+  background:radial-gradient(120% 90% at 30% 6%,rgba(255,255,255,.28),rgba(255,255,255,0) 55%),linear-gradient(150deg,rgba(255,255,255,.13),rgba(255,255,255,.035) 55%,rgba(255,170,110,.07));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 10px 24px -12px rgba(0,0,0,.65);
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1),box-shadow .3s ease,border-color .3s ease,color .25s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+.dl2-btn:hover{transform:translateY(-2px);border-color:rgba(255,190,140,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 0 24px 1px rgba(255,150,90,.32),0 12px 26px -12px rgba(0,0,0,.7)}
+.dl2-btn:active{transform:scale(.94)}
+.dl2-btn:focus-visible{outline:2px solid #ffb37a;outline-offset:3px}
+.dl2-ring{position:absolute;inset:-1px;width:calc(100% + 2px);height:calc(100% + 2px);pointer-events:none;overflow:visible}
+.dl2-ring circle{fill:none;stroke-width:2}
+.dl2-ring .track{stroke:rgba(255,255,255,0);transition:stroke .25s ease}
+.dl2-ring .bar{stroke:url(#dl2g);stroke-linecap:round;opacity:0;transition:opacity .2s ease}
+.dl2-btn[data-state="busy"] .dl2-ring .track{stroke:rgba(255,255,255,.14)}
+.dl2-btn[data-state="busy"] .dl2-ring .bar{opacity:1}
+.dl2-icon,.dl2-ok,.dl2-err{grid-area:1/1;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;overflow:visible}
+.dl2-ok,.dl2-err{display:none}
+.dl2-btn[data-state="idle"]:hover .arrow{animation:dl2Bob .95s ease-in-out infinite}
+@keyframes dl2Bob{0%,100%{transform:translateY(0)}50%{transform:translateY(2.4px)}}
+/* done: check draws in, ring flashes, six sparks fly out */
+.dl2-btn[data-state="done"]{color:#9be8b2;border-color:rgba(155,232,178,.6);animation:dl2Pop .34s cubic-bezier(.34,1.56,.64,1)}
+.dl2-btn[data-state="done"] .dl2-icon,.dl2-btn[data-state="error"] .dl2-icon{display:none}
+.dl2-btn[data-state="done"] .dl2-ok,.dl2-btn[data-state="error"] .dl2-err{display:block;stroke-dasharray:40;stroke-dashoffset:40;animation:dl2Draw .42s .08s cubic-bezier(.2,.75,.25,1) forwards}
+.dl2-btn[data-state="done"] .dl2-ring .bar{opacity:1;stroke:#9be8b2;animation:dl2Fade .7s .2s ease forwards}
+.dl2-btn[data-state="error"]{color:#ff9c9c;border-color:rgba(255,156,156,.6);animation:dl2Shake .36s ease}
+.dl2-btn[data-state="error"] .dl2-ring .bar{opacity:1;stroke:#ff9c9c;stroke-dashoffset:0}
+@keyframes dl2Pop{0%{transform:scale(.82)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
+@keyframes dl2Draw{to{stroke-dashoffset:0}}
+@keyframes dl2Fade{to{opacity:0}}
+@keyframes dl2Shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}50%{transform:translateX(4px)}75%{transform:translateX(-2px)}}
+.dl2-dot{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:#bff5cd;opacity:0;pointer-events:none}
+.dl2-btn[data-state="done"] .dl2-dot{animation:dl2Burst .6s .1s cubic-bezier(.16,1,.3,1) forwards}
+@keyframes dl2Burst{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--x),var(--y)) scale(.2);opacity:0}}
+@media (prefers-reduced-motion:reduce){
+  .dl2-btn,.dl2-btn[data-state="done"],.dl2-btn[data-state="error"]{animation:none;transition:none}
+  .dl2-btn[data-state="idle"]:hover .arrow,.dl2-btn[data-state="done"] .dl2-dot{animation:none}
+  .dl2-btn[data-state="done"] .dl2-ok,.dl2-btn[data-state="error"] .dl2-err{animation:none;stroke-dashoffset:0}
+}
+
+/* ---- download button v3: a glass vial that fills with the real download progress ---- */
+.dl3{position:relative;display:inline-block;width:48px;height:48px;flex:none}
+.dl3-btn{
+  position:absolute;inset:0;padding:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;color:#f6f0e9;overflow:hidden;
+  border:1px solid rgba(255,255,255,.24);
+  background:radial-gradient(120% 90% at 30% 6%,rgba(255,255,255,.30),rgba(255,255,255,0) 55%),linear-gradient(150deg,rgba(255,255,255,.14),rgba(255,255,255,.035) 55%,rgba(255,170,110,.07));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -8px 14px rgba(255,255,255,.03),0 10px 24px -12px rgba(0,0,0,.65);
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1),box-shadow .3s ease,border-color .3s ease,color .25s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+.dl3-btn:hover{transform:translateY(-2px);border-color:rgba(150,240,185,.6);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 0 26px 1px rgba(90,225,150,.30),0 12px 26px -12px rgba(0,0,0,.7)}
+.dl3-btn:active{transform:scale(.94)}
+.dl3-btn:focus-visible{outline:2px solid #ffb37a;outline-offset:3px}
+.dl3-vial{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.dl3-vial .wave{stroke:none}
+.dl3-vial .wave.a{fill:url(#dl3g);opacity:0;transition:opacity .2s ease}
+.dl3-vial .wave.b{fill:rgba(140,240,175,.5);opacity:0;transition:opacity .2s ease}
+.dl3-vial .bub{fill:rgba(240,255,246,.9);stroke:rgba(255,255,255,.55);stroke-width:.4}
+.dl3-vial .gloss{fill:none;stroke:rgba(255,255,255,.55);stroke-width:1.6;stroke-linecap:round}
+.dl3-btn[data-state="busy"] .wave,.dl3-btn[data-state="done"] .wave{opacity:1}
+.dl3-icon,.dl3-ok,.dl3-err{position:relative;grid-area:1/1;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.35));overflow:visible}
+.dl3-ok,.dl3-err{display:none}
+.dl3-btn[data-state="idle"]:hover .dl3-icon path:first-child{animation:dl3Bob .95s ease-in-out infinite}
+@keyframes dl3Bob{0%,100%{transform:translateY(0)}50%{transform:translateY(2.2px)}}
+.dl3-btn[data-state="busy"]{cursor:progress;color:#fff;border-color:rgba(150,240,185,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 0 22px 0 rgba(90,225,150,.28),0 10px 24px -12px rgba(0,0,0,.65);animation:dl3Float 1.7s ease-in-out infinite}
+@keyframes dl3Float{0%,100%{transform:translateY(0) rotate(-1.2deg)}50%{transform:translateY(-2.4px) rotate(1.2deg)}}
+.dl3-btn[data-state="done"]{color:#fff;border-color:rgba(150,240,185,.75);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 0 24px 0 rgba(90,225,150,.3),0 10px 24px -12px rgba(0,0,0,.65);animation:dl3Pop .36s cubic-bezier(.34,1.56,.64,1)}
+.dl3-btn[data-state="done"] .bub{opacity:0}
+.dl3-btn[data-state="done"] .dl3-icon,.dl3-btn[data-state="error"] .dl3-icon{display:none}
+.dl3-btn[data-state="done"] .dl3-ok,.dl3-btn[data-state="error"] .dl3-err{display:block;stroke-dasharray:40;stroke-dashoffset:40;animation:dl3Draw .42s .08s cubic-bezier(.2,.75,.25,1) forwards}
+.dl3-btn[data-state="done"] .dl3-vial{animation:dl3Settle .9s .15s ease forwards}
+@keyframes dl3Settle{to{opacity:.6}}
+.dl3-pulse{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(150,240,185,.9);opacity:0;pointer-events:none}
+.dl3-btn[data-state="done"] .dl3-pulse{animation:dl3Ring .7s .05s cubic-bezier(.16,1,.3,1) forwards}
+.dl3-btn[data-state="error"]{color:#ff9c9c;border-color:rgba(255,156,156,.6);animation:dl3Shake .36s ease}
+.dl3-btn[data-state="error"] .dl3-vial{opacity:0;transition:opacity .3s ease}
+@keyframes dl3Pop{0%{transform:scale(.84)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
+@keyframes dl3Draw{to{stroke-dashoffset:0}}
+@keyframes dl3Ring{0%{transform:scale(1);opacity:.9}100%{transform:scale(1.9);opacity:0}}
+@keyframes dl3Shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}50%{transform:translateX(4px)}75%{transform:translateX(-2px)}}
+.dl3-btn{overflow:visible}
+.dl3-vial{border-radius:50%}
+@media (prefers-reduced-motion:reduce){
+  .dl3-btn,.dl3-btn[data-state="done"],.dl3-btn[data-state="error"]{animation:none;transition:none}
+  .dl3-btn[data-state="idle"]:hover .dl3-icon path:first-child,.dl3-btn[data-state="done"] .dl3-pulse,.dl3-btn[data-state="done"] .dl3-vial,.dl3-btn[data-state="busy"]{animation:none}
+  .dl3-btn[data-state="done"] .dl3-ok,.dl3-btn[data-state="error"] .dl3-err{animation:none;stroke-dashoffset:0}
+}
+
+/* ---- share button + menu (same glass as pin / download) ---- */
+.vw-share-wrap{position:relative;display:inline-block}
+.vw-share{width:48px;height:48px;display:grid;place-items:center;padding:0;border-radius:50%;border:1px solid rgba(255,255,255,.22);color:#f0eae3;cursor:pointer;
+  background:radial-gradient(120% 90% at 30% 6%,rgba(255,255,255,.26),rgba(255,255,255,0) 55%),linear-gradient(150deg,rgba(255,255,255,.12),rgba(255,255,255,.03) 55%,rgba(150,170,255,.06));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.38),0 10px 24px -12px rgba(0,0,0,.65);
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1),box-shadow .3s ease,border-color .3s ease;-webkit-tap-highlight-color:transparent}
+.vw-share svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.vw-share:hover,.vw-share[aria-expanded="true"]{transform:translateY(-2px);border-color:rgba(190,205,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 0 24px 1px rgba(150,170,255,.26),0 12px 26px -12px rgba(0,0,0,.7)}
+.vw-share:active{transform:scale(.94)}
+.vw-share:focus-visible{outline:2px solid #ffb37a;outline-offset:3px}
+.vw-menu{position:absolute;left:0;bottom:calc(100% + 12px);z-index:30;min-width:232px;padding:8px;display:grid;gap:2px;border-radius:18px;
+  background:linear-gradient(160deg,rgba(255,255,255,.12),rgba(255,255,255,.04)),rgba(20,17,26,.78);
+  -webkit-backdrop-filter:blur(22px) saturate(130%);backdrop-filter:blur(22px) saturate(130%);
+  border:1px solid rgba(255,255,255,.2);box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 26px 54px -20px rgba(0,0,0,.85);
+  animation:vwMenuIn .22s cubic-bezier(.16,1,.3,1)}
+@keyframes vwMenuIn{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+.vw-menu a,.vw-menu button{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;border-radius:11px;border:0;background:none;color:#eee8f0;font:inherit;font-size:14px;text-align:left;text-decoration:none;cursor:pointer;transition:background .15s ease}
+.vw-menu a:hover,.vw-menu button:hover,.vw-menu a:focus-visible,.vw-menu button:focus-visible{background:rgba(255,255,255,.1);outline:none}
+.vw-menu .d{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 10px currentColor}
+.vw-toast{position:absolute;left:50%;bottom:calc(100% + 10px);transform:translateX(-50%);white-space:nowrap;padding:7px 12px;border-radius:999px;font-size:12.5px;color:#fff;
+  background:rgba(20,17,26,.86);border:1px solid rgba(155,232,178,.5);box-shadow:0 12px 30px -12px #000;animation:vwMenuIn .2s ease}
+@media (prefers-reduced-motion:reduce){.vw-menu,.vw-toast{animation:none}.vw-share{transition:none}}
+
+/* ---- alignment: the panel's content shares the page's left/right edge (same as the section title above it) ----
+   The panel keeps its side padding (room for the fanned card edges) but pulls itself out by the same amount, and
+   no longer centres itself in a narrower max-width, so headers, stacks and the viewer line up with the title. */
+:host{--pad:16px;display:block;margin-inline:calc(var(--pad) * -1)}
+.work-stacks{padding-inline:var(--pad);max-width:none;margin:0}
+@media (max-width:640px){:host{--pad:12px}}
+/* header and viewer sit exactly on the panel's content edge */
+.cf-head{padding-left:0;padding-right:0}
+.vw{padding-left:0;padding-right:0}
