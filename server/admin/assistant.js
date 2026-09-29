@@ -9,6 +9,7 @@ import { providerInfo } from '../assistant/providers.js';
 import { reindex, seedIfEmpty } from '../assistant/knowledge.js';
 import { runTurn, todayUsage, PROHIBITIONS } from '../assistant/engine.js';
 import { audit } from './auth.js';
+import { quotaReport } from '../assistant/quota.js';
 
 const LOG_DAYS = 90;
 
@@ -25,7 +26,9 @@ export async function overview(){
   ]);
   const recent = await db.query(`select m.content, m.created_at, m.conversation_id from assistant_messages m join assistant_conversations c on c.id = m.conversation_id
     where m.role = 'user' and c.audience <> 'playground' order by m.id desc limit 12`);
-  return json({ provider: providerInfo(), settings, today, days, totals, ratings, kb, recent, rules: PROHIBITIONS, logDays: LOG_DAYS });
+  const provider = providerInfo();
+  const quota = provider.name === 'gemini' ? await quotaReport(provider.chain) : null;
+  return json({ provider, settings, today, days, totals, ratings, kb, recent, rules: PROHIBITIONS, logDays: LOG_DAYS, quota });
 }
 
 // ---- knowledge base

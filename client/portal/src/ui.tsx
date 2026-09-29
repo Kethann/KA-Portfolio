@@ -324,7 +324,7 @@ export function Chart({ labels, series, height = 160, format = (v: number) => St
         onPointerLeave={() => setHover(null)}>
         {[0.25, 0.5, 0.75].map(f => <line key={f} x1={0} x2={W} y1={H - pad - f * (H - pad * 2 - 14)} y2={H - pad - f * (H - pad * 2 - 14)} className="chart-grid" />)}
         {series.map((s, si) => kind === 'bar' ? s.values.map((v, i) => {
-          const bw = Math.max(2, (W - pad * 2) / labels.length / series.length - 2);
+          const bw = Math.min(28, Math.max(2, (W - pad * 2) / labels.length / series.length - 2));   // a few data points stay normal bars, not one giant block
           return <rect key={si + '-' + i} x={x(i) - (bw * series.length) / 2 + si * bw} y={y(v)} width={bw - 1} height={H - pad - y(v)} rx={2} style={{ fill: s.color || 'var(--accent)' }} opacity={hover === null || hover === i ? 1 : .55} />;
         }) : (
           <g key={si}>

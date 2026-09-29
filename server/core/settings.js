@@ -34,7 +34,8 @@ export const DEFAULTS = {
     languages: 'Reply in the visitor’s language.',
     dailyBudgetMicros: 500000,        // USD 0.50 per day, then automatic shut-off
     visitorRules: { recommendProducts: true, takeMessages: true, collectLeads: true },
-    buyerRules: { orderStatus: true }
+    buyerRules: { orderStatus: true },
+    customRules: []                   // the owner's own rules, added after the built-in ones
   },
   reports: { daily: false, weekly: true, email: '' },
   visitors: { retentionDays: 365 },   // visits older than this are deleted daily (0 = keep forever)

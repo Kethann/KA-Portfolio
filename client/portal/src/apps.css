@@ -231,3 +231,12 @@
 .kb-tips .btn.ghost.sm{ height:auto; padding:0 2px; vertical-align:baseline; color:var(--accent); }
 
 .guide-steps{ margin:0; padding-left:1.3em; display:grid; gap:6px; }
+
+/* Assistant: quota rows and the owner's rules */
+.quota-list{ list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+.quota-list li{ display:flex; gap:10px; align-items:center; font-size:var(--fs-sm); }
+.quota-list li > .grow{ display:flex; flex-direction:column; flex:1; }
+.quota-list .meter{ display:block; flex:none; height:6px; width:100%; margin-top:6px; }   /* the shared meter grows (flex:1), which collapses it in a column */
+.quota-rank{ width:18px; text-align:right; }
+.rule-row{ display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:start; }
+.rule-row > .faint{ padding-top:8px; }

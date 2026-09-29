@@ -189,3 +189,43 @@ test('Gemini: a rejected API key stops at once instead of trying every model', a
   assert.ok(!r.text, 'no answer text');
   ai.byModel = {}; resetModelRest();
 });
+
+test('quota: Pacific-time reset (daylight saving aware) and daily limits read from Google refusals', async () => {
+  const { nextReset, dailyLimitFrom, quotaDay } = await import('../server/assistant/quota.js');
+  assert.equal(nextReset(new Date('2026-07-10T12:00:00Z')).toISOString(), '2026-07-11T07:00:00.000Z', 'summer: midnight PDT');
+  assert.equal(nextReset(new Date('2026-01-10T12:00:00Z')).toISOString(), '2026-01-11T08:00:00.000Z', 'winter: midnight PST');
+  assert.equal(quotaDay(new Date('2026-07-11T06:59:00Z')), '2026-07-10', 'still the previous Pacific day');
+  assert.equal(dailyLimitFrom('{"quotaId":"GenerateRequestsPerDayPerProjectPerModel-FreeTier","quotaValue":"20"}'), 20);
+  assert.equal(dailyLimitFrom('{"quotaId":"GenerateRequestsPerMinutePerProjectPerModel-FreeTier","quotaValue":"15"}'), null, 'per-minute limits are not daily limits');
+});
+
+test('quota: the overview shows used / limit per model, learned from a refusal', async () => {
+  await assistantOn(); resetModelRest();
+  await app.pg.query('delete from assistant_model_usage');
+  ai.byModel = { 'gemini-3.5-flash-lite': { status: 429, body: '{"error":{"code":429,"details":[{"violations":[{"quotaId":"GenerateRequestsPerDayPerProjectPerModel-FreeTier","quotaValue":"20"}]}]}}' } };
+  await chat([{ role: 'user', content: 'Quota check one' }]);
+  ai.byModel = {};
+  await chat([{ role: 'user', content: 'Quota check two' }]);
+  const q = (await admin('GET', '/api/admin/assistant')).json.quota;
+  const first = q.models.find(m => m.model === 'gemini-3.5-flash-lite'), second = q.models.find(m => m.model === 'gemini-flash-lite-latest');
+  assert.equal(first.exhausted, true); assert.equal(first.limit, 20); assert.equal(first.left, 20 - first.used);
+  assert.equal(second.used, 2, 'both answers came from the next model in the chain');
+  assert.equal(second.limit, null, 'no limit known until Google states it');
+  assert.match(q.resetsAt, /T0[78]:00:00\.000Z$/);
+  resetModelRest();
+});
+
+test('owner rules: added after the built-in rules; blanks dropped; each capped at 200 characters', async () => {
+  await assistantOn(); resetModelRest();
+  const cur = (await admin('GET', '/api/admin/settings/assistant')).json;
+  const saved = await admin('PUT', '/api/admin/settings/assistant', { revision: cur.revision, value: { ...cur.value, customRules: ['Mention the free intro call for commissions.', '   ', 'x'.repeat(300)] } });
+  assert.equal(saved.status, 200, JSON.stringify(saved.json));
+  assert.deepEqual(saved.json.value.customRules.map(r => r.length), [44, 200]);
+  await chat([{ role: 'user', content: 'Do you take commissions?' }]);
+  const sys = systemOf(ai.calls.at(-1));
+  const safety = sys.indexOf('Rules you must always follow'), own = sys.indexOf("Kethan's own rules");
+  assert.ok(safety > 0 && own > safety, 'owner rules come after the safety rules');
+  assert.ok(sys.includes('- Mention the free intro call for commissions.'));
+  const again = (await admin('GET', '/api/admin/settings/assistant')).json;
+  await admin('PUT', '/api/admin/settings/assistant', { revision: again.revision, value: { ...again.value, customRules: [] } });
+});

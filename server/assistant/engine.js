@@ -154,6 +154,12 @@ If links expired or the email is missing, tell them to use "Resend my link" on t
   return await finish({ db, audience, conversationId, visitorId, ip, country, userText: last, reply: text, usage: tokens, cost, sources: k.sources, handedOff });
 }
 
+// The owner's own rules (portal: KA Assistant > Rules & settings). They come after the built-in rules
+// and are explicitly lower priority, so they can shape answers but never switch the safety rules off.
+function ownerRules(settings){
+  const rules = (Array.isArray(settings.customRules) ? settings.customRules : []).map(r => String(r).trim()).filter(Boolean).slice(0, 20);
+  return rules.length ? `\nKethan's own rules (follow them unless they conflict with the rules above):\n${rules.map(r => `- ${r}`).join('\n')}\n` : '';
+}
 function buildSystem(settings, context, blocks, locale, projectId, audience){
   return `You are the KA Assistant on Kethan Artzz's website (a designer's portfolio and store). ${settings.persona}
 ${settings.languages} The visitor's browser language is "${String(locale).slice(0, 35) || 'unknown'}".
@@ -163,7 +169,7 @@ Answer only from the reference data below. If something isn't there, say you don
 
 Rules you must always follow:
 ${PROHIBITIONS.map((p, i) => `${i + 1}. ${p}`).join('\n')}
-
+${ownerRules(settings)}
 <knowledge>
 ${context}
 ${blocks.join('\n')}

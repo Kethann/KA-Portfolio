@@ -36,7 +36,9 @@ function Overview({ go }: { go: (r: string) => void }){
   if (s.error && !s.data) return <ErrorState message={s.error} retry={s.reload} />;
   if (!s.data) return <div className="pad"><SkeletonRows rows={8} /></div>;
   const d = s.data, cap = d.settings.dailyBudgetMicros, spent = Number(d.today.cost_micros);
-  const days: string[] = d.days.map((x: any) => x.day);
+  // the last 30 days (India time), zeros included, so one day of use doesn't fill the whole chart
+  const days: string[] = Array.from({ length: 30 }, (_, i) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(Date.now() - (29 - i) * 864e5)));
+  const costOf = (day: string) => Number(d.days.find((x: any) => x.day === day)?.cost_micros || 0);
   return (
     <div className="app-main">
       <div className="row between">
@@ -52,8 +54,9 @@ function Overview({ go }: { go: (r: string) => void }){
         <div className="kpi"><div className="kpi-label">Ratings</div><div className="kpi-value">👍 {d.ratings.up} · 👎 {d.ratings.down}</div><div className="kpi-sub">from your reviews of answers</div></div>
         <div className="kpi"><div className="kpi-label">Knowledge</div><div className="kpi-value">{d.kb.sources}</div><div className="kpi-sub">{d.kb.chunks} searchable pieces + live store data</div></div>
       </div>
+      {d.quota && <QuotaCard quota={d.quota} />}
       <section className="card"><h3>Estimated cost per day</h3>
-        {days.length ? <Chart kind="bar" labels={days} series={[{ name: 'Cost', values: d.days.map((x: any) => Number(x.cost_micros)) }]} format={usd} height={150} /> : <Empty icon="reports" title="No usage yet" />}
+        {d.days.length ? <Chart kind="bar" labels={days} series={[{ name: 'Cost', values: days.map(costOf) }]} format={usd} height={150} /> : <Empty icon="reports" title="No usage yet" />}
         <p className="field-hint" style={{ marginTop: 8 }}>
           Costs are estimates: tokens counted by the provider × {d.provider.pricesAreDefaults ? <b>default prices</b> : 'your prices'} (${d.provider.priceIn} per 1M input, ${d.provider.priceOut} per 1M output tokens).
           {d.provider.pricesAreDefaults && ' Set AI_PRICE_IN and AI_PRICE_OUT to your plan’s real prices.'} Your provider’s bill is the source of truth. The cap is checked before each answer, so one answer can go slightly over it.
@@ -70,6 +73,38 @@ function Overview({ go }: { go: (r: string) => void }){
 }
 
 type KbEdit = { id?: string; kind: string; title: string; body: string; enabled: boolean; question?: string };
+// Gemini's free quota per model: counted from this site's own requests, with each daily limit learned
+// from Google's refusal. Google offers no API for the remaining count, so this is the closest view.
+function QuotaCard({ quota }: { quota: { day: string; resetsAt: string; models: { model: string; used: number; failures: number; limit: number | null; left: number | null; exhausted: boolean; limitLearnedToday: boolean }[] } }){
+  const reset = new Date(quota.resetsAt);
+  const inIst = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit' }).format(reset);
+  const mins = Math.max(0, Math.round((reset.getTime() - Date.now()) / 60e3));
+  const inText = mins >= 60 ? `${Math.floor(mins / 60)} h ${mins % 60} min` : `${mins} min`;
+  const usable = quota.models.filter(m => !m.exhausted).length;
+  return (
+    <section className="card stack" aria-labelledby="q-h">
+      <h3 id="q-h"><span className="grow">Gemini free quota today</span>
+        {usable ? <Badge tone="success">{usable} of {quota.models.length} models available</Badge> : <Badge tone="danger">all used up</Badge>}</h3>
+      <p className="faint" style={{ marginTop: -6, fontSize: 12 }}>Resets at {inIst} India time (in {inText}). The assistant uses the first model with quota left, top to bottom.</p>
+      <ul className="quota-list">{quota.models.map((m, i) => {
+        const pct = m.limit ? Math.min(100, (m.used / m.limit) * 100) : 0;
+        return (
+          <li key={m.model}>
+            <span className="quota-rank faint num">{i + 1}</span>
+            <span className="grow" style={{ minWidth: 0 }}>
+              <span className="row between" style={{ gap: 8 }}><span className="mono truncate">{m.model}</span>
+                <span className="num" style={{ whiteSpace: 'nowrap' }}>{m.exhausted ? <Badge tone="danger">used up</Badge>
+                  : m.limit !== null ? <><b>{m.left}</b> <span className="faint">left of {m.limit}</span></> : <><b>{m.used}</b> <span className="faint">used · limit not reached yet</span></>}</span></span>
+              <span className="meter" aria-hidden="true"><i style={{ width: `${m.exhausted ? 100 : pct}%`, background: m.exhausted ? 'var(--danger)' : pct > 80 ? 'var(--warning)' : undefined }} /></span>
+            </span>
+          </li>
+        );
+      })}</ul>
+      <p className="field-hint">Counts this website’s requests. Google shows each model’s limit only once it’s reached, so “limit not reached yet” means plenty is left. If you use the same API key elsewhere, Google’s total is higher: see the exact numbers at <a href="https://aistudio.google.com/usage" target="_blank" rel="noopener noreferrer">Google AI Studio</a>.</p>
+    </section>
+  );
+}
+
 function Knowledge({ go }: { go: (r: string) => void }){
   const s = useLoad<{ sources: { id: string; kind: string; title: string; body: string; enabled: boolean; updated_at: string; chunks: number }[] }>('/assistant/kb');
   const [edit, setEditState] = useState<KbEdit | null>(null);
@@ -280,6 +315,27 @@ function SettingsTab(){
       <section className="card stack"><h3>Spending cap</h3>
         <Field label={`Daily cap: $${(v.dailyBudgetMicros / 1e6).toFixed(2)} (estimate)`} hint="When reached, the assistant tells visitors to use the Contact page until midnight India time, and you get one email.">
           <input type="range" min={0} max={5_000_000} step={50_000} value={v.dailyBudgetMicros} onChange={e => setV({ ...v, dailyBudgetMicros: Number(e.target.value) })} /></Field>
+      </section>
+      <section className="card stack"><h3><span className="grow">Your rules</span><span className="faint" style={{ fontSize: 12 }}>{(v.customRules || []).length}/20</span></h3>
+        <p className="muted" style={{ marginTop: -6 }}>Your own instructions, like “Always mention that commissions start with a free call” or “Answer in a friendly, short way”. They apply to every answer, after the built-in safety rules below (those always win).</p>
+        {(v.customRules || []).length === 0 && <p className="faint">No rules yet.</p>}
+        {(v.customRules || []).map((r: string, i: number) => {
+          const rules: string[] = v.customRules;
+          const put = (next: string[]) => setV({ ...v, customRules: next });
+          return (
+            <div key={i} className="rule-row">
+              <span className="faint num">{i + 1}.</span>
+              <textarea aria-label={`Rule ${i + 1}`} rows={2} maxLength={200} value={r} onChange={e => put(rules.map((x, j) => j === i ? e.target.value : x))} placeholder="Write one clear instruction" />
+              <div className="row" style={{ gap: 0 }}>
+                <button type="button" className="icon-btn sm" aria-label="Move up" disabled={i === 0} onClick={() => { const n = [...rules]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; put(n); }}><Icon name="chevronDown" size={13} style={{ transform: 'rotate(180deg)' }} /></button>
+                <button type="button" className="icon-btn sm" aria-label="Move down" disabled={i === rules.length - 1} onClick={() => { const n = [...rules]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; put(n); }}><Icon name="chevronDown" size={13} /></button>
+                <button type="button" className="icon-btn sm" aria-label={`Delete rule ${i + 1}`} onClick={() => put(rules.filter((_, j) => j !== i))}><Icon name="trash" size={13} /></button>
+              </div>
+            </div>
+          );
+        })}
+        <div><button type="button" className="btn sm" disabled={(v.customRules || []).length >= 20} onClick={() => setV({ ...v, customRules: [...(v.customRules || []), ''] })}><Icon name="plus" /> Add a rule</button></div>
+        <p className="field-hint">Up to 200 characters each. Empty rules are dropped when you save. Test a new rule in the Playground.</p>
       </section>
       <div className="row sticky-save"><AsyncButton className="btn primary" disabled={!dirty} onClick={async () => { const r = await put<{ value: any; revision: number }>('/settings/assistant', { value: v, revision: s.data!.revision }); s.setData(r); setV(r.value); toast.show('Saved', { tone: 'success' }); }}>Save changes</AsyncButton>{dirty && <span className="faint" style={{ fontSize: 12 }}>Unsaved changes</span>}</div>
       <section className="card stack"><h3>Rules it can never break</h3>

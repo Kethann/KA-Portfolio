@@ -165,7 +165,7 @@ export function coerce(def, input, path = ''){
   if (def === null || def === undefined) return undefined;
   if (Array.isArray(def)){
     if (!Array.isArray(input)) return def;
-    if (def.every(x => typeof x === 'number')) return input.map(Number).filter(Number.isFinite).slice(0, 20);
+    if (def.length && def.every(x => typeof x === 'number')) return input.map(Number).filter(Number.isFinite).slice(0, 20);   // an empty default is a text list
     return input.filter(x => typeof x === 'string').map(x => x.trim().slice(0, 200)).filter(Boolean).slice(0, 20);
   }
   if (typeof def === 'object'){

@@ -3,6 +3,7 @@
 // Choose with AI_PROVIDER (gemini | anthropic) and optionally AI_MODEL. Prices are per 1M tokens in USD
 // and are ESTIMATES used for the spending cap: set AI_PRICE_IN / AI_PRICE_OUT to your plan's real prices.
 import { env } from '../core/env.js';
+import { recordModel } from './quota.js';
 
 let fetchImpl = (...a) => fetch(...a);
 export function setAiFetch(f){ fetchImpl = f; }
@@ -76,10 +77,11 @@ const PROVIDERS = {
     let res = null, lastErr = null;
     for (const model of ready.length ? ready : chain){
       const think = /flash/i.test(model) && !/lite/i.test(model);
-      try { res = await request(model, think); break; }
+      try { res = await request(model, think); await recordModel(model, { ok: true }); break; }
       catch (e){
         let err = e;
-        if (think && err.status === 400){ try { res = await request(model, false); break; } catch (e2){ err = e2; } }
+        if (think && err.status === 400){ try { res = await request(model, false); await recordModel(model, { ok: true }); break; } catch (e2){ err = e2; } }
+        await recordModel(model, { ok: false, status: err.status, body: err.body });   // the portal's quota view learns the limit from this
         lastErr = err;
         if (err.status === 401 || err.status === 403) throw err;   // bad key: every model would fail the same way
         resting.set(model, Date.now() + (err.status === 429 ? (/PerDay/i.test(err.body) ? 3600e3 : 60e3) : err.status === 404 || err.status === 400 ? 6 * 3600e3 : 30e3));
