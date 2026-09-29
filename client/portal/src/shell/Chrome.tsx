@@ -10,6 +10,12 @@ import { Modal, useConfirm, useFocusTrap, useToast } from '../ui';
 import { useDebounced, useLoad, usePref } from '../hooks';
 import { TZ } from '../format';
 import { useFullscreen } from './fullscreen';
+import { ChartBar, ChatCircleText, DownloadSimple, Gauge, GearSix, GlobeHemisphereWest, Images, Lightbulb, Package, Palette as PaletteGlyph, Receipt, Scales, Ticket } from '@phosphor-icons/react';
+import type { Icon as PhIcon } from '@phosphor-icons/react';
+
+// App tiles use Phosphor's two-tone ("duotone") glyphs: modern, and they read like iOS icons on glass.
+const GLYPH: Record<string, PhIcon> = { overview: Gauge, products: Package, orders: Receipt, reports: ChartBar, coupons: Ticket, downloads: DownloadSimple,
+  visitors: GlobeHemisphereWest, messages: ChatCircleText, tips: Lightbulb, studio: PaletteGlyph, content: Images, legal: Scales, settings: GearSix };
 import logo from '../assets/ka-logo.png';
 
 export type Theme = 'system' | 'dark' | 'light';
@@ -140,7 +146,8 @@ export function AppTile({ id, size }: { id: string; size?: number }){
   const a = APP[id];
   return (
     <span className={'tile tile-' + id} style={{ background: `linear-gradient(160deg, ${a.tile[0]}, ${a.tile[1]})`, width: size, height: size }} aria-hidden="true">
-      {id === 'assistant' ? <img src={logo} alt="" /> : <Icon name={a.icon} size={Math.round((size || 52) * 0.5)} />}
+      {id === 'assistant' ? <img src={logo} alt="" /> : (() => { const G = GLYPH[id]; const px = Math.round((size || 52) * 0.56);
+        return G ? <G className="glyph" size={px} weight="duotone" color="#fff" aria-hidden="true" /> : <Icon name={a.icon} size={Math.round((size || 52) * 0.5)} />; })()}
     </span>
   );
 }
@@ -180,7 +187,7 @@ export function Dock({ pulse, compact }: { pulse: any; compact: boolean }){
   };
   return (
     <div className={'dock-wrap' + (compact ? ' compact' : '')}>
-      <div ref={ref} className="dock" role="toolbar" aria-label="Apps" onPointerMove={onMove} onPointerLeave={reset} onKeyDown={onKey}>
+      <div ref={ref} className="dock" role="toolbar" aria-label="Apps" onPointerMove={onMove} onPointerLeave={reset} onKeyDown={onKey} style={{ '--n': APPS.length } as React.CSSProperties}>
         {APPS.map((a, i) => {
           const w = desk.wins.find(x => x.id === a.id);
           const badge = a.id === 'messages' ? pulse?.newMessages : 0;

@@ -140,6 +140,7 @@ kbd{ font:500 var(--fs-2xs)/1 var(--font-mono); padding:3px 5px; border-radius:4
   background:linear-gradient(150deg, rgba(255,255,255,.95), rgba(255,255,255,.18) 30%, rgba(255,255,255,0) 55%, rgba(255,255,255,.12) 78%, rgba(255,255,255,.55));
   -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
 .tile > *{ position:relative; z-index:1; }
+.tile .glyph{ width:56%; height:56%; filter:drop-shadow(0 -0.5px 0 rgba(255,255,255,.4)) drop-shadow(0 1.5px 2px rgba(0,0,0,.35)); }
 .tile .ic{ stroke-width:2.1; filter:drop-shadow(0 -0.5px 0 rgba(255,255,255,.45)) drop-shadow(0 1.5px 2px rgba(0,0,0,.35)); }
 .tile-assistant{ background:radial-gradient(90% 90% at 50% 30%, #3a1419, #0d0507) !important; }
 .tile-assistant img{ width:78%; height:78%; object-fit:contain; filter:drop-shadow(0 0 6px rgba(255,80,60,.55)) drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
@@ -376,3 +377,14 @@ input[type="color"]{ width:40px; height:var(--control-h); padding:2px; border:1p
 .hello p{ color:var(--text-2); margin-top:4px; }
 
 input.invalid,textarea.invalid{ border-color:var(--danger) !important; box-shadow:0 0 0 3px var(--danger-soft); }
+
+/* Desktop dock: no bar behind the icons (it stretched while the icons magnified) — just a thin glass
+   shelf under them, sized from the resting icon size so it stays perfectly still. Phones keep a bar. */
+.dock-wrap:not(.compact) .dock{ background:none; border:0; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; padding:4px 6px 12px; }
+.dock-wrap:not(.compact) .dock::before{ top:auto; bottom:0; left:50%; right:auto; height:3px; translate:-50% 0; border-radius:3px;
+  width:calc(var(--n, 14) * var(--dock-icon) + (var(--n, 14) - 1) * 7px + 28px);
+  background:linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.55) 12%, rgba(255,255,255,.8) 50%, rgba(255,255,255,.55) 88%, rgba(255,255,255,0));
+  box-shadow:0 0 10px rgba(255,255,255,.25), 0 2px 6px rgba(0,0,0,.35); -webkit-mask-image:none; mask-image:none; }
+:root[data-theme="light"] .dock-wrap:not(.compact) .dock::before{ background:linear-gradient(90deg, rgba(60,40,30,0), rgba(60,40,30,.28) 12%, rgba(60,40,30,.4) 50%, rgba(60,40,30,.28) 88%, rgba(60,40,30,0)); box-shadow:0 1px 0 #fff; }
+@media (prefers-color-scheme: light){ :root:not([data-theme]) .dock-wrap:not(.compact) .dock::before{ background:linear-gradient(90deg, rgba(60,40,30,0), rgba(60,40,30,.28) 12%, rgba(60,40,30,.4) 50%, rgba(60,40,30,.28) 88%, rgba(60,40,30,0)); box-shadow:0 1px 0 #fff; } }
+.dock-wrap:not(.compact) .dock-item.running::after{ bottom:-8px; }

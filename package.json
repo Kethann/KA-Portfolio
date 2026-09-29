@@ -17,6 +17,7 @@
     "db:seed-demo": "node scripts/seed-demo.mjs"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "dotenv": "^16.4.5",
     "gsap": "^3.12.7",
     "postgres": "3.4.9",
@@ -30,9 +31,11 @@
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@types/three": "^0.185.4",
+    "aws4fetch": "^1.0.20",
     "postcss": "8.5.28",
     "typescript": "^5.7.2",
-    "vite": "^6.4.3"
+    "vite": "^6.4.3",
+    "wrangler": "^4.143.0"
   },
   "overrides": {
     "qs": "^6.16.0"
