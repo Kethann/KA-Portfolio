@@ -94,7 +94,7 @@ export function withinHours(hours, now){
   return (hours.days || []).includes(day) && minutes >= toMin(hours.start) && minutes < toMin(hours.end);
 }
 
-const TOPICS = { upscaler: 'the Image Upscaler' };
+export const TOPICS = { upscaler: 'the Image Upscaler' };
 export async function notify(ctx){
   await rateLimit(`notify:${ctx.ip}`, 5, 60 * 60);
   const body = await readJson(ctx.request, 8 * 1024);

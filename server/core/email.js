@@ -88,7 +88,8 @@ export const DEFAULT_TEMPLATES = {
   resend_link: { subject: 'Your download links', body: 'Here are fresh download links for your orders:\n\n{{links}}\n\nEach link works until {{expires}}.\n\n{{signature}}' },
   report: { subject: '{{period}} sales report', body: '{{summary}}\n\nOpen the portal: {{portal_url}}' },
   alert: { subject: 'Alert: {{title}}', body: '{{body}}' },
-  reply: { subject: 'Re: {{subject}}', body: '{{body}}\n\n{{signature}}' }
+  reply: { subject: 'Re: {{subject}}', body: '{{body}}\n\n{{signature}}' },
+  launch: { subject: '{{topic_title}} is live', body: 'Hi,\n\nYou asked to hear when {{topic_name}} launches. It’s ready now:\n{{link}}\n\n{{message}}\n\nYou got this one email because you signed up on the site; you won’t get more about it.\n\n{{signature}}' }
 };
 
 export async function loadTemplate(key){

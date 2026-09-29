@@ -11,6 +11,9 @@ import { registerCheckout } from './handlers/checkout.js';
 import { registerAuth, requireAdmin } from './admin/auth.js';
 import { registerCatalog } from './admin/catalog.js';
 import { registerSales } from './admin/sales.js';
+import { registerContent } from './admin/content.js';
+import { registerMessages } from './admin/messages.js';
+import { registerSystem } from './admin/system.js';
 
 export const router = createRouter();
 const { route } = router;
@@ -22,6 +25,9 @@ router.setGuard('admin', requireAdmin);
 registerAuth(route);
 registerCatalog(route);
 registerSales(route);
+registerContent(route);
+registerMessages(route);
+registerSystem(route);
 
 // ---- public site
 route('GET', '/api/public-config', pub.publicConfig);
