@@ -388,3 +388,16 @@ input.invalid,textarea.invalid{ border-color:var(--danger) !important; box-shado
 :root[data-theme="light"] .dock-wrap:not(.compact) .dock::before{ background:linear-gradient(90deg, rgba(60,40,30,0), rgba(60,40,30,.28) 12%, rgba(60,40,30,.4) 50%, rgba(60,40,30,.28) 88%, rgba(60,40,30,0)); box-shadow:0 1px 0 #fff; }
 @media (prefers-color-scheme: light){ :root:not([data-theme]) .dock-wrap:not(.compact) .dock::before{ background:linear-gradient(90deg, rgba(60,40,30,0), rgba(60,40,30,.28) 12%, rgba(60,40,30,.4) 50%, rgba(60,40,30,.28) 88%, rgba(60,40,30,0)); box-shadow:0 1px 0 #fff; } }
 .dock-wrap:not(.compact) .dock-item.running::after{ bottom:-8px; }
+
+/* Obsidian glass tiles (chosen style A): one smoked-glass material for every app, colour only on the
+   symbol, which glows softly in its own hue. Light appearance: pale frosted glass, deeper symbols. */
+.tile:not(.tile-assistant){ --tile-a:#2c282f; --tile-b:#141217; background:linear-gradient(160deg, var(--tile-a), var(--tile-b)); color:var(--g, #e7e5e4); }
+.tile:not(.tile-assistant)::before{ background:radial-gradient(115% 85% at calc(28% + var(--lx, 0) * 22%) -6%, rgba(255,255,255,.22), rgba(255,255,255,.05) 44%, rgba(255,255,255,0) 64%),
+  linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0) 46%, rgba(0,0,0,.18)); }
+.tile:not(.tile-assistant) .glyph{ filter:drop-shadow(0 0 6px color-mix(in srgb, var(--g, #fff) 55%, transparent)) drop-shadow(0 1px 1px rgba(0,0,0,.5)); }
+:root[data-theme="light"] .tile:not(.tile-assistant){ --tile-a:#ffffff; --tile-b:#e9e3dd; color:color-mix(in srgb, var(--g, #777) 62%, #1c1917); }
+:root[data-theme="light"] .tile:not(.tile-assistant) .glyph{ filter:drop-shadow(0 1px 0 rgba(255,255,255,.9)); }
+@media (prefers-color-scheme: light){
+  :root:not([data-theme]) .tile:not(.tile-assistant){ --tile-a:#ffffff; --tile-b:#e9e3dd; color:color-mix(in srgb, var(--g, #777) 62%, #1c1917); }
+  :root:not([data-theme]) .tile:not(.tile-assistant) .glyph{ filter:drop-shadow(0 1px 0 rgba(255,255,255,.9)); }
+}

@@ -16,6 +16,9 @@ import type { Icon as PhIcon } from '@phosphor-icons/react';
 // App tiles use Phosphor's two-tone ("duotone") glyphs: modern, and they read like iOS icons on glass.
 const GLYPH: Record<string, PhIcon> = { overview: Gauge, products: Package, orders: Receipt, reports: ChartBar, coupons: Ticket, downloads: DownloadSimple,
   visitors: GlobeHemisphereWest, messages: ChatCircleText, tips: Lightbulb, studio: PaletteGlyph, content: Images, legal: Scales, settings: GearSix };
+// "Obsidian glass": every tile is the same dark glass; each app is told apart by its symbol's soft colour.
+const HUE: Record<string, string> = { overview: '#FFB26B', products: '#A5B4FC', orders: '#6EE7B7', reports: '#7DD3FC', coupons: '#F9A8D4', downloads: '#BEF264',
+  visitors: '#5EEAD4', messages: '#93C5FD', tips: '#FDE68A', studio: '#D8B4FE', content: '#FDBA74', legal: '#E7E5E4', settings: '#D6D3D1' };
 import logo from '../assets/ka-logo.png';
 
 export type Theme = 'system' | 'dark' | 'light';
@@ -145,9 +148,9 @@ export function MenuBar({ theme, setTheme, accent, setAccent, pulse, onPalette, 
 export function AppTile({ id, size }: { id: string; size?: number }){
   const a = APP[id];
   return (
-    <span className={'tile tile-' + id} style={{ background: `linear-gradient(160deg, ${a.tile[0]}, ${a.tile[1]})`, width: size, height: size }} aria-hidden="true">
+    <span className={'tile tile-' + id} style={{ '--g': HUE[id] || '#E7E5E4', width: size, height: size } as React.CSSProperties} aria-hidden="true">
       {id === 'assistant' ? <img src={logo} alt="" /> : (() => { const G = GLYPH[id]; const px = Math.round((size || 52) * 0.56);
-        return G ? <G className="glyph" size={px} weight="duotone" color="#fff" aria-hidden="true" /> : <Icon name={a.icon} size={Math.round((size || 52) * 0.5)} />; })()}
+        return G ? <G className="glyph" size={px} weight="duotone" color="currentColor" aria-hidden="true" /> : <Icon name={a.icon} size={Math.round((size || 52) * 0.5)} />; })()}
     </span>
   );
 }
