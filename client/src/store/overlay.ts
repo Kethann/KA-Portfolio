@@ -2,6 +2,7 @@
 // page section that forms its own stacking context, so a dialog there could never cover the
 // fixed nav bar or the chat button. Same stylesheet, own shadow root.
 import storeCss from './store.css?inline';
+import checkoutCss from './checkout/checkout.css?inline';
 
 let overlayTarget: HTMLElement | null = null;
 export function overlayLayer(): HTMLElement {
@@ -11,7 +12,7 @@ export function overlayLayer(): HTMLElement {
   document.body.appendChild(host);
   const shadow = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
-  style.textContent = storeCss;
+  style.textContent = `${storeCss}\n${checkoutCss}`;
   overlayTarget = document.createElement('div');
   shadow.append(style, overlayTarget);
   return overlayTarget;

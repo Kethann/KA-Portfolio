@@ -7,6 +7,7 @@ export interface Product {
   category: { slug: string; name: string } | null; tags: string[]; techTags: string[]; version: string;
   sellable: boolean; free: boolean; prices: Record<Currency, Price>;
   license: { key: string; name: string; summary: string } | null; demoUrl: string; previewUrl: string; media: Media[];
+  delivery: { linkHours: number; maxDownloads: number };
 }
 export interface Category { kind: string; slug: string; name: string }
 export interface TipSummary { slug: string; title: string; excerpt: string; coverUrl: string; tags: string[]; publishedAt: string | null; category: { slug: string; name: string } | null }

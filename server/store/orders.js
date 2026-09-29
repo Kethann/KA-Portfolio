@@ -8,7 +8,7 @@
 //   * every transition locks the order row, so duplicate/out-of-order events can't double-deliver
 import { HttpError } from '../core/http.js';
 import { getDb } from '../core/db.js';
-import { env } from '../core/env.js';
+import { env, isProduction } from '../core/env.js';
 import { getSetting } from '../core/settings.js';
 import { randomToken, sha256hex } from '../core/crypto.js';
 import { sendEmail } from '../core/email.js';
@@ -18,6 +18,22 @@ import * as razorpay from './razorpay.js';
 import { issueToken, sendDeliveryEmails } from './delivery.js';
 
 export const MIN_CHARGE = 100;   // Razorpay's minimum: 100 minor units (₹1 / $1)
+
+// Demo payments: local testing of the whole checkout without Razorpay. Only when KA_DEMO_PAYMENTS=1
+// AND not production AND Razorpay keys are absent; the demo endpoint refuses otherwise.
+export function demoPaymentsEnabled(){
+  return !isProduction() && env('KA_DEMO_PAYMENTS') === '1' && !razorpay.isConfigured();
+}
+
+// What the buyer paid with, for the success screen only (never stored): e.g. card network + last 4
+// digits, or 'upi' / 'netbanking' / 'wallet'. No VPA, name or full card data is ever returned.
+export function methodSummary(p){
+  if (!p || typeof p !== 'object') return null;
+  const m = String(p.method || '');
+  if (m === 'card' && p.card) return { type: 'card', network: String(p.card.network || '').slice(0, 20), last4: /^\d{4}$/.test(String(p.card.last4 || '')) ? String(p.card.last4) : '' };
+  if (['upi', 'netbanking', 'wallet', 'emi', 'paylater'].includes(m)) return { type: m, detail: m === 'wallet' ? String(p.wallet || '').slice(0, 20) : m === 'netbanking' ? String(p.bank || '').slice(0, 20) : '' };
+  return m ? { type: m.slice(0, 20) } : null;
+}
 
 const PUBLIC_ID_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export function newPublicId(){
@@ -140,6 +156,12 @@ export async function createOrder({ productId, currency, codes, email, ip, count
     const link = await issueScreenLink(order.id, siteUrl);
     return { orderId: order.public_id, clientSecret, free: true, downloadUrl: link };
   }
+  if (demoPaymentsEnabled()){
+    const demoId = `demo_${order.public_id}`;
+    await db.query('update orders set razorpay_order_id = $2, updated_at = now() where id = $1', [order.id, demoId]);
+    return { orderId: order.public_id, clientSecret, free: false, demo: true,
+      razorpay: { keyId: '', orderId: demoId, amount: q.total, currency: q.currency, name: env('SITE_NAME', 'Kethan Artzz'), description: q.product.title, email } };
+  }
   let rz;
   try {
     rz = await razorpay.createOrder({ amount: q.total, currency: q.currency, receipt: order.public_id, notes: { order: order.public_id } });
@@ -199,6 +221,33 @@ export async function verifyCheckout({ publicId, clientSecret, razorpayOrderId, 
       razorpay_payment_id = coalesce(razorpay_payment_id, $2), updated_at = now() where id = $1`, [o.id, paymentId]);
   });
   await tryFinalize(order.id, siteUrl);
+  const result = await statusFor(publicId, clientSecret, siteUrl);
+  let method = null;
+  try { method = methodSummary(await razorpay.fetchPayment(paymentId)); } catch { /* display only */ }
+  return { ...result, method };
+}
+
+// Demo payment (see demoPaymentsEnabled). 'approve' records both proofs as a real capture would;
+// 'decline' records a failed attempt. Delivery then runs through the normal, unchanged path.
+export async function demoPay({ publicId, clientSecret, outcome, siteUrl }){
+  if (!demoPaymentsEnabled()) throw new HttpError(404, 'Not found.');
+  const db = await getDb();
+  const order = await orderByClient(db, publicId, clientSecret);
+  if (!String(order.razorpay_order_id || '').startsWith('demo_')) throw new HttpError(404, 'Not found.');
+  if (outcome === 'approve'){
+    await db.tx(async (tx) => {
+      const o = await tx.one('select * from orders where id = $1 for update', [order.id]);
+      if (o.captured_at) return;
+      await tx.query(`update orders set signature_verified_at = now(), captured_at = now(), razorpay_payment_id = $2, updated_at = now() where id = $1`, [o.id, `demo_pay_${o.public_id}`]);
+      await event(tx, o.id, 'demo_payment', { outcome });
+    });
+    await tryFinalize(order.id, siteUrl);
+  } else {
+    await db.tx(async (tx) => {
+      await tx.query(`update orders set status = 'failed', updated_at = now() where id = $1 and status = 'created'`, [order.id]);
+      await event(tx, order.id, 'payment_failed', { reason: 'demo_declined' });
+    });
+  }
   return statusFor(publicId, clientSecret, siteUrl);
 }
 

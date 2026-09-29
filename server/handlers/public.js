@@ -7,6 +7,7 @@ import { rateLimit, verifyTurnstile } from '../core/guard.js';
 import { str, email as vEmail } from '../core/validate.js';
 import { sendEmail } from '../core/email.js';
 import { isBlocked } from '../core/blocklist.js';
+import { demoPaymentsEnabled } from '../store/orders.js';
 import { createRequire } from 'node:module';
 const seed = createRequire(import.meta.url)('../portfolio-seed.json');
 
@@ -24,6 +25,7 @@ export async function publicConfig(ctx){
     country,
     suggestedCurrency: currencyFor(country),
     store: { enabled: store.enabled !== false },
+    demoPayments: demoPaymentsEnabled(),
     upscaler: { comingSoon: upscaler.comingSoon, title: upscaler.title, badge: upscaler.badge, text: upscaler.text, notifyEnabled: upscaler.notifyEnabled },
     assistant: { enabled: !!assistant.enabled, greeting: assistant.greeting, suggestions: assistant.suggestions }
   }, 200, { 'Cache-Control': 'private, no-store', Vary: 'Cookie' });

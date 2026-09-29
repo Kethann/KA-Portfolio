@@ -26,8 +26,14 @@ export async function quote(ctx){
   }
   const email = body.email ? vEmail(body.email) : null;
   const db = await getDb();
-  const q = await orders.quote(db, { productId: productIdFrom(body), currency: vCurrency(body.currency), codes, email });
-  return json(orders.quoteDto(q));
+  try {
+    const q = await orders.quote(db, { productId: productIdFrom(body), currency: vCurrency(body.currency), codes, email });
+    return json(orders.quoteDto(q));
+  } catch (err){
+    // a rejected code is a normal answer the form shows, not an HTTP error
+    if (err instanceof HttpError && (err.extra.code === 'coupon_rejected' || err.extra.code === 'coupon_invalid')) return json({ ok: false, error: err.message, code: err.extra.code });
+    throw err;
+  }
 }
 
 export async function createOrder(ctx){
@@ -59,6 +65,13 @@ export async function status(ctx){
   const body = await readJson(ctx.request, 4 * 1024);
   const { publicId, clientSecret } = clientFields(body);
   return json(await orders.statusFor(publicId, clientSecret, siteUrl(ctx.request)));
+}
+
+export async function demoPay(ctx){
+  await rateLimit(`demo:${ctx.ip}`, 30, 10 * 60);
+  const body = await readJson(ctx.request, 4 * 1024);
+  const outcome = body.outcome === 'approve' ? 'approve' : 'decline';
+  return json(await orders.demoPay({ ...clientFields(body), outcome, siteUrl: siteUrl(ctx.request) }));
 }
 
 export async function cancel(ctx){
@@ -118,6 +131,7 @@ export function registerCheckout(route){
   route('POST', '/api/checkout/verify', verify);
   route('POST', '/api/checkout/status', status);
   route('POST', '/api/checkout/cancel', cancel);
+  route('POST', '/api/checkout/demo-pay', demoPay);
   route('POST', '/api/webhooks/razorpay', razorpayWebhook, { access: 'webhook' });
   route('GET', '/api/download/:token', downloadGet);
   route('POST', '/api/download/:token', downloadPost);

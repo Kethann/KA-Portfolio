@@ -248,7 +248,7 @@ test('coupons through the API: case-insensitive, race-safe last use, per-email l
   const tiny = await order(kit, { email: 'tiny@example.com', codes: ['ALMOST'] });
   assert.equal(tiny.status, 400); assert.match(tiny.json.error, /at least ₹1/);
   const q = await app.call('POST', '/api/checkout/quote', { body: { productId: kit, currency: 'INR', codes: ['nope-code'] }, ip: ip() });
-  assert.equal(q.status, 400); assert.match(q.json.error, /isn’t a valid code/);
+  assert.equal(q.status, 200); assert.equal(q.json.ok, false); assert.match(q.json.error, /isn’t a valid code/);
   const ok = await app.call('POST', '/api/checkout/quote', { body: { productId: kit, currency: 'USD', codes: [] }, ip: ip() });
   assert.deepEqual([ok.json.subtotal, ok.json.total, ok.json.currency], [999, 999, 'USD']);
 });

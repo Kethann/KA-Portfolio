@@ -27,7 +27,8 @@ export function productDto(p, now = new Date()){
     sellable: !!p.sellable, free: !!p.is_free, prices,
     license: p.license_key ? { key: p.license_key, name: p.license_name, summary: p.license_summary } : null,
     demoUrl: p.demo_url || '', previewUrl: p.preview_url || '',
-    media: Array.isArray(p.media) ? p.media : []
+    media: Array.isArray(p.media) ? p.media : [],
+    delivery: { linkHours: p.link_ttl_hours, maxDownloads: p.max_downloads }
   };
 }
 
