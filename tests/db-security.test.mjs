@@ -46,10 +46,12 @@ test('money and state constraints hold at the database level', async()=>{
   // the app always sends values as parameters: a fractional amount is refused, never rounded
   await assert.rejects(pg.query(`insert into orders (public_id,email,currency,subtotal,total) values ('KA-2','a@b.co','INR',$1,$1)`, ['10.5']), /integer/);
   await assert.rejects(pg.query(`insert into orders (public_id,email,currency,subtotal,total) values ('KA-3','a@b.co','EUR',100,100)`), /currency/);
-  // paid needs both the verified signature and the verified webhook
-  await pg.query(`insert into orders (public_id,email,currency,subtotal,total) values ('KA-4','a@b.co','INR',100,100)`);
-  await assert.rejects(pg.query(`update orders set status='paid', paid_at=now(), signature_verified_at=now() where public_id='KA-4'`), /paid_needs_both/);
+  // paid needs two proofs: the verified webhook AND (checkout signature OR server-side API check)
+  await pg.query(`insert into orders (public_id,email,currency,subtotal,total) values ('KA-4','a@b.co','INR',100,100),('KA-5','a@b.co','INR',100,100)`);
+  await assert.rejects(pg.query(`update orders set status='paid', paid_at=now(), signature_verified_at=now() where public_id='KA-4'`), /paid_needs_two_proofs/, 'signature alone');
+  await assert.rejects(pg.query(`update orders set status='paid', paid_at=now(), captured_at=now() where public_id='KA-4'`), /paid_needs_two_proofs/, 'webhook alone');
   await pg.query(`update orders set status='paid', paid_at=now(), signature_verified_at=now(), captured_at=now() where public_id='KA-4'`);
+  await pg.query(`update orders set status='paid', paid_at=now(), api_verified_at=now(), captured_at=now() where public_id='KA-5'`);
 });
 
 test('rate limits and invoice numbers are atomic', async()=>{
