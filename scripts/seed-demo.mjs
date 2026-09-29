@@ -75,5 +75,15 @@ for (const [slug, title, excerpt, body, cat, cover] of [
   await db.query(`insert into tips (slug,title,excerpt,body_md,category_id,status,published_at,cover_url) values ($1,$2,$3,$4,$5,'published',now(),$6)`, [slug, title, excerpt, body, cat, cover]);
   added++;
 }
+// placeholder deliverables so a local test purchase can be downloaded end to end
+const { getStorage } = await import('../server/core/storage.js');
+const storage = getStorage();
+for (const p of await db.query(`select p.id, p.slug, p.title from products p where p.sellable and not exists (select 1 from product_files f where f.product_id = p.id and f.is_current)`)){
+  const path = `demo/${p.slug}.txt`;
+  const bytes = Buffer.from(`Demo deliverable for "${p.title}". Replace it by uploading the real file in the portal.\n`);
+  await storage.put('deliverables', path, bytes, 'text/plain');
+  await db.query(`insert into product_files (product_id, storage_path, filename, bytes) values ($1, $2, $3, $4)`, [p.id, path, `${p.slug}.txt`, bytes.length]);
+  added++;
+}
 console.log(`Demo data ready (${added} new rows).`);
 process.exit(0);

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { overlayLayer } from './overlay';
 import { getJson, getCurrency, setCurrency, onCurrency, publicConfig, formatPrice, formatDate, type Currency, type Product, type Category, type Price } from './api';
 import { useFocusTrap, useSwipe } from './hooks';
 
@@ -6,7 +8,7 @@ type Tab = 'artzz' | 'artifacts';
 const TABS: { id: Tab; label: string }[] = [{ id: 'artzz', label: 'Artzz' }, { id: 'artifacts', label: 'Artifacts' }];
 const TAB_KEY = 'ka-store-tab';
 
-export interface StoreProps { onBuy(product: Product, currency: Currency): void; onResend(): void; initialProduct?: string | null }
+export interface StoreProps { onBuy(product: Product, currency: Currency, opener?: HTMLElement | null): void; onResend(opener?: HTMLElement | null): void; initialProduct?: string | null }
 
 function savedTab(): Tab { try { const t = sessionStorage.getItem(TAB_KEY); return t === 'artifacts' ? 'artifacts' : 'artzz'; } catch { return 'artzz'; } }
 
@@ -64,9 +66,9 @@ export function Store({ onBuy, onResend, initialProduct }: StoreProps){
           <Panel kind={t.id} products={byKind[t.id]} categories={data.categories.filter(c => c.kind === t.id)} currency={currency}
             onOpen={(items, index, mediaIndex = 0, opener = null) => setLightbox({ items, index, mediaIndex, opener })} onBuy={onBuy} />
         </section>)}
-    <p className="kas-resend">Bought something before? <button type="button" className="kas-link" onClick={onResend}>Email me my download links</button></p>
-    {lightbox && <Lightbox {...lightbox} currency={currency} onBuy={onBuy} onClose={() => setLightbox(null)}
-      onMove={(index, mediaIndex) => setLightbox(l => l && { ...l, index, mediaIndex })} />}
+    <p className="kas-resend">Bought something before? <button type="button" className="kas-link" onClick={(e) => onResend(e.currentTarget)}>Email me my download links</button></p>
+    {lightbox && createPortal(<Lightbox {...lightbox} currency={currency} onBuy={onBuy} onClose={() => setLightbox(null)}
+      onMove={(index, mediaIndex) => setLightbox(l => l && { ...l, index, mediaIndex })} />, overlayLayer())}
   </div>;
 }
 
@@ -109,7 +111,7 @@ function Chips({ categories, value, onChange, label }: { categories: { slug: str
 
 function Panel({ kind, products, categories, currency, onOpen, onBuy }: {
   kind: Tab; products: Product[]; categories: Category[]; currency: Currency;
-  onOpen(items: Product[], index: number, mediaIndex?: number, opener?: HTMLElement | null): void; onBuy(p: Product, c: Currency): void;
+  onOpen(items: Product[], index: number, mediaIndex?: number, opener?: HTMLElement | null): void; onBuy(p: Product, c: Currency, opener?: HTMLElement | null): void;
 }){
   const [cat, setCat] = useState('');
   const used = useMemo(() => categories.filter(c => products.some(p => p.category?.slug === c.slug)), [categories, products]);
@@ -143,15 +145,15 @@ function PriceTag({ price }: { price: Price }){
   </span>;
 }
 
-function BuyButton({ product, currency, onBuy, compact }: { product: Product; currency: Currency; onBuy(p: Product, c: Currency): void; compact?: boolean }){
+function BuyButton({ product, currency, onBuy, compact }: { product: Product; currency: Currency; onBuy(p: Product, c: Currency, opener?: HTMLElement | null): void; compact?: boolean }){
   const price = product.prices[currency];
   if (!product.sellable || !price.available) return null;
   const label = price.free ? 'Download' : 'Buy';
-  return <button type="button" className={`kas-buy ${compact ? 'is-compact' : ''}`} onClick={() => onBuy(product, currency)}
+  return <button type="button" className={`kas-buy ${compact ? 'is-compact' : ''}`} onClick={(e) => onBuy(product, currency, e.currentTarget)}
     aria-label={`${label} ${product.title}${price.free ? ' (free)' : ` for ${formatPrice(price.amount, currency)}`}`}>{label}</button>;
 }
 
-function ArtTile({ product, currency, onOpen, onBuy }: { product: Product; currency: Currency; onOpen(opener: HTMLElement): void; onBuy(p: Product, c: Currency): void }){
+function ArtTile({ product, currency, onOpen, onBuy }: { product: Product; currency: Currency; onOpen(opener: HTMLElement): void; onBuy(p: Product, c: Currency, opener?: HTMLElement | null): void }){
   const price = product.prices[currency];
   return <li className="kas-art">
     <button type="button" className="kas-art-open" onClick={(e) => onOpen(e.currentTarget)} aria-label={`View ${product.title}`}>
@@ -164,7 +166,7 @@ function ArtTile({ product, currency, onOpen, onBuy }: { product: Product; curre
   </li>;
 }
 
-function ArtifactCard({ product, currency, onOpen, onBuy }: { product: Product; currency: Currency; onOpen(mediaIndex: number, opener: HTMLElement): void; onBuy(p: Product, c: Currency): void }){
+function ArtifactCard({ product, currency, onOpen, onBuy }: { product: Product; currency: Currency; onOpen(mediaIndex: number, opener: HTMLElement): void; onBuy(p: Product, c: Currency, opener?: HTMLElement | null): void }){
   const price = product.prices[currency];
   const demo = product.demoUrl || product.previewUrl;
   return <li className="kas-card">
@@ -196,7 +198,7 @@ function ArtifactCard({ product, currency, onOpen, onBuy }: { product: Product; 
 
 function Lightbox({ items, index, mediaIndex, opener, currency, onClose, onMove, onBuy }: {
   items: Product[]; index: number; mediaIndex: number; opener: HTMLElement | null; currency: Currency;
-  onClose(): void; onMove(index: number, mediaIndex: number): void; onBuy(p: Product, c: Currency): void;
+  onClose(): void; onMove(index: number, mediaIndex: number): void; onBuy(p: Product, c: Currency, opener?: HTMLElement | null): void;
 }){
   const ref = useRef<HTMLDivElement>(null);
   useFocusTrap(ref, true, onClose, opener);
@@ -237,7 +239,7 @@ function Lightbox({ items, index, mediaIndex, opener, currency, onClose, onMove,
         {product.description ? <p>{product.description}</p> : product.summary ? <p>{product.summary}</p> : null}
         {product.kind === 'artifacts' && media.length > 1 && <span className="kas-lb-count" aria-live="polite">{mediaIndex + 1} / {media.length}</span>}
       </div>
-      {product.sellable && product.prices[currency].available && <div className="kas-lb-buy"><PriceTag price={product.prices[currency]} /><BuyButton product={product} currency={currency} onBuy={(p, c) => { onClose(); onBuy(p, c); }} /></div>}
+      {product.sellable && product.prices[currency].available && <div className="kas-lb-buy"><PriceTag price={product.prices[currency]} /><BuyButton product={product} currency={currency} onBuy={(p, c) => { onClose(); onBuy(p, c, opener); }} /></div>}
     </div>
   </div>;
 }

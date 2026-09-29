@@ -6917,11 +6917,13 @@ document.addEventListener("keydown", function(e){
 });
 
 renderNavItems(); // builds the bar, measures the labels and places the pill (usable while the hero plays)
-// Shared links straight into the store or a tip: ?product=<slug> / ?tip=<slug>
+// Shared links straight into a page: ?product=<slug>, ?tip=<slug>, or ?page=store|tips|contact
 (function(){
   var params = new URLSearchParams(location.search);
+  var page = params.get("page");
   if (params.get("product")) switchSection("store");
   else if (params.get("tip")) switchSection("tips");
+  else if (page === "store" || page === "tips" || page === "contact") switchSection(page);
 })();
 requestAnimationFrame(function(){ nav.classList.add("revealed"); });
 document.fonts?.ready.then(measureNavLabels);

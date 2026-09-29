@@ -226,3 +226,45 @@ div.kas-lb-img{ width:min(80vw, 600px); aspect-ratio:4/5; }
   .kas-seg-indicator{ background:Highlight; }
   .kas-buy, .kas-btn, .kas-chip{ border:1px solid ButtonText; }
 }
+
+/* ---- checkout dialog ---- */
+.kas-co{ display:flex; flex-direction:column; gap:14px; }
+.kas-co-close{ position:absolute; top:14px; right:14px; width:var(--kas-target); height:var(--kas-target); display:grid; place-items:center; border-radius:50%; cursor:pointer; background:transparent; border:1px solid var(--kas-line); color:var(--kas-dim); }
+.kas-co-close:disabled{ opacity:.35; cursor:default; }
+.kas-co h2{ padding-right:calc(var(--kas-target) + 8px); }
+.kas-co-form{ display:flex; flex-direction:column; gap:16px; }
+.kas-co-form > p{ margin:0; color:var(--kas-dim); }
+.kas-co-item{ display:flex; align-items:center; gap:14px; padding:12px; border-radius:var(--kas-radius-sm); background:var(--kas-surface); border:1px solid var(--kas-line); }
+.kas-co-item img, .kas-co-item .kas-img-empty{ width:56px; height:70px; flex:none; object-fit:cover; border-radius:8px; }
+.kas-co-item div{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.kas-co-item small{ color:var(--kas-faint); font-size:12px; }
+.kas-field{ display:flex; flex-direction:column; gap:8px; font-size:var(--kas-small); color:var(--kas-dim); }
+.kas-field input{
+  min-height:calc(var(--kas-target) + 4px); padding:0 16px; border-radius:14px; font:inherit; font-size:16px; color:var(--kas-ink);
+  background:rgba(0,0,0,.28); border:1px solid var(--kas-line-2); width:100%;
+}
+.kas-field input:focus{ outline:none; border-color:rgba(255,148,56,.6); box-shadow:0 0 0 3px rgba(255,148,56,.16); }
+.kas-field input[aria-invalid="true"]{ border-color:rgba(255,156,156,.6); }
+.kas-co-code-row{ display:flex; gap:8px; }
+.kas-co-code-row input{ text-transform:uppercase; letter-spacing:.06em; }
+.kas-co-codes{ list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:6px; }
+.kas-co-codes li{ display:inline-flex; align-items:center; gap:6px; padding:4px 4px 4px 12px; border-radius:999px; background:rgba(255,148,56,.12); border:1px solid rgba(255,170,120,.4); color:#ffd9b8; font-size:12px; letter-spacing:.06em; }
+.kas-co-codes button{ width:28px; height:28px; border-radius:50%; border:0; background:transparent; color:inherit; cursor:pointer; font-size:16px; }
+.kas-co-lines{ display:grid; grid-template-columns:1fr auto; gap:6px 12px; margin:0; padding:14px 0 0; border-top:1px solid var(--kas-line); }
+.kas-co-lines dt{ color:var(--kas-dim); } .kas-co-lines dd{ margin:0; text-align:right; font-variant-numeric:tabular-nums; }
+.kas-co-lines .is-total{ color:var(--kas-ink); font-weight:700; font-size:calc(var(--kas-text) * 1.15); }
+.kas-co-lines .is-note{ color:var(--kas-faint); font-size:12px; }
+.kas-co-error{ margin:0; color:#ff9c9c; font-size:13px; min-height:0; }
+.kas-co-error:empty{ display:none; }
+.kas-co-pay{ width:100%; min-height:calc(var(--kas-target) + 8px); font-size:calc(var(--kas-small) + 1px); }
+.kas-co-fine{ margin:0; font-size:12px; line-height:1.55; color:var(--kas-faint); }
+.kas-co-fine a{ color:#ffc795; }
+.kas-co-result{ display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center; padding:12px 0 4px; }
+.kas-co-result p{ margin:0; color:var(--kas-dim); line-height:1.6; }
+.kas-co-lead{ color:var(--kas-ink) !important; font-size:calc(var(--kas-text) * 1.1); }
+.kas-co-actions{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:6px; }
+.kas-co-check{ display:grid; place-items:center; width:64px; height:64px; border-radius:50%; color:#8fe0a8; border:1px solid currentColor; background:rgba(143,224,168,.1); }
+.kas-spinner{ width:34px; height:34px; border-radius:50%; border:3px solid rgba(255,255,255,.15); border-top-color:var(--kas-accent); animation:kasSpin .9s linear infinite; }
+@keyframes kasSpin{ to{ transform:rotate(360deg); } }
+.ka-turnstile:empty{ display:none; }
+@media (prefers-reduced-motion: reduce){ .kas-spinner{ animation-duration:2s !important; animation-iteration-count:infinite !important; } }
