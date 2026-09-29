@@ -76,7 +76,8 @@ function orderFilters(url){
   const where = [], args = [];
   const add = (sql, v) => { args.push(v); where.push(sql.replace('?', `$${args.length}`)); };
   const status = url.searchParams.get('status');
-  if (status && /^[a-z]{3,12}$/.test(status)) add('o.status = ?', status);
+  if (status === 'attention') where.push(`(o.status = 'mismatch' or (o.status = 'paid' and o.paid_at < now() - interval '30 minutes'))`);
+  else if (status && /^[a-z]{3,12}$/.test(status)) add('o.status = ?', status);
   const cur = url.searchParams.get('currency');
   if (cur === 'INR' || cur === 'USD') add('o.currency = ?', cur);
   const q = (url.searchParams.get('q') || '').trim().slice(0, 100);

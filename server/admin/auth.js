@@ -36,12 +36,19 @@ function passwordPolicy(pw){
 }
 
 // ---- the guard every admin route runs through --------------------------------------------------
+async function findSession(ctx){
+  const token = parseCookies(ctx.request)[COOKIE];
+  if (!token || token.length > 100) return null;
+  const db = await getDb();
+  return db.maybeOne(`select s.*, u.email from admin_sessions s join admin_users u on u.id = s.user_id
+    where s.token_hash = $1 and s.revoked_at is null and s.expires_at > now() and s.last_seen_at > now() - make_interval(secs => $2)`, [sha256hex(token), IDLE_MS / 1000]);
+}
+
 export async function requireAdmin(ctx){
   const token = parseCookies(ctx.request)[COOKIE];
   if (!token || token.length > 100) throw new HttpError(401, 'Please sign in.', { code: 'signed_out' });
   const db = await getDb();
-  const s = await db.maybeOne(`select s.*, u.email from admin_sessions s join admin_users u on u.id = s.user_id
-    where s.token_hash = $1 and s.revoked_at is null and s.expires_at > now() and s.last_seen_at > now() - make_interval(secs => $2)`, [sha256hex(token), IDLE_MS / 1000]);
+  const s = await findSession(ctx);
   if (!s) throw new HttpError(401, 'Your session ended. Please sign in again.', { code: 'signed_out' });
   const m = ctx.request.method;
   if (m !== 'GET' && m !== 'HEAD'){
@@ -61,10 +68,12 @@ async function startSession(ctx, userId){
 }
 
 // ---- handlers ----------------------------------------------------------------------------------
-export async function setupStatus(){
+// Public and always 200, so the portal can choose a screen without a 401 in the browser console.
+export async function setupStatus(ctx){
   const db = await getDb();
   const n = (await db.one('select count(*)::int as n from admin_users')).n;
-  return json({ needsSetup: n === 0, setupConfigured: !!env('ADMIN_SETUP_TOKEN') || !isProduction() });
+  const signedIn = n > 0 && !!(await findSession(ctx));
+  return json({ needsSetup: n === 0, signedIn, setupConfigured: !!env('ADMIN_SETUP_TOKEN') || !isProduction() }, 200, { 'Cache-Control': 'no-store' });
 }
 
 export async function setup(ctx){
@@ -125,6 +134,13 @@ export async function session(ctx){
   await db.query('update admin_sessions set csrf_hash = $2 where id = $1', [ctx.admin.sessionId, sha256hex(csrf)]);
   const u = await db.one('select email, totp_enabled from admin_users where id = $1', [ctx.admin.userId]);
   return json({ email: u.email, twoFactor: u.totp_enabled, csrf });
+}
+
+// Read-only account details (unlike /session, it doesn't rotate the CSRF token).
+export async function account(ctx){
+  const db = await getDb();
+  const u = await db.one('select email, totp_enabled, password_changed_at, created_at from admin_users where id = $1', [ctx.admin.userId]);
+  return json({ email: u.email, twoFactor: u.totp_enabled, passwordChangedAt: u.password_changed_at, createdAt: u.created_at });
 }
 
 export async function logout(ctx){
@@ -208,6 +224,7 @@ export function registerAuth(route){
   route('POST', '/api/admin/setup', setup);
   route('POST', '/api/admin/login', login);
   route('GET', '/api/admin/session', session, { access: 'admin' });
+  route('GET', '/api/admin/account', account, { access: 'admin' });
   route('POST', '/api/admin/logout', logout, { access: 'admin' });
   route('POST', '/api/admin/logout-everywhere', logoutEverywhere, { access: 'admin' });
   route('GET', '/api/admin/sessions', listSessions, { access: 'admin' });

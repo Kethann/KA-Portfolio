@@ -1,12 +1,16 @@
 import {defineConfig} from 'vite';
 import {fileURLToPath} from 'node:url';
-import {readFileSync,writeFileSync,cpSync} from 'node:fs';
+import {readFileSync,writeFileSync,cpSync,mkdirSync} from 'node:fs';
 const local=path=>fileURLToPath(new URL(path,import.meta.url));
 export default defineConfig({
   plugins:[{name:'stage-crystal-homepage',apply:'build',closeBundle(){
     // Vercel serves dist/ only: publish the crystal homepage (root index.html) as dist/index.html, as server/app.js does locally.
     writeFileSync(local('./dist/index.html'),readFileSync(local('./index.html'),'utf8').replaceAll('./dist/assets/','./assets/'));
     cpSync(local('./images'),local('./dist/images'),{recursive:true});
+    // Firebase Hosting publishes dist/ rather than Vercel's project root.
+    // Keep the deployed portal entry available there.
+    mkdirSync(local('./dist/portal'),{recursive:true});
+    cpSync(local('./client/portal/index.html'),local('./dist/portal/index.html'));
   }},{name:'local-crystal-runtime',generateBundle(){this.emitFile({type:'asset',fileName:'assets/three-r128.min.js',source:readFileSync(local('./public/three-r128.min.js'))});}}],
   root:'client',
   preview:{host:'127.0.0.1',strictPort:true},
@@ -15,7 +19,7 @@ export default defineConfig({
     rollupOptions:{
       // The crystal homepage imports mount() at runtime, outside Vite's HTML graph.
       preserveEntrySignatures:'strict',
-      input:{main:local('./client/index.html'),gallery:local('./client/src/gallery-entry.tsx'),poster:local('./client/src/poster-background.ts'),panda:local('./client/src/panda.ts'),studio:local('./client/src/studio/studio-entry.ts'),store:local('./client/src/store/store-entry.tsx')},
+      input:{main:local('./client/index.html'),portal:local('./client/portal/index.html'),gallery:local('./client/src/gallery-entry.tsx'),poster:local('./client/src/poster-background.ts'),panda:local('./client/src/panda.ts'),studio:local('./client/src/studio/studio-entry.ts'),store:local('./client/src/store/store-entry.tsx')},
       output:{entryFileNames:chunk=>['gallery','poster','panda','studio','store'].includes(chunk.name)?'assets/'+chunk.name+'.js':'assets/[name]-[hash].js'}
     }
   },

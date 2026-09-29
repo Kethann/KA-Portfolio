@@ -3,7 +3,7 @@
 import { createRouter } from './core/router.js';
 import { json } from './core/http.js';
 import * as pub from './handlers/public.js';
-import { assistant } from './handlers/assistant-legacy.js';
+import { assistant } from './handlers/assistant.js';
 import * as cron from './handlers/cron.js';
 import { registerStorePublic } from './handlers/store-public.js';
 import { registerCheckout } from './handlers/checkout.js';
@@ -14,6 +14,9 @@ import { registerSales } from './admin/sales.js';
 import { registerContent } from './admin/content.js';
 import { registerMessages } from './admin/messages.js';
 import { registerSystem } from './admin/system.js';
+import { registerVisitors } from './admin/visitors.js';
+import { registerVisits } from './visitors/track.js';
+import { registerAssistantAdmin } from './admin/assistant.js';
 
 export const router = createRouter();
 const { route } = router;
@@ -28,6 +31,9 @@ registerSales(route);
 registerContent(route);
 registerMessages(route);
 registerSystem(route);
+registerVisitors(route);
+registerVisits(route);
+registerAssistantAdmin(route);
 
 // ---- public site
 route('GET', '/api/public-config', pub.publicConfig);
@@ -35,7 +41,6 @@ route('GET', '/api/portfolio', pub.portfolio);
 route('POST', '/api/contact', pub.contact);
 route('POST', '/api/notify', pub.notify);
 route('POST', '/api/assistant', assistant);
-route('POST', '/api/visit', async () => new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } }));
 route('GET', '/api/health', async () => json({ ok: true }));
 
 // ---- scheduled jobs

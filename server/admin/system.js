@@ -96,8 +96,43 @@ export async function purgeVisits(ctx){
   return json({ ok: true, deleted: rows.length });
 }
 
+// Menu-bar status, polled by the portal: cheap counts only.
+export async function pulse(){
+  const db = await getDb();
+  const r = await db.one(`select
+    (select count(*)::int from messages where status = 'new') as new_messages,
+    (select count(distinct session_id)::int from visits where last_seen_at > now() - interval '5 minutes' and not is_bot) as live_visitors,
+    (select count(*)::int from orders where status in ('paid','delivered') and paid_at > now() - interval '24 hours') as orders_24h,
+    (select count(*)::int from orders where status = 'mismatch' or (status = 'paid' and paid_at < now() - interval '30 minutes')) as needs_attention`);
+  return json({ newMessages: r.new_messages, liveVisitors: r.live_visitors, orders24h: r.orders_24h, needsAttention: r.needs_attention, serverTime: new Date().toISOString() });
+}
+
+// Command-palette search across the portal.
+export async function search(ctx){
+  const q = (ctx.url.searchParams.get('q') || '').trim().slice(0, 80);
+  if (q.length < 2) return json({ results: [] });
+  const like = `%${q.toLowerCase().replace(/[\\%_]/g, (m) => '\\' + m)}%`;
+  const db = await getDb();
+  const [orders, products, messages, tips, coupons] = await Promise.all([
+    db.query(`select id, public_id, email, status, total, currency from orders where lower(public_id) like $1 or lower(email) like $1 or lower(coalesce(razorpay_payment_id,'')) like $1 order by created_at desc limit 5`, [like]),
+    db.query(`select id, title, kind, status from products where lower(title) like $1 or lower(slug) like $1 order by updated_at desc limit 5`, [like]),
+    db.query(`select id, subject, name, email, status from messages where search @@ plainto_tsquery('simple', $1) or lower(email) like $2 order by created_at desc limit 5`, [q, like]),
+    db.query(`select id, title, status from tips where lower(title) like $1 order by updated_at desc limit 3`, [like]),
+    db.query(`select id, code, paused from coupons where lower(code) like $1 limit 3`, [like])
+  ]);
+  return json({ results: [
+    ...orders.map(o => ({ app: 'orders', route: o.id, title: `${o.public_id} · ${o.email}`, meta: o.status, kind: 'Order' })),
+    ...products.map(p => ({ app: 'products', route: p.id, title: p.title, meta: `${p.kind} · ${p.status}`, kind: 'Product' })),
+    ...messages.map(m => ({ app: 'messages', route: m.id, title: m.subject || '(no subject)', meta: `${m.name} · ${m.status}`, kind: 'Message' })),
+    ...tips.map(t => ({ app: 'tips', route: t.id, title: t.title, meta: t.status, kind: 'Tip' })),
+    ...coupons.map(c => ({ app: 'coupons', route: c.id, title: c.code, meta: c.paused ? 'paused' : 'active', kind: 'Coupon' }))
+  ] });
+}
+
 export function registerSystem(route){
   const a = { access: 'admin' };
+  route('GET', '/api/admin/pulse', pulse, a);
+  route('GET', '/api/admin/search', search, a);
   route('GET', '/api/admin/system', status, a);
   route('GET', '/api/admin/system/storage', storageUsage, a);
   route('POST', '/api/admin/system/test-email', testEmail, a);

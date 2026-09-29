@@ -1,0 +1,133 @@
+/* KA Portal design tokens.
+   Layers: primitives (raw palette) → semantic tokens (what components use) → themes.
+   Themes: data-theme="dark|light" (default follows the system), data-accent="ember|crimson".
+   Components never use primitives directly, so a theme is only a remap of the semantic layer. */
+
+:root{
+  /* ---- primitives: warm graphite neutrals (match the site's #EDEBE8 ink on near-black) */
+  --n-0:#fbfaf8; --n-50:#f4f2ef; --n-100:#e9e6e1; --n-200:#d6d1ca; --n-300:#b5aea5; --n-400:#8f877d;
+  --n-500:#6c655d; --n-600:#4d4843; --n-700:#35312e; --n-800:#242120; --n-850:#1c1a19; --n-900:#151413; --n-950:#0d0c0c;
+  /* ember = the site's amber #FF9438, crimson = the KA crystal logo */
+  --ember-300:#ffc08a; --ember-400:#ffa75c; --ember-500:#ff9438; --ember-600:#e87a1c; --ember-700:#b85c10;
+  --crimson-300:#ff8a93; --crimson-400:#f2545f; --crimson-500:#e0303e; --crimson-600:#c01f2e; --crimson-700:#8e1621;
+  --green-400:#4fd08a; --green-600:#1f9d5c; --amber-400:#f5c451; --amber-600:#b8860b; --red-400:#ff6b6b; --red-600:#d93636; --blue-400:#6aa8ff; --blue-600:#2f6fe0;
+
+  /* ---- type */
+  --font-ui:'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display:'Fraunces', Georgia, serif;
+  --font-mono:'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+  --fs-2xs:.6875rem; --fs-xs:.75rem; --fs-sm:.8125rem; --fs-md:.875rem; --fs-lg:1rem; --fs-xl:1.25rem; --fs-2xl:1.625rem; --fs-3xl:2.125rem;
+  --lh-tight:1.2; --lh:1.5;
+  --fw-regular:400; --fw-medium:500; --fw-semibold:600; --fw-bold:700;
+
+  /* ---- space (4px grid), radii, sizes */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-8:32px; --sp-10:40px; --sp-12:48px;
+  --r-xs:5px; --r-sm:7px; --r-md:10px; --r-lg:14px; --r-xl:20px; --r-pill:999px;
+  --menubar-h:30px; --titlebar-h:40px; --dock-icon:52px; --control-h:32px; --target:44px;
+
+  /* ---- motion: short and purposeful; springs approximated with cubic-beziers */
+  --ease-out:cubic-bezier(.22,.8,.24,1); --ease-in-out:cubic-bezier(.65,0,.35,1); --ease-spring:cubic-bezier(.34,1.4,.64,1);
+  --dur-1:90ms; --dur-2:160ms; --dur-3:240ms; --dur-4:360ms;
+
+  /* ---- layers */
+  --z-desktop:0; --z-window:10; --z-dock:5000; --z-menubar:5100; --z-popover:6000; --z-palette:7000; --z-modal:8000; --z-toast:9000;
+}
+
+/* ---- semantic tokens: dark (default) */
+:root, :root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0f0e0e;
+  --wallpaper:radial-gradient(120% 90% at 78% 8%, rgba(var(--accent-rgb),.20), transparent 55%),
+              radial-gradient(90% 80% at 10% 100%, rgba(var(--accent-2-rgb),.14), transparent 60%),
+              linear-gradient(160deg, #1b1716 0%, #0f0e0e 55%, #0b0a0a 100%);
+  --text:#efece8; --text-2:rgba(239,236,232,.72); --text-3:rgba(239,236,232,.5); --text-inverse:#151413;
+  --surface-window:rgba(30,27,26,.78); --surface-window-solid:#1e1b1a;
+  --surface-1:rgba(255,255,255,.035); --surface-2:rgba(255,255,255,.06); --surface-3:rgba(255,255,255,.1);
+  --surface-sunken:rgba(0,0,0,.22); --surface-hover:rgba(255,255,255,.07); --surface-active:rgba(255,255,255,.11);
+  --surface-glass:rgba(34,30,29,.62); --surface-menubar:rgba(20,18,17,.55); --surface-dock:rgba(40,36,34,.5);
+  --border:rgba(255,255,255,.09); --border-strong:rgba(255,255,255,.16); --border-window:rgba(255,255,255,.12);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.35);
+  --shadow-md:0 6px 18px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.3);
+  --shadow-window:0 24px 60px rgba(0,0,0,.55), 0 4px 14px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06);
+  --shadow-window-inactive:0 14px 36px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.04);
+  --success:var(--green-400); --warning:var(--amber-400); --danger:var(--red-400); --info:var(--blue-400);
+  --success-soft:rgba(79,208,138,.14); --warning-soft:rgba(245,196,81,.14); --danger-soft:rgba(255,107,107,.14); --info-soft:rgba(106,168,255,.14);
+  --skeleton:rgba(255,255,255,.06); --skeleton-shine:rgba(255,255,255,.11);
+  --scrollbar:rgba(255,255,255,.16);
+  --blur:saturate(160%) blur(22px);
+}
+
+/* ---- semantic tokens: light */
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#efece8;
+  --wallpaper:radial-gradient(120% 90% at 78% 8%, rgba(var(--accent-rgb),.22), transparent 55%),
+              radial-gradient(90% 80% at 10% 100%, rgba(var(--accent-2-rgb),.14), transparent 60%),
+              linear-gradient(160deg, #f6f3ef 0%, #ebe6e0 60%, #e3ddd6 100%);
+  --text:#1c1917; --text-2:rgba(28,25,23,.7); --text-3:rgba(28,25,23,.5); --text-inverse:#fbfaf8;
+  --surface-window:rgba(251,250,248,.84); --surface-window-solid:#fbfaf8;
+  --surface-1:rgba(0,0,0,.025); --surface-2:rgba(0,0,0,.045); --surface-3:rgba(0,0,0,.08);
+  --surface-sunken:rgba(0,0,0,.04); --surface-hover:rgba(0,0,0,.05); --surface-active:rgba(0,0,0,.09);
+  --surface-glass:rgba(255,255,255,.66); --surface-menubar:rgba(250,248,245,.6); --surface-dock:rgba(255,255,255,.45);
+  --border:rgba(0,0,0,.09); --border-strong:rgba(0,0,0,.16); --border-window:rgba(0,0,0,.12);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.08);
+  --shadow-md:0 6px 18px rgba(0,0,0,.1), 0 1px 3px rgba(0,0,0,.08);
+  --shadow-window:0 24px 60px rgba(60,40,20,.22), 0 4px 14px rgba(0,0,0,.1), inset 0 1px 0 rgba(255,255,255,.7);
+  --shadow-window-inactive:0 12px 30px rgba(60,40,20,.14), inset 0 1px 0 rgba(255,255,255,.6);
+  --success:var(--green-600); --warning:var(--amber-600); --danger:var(--red-600); --info:var(--blue-600);
+  --success-soft:rgba(31,157,92,.12); --warning-soft:rgba(184,134,11,.12); --danger-soft:rgba(217,54,54,.1); --info-soft:rgba(47,111,224,.1);
+  --skeleton:rgba(0,0,0,.06); --skeleton-shine:rgba(0,0,0,.02);
+  --scrollbar:rgba(0,0,0,.22);
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme]){
+    color-scheme:light;
+    --bg:#efece8;
+    --wallpaper:radial-gradient(120% 90% at 78% 8%, rgba(var(--accent-rgb),.22), transparent 55%),
+                radial-gradient(90% 80% at 10% 100%, rgba(var(--accent-2-rgb),.14), transparent 60%),
+                linear-gradient(160deg, #f6f3ef 0%, #ebe6e0 60%, #e3ddd6 100%);
+    --text:#1c1917; --text-2:rgba(28,25,23,.7); --text-3:rgba(28,25,23,.5); --text-inverse:#fbfaf8;
+    --surface-window:rgba(251,250,248,.84); --surface-window-solid:#fbfaf8;
+    --surface-1:rgba(0,0,0,.025); --surface-2:rgba(0,0,0,.045); --surface-3:rgba(0,0,0,.08);
+    --surface-sunken:rgba(0,0,0,.04); --surface-hover:rgba(0,0,0,.05); --surface-active:rgba(0,0,0,.09);
+    --surface-glass:rgba(255,255,255,.66); --surface-menubar:rgba(250,248,245,.6); --surface-dock:rgba(255,255,255,.45);
+    --border:rgba(0,0,0,.09); --border-strong:rgba(0,0,0,.16); --border-window:rgba(0,0,0,.12);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.08);
+    --shadow-md:0 6px 18px rgba(0,0,0,.1), 0 1px 3px rgba(0,0,0,.08);
+    --shadow-window:0 24px 60px rgba(60,40,20,.22), 0 4px 14px rgba(0,0,0,.1), inset 0 1px 0 rgba(255,255,255,.7);
+    --shadow-window-inactive:0 12px 30px rgba(60,40,20,.14), inset 0 1px 0 rgba(255,255,255,.6);
+    --success:var(--green-600); --warning:var(--amber-600); --danger:var(--red-600); --info:var(--blue-600);
+    --success-soft:rgba(31,157,92,.12); --warning-soft:rgba(184,134,11,.12); --danger-soft:rgba(217,54,54,.1); --info-soft:rgba(47,111,224,.1);
+    --skeleton:rgba(0,0,0,.06); --skeleton-shine:rgba(0,0,0,.02);
+    --scrollbar:rgba(0,0,0,.22);
+  }
+}
+
+/* ---- accents: ember (default, the site's amber) and crimson (the KA logo) */
+:root, :root[data-accent="ember"]{
+  --accent:var(--ember-500); --accent-hover:var(--ember-400); --accent-press:var(--ember-600); --accent-text:var(--ember-400);
+  --accent-rgb:255,148,56; --accent-2-rgb:224,48,62; --accent-contrast:#1a0f05;
+  --accent-soft:rgba(255,148,56,.14); --accent-border:rgba(255,148,56,.38);
+  --focus-ring:0 0 0 2px var(--bg), 0 0 0 4px rgba(255,148,56,.75);
+}
+:root[data-accent="crimson"]{
+  --accent:var(--crimson-500); --accent-hover:var(--crimson-400); --accent-press:var(--crimson-600); --accent-text:var(--crimson-400);
+  --accent-rgb:224,48,62; --accent-2-rgb:255,148,56; --accent-contrast:#fff;
+  --accent-soft:rgba(224,48,62,.14); --accent-border:rgba(224,48,62,.4);
+  --focus-ring:0 0 0 2px var(--bg), 0 0 0 4px rgba(242,84,95,.8);
+}
+:root[data-theme="light"][data-accent="ember"], :root[data-theme="light"]:not([data-accent]){ --accent-text:var(--ember-700); }
+:root[data-theme="light"][data-accent="crimson"]{ --accent-text:var(--crimson-600); }
+@media (prefers-color-scheme: light){
+  :root:not([data-theme]):not([data-accent]), :root:not([data-theme])[data-accent="ember"]{ --accent-text:var(--ember-700); }
+  :root:not([data-theme])[data-accent="crimson"]{ --accent-text:var(--crimson-600); }
+}
+
+/* ---- device scale: phones get bigger targets, TVs and 4K get everything larger */
+html{ font-size:15px; }
+@media (pointer: coarse){ :root{ --control-h:40px; --dock-icon:48px; } }
+@media (min-width: 1900px){ html{ font-size:16px; } :root{ --dock-icon:58px; } }
+@media (min-width: 2500px){ html{ font-size:19px; } :root{ --menubar-h:36px; --titlebar-h:48px; --dock-icon:70px; --control-h:38px; } }
+@media (min-width: 3400px){ html{ font-size:24px; } :root{ --menubar-h:44px; --titlebar-h:58px; --dock-icon:88px; --control-h:46px; } }
+@media (prefers-reduced-motion: reduce){ :root{ --dur-1:0ms; --dur-2:0ms; --dur-3:0ms; --dur-4:0ms; } }
+@media (prefers-contrast: more){ :root{ --border:var(--border-strong); --text-2:var(--text); } }

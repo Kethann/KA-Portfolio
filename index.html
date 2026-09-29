@@ -1863,6 +1863,10 @@ html.ka-modal-open{ overflow:hidden; }
 
 <script src="./dist/assets/three-r128.min.js"></script>
 <script>
+// The crystal hero uses this global r128 build; the lazily loaded modules (poster, panda, gallery)
+// bundle their own newer three.js. They never share objects, so two copies are intended: clearing
+// r128's marker stops the newer copy's "Multiple instances" console warning.
+try { delete window.__THREE__; } catch (e) {}
 // Procedural deep-space nebula backdrop -- the site's deepest visual layer, sitting behind the
 // crystal hero (#stage) and the ember drift. Fully self-contained (its own renderer/scene/RAF
 // loop, sharing only the global THREE the line above already loaded -- no second Three.js
@@ -6743,6 +6747,7 @@ function switchSection(name, focusTarget){
   var showing = all.filter(function(section){ return !section.hidden; });
   all.forEach(function(section){ section.classList.remove("fading-in", "fading-out"); });
   activeSection = page;
+  if (window.kaTrackView) window.kaTrackView("/?page=" + page);
   navItems.forEach(function(el){
     if (el.getAttribute("data-section") === page) el.setAttribute("aria-current", "page"); else el.removeAttribute("aria-current");
   });
@@ -7987,10 +7992,38 @@ document.querySelectorAll(".footer-link").forEach(revealOnScroll);
 // data-logging half of the feature, which the creator studio's Visitors dashboard depends on.
 // Skipped inside the creator studio's own live-preview iframe (?preview=1) so an admin
 // previewing draft edits never inflates their own visitor analytics.
-if (!/[?&]preview=1(&|$)/.test(location.search)){
-  // credentials:"include" so the dedupe cookie round-trips even when KA_API_BASE points at a
-  // different origin than this page (see the API BASE CONFIG note at the very top of this file).
-  fetch(kaApiUrl("/api/visit"), { method: "POST", credentials: "include" }).catch(function(){});
+// Visit beacon (no cookies): a random visitor ID in localStorage, a session ID in sessionStorage.
+// Sends a view on load and on section changes, a ping every 30 s while the tab is visible (live
+// visitors), and time on page when the tab is hidden or closed. Skipped in the portal's preview.
+if (!/[?&]preview=1(&|$)/.test(location.search) && window.parent === window){
+  (function(){
+    function rid(){ var a = new Uint8Array(12); (window.crypto || {}).getRandomValues ? crypto.getRandomValues(a) : a.forEach(function(_, i){ a[i] = Math.random() * 256; });
+      return Array.prototype.map.call(a, function(b){ return ("0" + b.toString(16)).slice(-2); }).join(""); }
+    var isNew = false, vid, sid;
+    try { vid = localStorage.getItem("ka_vid"); if (!vid){ vid = rid(); isNew = true; localStorage.setItem("ka_vid", vid); } } catch(e){ vid = rid(); }
+    try { sid = sessionStorage.getItem("ka_sid"); if (!sid){ sid = rid(); sessionStorage.setItem("ka_sid", sid); } } catch(e){ sid = rid(); }
+    var shownAt = Date.now(), visibleMs = 0, lastPath = "";
+    function body(o){ o.s = sid; o.v = vid; return JSON.stringify(o); }
+    function post(o, beacon){
+      var data = body(o);
+      if (beacon && navigator.sendBeacon){ try { if (navigator.sendBeacon(kaApiUrl("/api/visit"), new Blob([data], { type: "application/json" }))) return; } catch(e){} }
+      fetch(kaApiUrl("/api/visit"), { method: "POST", headers: { "Content-Type": "application/json" }, body: data, keepalive: true, credentials: "same-origin" }).catch(function(){});
+    }
+    function elapsed(){ return visibleMs + (document.visibilityState === "visible" ? Date.now() - shownAt : 0); }
+    window.kaTrackView = function(path){
+      if (path === lastPath) return;
+      lastPath = path;
+      var tz = ""; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch(e){}
+      post({ t: "view", p: path, r: document.referrer, n: isNew, w: screen.width, h: screen.height, l: navigator.language || "", z: tz });
+      isNew = false;
+    };
+    window.kaTrackView(location.pathname + location.search);
+    setInterval(function(){ if (document.visibilityState === "visible") post({ t: "ping", d: elapsed() }); }, 30000);
+    document.addEventListener("visibilitychange", function(){
+      if (document.visibilityState === "hidden"){ visibleMs += Date.now() - shownAt; post({ t: "leave", d: visibleMs }, true); }
+      else shownAt = Date.now();
+    });
+  })();
 }
 
 })();
@@ -8060,6 +8093,8 @@ body:has(.assistant-panel.open) .site-section{ filter:brightness(0.7); transitio
   display:flex; align-items:center; justify-content:space-between;
 }
 .assistant-head h3{ margin:0; font-size:var(--step-0); font-weight:600; }
+.assistant-avatar{ flex:none; width:30px; height:30px; object-fit:contain; margin-right:10px; filter:drop-shadow(0 2px 6px rgba(224,48,62,.45)); }
+.assistant-head-text{ flex:1; min-width:0; }
 .assistant-head p{ margin:2px 0 0; font-size:11px; color:var(--ink-dim); }
 .assistant-close{ background:transparent; border:none; color:var(--ink-dim); cursor:pointer; padding:6px; }
 .assistant-close:hover{ color:var(--amber); }
@@ -8116,7 +8151,8 @@ body:has(.assistant-panel.open) .site-section{ filter:brightness(0.7); transitio
 
 <div class="assistant-panel" id="assistant-panel" role="dialog" aria-modal="false" aria-label="Panda — KA Assistant chat" hidden>
   <div class="assistant-head">
-    <div>
+    <img class="assistant-avatar" src="/images/favicon-64.png" alt="" width="30" height="30" decoding="async">
+    <div class="assistant-head-text">
       <h3 id="assistant-title">Panda — KA Assistant</h3>
       <p>Explore the work, the process, or your next project.</p>
     </div>
@@ -8334,6 +8370,8 @@ function sendMessage(text){
       messages: history,
       locale: navigator.language,
       projectId: window.__kaCurrentProject || null,
+      visitorId: (function(){ try { return localStorage.getItem("ka_vid"); } catch(e){ return null; } })(),
+      conversationId: (function(){ try { return sessionStorage.getItem("ka_conv"); } catch(e){ return null; } })(),
     }),
   }).then(function(res){
     if (!res.body || !res.ok || !(res.headers.get('content-type')||'').includes('text/event-stream')){
@@ -8362,6 +8400,7 @@ function sendMessage(text){
           if (payload === "[DONE]") return finish();
           try {
             var data = JSON.parse(payload);
+            if (data.conversation){ try { sessionStorage.setItem("ka_conv", data.conversation); } catch(e){} return; }
             if (data.error){
               if (typing.parentNode) typing.remove();
               addMessage("bot", data.error);

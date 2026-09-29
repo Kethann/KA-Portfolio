@@ -37,6 +37,7 @@ export const DEFAULTS = {
     buyerRules: { orderStatus: true }
   },
   reports: { daily: false, weekly: true, email: '' },
+  visitors: { retentionDays: 365 },   // visits older than this are deleted daily (0 = keep forever)
   site: null,                         // the portfolio document (seeded on first read)
   system: { lastHeartbeat: null, lastBackup: null }
 };
