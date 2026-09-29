@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import type { AppProps } from './registry';
 import { useDraft, useLoad, usePref, useUnsavedGuard } from '../hooks';
 import { del, get, post, put } from '../api';
-import { AsyncButton, Badge, Empty, ErrorState, Field, Segmented, SkeletonRows, Switch, useConfirm, useToast } from '../ui';
+import { AsyncButton, Badge, Empty, ErrorState, Field, Segmented, SkeletonRows, Switch, useConfirm, useToast, SearchBox } from '../ui';
 import { Icon } from '../icons';
 import { ago, bytes, dateTime } from '../format';
 import { qrMatrix, qrPath } from '../qr';
@@ -300,7 +300,11 @@ function Backups(){
       {s.error && !s.data ? <ErrorState message={s.error} retry={s.reload} /> : !s.data ? <SkeletonRows rows={3} /> : !s.data.backups.length ? <p className="faint">No backups yet.</p> : (
         <ul className="list">{s.data.backups.map(b => (
           <li key={b.id}><Badge tone={b.status === 'ok' ? 'success' : 'danger'}>{b.status}</Badge><span className="grow">{dateTime(b.created_at)} <span className="faint">· {bytes(b.bytes)}</span>{b.error && <span className="field-error"> · {b.error}</span>}</span>
-            {b.status === 'ok' && <AsyncButton className="btn sm" onClick={async () => { const r = await get<{ url: string }>(`/backups/${b.id}/link`); location.assign(r.url); }}><Icon name="downloads" /> Download</AsyncButton>}</li>
+            {b.status === 'ok' && <AsyncButton className="btn sm" onClick={async () => { const r = await get<{ url: string }>(`/backups/${b.id}/link`); location.assign(r.url); }}><Icon name="downloads" /> Download</AsyncButton>}
+            <AsyncButton className="icon-btn sm" title="Delete this backup" onClick={async () => {
+              if (!(await confirm({ title: 'Delete this backup?', body: `The copy from ${dateTime(b.created_at)} is removed from storage. This can’t be undone.`, confirm: 'Delete', danger: true }))) return;
+              s.setData(await del(`/backups/${b.id}`)); toast.show('Backup deleted', { tone: 'success' });
+            }}><Icon name="trash" size={13} /></AsyncButton></li>
         ))}</ul>
       )}
       <p className="field-hint">Backups leave out passwords, 2FA keys and sign-in sessions. After restoring, create the owner account again with the setup code.</p>
@@ -320,7 +324,7 @@ function Audit(){
   const rows = s.data.entries.filter(e => !q || `${e.action} ${e.target || ''}`.toLowerCase().includes(q.toLowerCase()));
   return (
     <Section title="Activity log" desc="Sign-ins and every change made in the portal, newest first.">
-      <input type="search" aria-label="Filter the log" placeholder="Filter, e.g. login or coupon" value={q} onChange={e => setQ(e.target.value)} />
+      <SearchBox value={q} onChange={setQ} placeholder="Filter, e.g. login or coupon" label="Filter the log" />
       {!rows.length ? <Empty icon="list" title="Nothing matches" /> : <ul className="list">{rows.map(e => (
         <li key={e.id}><Badge tone={/failed|deleted|revoked|disabled|_off/.test(e.action) ? 'danger' : /login|owner/.test(e.action) ? 'info' : 'neutral'}>{e.action.replace(/_/g, ' ')}</Badge>
           <span className="grow truncate faint mono" style={{ fontSize: 12 }}>{e.target || ''}</span><span className="faint mono" style={{ fontSize: 12 }}>{e.ip || ''}</span><span className="faint" style={{ fontSize: 12 }}>{dateTime(e.at)}</span></li>

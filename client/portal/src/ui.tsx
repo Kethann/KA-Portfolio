@@ -204,6 +204,18 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
     </div>
   );
 }
+// Search field with a clear (✕) button; Esc clears it too. Replaces the browser's own clear button,
+// which only some browsers show.
+export function SearchBox({ value, onChange, placeholder, label, style }: { value: string; onChange: (v: string) => void; placeholder: string; label: string; style?: CSSProperties }){
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <div className="search" style={style}><Icon name="search" />
+      <input ref={ref} type="search" placeholder={placeholder} aria-label={label} value={value} onChange={e => onChange(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Escape' && value){ e.preventDefault(); e.stopPropagation(); onChange(''); } }} />
+      {value && <button type="button" className="search-clear" aria-label="Clear search" title="Clear" onClick={() => { onChange(''); ref.current?.focus(); }}><Icon name="close" size={12} /></button>}
+    </div>
+  );
+}
 export function Spinner({ size = 14 }: { size?: number }){ return <span className="spinner" style={{ width: size, height: size }} role="status" aria-label="Working" />; }
 
 // Button that shows progress and blocks double submits.

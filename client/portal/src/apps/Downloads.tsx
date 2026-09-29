@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import type { AppProps } from './registry';
 import { useLoad } from '../hooks';
 import { post } from '../api';
-import { Badge, Empty, ErrorState, SkeletonRows, STATUS_TONE, VirtualTable, useConfirm, useToast } from '../ui';
+import { Badge, Empty, ErrorState, SkeletonRows, STATUS_TONE, VirtualTable, useConfirm, useToast, SearchBox } from '../ui';
 import type { Column } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
@@ -50,7 +50,7 @@ export default function Downloads({ active, open }: AppProps){
         <button type="button" role="tab" aria-selected={tab === 'events'} onClick={() => setTab('events')}>Downloads {s.data ? `(${s.data.events.length})` : ''}</button>
         <button type="button" role="tab" aria-selected={tab === 'links'} onClick={() => setTab('links')}>Links {s.data ? `(${s.data.links.filter(l => l.state === 'active').length} active)` : ''}</button>
       </div>
-      <div className="app-toolbar"><div className="search"><Icon name="search" /><input type="search" placeholder="File, buyer or order" value={q} onChange={e => setQ(e.target.value)} aria-label="Search downloads" /></div>
+      <div className="app-toolbar"><SearchBox value={q} onChange={setQ} placeholder="File, buyer or order" label="Search downloads" />
         <span className="faint" style={{ fontSize: 12 }}>Files are private; buyers only ever get short-lived links.</span></div>
       <div className="app-main fill" role="tabpanel">
         {s.error && !s.data ? <ErrorState message={s.error} retry={s.reload} /> : !s.data ? <SkeletonRows rows={8} /> : tab === 'events'

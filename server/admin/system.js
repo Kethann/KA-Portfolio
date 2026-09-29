@@ -72,6 +72,15 @@ export async function backupNow(ctx){
   const b = await runBackup();
   return json({ ok: true, bytes: b.bytes });
 }
+export async function deleteBackup(ctx){
+  const db = await getDb();
+  const b = await db.maybeOne('select id, storage_path from backups where id::text = $1', [ctx.params.id]);
+  if (!b) throw new HttpError(404, 'Backup not found.');
+  if (b.storage_path) await getStorage().remove('backups', [b.storage_path]).catch(() => {});
+  await db.query('delete from backups where id = $1', [b.id]);
+  await audit(ctx, 'backup_deleted', String(b.id));
+  return listBackups();
+}
 export async function backupLink(ctx){
   const db = await getDb();
   const b = await db.maybeOne(`select storage_path from backups where id::text = $1 and status = 'ok'`, [ctx.params.id]);
@@ -139,6 +148,7 @@ export function registerSystem(route){
   route('GET', '/api/admin/backups', listBackups, a);
   route('POST', '/api/admin/backups', backupNow, a);
   route('GET', '/api/admin/backups/:id/link', backupLink, a);
+  route('DELETE', '/api/admin/backups/:id', deleteBackup, a);
   route('GET', '/api/admin/audit', auditLog, a);
   route('POST', '/api/admin/visits/purge', purgeVisits, a);
 }

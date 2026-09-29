@@ -127,6 +127,7 @@ function CustomFonts({ doc }: { doc: SiteDoc }){
   );
 }
 
+const linkOk = (l: { url: string; icon: string }) => l.icon === 'email' ? /^mailto:[^\s@]+@[^\s@]+\.[^\s@]+$/i.test(l.url) : /^https?:\/\/[^\s/]+\.[^\s]+/i.test(l.url);
 function Social({ doc }: { doc: SiteDoc }){
   const links = doc.socialLinks;
   const set = (next: SiteDoc['socialLinks']) => updateSite(x => ({ ...x, socialLinks: next }));
@@ -137,7 +138,8 @@ function Social({ doc }: { doc: SiteDoc }){
         <div key={i} className="social-row">
           <select aria-label="Icon" value={l.icon} onChange={e => set(links.map((x, j) => j === i ? { ...x, icon: e.target.value } : x))}>{ICONS.map(ic => <option key={ic}>{ic}</option>)}</select>
           <input aria-label="Label" value={l.label} onChange={e => set(links.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} maxLength={60} placeholder="Label" />
-          <input aria-label="Link" value={l.url} onChange={e => set(links.map((x, j) => j === i ? { ...x, url: e.target.value } : x))} maxLength={300} placeholder={l.icon === 'email' ? 'mailto:you@example.com' : 'https://'} />
+          <input aria-label="Link" value={l.url} onChange={e => set(links.map((x, j) => j === i ? { ...x, url: e.target.value } : x))} maxLength={300} placeholder={l.icon === 'email' ? 'mailto:you@example.com' : 'https://'}
+            aria-invalid={!!l.url && !linkOk(l) || undefined} className={l.url && !linkOk(l) ? 'invalid' : ''} title={l.url && !linkOk(l) ? (l.icon === 'email' ? 'Use mailto:you@example.com' : 'Use a full address starting with https://') : undefined} />
           <div className="row" style={{ gap: 0 }}>
             <button type="button" className="icon-btn sm" aria-label="Move up" disabled={i === 0} onClick={() => { const n = [...links]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; set(n); }}><Icon name="chevronDown" size={13} style={{ transform: 'rotate(180deg)' }} /></button>
             <button type="button" className="icon-btn sm" aria-label="Move down" disabled={i === links.length - 1} onClick={() => { const n = [...links]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; set(n); }}><Icon name="chevronDown" size={13} /></button>
@@ -145,6 +147,8 @@ function Social({ doc }: { doc: SiteDoc }){
           </div>
         </div>
       ))}
+      {links.some(l => l.url && !linkOk(l)) && <p className="field-error" role="alert">Links must be full addresses: https://… (or mailto:you@example.com for email).</p>}
+      {links.some(l => !l.label.trim() || !l.url.trim()) && <p className="field-hint">Each link needs a label and an address before you can publish.</p>}
       <div><button type="button" className="btn sm" disabled={links.length >= 8} onClick={() => set([...links, { label: '', url: '', icon: 'website' }])}><Icon name="plus" /> Add link</button></div>
     </div>
   );
@@ -189,11 +193,12 @@ function Preview({ doc, device, setDevice, arrange, onSelect }: { doc: SiteDoc; 
   const [nonce, setNonce] = useState(0);
   const dev = DEVICES[device];
   const send = (msg: unknown) => frame.current?.contentWindow?.postMessage(msg, location.origin);
+  const selectRef = useRef(onSelect); selectRef.current = onSelect;
   useEffect(() => {
     const on = (e: MessageEvent) => {
       if (e.origin !== location.origin || e.source !== frame.current?.contentWindow || !e.data || typeof e.data !== 'object') return;
       if (e.data.type === 'ka-preview-ready') setReady(true);
-      else if (e.data.type === 'ka-preview-selected' && typeof e.data.id === 'string') onSelect(e.data.id);
+      else if (e.data.type === 'ka-preview-selected' && typeof e.data.id === 'string') selectRef.current(e.data.id);
       else if (e.data.type === 'ka-preview-moved' && typeof e.data.id === 'string'){
         const { id, breakpoint, x, y, scale: sc } = e.data;
         if (!['mobile', 'tablet', 'desktop'].includes(breakpoint) || ![x, y, sc].every(Number.isFinite)) return;
@@ -202,7 +207,7 @@ function Preview({ doc, device, setDevice, arrange, onSelect }: { doc: SiteDoc; 
     };
     addEventListener('message', on);
     return () => removeEventListener('message', on);
-  }, [onSelect]);
+  }, []);
   useEffect(() => setReady(false), [device]);   // a new frame must announce itself again
   // stream the draft (debounced)
   useEffect(() => { if (!ready) return; const t = setTimeout(() => send({ type: 'ka-preview-data', data: doc }), 120); return () => clearTimeout(t); }, [doc, ready]);

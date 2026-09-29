@@ -49,6 +49,12 @@ export function saveSite(): Promise<void>{
   })();
   return inFlight;
 }
+// Someone saved the site elsewhere after this draft was loaded: take their revision number so the
+// next save deliberately replaces their version with this draft.
+export async function keepMineOverTheirs(){
+  const latest = await get<SiteDoc>('/site');
+  if (state.doc) emit({ doc: { ...state.doc, revision: latest.revision } });
+}
 export function useSite(){
   const s = useSyncExternalStore(f => { subs.add(f); return () => subs.delete(f); }, () => state);
   return { ...s, dirty: !!s.doc && norm(s.doc) !== s.saved };

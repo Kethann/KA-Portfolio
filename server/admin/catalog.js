@@ -193,6 +193,21 @@ export async function duplicateProduct(ctx){
   return getProduct({ ...ctx, params: { id: copy.id } });
 }
 
+// A license can be deleted only while nothing depends on it: no product uses it and no order was
+// sold under it (buyers keep the version they bought, so those texts must stay).
+export async function deleteLicense(ctx){
+  const id = vUuid(ctx.params.id, 'License');
+  const db = await getDb();
+  const l = await db.maybeOne('select key, name from licenses where id = $1', [id]);
+  if (!l) throw new HttpError(404, 'License not found.');
+  const used = await db.maybeOne('select (select count(*) from products where license_id = $1)::int as products, (select count(*) from order_items where license_key = $2)::int as orders', [id, l.key]);
+  if (used.products) throw new HttpError(409, `“${l.name}” is used by ${used.products} product${used.products === 1 ? '' : 's'}. Choose another license for ${used.products === 1 ? 'it' : 'them'} first.`);
+  if (used.orders) throw new HttpError(409, `“${l.name}” was sold with ${used.orders} order${used.orders === 1 ? '' : 's'}, so it has to stay (buyers keep the text they agreed to).`);
+  await db.query('delete from licenses where id = $1', [id]);
+  await audit(ctx, 'license_deleted', l.key);
+  return listLicenses();
+}
+
 // Items that were ever sold are archived (orders keep pointing at them); others are deleted.
 export async function deleteProduct(ctx){
   const id = vUuid(ctx.params.id, 'Product');
@@ -348,4 +363,5 @@ export function registerCatalog(route){
   route('GET', '/api/admin/licenses', listLicenses, a);
   route('POST', '/api/admin/licenses', saveLicense, a);
   route('PUT', '/api/admin/licenses/:id', saveLicense, a);
+  route('DELETE', '/api/admin/licenses/:id', deleteLicense, a);
 }

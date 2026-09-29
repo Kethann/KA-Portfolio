@@ -8,7 +8,7 @@ import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, SkeletonRows, Swit
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
 import { TagInput, Uploader, useSaveKey } from './common';
-import { discardSite, loadSite, saveSite, thumb, updateSite, useSite } from './siteDoc';
+import { discardSite, keepMineOverTheirs, loadSite, saveSite, thumb, updateSite, useSite } from './siteDoc';
 import type { SiteImage } from './siteDoc';
 import { ago, dateTime } from '../format';
 
@@ -28,7 +28,13 @@ export function SiteSaveBar(){
   return <>
     {site.dirty && <span className="faint" style={{ fontSize: 12 }}>Unsaved site changes</span>}
     {site.dirty && <button type="button" className="btn sm ghost" onClick={async () => { if (await confirm({ title: 'Discard site changes?', body: 'This affects both Studio and Content.', confirm: 'Discard', danger: true })) discardSite(); }}>Discard</button>}
-    <button type="button" className="btn primary sm" disabled={!site.dirty || site.saving} onClick={() => saveSite().then(() => toast.show('Site updated: live within a few seconds', { tone: 'success' })).catch((e) => { toast.error(e); if (e.code === 'stale') void loadSite(true); })}>
+    <button type="button" className="btn primary sm" disabled={!site.dirty || site.saving} onClick={() => saveSite().then(() => toast.show('Site updated: live within a few seconds', { tone: 'success' })).catch(async (e) => {
+      if (e.code !== 'stale') return toast.error(e);
+      // published from another device or tab meanwhile: never throw these edits away without asking
+      const mine = await confirm({ title: 'The site was changed somewhere else', body: 'Someone published the site from another device or tab after you started editing. Publish your version over theirs, or load theirs and drop your unsaved changes?', confirm: 'Publish mine' });
+      if (mine){ try { await keepMineOverTheirs(); await saveSite(); toast.show('Site updated: live within a few seconds', { tone: 'success' }); } catch (e2){ toast.error(e2); } }
+      else { discardSite(); await loadSite(true); toast.show('Loaded the latest version'); }
+    })}>
       {site.saving ? 'Saving…' : 'Publish changes'}</button>
   </>;
 }
@@ -160,12 +166,16 @@ function ImageEditor({ slug, onClose }: { slug: string; onClose: () => void }){
   const confirm = useConfirm();
   const img = doc!.images.find(i => i.slug === slug);
   const [f, setF] = useState<SiteImage | null>(img ? { ...img } : null);
+  const [start] = useState(() => JSON.stringify(img || null));
   if (!f) return null;
+  const dirty = JSON.stringify(f) !== start;
+  const close = async () => { if (!dirty || await confirm({ title: 'Discard changes to this image?', confirm: 'Discard', danger: true })) onClose(); };
   const apply = () => { updateSite(d => ({ ...d, images: d.images.map(i => i.slug === slug ? { ...f, id: f.slug } : i) })); onClose(); };
   return (
-    <Modal wide title="Edit image" onClose={onClose} footer={<>
-      <button type="button" className="btn ghost" style={{ marginRight: 'auto', color: 'var(--danger)' }} onClick={async () => { if (await confirm({ title: `Remove “${f.title}” from the site?`, body: 'It disappears when you publish. The file stays in storage.', confirm: 'Remove', danger: true })){ updateSite(d => ({ ...d, images: d.images.filter(i => i.slug !== slug) })); onClose(); } }}><Icon name="trash" /> Remove</button>
-      <button type="button" className="btn" onClick={onClose}>Cancel</button>
+    <Modal wide title="Edit image" onClose={() => void close()} footer={<>
+      <button type="button" className="btn ghost" style={{ marginRight: 'auto', color: 'var(--danger)' }} onClick={async () => { if (await confirm({ title: `Remove “${f.title}” from the site?`, body: 'It disappears when you publish. The file stays in storage.', confirm: 'Remove', danger: true })){ updateSite(d => ({ ...d, images: d.images.filter(i => i.slug !== slug),
+        stacks: { ...d.stacks, covers: Object.fromEntries(Object.entries(d.stacks.covers).map(([k, v]) => [k, v === slug ? '' : v])) } })); onClose(); } }}><Icon name="trash" /> Remove</button>
+      <button type="button" className="btn" onClick={() => void close()}>Cancel</button>
       <button type="button" className="btn primary" onClick={apply}>Done</button>
     </>}>
       <div className="img-edit">

@@ -62,6 +62,7 @@ const P: Record<string, string> = {
   archive: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4',
   sparkle: 'M12 4l1.5 5L18 10.5l-4.5 1.5L12 17l-1.5-5L6 10.5 10.5 9z',
   maximize: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
+  unmaximize: 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5',
   home: 'M3 11l9-8 9 8M5 9.5V21h14V9.5',
   font: 'M4 20l6-16h1l6 16M7 14h7M18 20v-6'
 };

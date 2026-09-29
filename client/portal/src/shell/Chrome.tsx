@@ -9,6 +9,7 @@ import { get, post } from '../api';
 import { Modal, useConfirm, useFocusTrap, useToast } from '../ui';
 import { useDebounced, useLoad, usePref } from '../hooks';
 import { TZ } from '../format';
+import { useFullscreen } from './fullscreen';
 import logo from '../assets/ka-logo.png';
 
 export type Theme = 'system' | 'dark' | 'light';
@@ -74,8 +75,9 @@ function Clock(){
   return <time className="mb-clock" dateTime={now.toISOString()} title="India Standard Time">{fmt.format(now)}</time>;
 }
 
-export function MenuBar({ theme, setTheme, accent, setAccent, pulse, onPalette, onShortcuts, onTour, onSignOut, email }: {
+export function MenuBar({ theme, setTheme, accent, setAccent, pulse, onPalette, onShortcuts, onTour, onSignOut, email, fs }: {
   theme: Theme; setTheme: (t: Theme) => void; accent: Accent; setAccent: (a: Accent) => void; pulse: any; onPalette: () => void; onShortcuts: () => void; onTour: () => void; onSignOut: (everywhere: boolean) => void; email: string;
+  fs: ReturnType<typeof useFullscreen>;
 }){
   const desk = useDesk();
   const f = desk.focused;
@@ -108,6 +110,7 @@ export function MenuBar({ theme, setTheme, accent, setAccent, pulse, onPalette, 
         { label: 'Tile left', run: () => f && desk.tile(f, 'left'), disabled: !f },
         { label: 'Tile right', run: () => f && desk.tile(f, 'right'), disabled: !f },
         { label: 'Close', run: () => f && desk.close(f), hint: `${ALT}+W`, disabled: !f },
+        ...(fs.available ? [{ sep: true, label: '' }, { label: fs.active ? 'Exit full screen' : 'Enter full screen', run: () => void fs.toggle() }] : []),
         { sep: true, label: '' },
         ...(openWins.length ? openWins.map(w => ({ label: APP[w.id].title, checked: w.id === f, run: () => desk.focus(w.id) })) : [{ label: 'No open windows', disabled: true }])
       ]} />
@@ -119,6 +122,8 @@ export function MenuBar({ theme, setTheme, accent, setAccent, pulse, onPalette, 
       <button type="button" className="mb-icon" onClick={() => desk.open('messages', 'inbox')} aria-label={`Messages, ${pulse?.newMessages || 0} new`} title="Messages">
         <Icon name="bell" size={15} />{pulse?.newMessages > 0 && <span className="mb-badge">{pulse.newMessages > 99 ? '99+' : pulse.newMessages}</span>}
       </button>
+      {fs.available && <button type="button" className="mb-icon" onClick={() => void fs.toggle()} aria-label={fs.active ? 'Exit full screen' : 'Full screen'} aria-pressed={fs.active} title={fs.active ? 'Exit full screen' : 'Full screen'}>
+        <Icon name={fs.active ? 'unmaximize' : 'maximize'} size={15} /></button>}
       <button type="button" className="mb-icon mb-search" onClick={onPalette} aria-label={`Search and commands (${MOD}+K)`} title={`Search (${MOD}+K)`}><Icon name="search" size={15} /></button>
       <Clock />
       <Menu label="Account" className="mb-hide-sm" button={<span className="mb-avatar" aria-hidden="true">{email.slice(0, 1).toUpperCase()}</span>} items={[
@@ -337,6 +342,7 @@ export function useChrome({ email, onSignedOut }: { email: string; onSignedOut: 
   const [tourDone, setTourDone] = usePref('tour.v1', false);
   const [tour, setTour] = useState(false);
   const active = useUserActive();
+  const fs = useFullscreen();
   const pulse = useLoad('/pulse', { pollMs: 30e3, active });
   useEffect(() => { if (!tourDone){ const t = setTimeout(() => setTour(true), 900); return () => clearTimeout(t); } }, [tourDone]);
   useEffect(() => {
@@ -390,15 +396,17 @@ export function useChrome({ email, onSignedOut }: { email: string; onSignedOut: 
     { id: 'c-tour', title: 'Take the tour', kind: 'Command', icon: 'info', run: () => setTour(true) },
     { id: 'c-backup', title: 'Back up now', kind: 'Command', icon: 'archive', meta: 'database export', run: () => desk.open('settings', 'backups') },
     { id: 'c-site', title: 'View the live site', kind: 'Command', icon: 'external', run: () => window.open('/', '_blank', 'noopener') },
+    ...(fs.available ? [{ id: 'c-fullscreen', title: fs.active ? 'Exit full screen' : 'Enter full screen', kind: 'Command', icon: fs.active ? 'unmaximize' : 'maximize', meta: 'fullscreen hide browser bars', run: () => void fs.toggle() }] : []),
     { id: 'c-signout', title: 'Sign out', kind: 'Command', icon: 'logout', run: () => signOut(false) }
-  ], [desk, toggleTheme, accent, setAccent, signOut]);
+  ], [desk, toggleTheme, accent, setAccent, signOut, fs]);
 
   const overlays = <>
     {palette && <Palette onClose={() => setPalette(false)} commands={commands} />}
     {sheet && <Shortcuts onClose={() => setSheet(false)} />}
     {tour && <Tour onDone={() => { setTour(false); setTourDone(true); }} />}
+    {fs.guideEl}
   </>;
   const menubar = <MenuBar theme={theme} setTheme={setTheme} accent={accent} setAccent={setAccent} pulse={pulse.data} onPalette={() => setPalette(true)}
-    onShortcuts={() => setSheet(true)} onTour={() => setTour(true)} onSignOut={signOut} email={email} />;
+    onShortcuts={() => setSheet(true)} onTour={() => setTour(true)} onSignOut={signOut} email={email} fs={fs} />;
   return { menubar, overlays, pulse: pulse.data };
 }

@@ -3,7 +3,7 @@ import { Fragment, useMemo, useState } from 'react';
 import type { AppProps } from './registry';
 import { useDebounced, useLoad, usePref } from '../hooks';
 import { downloadFile } from '../api';
-import { AsyncButton, Badge, Chart, Empty, ErrorState, Modal, Segmented, SkeletonRows, VirtualTable, useToast } from '../ui';
+import { AsyncButton, Badge, Chart, Empty, ErrorState, Modal, Segmented, SkeletonRows, VirtualTable, useToast, SearchBox } from '../ui';
 import type { Column } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
@@ -112,7 +112,7 @@ function Log(){
   return (
     <div className="app" style={{ minHeight: 0, flex: 1 }}>
       <div className="app-toolbar">
-        <div className="search"><Icon name="search" /><input type="search" placeholder="IP, city, page, browser…" value={q} onChange={e => setQ(e.target.value)} aria-label="Search the visit log" /></div>
+        <SearchBox value={q} onChange={setQ} placeholder="IP, city, page, browser…" label="Search the visit log" />
         <Segmented label="Bots" value={bots} onChange={setBots} options={[{ value: 'exclude', label: 'People' }, { value: 'include', label: 'All' }, { value: 'only', label: 'Bots' }]} />
         <span className="grow" />
         <AsyncButton className="btn sm" onClick={async () => { await downloadFile(`/visitors.csv?${qs}`, `visitors-${todayIST()}.csv`); toast.show('CSV downloaded', { tone: 'success' }); }}><Icon name="downloads" /> CSV</AsyncButton>

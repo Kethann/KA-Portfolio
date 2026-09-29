@@ -17,12 +17,12 @@ config({ path: resolve(root, '.env') });
 setEnvSource(process.env);
 
 const TYPES = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8',
-  '.json':'application/json', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.webp':'image/webp', '.avif':'image/avif', '.svg':'image/svg+xml',
+  '.json':'application/json', '.webmanifest':'application/manifest+json', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.webp':'image/webp', '.avif':'image/avif', '.svg':'image/svg+xml',
   '.gif':'image/gif', '.ico':'image/x-icon', '.woff2':'font/woff2', '.woff':'font/woff', '.ttf':'font/ttf', '.otf':'font/otf', '.glb':'model/gltf-binary',
   '.mp4':'video/mp4', '.webm':'video/webm', '.txt':'text/plain; charset=utf-8', '.zip':'application/zip', '.pdf':'application/pdf', '.gz':'application/gzip' };
 const SECURITY = { 'X-Content-Type-Options':'nosniff', 'Referrer-Policy':'strict-origin-when-cross-origin', 'X-Frame-Options':'SAMEORIGIN' };
 
-export async function createDevServer({ port = Number(env('PORT', 8787)), host = env('HOST', '127.0.0.1'), dataDir = env('KA_DATA_DIR', resolve(root, '.data')) } = {}){
+export async function createDevServer({ port = Number(env('PORT', 9878)), host = env('HOST', '127.0.0.1'), dataDir = env('KA_DATA_DIR', resolve(root, '.data')) } = {}){
   process.env.KA_DATA_DIR = dataDir;
   let pg = null;
   if (!env('DATABASE_URL')){
@@ -55,7 +55,7 @@ export async function createDevServer({ port = Number(env('PORT', 8787)), host =
     try {
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
       const path = decodeURIComponent(url.pathname);
-      if (path.startsWith('/api/')){
+      if (path.startsWith('/api/') || path === '/legal' || path.startsWith('/legal/')){
         const headers = new Headers();
         for (const [k, v] of Object.entries(req.headers)) if (v !== undefined) headers.set(k, Array.isArray(v) ? v.join(', ') : v);
         const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
@@ -97,7 +97,7 @@ export async function createDevServer({ port = Number(env('PORT', 8787)), host =
         if (await sendFile(res, resolve(root, 'index.html'), 'no-cache')) return;
       }
       for (const [prefix, base, cache] of [['/dist/assets/', resolve(root, 'dist/assets'), 'no-cache'], ['/assets/', resolve(root, 'dist/assets'), 'no-cache'],
-        ['/images/', resolve(root, 'images'), 'public, max-age=3600'], ['/legal/', resolve(root, 'dist/legal'), 'no-cache'], ['/portal/', resolve(root, 'dist/portal'), 'no-store']]){
+        ['/images/', resolve(root, 'images'), 'public, max-age=3600'], ['/portal/', resolve(root, 'dist/portal'), 'no-store']]){
         if (path.startsWith(prefix)){
           let rel = path.slice(prefix.length) || 'index.html';
           if (prefix === '/portal/' && !extname(rel)) rel = 'index.html';     // single-page app
@@ -105,8 +105,11 @@ export async function createDevServer({ port = Number(env('PORT', 8787)), host =
           if (file && await sendFile(res, file, cache)) return;
         }
       }
+      if (path === '/creator' || path === '/creator/'){
+        res.writeHead(301, { Location: '/portal/' }); return res.end();
+      }
       if (path === '/portal'){ res.writeHead(301, { Location: '/portal/' }); return res.end(); }
-      for (const f of ['robots.txt', 'favicon.ico']) if (path === '/' + f){ const file = resolve(root, 'dist', f); if (await sendFile(res, file, 'public, max-age=3600')) return; }
+      for (const f of ['robots.txt', 'favicon.ico', 'manifest.webmanifest']) if (path === '/' + f){ const file = resolve(root, 'dist', f); if (await sendFile(res, file, 'public, max-age=3600')) return; }
       res.writeHead(404, { ...SECURITY, 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('Not found');
     } catch (err){

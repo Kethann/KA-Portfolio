@@ -7,6 +7,7 @@ import { assistant } from './handlers/assistant.js';
 import * as cron from './handlers/cron.js';
 import { registerStorePublic } from './handlers/store-public.js';
 import { registerCheckout } from './handlers/checkout.js';
+import { registerLegal } from './handlers/legal.js';
 
 import { registerAuth, requireAdmin } from './admin/auth.js';
 import { registerCatalog } from './admin/catalog.js';
@@ -22,6 +23,7 @@ export const router = createRouter();
 const { route } = router;
 registerStorePublic(route);
 registerCheckout(route);
+registerLegal(route);
 
 // ---- creator portal: every /api/admin/* route below the auth endpoints runs requireAdmin first
 router.setGuard('admin', requireAdmin);

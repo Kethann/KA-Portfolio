@@ -28,7 +28,7 @@ export function TagInput({ value, onChange, placeholder = 'Add and press Enter',
 }
 
 // Money in minor units, edited as a decimal ("499.00").
-export function MoneyInput({ value, onChange, currency, label, placeholder }: { value: number | null; onChange: (v: number | null) => void; currency: 'INR' | 'USD'; label: string; placeholder?: string }){
+export function MoneyInput({ value, onChange, currency, label, placeholder, clearable }: { value: number | null; onChange: (v: number | null) => void; currency: 'INR' | 'USD'; label: string; placeholder?: string; clearable?: boolean }){
   const [text, setText] = useState(minorToInput(value));
   const last = useRef(value);
   useEffect(() => { if (value !== last.current){ last.current = value; setText(minorToInput(value)); } }, [value]);
@@ -36,12 +36,25 @@ export function MoneyInput({ value, onChange, currency, label, placeholder }: { 
     <span className="input-affix">
       <span aria-hidden="true">{currency === 'INR' ? '₹' : '$'}</span>
       <input inputMode="decimal" aria-label={label} placeholder={placeholder} value={text} onChange={e => { const t = e.target.value.replace(/[^\d.,]/g, ''); setText(t); const v = parseMoney(t); last.current = v; onChange(v); }}
-        onBlur={() => setText(minorToInput(parseMoney(text)))} className="num" />
+        onBlur={() => setText(minorToInput(parseMoney(text)))} className={'num' + (clearable ? ' has-clear' : '')} />
+      {clearable && value !== null && <button type="button" className="field-clear" aria-label={`Clear ${label}`} title="Clear" onClick={() => { last.current = null; setText(''); onChange(null); }}><Icon name="close" size={12} /></button>}
     </span>
   );
 }
 
 (MoneyInput as any).labelable = true;   // a single input: safe inside <label>
+
+// Optional date + time with a clear (✕): clearing a datetime field by hand is awkward or impossible
+// in several browsers. `value` is the input's own local format ("2026-10-01T09:30") or ''.
+export function DateTimeInput({ value, onChange, label, min }: { value: string; onChange: (v: string) => void; label: string; min?: string }){
+  return (
+    <span className="input-with-btn">
+      <input type="datetime-local" aria-label={label} value={value} min={min} onChange={e => onChange(e.target.value)} />
+      {value && <button type="button" className="icon-btn" aria-label={`Clear ${label}`} title="Clear" onClick={() => onChange('')}><Icon name="close" size={13} /></button>}
+    </span>
+  );
+}
+(DateTimeInput as any).labelable = true;
 
 // Markdown source + server-rendered preview (the same safe renderer the site uses).
 export function MarkdownField({ value, onChange, label, rows = 12, hint }: { value: string; onChange: (v: string) => void; label: string; rows?: number; hint?: ReactNode }){

@@ -83,19 +83,22 @@ export async function previewMarkdown(ctx){
 }
 
 // ---- legal pages ---------------------------------------------------------------------------------
-const LEGAL = { terms: 'Terms of Sale', privacy: 'Privacy Policy', refunds: 'Refund Policy', delivery: 'Delivery Policy' };
+import { LEGAL_TITLES as LEGAL, LEGAL_DRAFTS, hasBlanks } from '../content/legal-drafts.js';
 export async function listLegal(){
   const db = await getDb();
   const rows = await db.query('select * from legal_pages');
   return json({ pages: Object.entries(LEGAL).map(([slug, title]) => {
     const r = rows.find(x => x.slug === slug);
-    return { slug, title: r?.title || title, body: r?.body_md || '', published: !!r?.published, updatedAt: r?.updated_at || null };
+    // never written yet: start from the draft (still unpublished until the owner publishes it)
+    const body = r?.body_md || LEGAL_DRAFTS[slug];
+    return { slug, title: r?.title || title, body, published: !!r?.published, updatedAt: r?.updated_at || null, isDraftText: !r?.body_md, hasBlanks: hasBlanks(body) };
   }) });
 }
 export async function saveLegal(ctx){
   const slug = ctx.params.slug;
   if (!LEGAL[slug]) throw new HttpError(404, 'Unknown page.');
   const b = await readJson(ctx.request, 256 * 1024);
+  if (b.published === true && !String(b.body || '').trim()) throw new HttpError(400, 'Write the page before publishing it.');
   const db = await getDb();
   await db.query(`insert into legal_pages (slug, title, body_md, published) values ($1,$2,$3,$4)
     on conflict (slug) do update set title = excluded.title, body_md = excluded.body_md, published = excluded.published, updated_at = now()`,

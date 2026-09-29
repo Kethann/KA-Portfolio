@@ -3,10 +3,10 @@ import { useEffect, useMemo, useState } from 'react';
 import type { AppProps } from './registry';
 import { useDraft, useLoad, usePref, useUnsavedGuard } from '../hooks';
 import { api, del, get, post, put, patch } from '../api';
-import { Badge, Empty, ErrorState, Field, Segmented, SkeletonRows, Switch, AsyncButton, STATUS_TONE, useConfirm, useToast } from '../ui';
+import { Badge, Empty, ErrorState, Field, Segmented, SkeletonRows, Switch, AsyncButton, STATUS_TONE, useConfirm, useToast, SearchBox } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
-import { DetailHeader, MarkdownField, MoneyInput, TagInput, Uploader, useSaveKey } from './common';
+import { DateTimeInput, DetailHeader, MarkdownField, MoneyInput, TagInput, Uploader, useSaveKey } from './common';
 import { money, ago, bytes } from '../format';
 import { appendToZip, licenseText, zipFiles } from '../zip';
 
@@ -51,7 +51,7 @@ function List({ go }: { go: (r: string) => void }){
       <WinTools><button type="button" className="btn primary sm" onClick={() => go('new')}><Icon name="plus" /> New</button></WinTools>
       <div className="app-toolbar">
         <Segmented label="Section" value={kind} onChange={setKind} options={[{ value: 'all', label: 'All' }, { value: 'artzz', label: 'Artzz' }, { value: 'artifacts', label: 'Artifacts' }]} />
-        <div className="search"><Icon name="search" /><input type="search" placeholder="Search titles and tags" value={q} onChange={e => setQ(e.target.value)} aria-label="Search products" /></div>
+        <SearchBox value={q} onChange={setQ} placeholder="Search titles and tags" label="Search products" />
         <span className="grow" />
         <Segmented label="View" value={view} onChange={setView} options={[{ value: 'grid', label: <Icon name="grid" label="Grid" /> }, { value: 'list', label: <Icon name="list" label="List" /> }]} />
       </div>
@@ -269,10 +269,10 @@ function Editor({ id, go, active }: { id: string; go: (r: string) => void; activ
                   <div className="form-grid">
                     <Field label="Price in India"><MoneyInput currency="INR" label="INR price" value={p.priceInr} onChange={v => set('priceInr', v)} placeholder="499.00" /></Field>
                     <Field label="Price elsewhere"><MoneyInput currency="USD" label="USD price" value={p.priceUsd} onChange={v => set('priceUsd', v)} placeholder="9.00" /></Field>
-                    <Field label="Sale price (INR)" hint="Optional, lower than the price"><MoneyInput currency="INR" label="INR sale price" value={p.salePriceInr} onChange={v => set('salePriceInr', v)} /></Field>
-                    <Field label="Sale price (USD)"><MoneyInput currency="USD" label="USD sale price" value={p.salePriceUsd} onChange={v => set('salePriceUsd', v)} /></Field>
-                    <Field label="Sale starts" hint="India time"><input type="datetime-local" value={toLocal(p.saleStartsAt)} onChange={e => set('saleStartsAt', fromLocal(e.target.value))} /></Field>
-                    <Field label="Sale ends"><input type="datetime-local" value={toLocal(p.saleEndsAt)} onChange={e => set('saleEndsAt', fromLocal(e.target.value))} /></Field>
+                    <Field label="Sale price (INR)" hint="Optional, lower than the price"><MoneyInput currency="INR" label="INR sale price" value={p.salePriceInr} onChange={v => set('salePriceInr', v)} clearable /></Field>
+                    <Field label="Sale price (USD)"><MoneyInput currency="USD" label="USD sale price" value={p.salePriceUsd} onChange={v => set('salePriceUsd', v)} clearable /></Field>
+                    <Field label="Sale starts" hint="India time · empty = now"><DateTimeInput label="Sale start" value={toLocal(p.saleStartsAt)} onChange={v => set('saleStartsAt', fromLocal(v))} /></Field>
+                    <Field label="Sale ends" hint="Empty = no end"><DateTimeInput label="Sale end" value={toLocal(p.saleEndsAt)} min={toLocal(p.saleStartsAt) || undefined} onChange={v => set('saleEndsAt', fromLocal(v))} /></Field>
                   </div>
                   <p className="field-hint">Prices are charged exactly as set: ₹ in India, $ elsewhere. Razorpay’s minimum is ₹1 / $1.</p>
                 </>}

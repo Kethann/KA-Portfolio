@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { AppProps } from './registry';
 import { useDebounced, useLoad, useMedia } from '../hooks';
 import { api, del, patch, post } from '../api';
-import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, SkeletonRows, STATUS_TONE, useConfirm, useToast } from '../ui';
+import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, SkeletonRows, STATUS_TONE, useConfirm, useToast, SearchBox } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
 import { Copy, TagInput } from './common';
@@ -41,7 +41,7 @@ export default function Messages({ route, go, active, open }: AppProps){
   const list = (
     <div className="msg-list">
       <div className="app-toolbar">
-        <div className="search" style={{ maxWidth: 'none' }}><Icon name="search" /><input type="search" placeholder="Search messages" value={q} onChange={e => setQ(e.target.value)} aria-label="Search messages" /></div>
+        <SearchBox value={q} onChange={setQ} placeholder="Search messages" label="Search messages" style={{ maxWidth: 'none' }} />
       </div>
       <div className="tabs" role="tablist" aria-label="Folders">
         {(['inbox', 'new', 'done', 'spam', 'all'] as Box[]).map(b => (

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { AppProps } from './registry';
 import { useDebounced, useDraft, useLoad, useMedia, useUnsavedGuard } from '../hooks';
 import { del, post, put } from '../api';
-import { AsyncButton, Badge, Chart, Empty, ErrorState, Field, Modal, Segmented, SkeletonRows, Switch, useConfirm, useToast } from '../ui';
+import { AsyncButton, Badge, Chart, Empty, ErrorState, Field, Modal, Segmented, SkeletonRows, Switch, useConfirm, useToast, SearchBox } from '../ui';
 import { Icon } from '../icons';
 import { TagInput } from './common';
 import { ago, dateTime, num } from '../format';
@@ -108,7 +108,7 @@ function Knowledge({ go }: { go: (r: string) => void }){
           <li>Ask the same question in the <button type="button" className="btn ghost sm" onClick={() => go('playground')}>Playground</button> to check the new answer.</li>
         </ol>
       </div>
-      {(s.data?.sources.length || 0) > 3 && <div className="search" style={{ maxWidth: 360 }}><Icon name="search" /><input type="search" placeholder="Search what it knows" value={q} onChange={e => setQ(e.target.value)} aria-label="Search knowledge" /></div>}
+      {(s.data?.sources.length || 0) > 3 && <SearchBox value={q} onChange={setQ} placeholder="Search what it knows" label="Search knowledge" style={{ maxWidth: 360 }} />}
       {!s.data ? <SkeletonRows rows={4} /> : !s.data.sources.length ? <Empty icon="assistant" title="Nothing written yet">Start with a short “About me” and your most common questions.</Empty> : !list.length ? <Empty icon="search" title="No matches" /> : (
         <ul className="kb-list">{list.map(k => (
           <li key={k.id} className={k.enabled ? '' : 'off'}>
@@ -165,7 +165,7 @@ function Logs({ id, go }: { id?: string; go: (r: string) => void }){
   return (
     <div className={'msg-split' + (id ? ' has-open' : '')} style={{ flex: 1, minHeight: 0 }}>
       {(!narrow || !id) && <div className="msg-list">
-        <div className="app-toolbar"><div className="search" style={{ maxWidth: 'none' }}><Icon name="search" /><input type="search" placeholder="Search what people asked" value={q} onChange={e => setQ(e.target.value)} aria-label="Search conversations" /></div>
+        <div className="app-toolbar"><SearchBox value={q} onChange={setQ} placeholder="Search what people asked" label="Search conversations" style={{ maxWidth: 'none' }} />
           <select aria-label="Who" value={aud} onChange={e => setAud(e.target.value as typeof aud)} style={{ width: 'auto' }}><option value="all">Everyone</option><option value="visitor">Visitors</option><option value="buyer">Verified buyers</option><option value="playground">Playground</option></select></div>
         <div className="msg-scroll">
           {!s.data ? <div className="pad"><SkeletonRows rows={6} cols={2} /></div> : !s.data.conversations.length ? <Empty icon="messages" title="No conversations" /> : (

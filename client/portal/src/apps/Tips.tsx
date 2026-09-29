@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { AppProps } from './registry';
 import { useLoad, useUnsavedGuard } from '../hooks';
 import { del, post, put } from '../api';
-import { Badge, Empty, ErrorState, Field, SkeletonRows, STATUS_TONE, useConfirm, useToast } from '../ui';
+import { Badge, Empty, ErrorState, Field, SkeletonRows, STATUS_TONE, useConfirm, useToast, SearchBox } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
 import { DetailHeader, MarkdownField, TagInput, Uploader, useSaveKey } from './common';
@@ -27,7 +27,7 @@ export default function Tips({ route, go, active }: AppProps){
   return (
     <div className="app">
       <WinTools><button type="button" className="btn primary sm" onClick={() => go('new')}><Icon name="plus" /> New tip</button></WinTools>
-      <div className="app-toolbar"><div className="search"><Icon name="search" /><input type="search" placeholder="Search tips" value={q} onChange={e => setQ(e.target.value)} aria-label="Search tips" /></div></div>
+      <div className="app-toolbar"><SearchBox value={q} onChange={setQ} placeholder="Search tips" label="Search tips" /></div>
       <div className="app-main">
         {s.error && !s.data ? <ErrorState message={s.error} retry={s.reload} /> : !s.data ? <SkeletonRows rows={6} /> : !rows.length ? (
           <Empty icon="tips" title={q ? 'No matches' : 'No tips yet'} action={!q && <button type="button" className="btn primary" onClick={() => go('new')}><Icon name="plus" /> Write the first tip</button>}>Short, useful posts: techniques, process notes, free resources.</Empty>
@@ -88,7 +88,7 @@ function Editor({ id, tip, loading, go, active, onSaved, onDeleted }: { id: stri
         </DetailHeader>
         <Field label="Title"><input value={d.title} onChange={e => set('title', e.target.value)} maxLength={160} autoFocus={!id} /></Field>
         <div className="form-grid">
-          <Field label="Web address" hint="Filled from the title if empty"><span className="input-affix"><span>?tip=</span><input value={d.slug} onChange={e => set('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} maxLength={80} /></span></Field>
+          <Field label="Web address" hint="Filled from the title if empty"><span className="input-affix"><span>?tip=</span><input value={d.slug} onChange={e => set('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} onBlur={() => set('slug', d.slug.replace(/-+/g, '-').replace(/^-|-$/g, ''))} maxLength={80} /></span></Field>
           <Field label="Category"><select value={d.categoryId || ''} onChange={e => set('categoryId', e.target.value || null)}><option value="">None</option>
             {cats.data?.categories.filter(c => c.kind === 'tips').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
         </div>

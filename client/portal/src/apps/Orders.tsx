@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { AppProps } from './registry';
 import { useDebounced, useLoad, usePref } from '../hooks';
 import { downloadFile, post } from '../api';
-import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, Segmented, SkeletonRows, STATUS_TONE, Switch, VirtualTable, useConfirm, useToast } from '../ui';
+import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, Segmented, SkeletonRows, STATUS_TONE, Switch, VirtualTable, useConfirm, useToast, SearchBox } from '../ui';
 import type { Column } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
@@ -49,7 +49,7 @@ function List({ go, active, initialStatus, onExport }: { go: (r: string) => void
     <div className="app">
       <WinTools><button type="button" className="btn sm" onClick={onExport}><Icon name="downloads" /> Export</button></WinTools>
       <div className="app-toolbar">
-        <div className="search"><Icon name="search" /><input type="search" placeholder="Order, email or payment ID" value={q} onChange={e => setQ(e.target.value)} aria-label="Search orders" /></div>
+        <SearchBox value={q} onChange={setQ} placeholder="Order, email or payment ID" label="Search orders" />
         <select aria-label="Status" value={status} onChange={e => setStatus(e.target.value)} style={{ width: 'auto' }}>
           {STATUSES.map(x => <option key={x} value={x}>{x === 'all' ? 'All statuses' : x === 'attention' ? 'Needs attention' : x[0].toUpperCase() + x.slice(1)}</option>)}
         </select>

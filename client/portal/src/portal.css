@@ -230,6 +230,10 @@ input[type="color"]{ width:40px; height:var(--control-h); padding:2px; border:1p
 .input-with-btn{ position:relative; display:block; } .input-with-btn input{ padding-right:44px !important; } .input-with-btn .icon-btn{ position:absolute; right:2px; top:50%; translate:0 -50%; }
 .input-affix{ display:flex; align-items:stretch; } .input-affix > span{ display:grid; place-items:center; white-space:nowrap; flex:none; padding:0 10px; border:1px solid var(--border-strong); border-right:0; border-radius:var(--r-sm) 0 0 var(--r-sm); background:var(--surface-2); color:var(--text-2); font-size:var(--fs-sm); }
 .input-affix input{ border-radius:0 var(--r-sm) var(--r-sm) 0 !important; }
+.input-affix{ position:relative; } .input-affix input.has-clear{ padding-right:34px; }
+.field-clear{ position:absolute; right:4px; top:50%; translate:0 -50%; width:26px; height:26px; display:grid; place-items:center; border:0; border-radius:50%; background:transparent; color:var(--text-3); cursor:pointer; }
+.field-clear:hover{ background:var(--surface-hover); color:var(--text); } .field-clear:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+@media (pointer:coarse){ .field-clear{ width:36px; height:36px; right:0; } }
 .switch{ display:inline-flex; align-items:center; gap:10px; cursor:pointer; min-height:28px; }
 .switch input{ position:absolute; opacity:0; width:1px; height:1px; }
 .switch-track{ width:34px; height:20px; border-radius:10px; background:var(--surface-3); position:relative; transition:background var(--dur-2); flex:none; border:1px solid var(--border); }
@@ -290,9 +294,14 @@ input[type="color"]{ width:40px; height:var(--control-h); padding:2px; border:1p
 .app{ display:flex; flex-direction:column; height:100%; min-height:0; }
 .app-toolbar{ display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-3) var(--sp-4); border-bottom:1px solid var(--border); flex-wrap:wrap; flex:none; }
 .app-toolbar .grow{ flex:1; }
-.app-toolbar .search{ position:relative; min-width:180px; flex:1; max-width:340px; }
-.app-toolbar .search .ic{ position:absolute; left:10px; top:50%; translate:0 -50%; color:var(--text-3); pointer-events:none; }
-.app-toolbar .search input{ padding-left:32px; }
+.search{ position:relative; display:block; }
+.app-toolbar .search{ min-width:180px; flex:1; max-width:340px; }
+.search .ic{ position:absolute; left:10px; top:50%; translate:0 -50%; color:var(--text-3); pointer-events:none; }
+.search input{ padding-left:32px; padding-right:34px; width:100%; }
+.search input::-webkit-search-cancel-button{ -webkit-appearance:none; appearance:none; }   /* our own ✕ below, in every browser */
+.search-clear{ position:absolute; right:4px; top:50%; translate:0 -50%; width:26px; height:26px; display:grid; place-items:center; border:0; border-radius:50%; background:transparent; color:var(--text-3); cursor:pointer; }
+.search-clear:hover{ background:var(--surface-hover); color:var(--text); } .search-clear:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+@media (pointer:coarse){ .search-clear{ width:36px; height:36px; right:0; } }
 .app-main{ flex:1; min-height:0; display:flex; flex-direction:column; padding:var(--sp-4); gap:var(--sp-4); overflow:auto; }
 .app-main.fill{ overflow:hidden; }
 .split{ display:grid; grid-template-columns:minmax(260px, 340px) 1fr; flex:1; min-height:0; }
@@ -339,3 +348,5 @@ input[type="color"]{ width:40px; height:var(--control-h); padding:2px; border:1p
 .hello{ display:flex; align-items:flex-end; justify-content:space-between; gap:var(--sp-3); flex-wrap:wrap; }
 .hello h2{ font:600 var(--fs-3xl)/1.1 var(--font-display); letter-spacing:-.02em; }
 .hello p{ color:var(--text-2); margin-top:4px; }
+
+input.invalid,textarea.invalid{ border-color:var(--danger) !important; box-shadow:0 0 0 3px var(--danger-soft); }

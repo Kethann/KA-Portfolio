@@ -3,11 +3,11 @@ import { useEffect, useMemo, useState } from 'react';
 import type { AppProps } from './registry';
 import { useLoad } from '../hooks';
 import { del, post, put } from '../api';
-import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, Segmented, SkeletonRows, Switch, VirtualTable, useConfirm, useToast } from '../ui';
+import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, Segmented, SkeletonRows, Switch, VirtualTable, useConfirm, useToast, SearchBox } from '../ui';
 import type { Column } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
-import { MoneyInput } from './common';
+import { DateTimeInput, MoneyInput } from './common';
 import { dateTime, money, pct } from '../format';
 
 type Coupon = { id: string; code: string; description: string; kind: 'percent' | 'fixed'; percent_bp: number | null; amount_inr: number | null; amount_usd: number | null;
@@ -67,7 +67,7 @@ export default function Coupons({ route, go }: AppProps){
   return (
     <div className="app">
       <WinTools><button type="button" className="btn primary sm" onClick={() => setEditing('new')}><Icon name="plus" /> New code</button></WinTools>
-      <div className="app-toolbar"><div className="search"><Icon name="search" /><input type="search" placeholder="Search codes" value={q} onChange={e => setQ(e.target.value)} aria-label="Search coupons" /></div></div>
+      <div className="app-toolbar"><SearchBox value={q} onChange={setQ} placeholder="Search codes" label="Search coupons" /></div>
       <div className="app-main fill">
         {s.error && !s.data ? <ErrorState message={s.error} retry={s.reload} /> : !s.data ? <SkeletonRows rows={6} /> : (
           <VirtualTable label="Coupons" rows={rows} columns={cols} rowKey={c => c.id} onOpen={c => setEditing(c)}
@@ -154,8 +154,8 @@ function Editor({ coupon, onClose, onSaved }: { coupon: Coupon | 'new' | { copy:
         {f.kind === 'percent' ? (
           <div className="form-grid">
             <Field label="Percent off"><span className="input-affix"><span>%</span><input inputMode="decimal" value={f.percent} onChange={e => set('percent', e.target.value.replace(/[^\d.]/g, ''))} className="num" /></span></Field>
-            <Field label="Cap (INR)" hint="Optional"><MoneyInput currency="INR" label="Maximum discount INR" value={f.maxDiscountInr} onChange={v => set('maxDiscountInr', v)} /></Field>
-            <Field label="Cap (USD)"><MoneyInput currency="USD" label="Maximum discount USD" value={f.maxDiscountUsd} onChange={v => set('maxDiscountUsd', v)} /></Field>
+            <Field label="Cap (INR)" hint="Optional"><MoneyInput currency="INR" label="Maximum discount INR" value={f.maxDiscountInr} onChange={v => set('maxDiscountInr', v)} clearable /></Field>
+            <Field label="Cap (USD)"><MoneyInput currency="USD" label="Maximum discount USD" value={f.maxDiscountUsd} onChange={v => set('maxDiscountUsd', v)} clearable /></Field>
           </div>
         ) : (
           <div className="form-grid">
@@ -179,12 +179,12 @@ function Editor({ coupon, onClose, onSaved }: { coupon: Coupon | 'new' | { copy:
             <label key={p.id}><input type="checkbox" checked={f.productIds.includes(p.id)} onChange={e => set('productIds', e.target.checked ? [...f.productIds, p.id] : f.productIds.filter(x => x !== p.id))} /> {p.title} <span className="faint">· {p.kind}</span></label>
           ))}</div></Field>}
         <div className="form-grid">
-          <Field label="Starts" hint="India time; empty = now"><input type="datetime-local" value={f.startsAt} onChange={e => set('startsAt', e.target.value)} /></Field>
-          <Field label="Ends" hint="Empty = never"><input type="datetime-local" value={f.endsAt} onChange={e => set('endsAt', e.target.value)} /></Field>
+          <Field label="Starts" hint="India time; empty = now"><DateTimeInput label="Start" value={f.startsAt} onChange={v => set('startsAt', v)} /></Field>
+          <Field label="Ends" hint="Empty = never"><DateTimeInput label="End" value={f.endsAt} min={f.startsAt || undefined} onChange={v => set('endsAt', v)} /></Field>
           <Field label="Total uses" hint="Empty = unlimited"><input inputMode="numeric" value={f.maxUses} onChange={e => set('maxUses', e.target.value.replace(/\D/g, ''))} className="num" /></Field>
           <Field label="Uses per email"><input inputMode="numeric" value={f.perEmailLimit} onChange={e => set('perEmailLimit', e.target.value.replace(/\D/g, ''))} className="num" /></Field>
-          <Field label="Minimum order (INR)"><MoneyInput currency="INR" label="Minimum INR" value={f.minOrderInr} onChange={v => set('minOrderInr', v)} /></Field>
-          <Field label="Minimum order (USD)"><MoneyInput currency="USD" label="Minimum USD" value={f.minOrderUsd} onChange={v => set('minOrderUsd', v)} /></Field>
+          <Field label="Minimum order (INR)"><MoneyInput currency="INR" label="Minimum INR" value={f.minOrderInr} onChange={v => set('minOrderInr', v)} clearable /></Field>
+          <Field label="Minimum order (USD)"><MoneyInput currency="USD" label="Minimum USD" value={f.minOrderUsd} onChange={v => set('minOrderUsd', v)} clearable /></Field>
         </div>
         <div className="stack">
           <Switch checked={f.firstOrderOnly} onChange={v => set('firstOrderOnly', v)} label="Only for a buyer’s first order" />
