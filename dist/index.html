@@ -1287,10 +1287,15 @@ html.ka-modal-open{ overflow:hidden; }
 /* ---- Portfolio now follows About > Featured Work: less top room than it had as the first section ---- */
 #section-portfolio #folder-shelf.folder-shelf{ padding-top:clamp(32px, 6vw, 72px); }
 
-/* ---- Store / Tips placeholders (Phase 2 replaces their content) ---- */
-.soon-wrap{ max-width:880px; margin:0 auto; padding:120px clamp(20px,5vw,48px) 100px; text-align:center; min-height:60vh; box-sizing:border-box; }
-.soon-wrap h2{ font-size:var(--step-4); margin:0 0 12px; }
-.soon-wrap p{ margin:0; color:var(--ink-dim); }
+/* ---- Store / Tips pages: shell around the lazily mounted bundle ---- */
+.shop-shell{ max-width:1400px; margin:0 auto; padding:120px 0 96px; min-height:80vh; box-sizing:border-box; }
+.shop-shell > .gallery-head{ margin-bottom:clamp(20px, 3vw, 36px); }
+.shop-root{ padding:0 clamp(16px, 5vw, 64px); min-height:40vh; }
+.shop-loading{ margin:0; padding:48px 0; text-align:center; color:var(--ink-dim); }
+@media (min-width:1900px){ .shop-shell{ max-width:1720px; } }
+@media (min-width:2500px){ .shop-shell{ max-width:2200px; } }
+@media (min-width:3400px){ .shop-shell{ max-width:3000px; } }
+@media (max-width:600px){ .shop-shell{ padding-top:96px; } }
 </style>
 
 <div id="site-notice" role="status" hidden><p id="site-notice-text"></p><button type="button" id="site-notice-close" aria-label="Dismiss notice">&times;</button></div>
@@ -1389,18 +1394,25 @@ html.ka-modal-open{ overflow:hidden; }
   </div>
 </section>
 
-<!-- Store and Tips: destinations in the nav now; their catalog and posts arrive in Phase 2. -->
+<!-- Store and Tips: their content is a lazily loaded bundle (dist/assets/store.js), mounted into
+     the *-root element the first time the page is opened (see loadStorePage in the nav script). -->
 <section class="site-section" id="section-store" data-section="store" hidden>
-  <div class="soon-wrap">
-    <h2>Store</h2>
-    <p>Artzz and Artifacts are almost ready. Check back soon.</p>
+  <div class="shop-shell">
+    <div class="gallery-head">
+      <h2 id="store-title" data-ka-editable="storeTitle">Store</h2>
+      <p id="store-intro" data-ka-editable="storeIntro">Artwork, designs and the tools I build.</p>
+    </div>
+    <div class="shop-root" id="store-root" aria-busy="true"><p class="shop-loading">Loading the store…</p></div>
   </div>
 </section>
 
 <section class="site-section" id="section-tips" data-section="tips" hidden>
-  <div class="soon-wrap">
-    <h2>Tips</h2>
-    <p>Short design and development tips are on the way.</p>
+  <div class="shop-shell">
+    <div class="gallery-head">
+      <h2 id="tips-title" data-ka-editable="tipsTitle">Tips</h2>
+      <p id="tips-intro" data-ka-editable="tipsIntro">Short notes on design and development.</p>
+    </div>
+    <div class="shop-root" id="tips-root" aria-busy="true"><p class="shop-loading">Loading tips…</p></div>
   </div>
 </section>
 
@@ -6757,6 +6769,7 @@ function switchSection(name, focusTarget){
     }
     // [contact card] "pop up" materialize -- layered on top of the section's own cross-fade,
     // triggered fresh every time Contact becomes the active section (not just once ever).
+    if (page === "store" || page === "tips") loadStorePage(page);
     if (page === "contact"){
       var card = document.getElementById("contact-card");
       card.classList.remove("in");
@@ -6845,6 +6858,34 @@ expandPanel.addEventListener("click", function(e){
     openTypographyStudio();
   }
 });
+// Store and Tips share one lazily loaded bundle (dist/assets/store.js). It starts downloading as
+// soon as a pointer or keyboard focus reaches either nav item, and mounts when the page opens.
+var shopBundle = null, shopMounted = {};
+function shopImport(){
+  if (!shopBundle) shopBundle = import("./assets/store.js").catch(function(err){ shopBundle = null; throw err; });
+  return shopBundle;
+}
+function loadStorePage(page){
+  if (shopMounted[page]) return;
+  shopMounted[page] = true;
+  var root = document.getElementById(page === "store" ? "store-root" : "tips-root");
+  var params = new URLSearchParams(location.search);
+  shopImport().then(function(m){
+    if (page === "store") m.mountStore(root, { initialProduct: params.get("product") });
+    else m.mountTips(root, { initialTip: params.get("tip") });
+    root.removeAttribute("aria-busy");
+  }).catch(function(){
+    shopMounted[page] = false;
+    root.innerHTML = '<p class="shop-loading" role="alert">This page couldn’t load. <button type="button" class="shop-retry">Try again</button></p>';
+    root.querySelector(".shop-retry").addEventListener("click", function(){ loadStorePage(page); });
+  });
+}
+function prefetchShop(e){
+  var item = e.target.closest && e.target.closest('.nav-item[data-section="store"], .nav-item[data-section="tips"]');
+  if (item) shopImport().catch(function(){});
+}
+navItemsContainer.addEventListener("pointerover", prefetchShop);
+navItemsContainer.addEventListener("focusin", prefetchShop);
 // The Typography studio is its own lazily loaded bundle (dist/assets/studio.js): nothing of it is
 // downloaded until someone opens it from the menu.
 var studioLoading = false;
@@ -6876,6 +6917,12 @@ document.addEventListener("keydown", function(e){
 });
 
 renderNavItems(); // builds the bar, measures the labels and places the pill (usable while the hero plays)
+// Shared links straight into the store or a tip: ?product=<slug> / ?tip=<slug>
+(function(){
+  var params = new URLSearchParams(location.search);
+  if (params.get("product")) switchSection("store");
+  else if (params.get("tip")) switchSection("tips");
+})();
 requestAnimationFrame(function(){ nav.classList.add("revealed"); });
 document.fonts?.ready.then(measureNavLabels);
 document.fonts?.addEventListener?.("loadingdone", measureNavLabels); // a font requested later (e.g. the mono label face) also re-measures

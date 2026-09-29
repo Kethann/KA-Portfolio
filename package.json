@@ -13,7 +13,8 @@
     "frontend": "vite",
     "test": "node --test --test-concurrency=1 tests/ && node generator/scripts/verify_ui.cjs",
     "db:import-legacy": "node scripts/import-legacy.mjs",
-    "db:migrate": "node scripts/db-migrate.mjs"
+    "db:migrate": "node scripts/db-migrate.mjs",
+    "db:seed-demo": "node scripts/seed-demo.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",

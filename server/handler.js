@@ -5,9 +5,11 @@ import { json } from './core/http.js';
 import * as pub from './handlers/public.js';
 import { assistant } from './handlers/assistant-legacy.js';
 import * as cron from './handlers/cron.js';
+import { registerStorePublic } from './handlers/store-public.js';
 
 export const router = createRouter();
 const { route } = router;
+registerStorePublic(route);
 
 // ---- public site
 route('GET', '/api/public-config', pub.publicConfig);

@@ -17,7 +17,7 @@ test('the running site serves the homepage, lazy bundles and all built assets', 
     const html = await page.text();
     assert(html.includes("import('./dist/assets/panda.js')")); assert(html.includes('assistant-launcher'));
     assert(html.includes('import("./dist/assets/studio.js")'), 'the Typography studio bundle is wired to the menu');
-    for (const asset of ['/dist/assets/panda.js', '/dist/assets/three-r128.min.js', '/dist/assets/studio.js']){
+    for (const asset of ['/dist/assets/panda.js', '/dist/assets/three-r128.min.js', '/dist/assets/studio.js', '/dist/assets/store.js']){
       const response = await fetch(base + asset); assert.equal(response.status, 200, asset); await response.arrayBuffer();
     }
     for (const name of await readdir(resolve(root, 'dist/assets'))){

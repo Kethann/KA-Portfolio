@@ -42,6 +42,7 @@ const c=vm.createContext({console,window,document:{createElement:t=>new Element(
   performance:{now:()=>time},requestAnimationFrame:fn=>{rafs.set(++id,fn);return id;},cancelAnimationFrame:i=>rafs.delete(i),
   setTimeout:fn=>{timers.set(++id,fn);return id;},clearTimeout:i=>timers.delete(i),
   ResizeObserver:class{observe(){}disconnect(){}},POSTERS:[],IMG_BASE:'images/',
+  loadStorePage(page){c.shopLoads=(c.shopLoads||[]).concat(page);},
   buildPicture:()=>new Element('picture'),isPinned:()=>false,setPinned(){},sampleDominantColor:(p,cb)=>cb('#c88'),openLightbox:(p,i)=>{c.opened=i;}});
 function timersOnce(){const tasks=[...timers.values()];timers.clear();tasks.forEach(f=>f());}
 function frames(){for(let n=0;n<100&&rafs.size;n++){time+=16.667;const callbacks=[...rafs.values()];rafs.clear();callbacks.forEach(f=>f(time));}}
@@ -57,6 +58,7 @@ nav.emit('pointerdown',{target:items[1],clientX:150});timersOnce();assert(nav.cl
 nav.emit('pointermove',{target:items[1],clientX:250});
 nav.emit('pointerup',{target:items[1],clientX:250});timersOnce();frames();
 assert.equal(c.activeSection,'store');assert.equal(visible(),'store');assert.equal(c.navDrag,null);
+assert.deepEqual(c.shopLoads,['store'],'opening Store mounts the store bundle');
 assert.equal(items[2].getAttribute('aria-current'),'page');assert.equal(items[1].getAttribute('aria-current'),null);
 // The pill finishes exactly on the selected item.
 assert.equal(parseFloat(pill.style.width),items[2].offsetWidth);assert(pill.style.transform.startsWith('translateX('+items[2].offsetLeft.toFixed(2)+'px)'));
