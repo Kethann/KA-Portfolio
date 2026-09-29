@@ -38,8 +38,8 @@ function List({ go, active, initialStatus, onExport }: { go: (r: string) => void
   if (dq.trim()) qs.set('q', dq.trim());
   const s = useLoad<{ orders: Order[]; total: number; hasMore: boolean }>(`/orders?${qs}`, { pollMs: 30e3, active });
   const cols: Column<Order>[] = useMemo(() => [
-    { key: 'id', label: 'Order', width: '1.1fr', render: o => <span className="mono">{o.public_id}</span>, sort: (a, b) => a.public_id.localeCompare(b.public_id) },
-    { key: 'buyer', label: 'Buyer', width: '1.6fr', render: o => <span className="truncate" title={o.email}>{o.email}</span>, sort: (a, b) => a.email.localeCompare(b.email) },
+    { key: 'id', label: 'Order', width: '124px', render: o => <span className="mono">{o.public_id}</span>, sort: (a, b) => a.public_id.localeCompare(b.public_id) },
+    { key: 'buyer', label: 'Buyer', width: '1.6fr', render: o => <span className="truncate" title={o.email}>{o.email}</span>, sort: (a, b) => a.email.localeCompare(b.email), hideBelow: 480 },
     { key: 'items', label: 'Items', width: '1.5fr', render: o => <span className="truncate muted">{o.items}</span>, hideBelow: 820 },
     { key: 'total', label: 'Total', width: '110px', align: 'right', render: o => o.is_free ? <span className="muted">Free</span> : money(o.total, o.currency), sort: (a, b) => a.currency.localeCompare(b.currency) || a.total - b.total },
     { key: 'status', label: 'Status', width: '104px', render: o => <Badge tone={STATUS_TONE[o.status]}>{o.status}</Badge>, sort: (a, b) => a.status.localeCompare(b.status) },

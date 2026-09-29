@@ -39,7 +39,7 @@ export function DeskProvider({ areaRef, children }: { areaRef: React.RefObject<H
     if (saved) return { w, h, x: clamp(saved.x, 0, Math.max(0, a.width - w)), y: clamp(saved.y, 0, Math.max(0, a.height - 60)) };
     // cascade new windows from the centre
     const n = APPS.findIndex(x => x.id === id) % 6;
-    return { w, h, x: Math.max(0, Math.round((a.width - w) / 2) + (n - 3) * 26), y: Math.max(0, Math.round((a.height - h) / 2.6) + (n - 3) * 22) };
+    return { w, h, x: clamp(Math.round((a.width - w) / 2) + (n - 3) * 26, 0, Math.max(0, a.width - w)), y: clamp(Math.round((a.height - h) / 2.6) + (n - 3) * 22, 0, Math.max(0, a.height - h)) };
   }, [area]);
 
   const open = useCallback((id: string, route?: string) => {
@@ -70,6 +70,26 @@ export function DeskProvider({ areaRef, children }: { areaRef: React.RefObject<H
       return next;
     }));
   }, []);
+  // keep windows on screen when the viewport shrinks (tablet rotation, browser resize)
+  useEffect(() => {
+    let raf = 0;
+    const fit = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => {
+      const a = area();
+      setWins(ws => {
+        let changed = false;
+        const next = ws.map(w => {
+          const nw = Math.min(w.w, Math.max(360, a.width - 24)), nh = Math.min(w.h, Math.max(300, a.height - 16));
+          const nx = clamp(w.x, 0, Math.max(0, a.width - nw)), ny = clamp(w.y, 0, Math.max(0, a.height - 60));
+          if (nw === w.w && nh === w.h && nx === w.x && ny === w.y) return w;
+          changed = true;
+          return { ...w, w: nw, h: nh, x: nx, y: ny };
+        });
+        return changed ? next : ws;
+      });
+    }); };
+    addEventListener('resize', fit);
+    return () => { cancelAnimationFrame(raf); removeEventListener('resize', fit); };
+  }, [area]);
   // persist geometry lazily (not on every pointer move)
   useEffect(() => { const t = setTimeout(() => saveGeoms(geoms.current), 400); return () => clearTimeout(t); }, [wins]);
   const tile = useCallback((id: string, side: 'left' | 'right') => {
