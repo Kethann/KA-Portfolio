@@ -11,6 +11,7 @@ import { safeEqual } from './crypto.js';
 
 export function createRouter(){
   const routes = [];
+  const guards = {};   // access level -> async (ctx) => void (throws to refuse), e.g. the owner session check
   function route(method, pattern, handler, options = {}){
     const keys = [];
     const regex = new RegExp('^' + pattern.replace(/\/:([a-zA-Z_]+)/g, (_, k) => { keys.push(k); return '/([^/]+)'; }) + '/?$');
@@ -30,6 +31,11 @@ export function createRouter(){
       try {
         if (r.access === 'public' && request.method !== 'GET' && request.method !== 'HEAD') assertSameOrigin(request, allowedOrigins());
         if (r.access === 'cron') assertCron(request);
+        if (r.access === 'admin'){
+          if (!guards.admin) throw new HttpError(503, 'Not available.');
+          assertSameOrigin(request, []);          // the portal is same-origin only, for every method
+          await guards.admin(ctx);
+        }
         const res = await r.handler(ctx);
         return res;
       } catch (err){
@@ -40,7 +46,8 @@ export function createRouter(){
     if (allowed.length) return json({ error: 'Method not allowed.' }, 405, { Allow: [...new Set(allowed)].join(', ') });
     return json({ error: 'This API endpoint does not exist.' }, 404);
   }
-  return { route, dispatch, routes };
+  function setGuard(access, fn){ guards[access] = fn; }
+  return { route, dispatch, routes, setGuard };
 }
 
 function allowedOrigins(){

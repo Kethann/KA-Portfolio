@@ -8,10 +8,20 @@ import * as cron from './handlers/cron.js';
 import { registerStorePublic } from './handlers/store-public.js';
 import { registerCheckout } from './handlers/checkout.js';
 
+import { registerAuth, requireAdmin } from './admin/auth.js';
+import { registerCatalog } from './admin/catalog.js';
+import { registerSales } from './admin/sales.js';
+
 export const router = createRouter();
 const { route } = router;
 registerStorePublic(route);
 registerCheckout(route);
+
+// ---- creator portal: every /api/admin/* route below the auth endpoints runs requireAdmin first
+router.setGuard('admin', requireAdmin);
+registerAuth(route);
+registerCatalog(route);
+registerSales(route);
 
 // ---- public site
 route('GET', '/api/public-config', pub.publicConfig);
