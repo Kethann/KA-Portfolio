@@ -17,6 +17,7 @@ import { getSettingWithRevision, setSetting } from '../server/core/settings.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 config({ path: resolve(root, '.env') });
+process.env.KA_DATA_DIR ||= resolve(root, '.data');
 setEnvSource(process.env);
 const legacyDir = resolve(process.argv[2] || resolve(root, 'server/data'));
 

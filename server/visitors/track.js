@@ -2,14 +2,13 @@
 // localStorage and a session ID in sessionStorage. We store the raw IP, approximate location and the
 // parsed browser/device (ua-parser-js). Events: view (a page or section was shown), ping (still here,
 // every 30 s while visible) and leave (time on page).
-import { createRequire } from 'node:module';
 import { HttpError } from '../core/http.js';
 import { getDb } from '../core/db.js';
 import { rateLimit } from '../core/guard.js';
 import { locate } from './geo.js';
 import { getSetting } from '../core/settings.js';
 import { onDaily } from '../jobs/hooks.js';
-const UAParser = createRequire(import.meta.url)('ua-parser-js');
+import UAParser from 'ua-parser-js'; // a static import so Vercel bundles the package
 
 const ID = /^[A-Za-z0-9_-]{8,40}$/;
 export const BOT = /bot|crawl|spider|slurp|mediapartners|facebookexternalhit|embedly|quora link|whatsapp|telegram|discord|skype|headless|lighthouse|pagespeed|gtmetrix|pingdom|uptime|monitor|preview|curl|wget|python|httpclient|axios|node-fetch|okhttp|go-http|java\//i;

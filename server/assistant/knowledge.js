@@ -4,8 +4,9 @@
 import { getDb } from '../core/db.js';
 import { getSetting } from '../core/settings.js';
 import { formatMoney, priceFor } from '../store/pricing.js';
-import { createRequire } from 'node:module';
-const legacy = createRequire(import.meta.url)('../knowledge.json');
+import { readFileSync } from 'node:fs';
+// new URL(..., import.meta.url) lets Vercel's file tracer see and bundle the JSON (createRequire it can't).
+const legacy = JSON.parse(readFileSync(new URL('../knowledge.json', import.meta.url), 'utf8'));
 
 const CHUNK = 900;
 export function chunk(text){

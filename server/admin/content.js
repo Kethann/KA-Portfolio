@@ -11,8 +11,9 @@ import { loadSiteDocument, TOPICS } from '../handlers/public.js';
 import { validateSiteDocument } from './site-document.js';
 import { isOwnMediaUrl, slugify } from './catalog.js';
 import { audit } from './auth.js';
-import { createRequire } from 'node:module';
-const seed = createRequire(import.meta.url)('../portfolio-seed.json');
+import { readFileSync } from 'node:fs';
+// new URL(..., import.meta.url) lets Vercel's file tracer see and bundle the JSON (createRequire it can't).
+const seed = JSON.parse(readFileSync(new URL('../portfolio-seed.json', import.meta.url), 'utf8'));
 
 // ---- portfolio document --------------------------------------------------------------------------
 export async function getSite(){ return json(await loadSiteDocument()); }

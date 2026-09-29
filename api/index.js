@@ -1,5 +1,5 @@
 // The single Vercel Function behind every /api/* URL (vercel.json rewrites /api/:path* here and
-// passes the original path as ?__path=). Standard Web Request -> Response; all routing and logic
+// passes the matched path as ?__path=, used only as a fallback in server/core/router.js). Standard Web Request -> Response; all routing and logic
 // is host-neutral and lives in server/.
 import { vercelFetch } from '../server/platform/vercel.js';
 

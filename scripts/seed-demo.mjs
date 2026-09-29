@@ -9,6 +9,7 @@ import { getDb, setDatabase, wrapPglite } from '../server/core/db.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 config({ path: resolve(root, '.env') });
+process.env.KA_DATA_DIR ||= resolve(root, '.data');
 setEnvSource(process.env);
 if (isProduction() || process.env.DATABASE_URL){
   console.error('Refusing to seed demo data into a configured/live database. Unset DATABASE_URL to seed the local one.');

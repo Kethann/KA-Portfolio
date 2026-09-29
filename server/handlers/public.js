@@ -8,8 +8,9 @@ import { str, email as vEmail } from '../core/validate.js';
 import { sendEmail } from '../core/email.js';
 import { isBlocked } from '../core/blocklist.js';
 import { demoPaymentsEnabled } from '../store/orders.js';
-import { createRequire } from 'node:module';
-const seed = createRequire(import.meta.url)('../portfolio-seed.json');
+import { readFileSync } from 'node:fs';
+// new URL(..., import.meta.url) lets Vercel's file tracer see and bundle the JSON (createRequire it can't).
+const seed = JSON.parse(readFileSync(new URL('../portfolio-seed.json', import.meta.url), 'utf8'));
 
 // Short shared caching for public, non-personal reads; edits show up within seconds.
 export const PUBLIC_CACHE = { 'Cache-Control': 'public, max-age=0, s-maxage=10, stale-while-revalidate=60' };

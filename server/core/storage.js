@@ -4,10 +4,13 @@
 //   backups      private  weekly database exports
 // Production: Supabase Storage over its REST API with the service-role key (server only).
 // Local development and tests: files under .data/storage, signed URLs served by the dev server.
-import { env } from './env.js';
+import { env, localDataDir } from './env.js';
 import { hmacHex, safeEqual } from './crypto.js';
 import { mkdir, writeFile, readFile, rm, stat, readdir } from 'node:fs/promises';
-import { resolve, dirname, sep } from 'node:path';
+import { dirname, sep } from 'node:path';
+
+// Plain string joins, not path.resolve(): see the note in email.js about Vercel's file tracer.
+const at = (...parts) => parts.join(sep);
 
 export const BUCKETS = { media: { public: true }, deliverables: { public: false }, backups: { public: false } };
 
@@ -20,7 +23,7 @@ let driver = null;
 export function setStorage(d){ driver = d; }
 export function getStorage(){
   if (driver) return driver;
-  driver = env('SUPABASE_URL') && env('SUPABASE_SERVICE_ROLE_KEY') ? supabaseStorage() : localStorage(env('KA_DATA_DIR', '.data'));
+  driver = env('SUPABASE_URL') && env('SUPABASE_SERVICE_ROLE_KEY') ? supabaseStorage() : localStorage(localDataDir('File storage (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)'));
   return driver;
 }
 
@@ -97,13 +100,12 @@ function supabaseStorage(){
 
 // Local driver: same interface, signed URLs are HMAC-protected paths the dev server serves.
 export function localStorage(dataDir){
-  const root = resolve(dataDir, 'storage');
+  const root = at(dataDir, 'storage');
   const secret = env('DOWNLOAD_TOKEN_SECRET', 'local-development-only');
   const file = (bucket, path) => {
     assertPath(bucket, path);
-    const full = resolve(root, bucket, path);
-    if (!full.startsWith(resolve(root, bucket) + sep)) throw new Error('Invalid storage path.');
-    return full;
+    // assertPath allows only [A-Za-z0-9._/-], no '..' and no leading '/', so this stays inside the bucket
+    return at(root, bucket, ...path.split('/'));
   };
   return {
     kind: 'local',
@@ -134,11 +136,11 @@ export function localStorage(dataDir){
         let entries = [];
         try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
         for (const e of entries){
-          const p = resolve(dir, e.name);
+          const p = at(dir, e.name);
           if (e.isDirectory()) await walk(p); else { count++; bytes += (await stat(p)).size; }
         }
       }
-      await walk(resolve(root, bucket));
+      await walk(at(root, bucket));
       return { bytes, count };
     }
   };

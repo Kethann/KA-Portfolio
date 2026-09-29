@@ -1,10 +1,14 @@
 // Transactional email. Production: Brevo's HTTPS API (same free quota as Brevo SMTP; works from
 // serverless functions and from Cloudflare Workers later). Development/tests: messages are
 // written to .data/outbox as .json files. Every send is recorded in email_log (never the body).
-import { env } from './env.js';
+import { env, localDataDir } from './env.js';
 import { getDb } from './db.js';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { sep } from 'node:path';
+
+// Local paths are joined as plain strings: path.resolve() with a runtime folder makes Vercel's file
+// tracer bundle every .json it can find into the function.
+const at = (...parts) => parts.join(sep);
 
 let transport = null;
 export function setEmailTransport(t){ transport = t; }
@@ -12,7 +16,7 @@ export function setEmailTransport(t){ transport = t; }
 function getTransport(){
   if (transport) return transport;
   if (env('BREVO_API_KEY')) transport = brevoTransport(env('BREVO_API_KEY'));
-  else transport = outboxTransport(resolve(env('KA_DATA_DIR', '.data'), 'outbox'));
+  else transport = outboxTransport(at(localDataDir('Email (BREVO_API_KEY)'), 'outbox'));
   return transport;
 }
 
@@ -51,7 +55,7 @@ export function outboxTransport(dir){
     async send(msg){
       await mkdir(dir, { recursive: true });
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      await writeFile(resolve(dir, id + '.json'), JSON.stringify({ ...msg, attachments: (msg.attachments || []).map(a => a.name) }, null, 2));
+      await writeFile(at(dir, id + '.json'), JSON.stringify({ ...msg, attachments: (msg.attachments || []).map(a => a.name) }, null, 2));
       this.sent.push(msg);
       return { id };
     }

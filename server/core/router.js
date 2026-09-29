@@ -19,7 +19,10 @@ export function createRouter(){
   }
   async function dispatch(request, platform){
     const url = new URL(request.url);
-    const path = url.pathname;
+    // Vercel hands the function the original URL after the /api rewrite; if a host ever passes the
+    // rewritten one (/api/index?__path=a/b) instead, recover the original path from __path.
+    const rewritten = url.pathname === '/api/index' && url.searchParams.get('__path');
+    const path = rewritten ? '/api/' + rewritten.replace(/^\/+/, '') : url.pathname;
     let allowed = [];
     for (const r of routes){
       const m = r.regex.exec(path);
