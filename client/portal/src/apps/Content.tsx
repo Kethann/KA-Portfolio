@@ -1,8 +1,8 @@
 // Content: portfolio images and folders, the site's words, the Image Upscaler notice + notify list,
 // and every email the site sends.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppProps } from './registry';
-import { useLoad, useUnsavedGuard } from '../hooks';
+import { useDraft, useLoad, useUnsavedGuard } from '../hooks';
 import { del, post, put } from '../api';
 import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, SkeletonRows, Switch, useConfirm, useToast } from '../ui';
 import { Icon } from '../icons';
@@ -23,7 +23,7 @@ export function SiteSaveBar(){
   const site = useSite();
   const toast = useToast();
   const confirm = useConfirm();
-  useUnsavedGuard(site.dirty);
+  useUnsavedGuard(site.dirty, { window: false });   // the draft is shared with Studio and survives closing
   if (!site.doc) return null;
   return <>
     {site.dirty && <span className="faint" style={{ fontSize: 12 }}>Unsaved site changes</span>}
@@ -188,10 +188,11 @@ function Upscaler(){
   const n = useLoad<{ topics: { key: string; name: string; total: number; waiting: number }[]; signups: any[] }>('/notify');
   const toast = useToast();
   const confirm = useConfirm();
-  const [v, setV] = useState<any>(null);
+  const [v, setV] = useDraft<any>(s.data?.value);
   const [link, setLink] = useState('');
   const [message, setMessage] = useState('');
-  useEffect(() => { if (s.data) setV(s.data.value); }, [s.data]);
+  const dirty = !!v && !!s.data && JSON.stringify(v) !== JSON.stringify(s.data.value);
+  useUnsavedGuard(dirty);
   if ((s.error && !s.data) || (n.error && !n.data)) return <ErrorState message={s.error || n.error!} retry={() => { s.reload(); n.reload(); }} />;
   if (!v || !n.data) return <div className="pad"><SkeletonRows rows={8} /></div>;
   const topic = n.data.topics.find(t => t.key === 'upscaler');
@@ -206,7 +207,10 @@ function Upscaler(){
         </div>
         <Field label="Text"><textarea rows={3} value={v.text} onChange={e => setV({ ...v, text: e.target.value })} maxLength={600} /></Field>
         <Switch checked={v.notifyEnabled} onChange={x => setV({ ...v, notifyEnabled: x })} label="Let visitors join the notify-me list" />
-        <div><AsyncButton className="btn primary" onClick={async () => { const r = await put<{ value: any; revision: number }>('/settings/upscaler', { value: v, revision: s.data!.revision }); s.setData(r); toast.show('Saved', { tone: 'success' }); }}>Save</AsyncButton></div>
+        <div className="row"><AsyncButton className="btn primary" disabled={!dirty} onClick={async () => {
+          try { const r = await put<{ value: any; revision: number }>('/settings/upscaler', { value: v, revision: s.data!.revision }); s.setData(r); setV(r.value); toast.show('Saved: live on the site', { tone: 'success' }); }
+          catch (e: any){ if (e.code === 'stale'){ await s.reload(); throw new Error('This was changed on another device. Your edits are still here: save again to keep them.'); } throw e; }
+        }}>Save</AsyncButton>{dirty && <span className="faint" style={{ fontSize: 12 }}>Unsaved changes</span>}</div>
       </section>
       <section className="card stack" aria-labelledby="nl-h"><h3 id="nl-h"><span className="grow">Notify-me list</span><Badge tone="accent">{topic?.waiting || 0} waiting</Badge><Badge>{topic?.total || 0} total</Badge></h3>
         {!signups.length ? <Empty icon="mail" title="No signups yet" /> : (
@@ -233,18 +237,34 @@ function Upscaler(){
 function Emails(){
   const s = useLoad<{ templates: { key: string; label: string; subject: string; body: string; customised: boolean; updatedAt: string | null; placeholders: string[] }[] }>('/email-templates');
   const [key, setKey] = useState<string | null>(null);
-  const [draft, setDraft] = useState<{ subject: string; body: string } | null>(null);
   const toast = useToast();
   const confirm = useConfirm();
   const t = s.data?.templates.find(x => x.key === key) || null;
-  useEffect(() => { if (t) setDraft({ subject: t.subject, body: t.body }); }, [key, s.data]); // reset draft when switching templates
+  const server = useMemo(() => (t ? { subject: t.subject, body: t.body } : null), [t]);
+  const [draft, setDraft] = useDraft(server, { resetKey: key });
+  const dirty = !!draft && !!server && (draft.subject !== server.subject || draft.body !== server.body);
+  useUnsavedGuard(dirty);
+  const body = useRef<HTMLTextAreaElement>(null);
+  const choose = async (k: string) => {
+    if (k === key) return;
+    if (dirty && !(await confirm({ title: 'Leave this email unsaved?', body: 'Your changes to it will be lost.', confirm: 'Discard changes', danger: true }))) return;
+    setKey(k);
+  };
+  // placeholders go where the cursor is, not always at the end
+  const insert = (p: string) => {
+    if (!draft) return;
+    const el = body.current, tag = `{{${p}}}`;
+    const at = el ? el.selectionStart : draft.body.length, end = el ? el.selectionEnd : at;
+    setDraft({ ...draft, body: draft.body.slice(0, at) + tag + draft.body.slice(end) });
+    requestAnimationFrame(() => { if (el){ el.focus(); el.setSelectionRange(at + tag.length, at + tag.length); } });
+  };
   if (s.error && !s.data) return <ErrorState message={s.error} retry={s.reload} />;
   if (!s.data) return <div className="pad"><SkeletonRows rows={8} /></div>;
   return (
     <div className="content-split">
       <nav className="folder-nav" aria-label="Emails">
         {s.data.templates.map(x => (
-          <button key={x.key} type="button" className={'folder-btn' + (x.key === key ? ' on' : '')} onClick={() => setKey(x.key)} aria-current={x.key === key || undefined}>
+          <button key={x.key} type="button" className={'folder-btn' + (x.key === key ? ' on' : '')} onClick={() => void choose(x.key)} aria-current={x.key === key || undefined}>
             <Icon name="mail" size={14} /><span className="truncate grow">{x.label}</span>{x.customised && <Badge tone="accent">edited</Badge>}
           </button>
         ))}
@@ -253,11 +273,11 @@ function Emails(){
         {!t || !draft ? <Empty icon="mail" title="Choose an email">Edit the words of any email the site sends. Placeholders like {'{{name}}'} are filled in automatically.</Empty> : <>
           <h2 className="section-title">{t.label}</h2>
           <Field label="Subject"><input value={draft.subject} onChange={e => setDraft({ ...draft, subject: e.target.value })} maxLength={200} /></Field>
-          <Field label="Message" hint="Plain text. Links become clickable."><textarea rows={14} value={draft.body} onChange={e => setDraft({ ...draft, body: e.target.value })} /></Field>
+          <Field label="Message" hint="Plain text. Links become clickable."><textarea ref={body} rows={14} value={draft.body} onChange={e => setDraft({ ...draft, body: e.target.value })} /></Field>
           <div className="row" style={{ gap: 6 }}><span className="faint" style={{ fontSize: 12 }}>Insert:</span>{t.placeholders.map(p => (
-            <button key={p} type="button" className="chip-btn mono" onClick={() => setDraft({ ...draft, body: draft.body + `{{${p}}}` })}>{`{{${p}}}`}</button>))}</div>
+            <button key={p} type="button" className="chip-btn mono" onClick={() => insert(p)}>{`{{${p}}}`}</button>))}</div>
           <div className="row">
-            <AsyncButton className="btn primary" onClick={async () => { s.setData(await put(`/email-templates/${t.key}`, draft)); toast.show('Saved', { tone: 'success' }); }}>Save</AsyncButton>
+            <AsyncButton className="btn primary" disabled={!dirty} onClick={async () => { s.setData(await put(`/email-templates/${t.key}`, draft)); toast.show('Saved: new emails use this wording', { tone: 'success' }); }}>Save</AsyncButton>
             <AsyncButton className="btn" onClick={async () => { const r = await post<{ to: string }>(`/email-templates/${t.key}/test`, draft); toast.show(`Test sent to ${r.to}`, { tone: 'success' }); }}><Icon name="send" /> Send me a test</AsyncButton>
             {t.customised && <AsyncButton className="btn ghost" onClick={async () => { if (await confirm({ title: 'Go back to the original wording?', confirm: 'Reset', danger: true })){ s.setData(await del(`/email-templates/${t.key}`)); toast.show('Reset to the original', { tone: 'success' }); } }}>Reset to original</AsyncButton>}
           </div>

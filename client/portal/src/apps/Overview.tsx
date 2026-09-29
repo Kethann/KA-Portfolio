@@ -103,9 +103,9 @@ export default function Overview({ active, open }: AppProps){
               const text = k ? k.text(a) : a.kind === 'message' ? `Message from ${a.who || 'someone'}: ${a.ref || '(no subject)'}` : `Notify-me signup · ${a.ref}`;
               const app = k ? k.app : a.kind === 'message' ? 'messages' : 'content';
               return (
-                <li key={i}>
+                <li key={a.kind + (a.target || '') + a.what + a.at}>
                   <span className={'act-ic ' + (k?.tone || (a.kind === 'message' ? 'acc' : ''))}><Icon name={k?.icon || (a.kind === 'message' ? 'messages' : 'mail')} size={14} /></span>
-                  <button type="button" className="btn ghost truncate" style={{ flex: 1, justifyContent: 'flex-start', padding: 0, height: 'auto', fontWeight: 500 }} onClick={() => open(app, a.kind === 'signup' ? 'notify' : '')}>{text}</button>
+                  <button type="button" className="btn ghost truncate" style={{ flex: 1, justifyContent: 'flex-start', padding: 0, height: 'auto', fontWeight: 500 }} onClick={() => open(app, a.kind === 'signup' ? 'notify' : a.target || '')}>{text}</button>
                   {a.kind === 'message' && a.what === 'new' && <Badge tone="accent">new</Badge>}
                   <time className="faint num" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{ago(a.at)}</time>
                 </li>

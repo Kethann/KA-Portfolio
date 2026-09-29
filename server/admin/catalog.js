@@ -150,6 +150,18 @@ export async function updateProduct(ctx){
     link_ttl_hours: int(b.linkTtlHours ?? current.link_ttl_hours, { name: 'Link lifetime', min: 1, max: 168 }),
     refund_after_download: bool(b.refundAfterDownload, current.refund_after_download)
   };
+  // prices: a sale must be a real discount inside a real window, and anything charged must clear
+  // Razorpay's minimum (₹1 / $1), so a published item can always be bought
+  if (v.sale_starts_at && v.sale_ends_at && v.sale_ends_at <= v.sale_starts_at) throw new HttpError(400, 'The sale must end after it starts.');
+  for (const [sale, full, cur] of [[v.sale_price_inr, v.price_inr, 'INR'], [v.sale_price_usd, v.price_usd, 'USD']]){
+    if (sale === null) continue;
+    if (sale < 100) throw new HttpError(400, `The ${cur} sale price must be at least ${cur === 'INR' ? '₹1' : '$1'}.`);
+    if (full !== null && sale >= full) throw new HttpError(400, 'The sale price must be lower than the normal price.');
+  }
+  if (status === 'published' && v.sellable && !v.is_free){
+    if (v.price_inr === null || v.price_usd === null) throw new HttpError(400, 'A published item for sale needs both an INR and a USD price (or mark it free).');
+    if (v.price_inr < 100 || v.price_usd < 100) throw new HttpError(400, 'Prices must be at least ₹1 and $1 (the lowest amount cards can be charged), or mark it free.');
+  }
   if (v.category_id){
     const cat = await db.maybeOne('select kind from categories where id = $1', [v.category_id]);
     if (!cat || cat.kind !== current.kind) throw new HttpError(400, 'Choose a category from the same section.');

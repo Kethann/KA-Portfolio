@@ -1,7 +1,7 @@
 // Products (Artzz gallery pieces and Artifacts for sale): list, reorder, edit, publish, images, file.
 import { useEffect, useMemo, useState } from 'react';
 import type { AppProps } from './registry';
-import { useLoad, usePref, useUnsavedGuard } from '../hooks';
+import { useDraft, useLoad, usePref, useUnsavedGuard } from '../hooks';
 import { api, del, get, post, put, patch } from '../api';
 import { Badge, Empty, ErrorState, Field, Segmented, SkeletonRows, Switch, AsyncButton, STATUS_TONE, useConfirm, useToast } from '../ui';
 import { Icon } from '../icons';
@@ -65,7 +65,12 @@ function List({ go }: { go: (r: string) => void }){
             {items.map(p => (
               <button key={p.id} type="button" className={'p-card' + (dragId === p.id ? ' dragging' : '')} onClick={() => go(p.id)} draggable={!q}
                 onDragStart={() => setDragId(p.id)} onDragEnd={() => setDragId(null)} onDragOver={e => e.preventDefault()}
-                onDrop={() => { if (dragId && dragId !== p.id){ const same = s.data!.products.filter(x => x.kind === p.kind); void move(dragId, same.findIndex(x => x.id === p.id)); } }}>
+                onDrop={() => {
+                  const dragged = dragId && s.data!.products.find(x => x.id === dragId);
+                  if (!dragged || dragged.id === p.id) return;
+                  if (dragged.kind !== p.kind){ toast.show('Artzz and Artifacts are ordered separately: drop it onto an item in the same section.'); return; }
+                  const same = s.data!.products.filter(x => x.kind === p.kind); void move(dragged.id, same.findIndex(x => x.id === p.id));
+                }}>
                 <span className="p-thumb">{p.media[0] ? <img src={p.media[0].url} alt="" loading="lazy" decoding="async" /> : <Icon name="image" size={28} />}</span>
                 <span className="p-body">
                   <span className="p-title truncate">{p.title}</span>
@@ -100,11 +105,21 @@ function List({ go }: { go: (r: string) => void }){
   );
 }
 
-function priceLine(p: Pick<Product, 'isFree' | 'sellable' | 'priceInr' | 'priceUsd' | 'salePriceInr' | 'salePriceUsd'>){
+// A sale price counts only inside its window (no dates = always), and only when it is actually lower.
+function saleOn(p: Pick<Product, 'saleStartsAt' | 'saleEndsAt'>, now = Date.now()){
+  return (!p.saleStartsAt || new Date(p.saleStartsAt).getTime() <= now) && (!p.saleEndsAt || new Date(p.saleEndsAt).getTime() > now);
+}
+function effective(p: Product){
+  const on = saleOn(p);
+  const inr = on && p.salePriceInr !== null && p.priceInr !== null && p.salePriceInr < p.priceInr ? p.salePriceInr : p.priceInr;
+  const usd = on && p.salePriceUsd !== null && p.priceUsd !== null && p.salePriceUsd < p.priceUsd ? p.salePriceUsd : p.priceUsd;
+  return { inr, usd, inrSale: inr !== p.priceInr, usdSale: usd !== p.priceUsd };
+}
+function priceLine(p: Product){
   if (!p.sellable) return 'Not for sale';
   if (p.isFree) return 'Free';
-  const inr = p.salePriceInr ?? p.priceInr, usd = p.salePriceUsd ?? p.priceUsd;
-  return [inr !== null ? money(inr, 'INR') : null, usd !== null ? money(usd, 'USD') : null].filter(Boolean).join(' · ') || 'No price yet';
+  const e = effective(p);
+  return [e.inr !== null ? money(e.inr, 'INR') : null, e.usd !== null ? money(e.usd, 'USD') : null].filter(Boolean).join(' · ') || 'No price yet';
 }
 
 function NewProduct({ go }: { go: (r: string) => void }){
@@ -133,10 +148,12 @@ function Editor({ id, go, active }: { id: string; go: (r: string) => void; activ
   const s = useLoad<{ product: Product }>(`/products/${id}`);
   const cats = useLoad<{ categories: { id: string; kind: string; name: string }[] }>('/categories');
   const lic = useLoad<{ licenses: { id: string; key: string; name: string; summary: string; body_md: string; version: number }[] }>('/licenses');
-  const [draft, setDraft] = useState<Product | null>(null);
+  // Server-owned parts (uploaded media/file, sales count) follow the server even while fields are being
+  // edited; the version stamp (updatedAt) stays the one this edit started from.
+  const [draft, setDraft] = useDraft<Product>(s.data?.product, { resetKey: id, same: (a, b) => JSON.stringify(strip(a)) === JSON.stringify(strip(b)),
+    merge: (d, srv) => ({ ...d, media: srv.media, file: srv.file, sales: srv.sales }) });
   const [saving, setSaving] = useState(false);
   const [packLicense, setPackLicense] = usePref('products.packLicense', true);
-  useEffect(() => { if (s.data) setDraft(s.data.product); }, [s.data]);
   const saved = s.data?.product;
   const dirty = !!draft && !!saved && JSON.stringify(strip(draft)) !== JSON.stringify(strip(saved));
   useUnsavedGuard(dirty);
@@ -144,14 +161,21 @@ function Editor({ id, go, active }: { id: string; go: (r: string) => void; activ
 
   const save = async (status?: Product['status']) => {
     if (!draft || saving) return;
+    // the same rules the server enforces, checked here first for instant feedback
+    const problem = (status || draft.status) === 'published' ? publishProblem(draft) : draftProblem(draft);
+    if (problem){ toast.show(problem, { tone: 'error' }); return; }
     setSaving(true);
     try {
-      const r = await put<{ product: Product }>(`/products/${id}`, { ...draft, status: status || draft.status, updatedAt: saved!.updatedAt });
+      const r = await put<{ product: Product }>(`/products/${id}`, { ...draft, status: status || draft.status, updatedAt: draft.updatedAt || saved!.updatedAt });
       s.setData(r); setDraft(r.product);
       toast.show(status === 'published' ? 'Published: it’s live on the store' : status === 'draft' ? 'Unpublished: back to draft' : 'Saved', { tone: 'success' });
     } catch (e: any){
-      toast.error(e);
-      if (e.code === 'stale') s.reload();
+      if (e.code === 'stale'){
+        // changed elsewhere since this edit began: take that version's stamp so the next Save is a
+        // deliberate overwrite, keep the edits on screen, and explain
+        try { const fresh = await get<{ product: Product }>(`/products/${id}`); s.setData(fresh); setDraft(d => d && { ...d, updatedAt: fresh.product.updatedAt }); } catch { /* the error below still shows */ }
+        toast.show('This product was changed somewhere else after you opened it. Your edits are still here: Save again to keep yours.', { tone: 'error', ms: 10000 });
+      } else toast.error(e);
     } finally { setSaving(false); }
   };
   useSaveKey(active, () => void save());
@@ -195,7 +219,7 @@ function Editor({ id, go, active }: { id: string; go: (r: string) => void; activ
       </WinTools>
       <div className="app-main">
         <DetailHeader back={() => { if (!dirty) return go(''); void confirm({ title: 'Leave without saving?', body: 'Your changes to this product will be lost.', confirm: 'Discard changes', danger: true }).then(ok => ok && go('')); }}
-          title={p.title || 'Untitled'} meta={<><Badge tone={STATUS_TONE[saved.status]}>{saved.status}</Badge><span className="faint">{p.kind === 'artzz' ? 'Artzz' : 'Artifacts'} · /store?product={saved.slug} · updated {ago(saved.updatedAt)}</span></>}>
+          title={p.title || 'Untitled'} meta={<><Badge tone={STATUS_TONE[saved.status]}>{saved.status}</Badge><span className="faint">{p.kind === 'artzz' ? 'Artzz' : 'Artifacts'} · /?product={saved.slug} · updated {ago(saved.updatedAt)}</span></>}>
           {saved.status === 'published' && <a className="btn sm ghost" href={`/?product=${encodeURIComponent(saved.slug)}`} target="_blank" rel="noopener"><Icon name="external" /> View</a>}
           <AsyncButton className="btn sm ghost" onClick={async () => { const r = await post<{ product: Product }>(`/products/${id}/duplicate`); toast.show('Duplicated as a draft', { tone: 'success' }); go(r.product.id); }}><Icon name="copy" /> Duplicate</AsyncButton>
           <button type="button" className="btn sm ghost" onClick={() => remove().catch(toast.error)}><Icon name="trash" /> Delete</button>
@@ -205,7 +229,8 @@ function Editor({ id, go, active }: { id: string; go: (r: string) => void; activ
           <div className="stack-lg">
             <section className="card stack" aria-labelledby="pe-basics"><h3 id="pe-basics">Basics</h3>
               <Field label="Title"><input value={p.title} onChange={e => set('title', e.target.value)} maxLength={160} /></Field>
-              <Field label="Web address" hint="Letters, numbers and dashes. Changing it breaks old links."><span className="input-affix"><span>?product=</span><input value={p.slug} onChange={e => set('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} maxLength={60} /></span></Field>
+              <Field label="Web address" hint="Letters, numbers and dashes. Changing it breaks old links."><span className="input-affix"><span>?product=</span><input value={p.slug} onChange={e => set('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
+                onBlur={() => set('slug', p.slug.replace(/-+/g, '-').replace(/^-|-$/g, ''))} maxLength={60} /></span></Field>
               <Field label="Short description" hint={`${p.summary.length}/400 · shown on the card`}><textarea rows={2} value={p.summary} onChange={e => set('summary', e.target.value)} maxLength={400} /></Field>
               <MarkdownField label="Full description" value={p.description} onChange={v => set('description', v)} rows={8} hint="Markdown: **bold**, lists, links." />
               <div className="form-grid">
@@ -254,8 +279,8 @@ function Editor({ id, go, active }: { id: string; go: (r: string) => void; activ
                 <div className="form-grid">
                   <Field label="License"><select value={p.licenseId || ''} onChange={e => set('licenseId', e.target.value || null)}>
                     <option value="">Choose a license</option>{lic.data?.licenses.map(l => <option key={l.id} value={l.id}>{l.name} (v{l.version})</option>)}</select></Field>
-                  <Field label="Downloads per purchase"><input type="number" min={1} max={100} value={p.maxDownloads} onChange={e => set('maxDownloads', Number(e.target.value) || 1)} className="num" /></Field>
-                  <Field label="Link works for" hint="Hours, up to 168 (7 days)"><input type="number" min={1} max={168} value={p.linkTtlHours} onChange={e => set('linkTtlHours', Number(e.target.value) || 1)} className="num" /></Field>
+                  <Field label="Downloads per purchase" hint="1 to 100"><IntInput label="Downloads per purchase" value={p.maxDownloads} min={1} max={100} onChange={v => set('maxDownloads', v)} /></Field>
+                  <Field label="Link works for" hint="Hours, 1 to 168 (7 days)"><IntInput label="Link lifetime in hours" value={p.linkTtlHours} min={1} max={168} onChange={v => set('linkTtlHours', v)} /></Field>
                 </div>
                 <Switch checked={p.refundAfterDownload} onChange={v => set('refundAfterDownload', v)} label="Allow refunds after the file was downloaded" />
               </>}
@@ -294,6 +319,7 @@ function Editor({ id, go, active }: { id: string; go: (r: string) => void; activ
                 <div className="scp-price num">{previewPrice(p)}</div>
               </div>
             </div>
+            <Readiness p={p} />
             <dl className="kv card">
               <dt>Status</dt><dd><Badge tone={STATUS_TONE[saved.status]}>{saved.status}</Badge></dd>
               <dt>Sold</dt><dd className="num">{p.sales}</dd>
@@ -308,12 +334,62 @@ function Editor({ id, go, active }: { id: string; go: (r: string) => void; activ
   );
 }
 
+// What a published item needs, in the order the owner would fix it.
+function checklist(p: Product){
+  const selling = p.sellable && !p.isFree;
+  return [
+    { ok: !!p.title.trim(), label: 'Title', fix: 'Add a title.' },
+    { ok: !!p.slug.replace(/-/g, ''), label: 'Web address', fix: 'Give it a web address (letters and numbers).' },
+    { ok: p.kind !== 'artzz' || p.media.length > 0, label: p.kind === 'artzz' ? 'At least one image' : 'Cover image (recommended)', fix: 'Add at least one image before publishing an Artzz item.', soft: p.kind !== 'artzz' },
+    ...(selling ? [
+      { ok: p.priceInr !== null && p.priceInr >= 100, label: 'Price in India (₹1 or more)', fix: 'Set the India price (₹1 or more), or mark it free.' },
+      { ok: p.priceUsd !== null && p.priceUsd >= 100, label: 'Price elsewhere ($1 or more)', fix: 'Set the price for other countries ($1 or more), or mark it free.' },
+    ] : []),
+    ...(p.sellable ? [
+      { ok: !!p.file, label: 'File for buyers', fix: 'Upload the file buyers will download before publishing it for sale.' },
+      { ok: !!p.licenseId, label: 'License', fix: 'Choose a license: it tells buyers what they may do with the file.', soft: true },
+    ] : []),
+  ];
+}
+function draftProblem(p: Product){
+  if (p.sellable && !p.isFree && ((p.salePriceInr !== null && p.priceInr !== null && p.salePriceInr >= p.priceInr) || (p.salePriceUsd !== null && p.priceUsd !== null && p.salePriceUsd >= p.priceUsd))) return 'The sale price must be lower than the normal price.';
+  if (p.saleStartsAt && p.saleEndsAt && new Date(p.saleEndsAt) <= new Date(p.saleStartsAt)) return 'The sale must end after it starts.';
+  if (p.sellable && !p.isFree && ((p.salePriceInr !== null && p.salePriceInr < 100) || (p.salePriceUsd !== null && p.salePriceUsd < 100))) return 'A sale price must be at least ₹1 / $1.';
+  return null;
+}
+function publishProblem(p: Product){
+  return checklist(p).find(c => !c.ok && !c.soft)?.fix || draftProblem(p);
+}
+function Readiness({ p }: { p: Product }){
+  const items = checklist(p), missing = items.filter(c => !c.ok && !c.soft).length;
+  return (
+    <div className="card stack readiness" aria-label="Ready to publish">
+      <div className="row between"><b>{missing ? 'Before publishing' : 'Ready to publish'}</b>{missing ? <Badge tone="warning">{missing} to do</Badge> : <Badge tone="success">all set</Badge>}</div>
+      <ul className="check-list">{items.map(c => (
+        <li key={c.label} className={c.ok ? 'ok' : c.soft ? 'soft' : 'todo'}><Icon name={c.ok ? 'check' : c.soft ? 'info' : 'alert'} size={13} />{c.label}</li>
+      ))}</ul>
+    </div>
+  );
+}
+
 function previewPrice(p: Product){
   if (!p.sellable) return 'View only';
   if (p.isFree) return 'Free';
-  const sale = p.salePriceInr !== null && p.priceInr !== null && p.salePriceInr < p.priceInr;
-  if (p.priceInr === null) return 'Set a price';
-  return <>{money(sale ? p.salePriceInr! : p.priceInr, 'INR')}{sale && <s className="faint" style={{ marginLeft: 8 }}>{money(p.priceInr, 'INR')}</s>}</>;
+  if (p.priceInr === null && p.priceUsd === null) return 'Set a price';
+  const e = effective(p);
+  const one = (v: number | null, full: number | null, sale: boolean, cur: 'INR' | 'USD') => v === null ? null
+    : <span>{money(v, cur)}{sale && full !== null && <s className="faint" style={{ marginLeft: 6 }}>{money(full, cur)}</s>}</span>;
+  return <span className="scp-prices">{one(e.inr, p.priceInr, e.inrSale, 'INR')}{one(e.usd, p.priceUsd, e.usdSale, 'USD')}</span>;
+}
+
+// Whole numbers typed freely (the field can be emptied while typing); clamped when you leave it.
+function IntInput({ value, onChange, min, max, label }: { value: number; onChange: (v: number) => void; min: number; max: number; label: string }){
+  const [text, setText] = useState(String(value));
+  useEffect(() => { if (Number(text) !== value) setText(String(value)); }, [value]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const commit = (t: string) => { const n = Math.min(max, Math.max(min, parseInt(t, 10) || min)); setText(String(n)); onChange(n); };
+  return <input inputMode="numeric" aria-label={label} className="num" value={text}
+    onChange={e => { const t = e.target.value.replace(/\D/g, '').slice(0, 4); setText(t); const n = parseInt(t, 10); if (n >= min && n <= max) onChange(n); }}
+    onBlur={() => commit(text)} onKeyDown={e => { if (e.key === 'Enter') commit(text); }} />;
 }
 const strip = (p: Product) => ({ ...p, media: undefined, file: undefined, updatedAt: undefined, sales: undefined });
 // datetime-local works in the viewer's zone; the portal assumes India time is the owner's zone.

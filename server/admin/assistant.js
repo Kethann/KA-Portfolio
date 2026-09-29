@@ -23,7 +23,7 @@ export async function overview(){
     db.one(`select count(*) filter (where rating = 1)::int as up, count(*) filter (where rating = -1)::int as down from assistant_messages`),
     db.one(`select (select count(*) from kb_sources)::int as sources, (select count(*) from kb_chunks)::int as chunks`)
   ]);
-  const recent = await db.query(`select m.content, m.created_at from assistant_messages m join assistant_conversations c on c.id = m.conversation_id
+  const recent = await db.query(`select m.content, m.created_at, m.conversation_id from assistant_messages m join assistant_conversations c on c.id = m.conversation_id
     where m.role = 'user' and c.audience <> 'playground' order by m.id desc limit 12`);
   return json({ provider: providerInfo(), settings, today, days, totals, ratings, kb, recent, rules: PROHIBITIONS, logDays: LOG_DAYS });
 }

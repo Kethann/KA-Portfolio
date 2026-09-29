@@ -3,6 +3,19 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { APP, APPS } from '../apps/registry';
+import { useConfirm } from '../ui';
+
+// Which window a component lives in (set by <Window>), and which windows hold unsaved edits.
+export const WinIdCtx = createContext('');
+const dirtyWins = new Map<string, number>();
+export function useWinDirty(dirty: boolean){
+  const id = useContext(WinIdCtx);
+  useEffect(() => {
+    if (!id || !dirty) return;
+    dirtyWins.set(id, (dirtyWins.get(id) || 0) + 1);
+    return () => { const n = (dirtyWins.get(id) || 1) - 1; if (n) dirtyWins.set(id, n); else dirtyWins.delete(id); };
+  }, [id, dirty]);
+}
 
 export type Win = { id: string; route: string; x: number; y: number; w: number; h: number; z: number; min: boolean; max: boolean; opened: number };
 type Desk = {
@@ -21,7 +34,9 @@ function loadGeoms(): Record<string, { x: number; y: number; w: number; h: numbe
 function saveGeoms(g: Record<string, unknown>){ try { localStorage.setItem(GEOM_KEY, JSON.stringify(g)); } catch { /* private mode */ } }
 
 function parseHash(): { app: string; route: string } | null {
-  const h = decodeURIComponent(location.hash.replace(/^#\/?/, ''));
+  const raw = location.hash.replace(/^#\/?/, '');
+  let h = raw;
+  try { h = decodeURIComponent(raw); } catch { /* keep it as typed */ }
   if (!h) return null;
   const [app, ...rest] = h.split('/');
   return APP[app] ? { app, route: rest.join('/') } : null;
@@ -51,7 +66,13 @@ export function DeskProvider({ areaRef, children }: { areaRef: React.RefObject<H
       return [...ws, { id, route: route || '', z: zi, min: false, max: false, opened: Date.now(), ...place(id) }];
     });
   }, [place]);
-  const close = useCallback((id: string) => setWins(ws => ws.filter(w => w.id !== id)), []);
+  const confirm = useConfirm();
+  const close = useCallback((id: string) => {
+    const shut = () => setWins(ws => ws.filter(w => w.id !== id));
+    if (!dirtyWins.has(id)) return shut();
+    void confirm({ title: `Close ${APP[id]?.title || 'this window'}?`, body: 'It has changes you haven’t saved. Closing discards them.', confirm: 'Discard and close', danger: true })
+      .then(ok => { if (ok){ dirtyWins.delete(id); shut(); } });
+  }, [confirm]);
   const focus = useCallback((id: string) => setWins(ws => {
     const top = ws.reduce((m, w) => Math.max(m, w.z), 0);
     const cur = ws.find(w => w.id === id);
@@ -110,10 +131,8 @@ export function DeskProvider({ areaRef, children }: { areaRef: React.RefObject<H
   // hash ⇄ focused window
   const booted = useRef(false);
   useEffect(() => {
-    if (booted.current) return;
-    booted.current = true;
-    const h = parseHash();
-    open(h?.app || 'overview', h?.route);
+    if (!booted.current){ booted.current = true; const h = parseHash(); open(h?.app || 'overview', h?.route); }
+    // attached on every run (StrictMode runs effects twice in development)
     const onHash = () => { const x = parseHash(); if (x) open(x.app, x.route); };
     addEventListener('hashchange', onHash);
     return () => removeEventListener('hashchange', onHash);

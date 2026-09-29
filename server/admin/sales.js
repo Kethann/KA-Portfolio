@@ -62,10 +62,11 @@ export async function overview(ctx){
     from orders where status in ('paid','delivered') and not is_free and paid_at >= $1 and paid_at < $2 group by 1, 2 order by 1`, [start, end]);
   const visitors = await db.one(`select count(distinct session_id)::int as sessions from visits where visited_at >= $1 and visited_at < $2 and not is_bot`, [start, end]);
   const live = await db.one(`select count(distinct session_id)::int as n from visits where last_seen_at > now() - interval '5 minutes' and not is_bot`);
-  const activity = await db.query(`(select 'order' as kind, e.type as what, o.public_id as ref, o.email as who, e.created_at as at from order_events e join orders o on o.id = e.order_id
+  // `target` is what the portal opens when the line is clicked (the order or message itself)
+  const activity = await db.query(`(select 'order' as kind, e.type as what, o.public_id as ref, o.email as who, e.created_at as at, o.id::text as target from order_events e join orders o on o.id = e.order_id
         where e.type in ('paid','delivered','refunded','payment_failed','mismatch','delivery_email_failed','refund_requested') order by e.created_at desc limit 12)
-    union all (select 'message', status, subject, email, created_at from messages where status <> 'spam' order by created_at desc limit 6)
-    union all (select 'signup', topic, topic, email, created_at from notify_signups order by created_at desc limit 4)
+    union all (select 'message', status, subject, email, created_at, id::text from messages where status <> 'spam' order by created_at desc limit 6)
+    union all (select 'signup', topic, topic, email, created_at, null from notify_signups order by created_at desc limit 4)
     order by at desc limit 15`);
   return json({ from, to, revenue, counts: { ...counts, failedAttempts }, conversion: counts.started ? Math.round((counts.paid / counts.started) * 1000) / 10 : null,
     top, series, visitors: visitors.sessions, liveVisitors: live.n, activity });

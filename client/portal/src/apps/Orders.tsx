@@ -97,7 +97,7 @@ function Detail({ id, go, open }: { id: string; go: (r: string) => void; open: A
               {o.discount > 0 && <><dt>Discount{o.codes ? ` (${o.codes})` : ''}</dt><dd className="num">−{money(o.discount, o.currency)}</dd></>}
               {o.tax > 0 && <><dt>Tax</dt><dd className="num">{money(o.tax, o.currency)}</dd></>}
               <dt><b>Total</b></dt><dd className="num"><b>{o.is_free ? 'Free' : money(o.total, o.currency)}</b></dd>
-              {o.refund_amount && <><dt>Refunded</dt><dd className="num">{money(o.refund_amount, o.currency)}</dd></>}
+              {o.refund_amount > 0 && <><dt>Refunded</dt><dd className="num">{money(o.refund_amount, o.currency)}</dd></>}
             </dl>
           </section>
 
@@ -148,6 +148,8 @@ function RefundDialog({ order, onClose, onDone }: { order: any; onClose: () => v
   const [reason, setReason] = useState('');
   const [needsOk, setNeedsOk] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
+  const min = 100;   // the smallest refund a card can take (₹1 / $1)
+  const bad: string | null = full ? null : (amount === null ? 'Enter an amount.' : amount > order.total ? `That’s more than the order total (${money(order.total, order.currency)}).` : amount < min ? `The smallest refund is ${money(min, order.currency)}.` : null);
   const submit = async () => {
     try {
       const r = await post<{ amount: number }>(`/orders/${order.id}/refund`, { amount: full ? undefined : amount, reason, confirmAfterDownload: ok });
@@ -161,11 +163,11 @@ function RefundDialog({ order, onClose, onDone }: { order: any; onClose: () => v
   return (
     <Modal title={`Refund ${order.public_id}`} onClose={onClose} footer={<>
       <button type="button" className="btn" onClick={onClose}>Cancel</button>
-      <AsyncButton className="btn danger" disabled={(!!needsOk && !ok) || (!full && !amount)} onClick={submit}>Refund {full ? money(order.total, order.currency) : amount ? money(amount, order.currency) : ''}</AsyncButton>
+      <AsyncButton className="btn danger" disabled={(!!needsOk && !ok) || !!bad} onClick={submit}>Refund {full ? money(order.total, order.currency) : amount ? money(amount, order.currency) : ''}</AsyncButton>
     </>}>
       <p className="muted">Money goes back to the buyer’s original payment method. Their download links stop working right away.</p>
       <Switch checked={full} onChange={setFull} label="Refund the full amount" />
-      {!full && <Field label={`Amount (up to ${money(order.total, order.currency)})`}><MoneyInput currency={order.currency} label="Refund amount" value={amount} onChange={setAmount} /></Field>}
+      {!full && <Field label={`Amount (up to ${money(order.total, order.currency)})`} error={amount !== null ? bad : null}><MoneyInput currency={order.currency} label="Refund amount" value={amount} onChange={setAmount} /></Field>}
       <Field label="Reason (kept in Razorpay notes)"><input value={reason} onChange={e => setReason(e.target.value)} maxLength={200} placeholder="Optional" /></Field>
       {needsOk && <div className="notice warn" role="alert"><Icon name="alert" /> <div>{needsOk}<Switch checked={ok} onChange={setOk} label="Refund anyway" /></div></div>}
     </Modal>

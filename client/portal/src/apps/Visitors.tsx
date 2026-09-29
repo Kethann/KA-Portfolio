@@ -66,8 +66,8 @@ function Bars({ title, rows }: { title: string; rows: { k: string; n: number }[]
   const max = Math.max(1, ...rows.map(r => r.n));
   return (
     <section className="card"><h3>{title}</h3>
-      {!rows.length ? <p className="faint">No data yet.</p> : <ul className="list bar-list">{rows.slice(0, 10).map(r => (
-        <li key={r.k}><span className="truncate">{r.k}</span><span className="num muted">{num(r.n)}</span><span className="bar" aria-hidden="true"><i style={{ width: `${(r.n / max) * 100}%` }} /></span></li>
+      {!rows.length ? <p className="faint">No data yet.</p> : <ul className="list bar-list">{rows.slice(0, 10).map((r, i) => (
+        <li key={i + r.k}><span className="truncate">{r.k}</span><span className="num muted">{num(r.n)}</span><span className="bar" aria-hidden="true"><i style={{ width: `${(r.n / max) * 100}%` }} /></span></li>
       ))}</ul>}
     </section>
   );

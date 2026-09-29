@@ -42,12 +42,13 @@ export function ToastProvider({ children }: { children: ReactNode }){
 function ToastItem({ t, onDone }: { t: Toast; onDone: () => void }){
   const [hover, setHover] = useState(false);
   const left = useRef(t.ms), started = useRef(Date.now());
+  const done = useRef(onDone); done.current = onDone;   // a new callback each render must not restart the timer
   useEffect(() => {
     if (hover){ left.current -= Date.now() - started.current; return; }
     started.current = Date.now();
-    const id = setTimeout(onDone, Math.max(800, left.current));
+    const id = setTimeout(() => done.current(), Math.max(800, left.current));
     return () => clearTimeout(id);
-  }, [hover, onDone]);
+  }, [hover]);
   return (
     <div className={`toast toast-${t.tone}`} role={t.tone === 'error' ? 'alert' : 'status'} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       <Icon name={t.tone === 'error' ? 'alert' : t.tone === 'success' ? 'check' : 'info'} />
@@ -99,7 +100,10 @@ export const useConfirm = () => useContext(ConfirmCtx);
 export function ConfirmProvider({ children }: { children: ReactNode }){
   const [state, setState] = useState<(ConfirmOpts & { resolve: (v: boolean) => void }) | null>(null);
   const [typed, setTyped] = useState('');
-  const ask = useCallback((o: ConfirmOpts) => new Promise<boolean>(resolve => { setTyped(''); setState({ ...o, resolve }); }), []);
+  const ask = useCallback((o: ConfirmOpts) => new Promise<boolean>(resolve => {
+    setTyped('');
+    setState(prev => { prev?.resolve(false); return { ...o, resolve }; });   // never leave an earlier question hanging
+  }), []);
   const done = (v: boolean) => { state?.resolve(v); setState(null); };
   const blocked = !!state?.typeToConfirm && typed !== state.typeToConfirm;
   return (
@@ -245,6 +249,7 @@ export function VirtualTable<T>({ rows, columns, rowKey, onOpen, rowHeight = 44,
   const end = Math.min(sorted.length, Math.ceil((scroll + height) / rowHeight) + overscan);
   const grid = (onSelect ? '40px ' : '') + cols.map(c => c.width || '1fr').join(' ');
   const allSel = !!selected && sorted.length > 0 && sorted.every(r => selected.has(rowKey(r)));
+  useEffect(() => { if (cursor >= sorted.length) setCursor(sorted.length - 1); }, [sorted.length, cursor]);
   const toggle = (k: string) => { if (!onSelect || !selected) return; const s = new Set(selected); s.has(k) ? s.delete(k) : s.add(k); onSelect(s); };
   const onKey = (e: RKeyboardEvent) => {
     if (!sorted.length) return;
@@ -255,8 +260,8 @@ export function VirtualTable<T>({ rows, columns, rowKey, onOpen, rowHeight = 44,
       const el = scroller.current!;
       const top = n * rowHeight, bottom = top + rowHeight;
       if (top < el.scrollTop) el.scrollTop = top; else if (bottom > el.scrollTop + el.clientHeight - rowHeight) el.scrollTop = bottom - el.clientHeight + rowHeight;
-    } else if (e.key === 'Enter' && cursor >= 0 && onOpen){ onOpen(sorted[cursor]); }
-    else if (e.key === ' ' && cursor >= 0 && onSelect){ e.preventDefault(); toggle(rowKey(sorted[cursor])); }
+    } else if (e.key === 'Enter' && sorted[cursor] && onOpen){ onOpen(sorted[cursor]); }
+    else if (e.key === ' ' && sorted[cursor] && onSelect){ e.preventDefault(); toggle(rowKey(sorted[cursor])); }
   };
   return (
     <div className="vtable" role="grid" aria-label={label} aria-rowcount={sorted.length + 1}>

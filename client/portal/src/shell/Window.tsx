@@ -1,19 +1,18 @@
 // One app window: drag by the title bar, resize from any edge, snap to halves/maximise at screen
 // edges, traffic-light controls, and an error boundary so one app failing never takes the desktop down.
 // While dragging, the element is moved directly (no React re-render per frame); the result is committed on release.
-import { Component, Suspense, createContext, useCallback, useContext, useLayoutEffect, useRef, useState } from 'react';
+import { Component, Suspense, useCallback, useContext, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ReactNode, PointerEvent as RPointerEvent } from 'react';
 import { APP } from '../apps/registry';
-import { useDesk, clamp } from './desk';
+import { useDesk, clamp, WinIdCtx } from './desk';
 import type { Win } from './desk';
 import { Icon } from '../icons';
 import { SkeletonRows } from '../ui';
 
 // Apps put their toolbar buttons into the title bar with <WinTools>.
-const WinId = createContext('');
 export function WinTools({ children }: { children: ReactNode }){
-  const id = useContext(WinId);
+  const id = useContext(WinIdCtx);
   const [host, setHost] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => { setHost(document.getElementById(`win-tools-${id}`)); }, [id]);
   return host ? createPortal(children, host) : null;
@@ -91,7 +90,7 @@ export function Window({ win, compact }: { win: Win; compact: boolean }){
         onPointerDownCapture={() => { if (!focused) desk.focus(win.id); }} data-app={win.id} {...(win.min ? { inert: '' } as object : {})}>
         <header className="win-bar" onPointerDown={startDrag} onDoubleClick={(e) => { if (!compact && !(e.target as HTMLElement).closest('button')) desk.toggleMax(win.id); }}>
           {compact ? (
-            <button type="button" className="win-back" onClick={() => desk.close(win.id)} aria-label="Back to apps"><Icon name="chevronLeft" size={18} /> Apps</button>
+            <button type="button" className="win-back" onClick={() => desk.minimize(win.id)} aria-label="Back to apps"><Icon name="chevronLeft" size={18} /> Apps</button>
           ) : (
             <div className="traffic" role="group" aria-label="Window controls">
               <button type="button" className="tl tl-close" aria-label={`Close ${app.title}`} title="Close (Alt+W)" onClick={() => desk.close(win.id)}><Icon name="close" size={8} /></button>
@@ -103,11 +102,11 @@ export function Window({ win, compact }: { win: Win; compact: boolean }){
           <div className="win-bar-end" id={`win-tools-${win.id}`} />
         </header>
         <div className="win-body">
-          <WinId.Provider value={win.id}><Boundary name={app.title}>
+          <WinIdCtx.Provider value={win.id}><Boundary name={app.title}>
             <Suspense fallback={<div className="pad"><SkeletonRows rows={8} /></div>}>
               <app.Component route={win.route} go={go} active={focused && !win.min} open={desk.open} />
             </Suspense>
-          </Boundary></WinId.Provider>
+          </Boundary></WinIdCtx.Provider>
         </div>
         {!full && ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'].map(edge => <div key={edge} className={`rz rz-${edge}`} onPointerDown={(e) => startResize(e, edge)} aria-hidden="true" />)}
       </section>

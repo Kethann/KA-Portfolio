@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AppProps } from './registry';
-import { useLoad, usePref } from '../hooks';
+import { useDraft, useLoad, usePref, useUnsavedGuard } from '../hooks';
 import { del, get, post, put } from '../api';
 import { AsyncButton, Badge, Empty, ErrorState, Field, Segmented, SkeletonRows, Switch, useConfirm, useToast } from '../ui';
 import { Icon } from '../icons';
@@ -36,13 +36,17 @@ function Section({ title, children, desc }: { title: string; children: ReactNode
 // ---- settings documents (store / messages / reports) share one load/save pattern
 function useSettingsDoc<T>(key: string){
   const s = useLoad<{ value: T; revision: number }>(`/settings/${key}`);
-  const [v, setV] = useState<T | null>(null);
+  const [v, setV] = useDraft<T>(s.data?.value);
   const toast = useToast();
-  useEffect(() => { if (s.data) setV(s.data.value); }, [s.data]);
   const dirty = !!v && !!s.data && JSON.stringify(v) !== JSON.stringify(s.data.value);
+  useUnsavedGuard(dirty);
   const save = async () => {
-    try { const r = await put<{ value: T; revision: number }>(`/settings/${key}`, { value: v, revision: s.data!.revision }); s.setData(r); toast.show('Saved', { tone: 'success' }); }
-    catch (e: any){ if (e.code === 'stale') s.reload(); throw e; }
+    try { const r = await put<{ value: T; revision: number }>(`/settings/${key}`, { value: v, revision: s.data!.revision }); s.setData(r); setV(r.value); toast.show('Saved', { tone: 'success' }); }
+    catch (e: any){
+      // saved elsewhere meanwhile: load that version's revision, keep these edits on screen, and say so
+      if (e.code === 'stale'){ await s.reload(); throw new Error('These settings were changed on another device. Your edits are still here: check them and save again.'); }
+      throw e;
+    }
   };
   return { s, v, setV, dirty, save };
 }
@@ -109,6 +113,14 @@ function Security(){
     </Section>
   </>;
 }
+// Percent edited as text so "12." and "12.5" can be typed; stored as basis points (1250 = 12.5%).
+function PercentInput({ bp, onChange, label }: { bp: number; onChange: (bp: number) => void; label: string }){
+  const [text, setText] = useState(() => String(bp / 100));
+  useEffect(() => { if (Math.round((parseFloat(text) || 0) * 100) !== bp) setText(String(bp / 100)); }, [bp]);   // eslint-disable-line react-hooks/exhaustive-deps
+  return <input inputMode="decimal" aria-label={label} className="num" value={text}
+    onChange={e => { const t = e.target.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'); setText(t); onChange(Math.min(10000, Math.round((parseFloat(t) || 0) * 100))); }}
+    onBlur={() => setText(String(bp / 100))} />;
+}
 function uaLabel(ua: string | null){
   if (!ua) return 'Unknown device';
   const b = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
@@ -131,7 +143,7 @@ function StoreSettings(){
       <Switch checked={v.taxEnabled} onChange={x => set('taxEnabled', x)} label="Charge tax" />
       {v.taxEnabled && <div className="form-grid">
         <Field label="Label"><input value={v.taxLabel} onChange={e => set('taxLabel', e.target.value)} maxLength={20} /></Field>
-        <Field label="Rate" hint="e.g. 18"><span className="input-affix"><span>%</span><input inputMode="decimal" value={String(v.taxRateBp / 100)} onChange={e => set('taxRateBp', Math.round((parseFloat(e.target.value) || 0) * 100))} className="num" /></span></Field>
+        <Field label="Rate" hint="e.g. 18 or 12.5"><span className="input-affix"><span>%</span><PercentInput bp={v.taxRateBp} onChange={x => set('taxRateBp', x)} label="Tax rate" /></span></Field>
         <Field label="Prices"><Segmented label="Tax mode" value={v.taxInclusive ? 'in' : 'ex'} onChange={x => set('taxInclusive', x === 'in')} options={[{ value: 'in', label: 'Include tax' }, { value: 'ex', label: 'Tax added at checkout' }]} /></Field>
       </div>}
     </Section>
@@ -295,7 +307,7 @@ function Backups(){
     </Section>
     <Section title="Visitor data" desc="Delete visitor records older than a number of days (your privacy policy says how long you keep them).">
       <div className="row"><span>Delete visits older than</span><input inputMode="numeric" aria-label="Days" value={days} onChange={e => setDays(e.target.value.replace(/\D/g, ''))} style={{ width: 90 }} className="num" /><span>days</span>
-        <AsyncButton className="btn" disabled={!days} onClick={async () => { if (!(await confirm({ title: `Delete visits older than ${days} days?`, body: 'This can’t be undone.', confirm: 'Delete', danger: true }))) return; const r = await post<{ deleted: number }>('/visits/purge', { olderThanDays: Number(days) }); toast.show(`Deleted ${r.deleted} visit records`, { tone: 'success' }); }}>Delete</AsyncButton></div>
+        <AsyncButton className="btn" disabled={!days || Number(days) < 1} onClick={async () => { if (!(await confirm({ title: `Delete visits older than ${days} days?`, body: 'This can’t be undone.', confirm: 'Delete', danger: true }))) return; const r = await post<{ deleted: number }>('/visits/purge', { olderThanDays: Number(days) }); toast.show(`Deleted ${r.deleted} visit records`, { tone: 'success' }); }}>Delete</AsyncButton></div>
     </Section>
   </>;
 }

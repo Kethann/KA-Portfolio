@@ -9,6 +9,13 @@ export class ApiError extends Error {
 }
 
 const SIGNED_OUT = 'ka:signed-out';
+// Every successful write announces itself, so all open windows refresh (Overview after an order is
+// refunded, Products after a coupon changes a price…) instead of waiting for their next poll.
+const CHANGED = 'ka:changed';
+export function onDataChanged(fn: (path: string) => void){
+  const h = (e: Event) => fn((e as CustomEvent<string>).detail);
+  window.addEventListener(CHANGED, h); return () => window.removeEventListener(CHANGED, h);
+}
 export function onSignedOut(fn: () => void){ window.addEventListener(SIGNED_OUT, fn); return () => window.removeEventListener(SIGNED_OUT, fn); }
 
 export async function api<T = any>(method: string, path: string, body?: unknown, opts: { signal?: AbortSignal; raw?: boolean } = {}): Promise<T>{
@@ -32,6 +39,7 @@ export async function api<T = any>(method: string, path: string, body?: unknown,
     if (res.status === 401 && (code === 'signed_out' || !code) && !path.startsWith('/login') && !path.startsWith('/setup')) window.dispatchEvent(new Event(SIGNED_OUT));
     throw new ApiError(message, res.status, code, data);
   }
+  if (method !== 'GET' && !/^\/(login|logout|setup|markdown|search|uploads$)/.test(path)) window.dispatchEvent(new CustomEvent(CHANGED, { detail: path }));
   return data as T;
 }
 

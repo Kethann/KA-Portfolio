@@ -24,7 +24,12 @@ export default function Reports({ open }: AppProps){
     <div className="app report-app">
       <WinTools>
         <AsyncButton className="btn sm" onClick={async () => { await downloadFile(`/reports.csv?from=${from}&to=${to}&group=${group}`, `report-${from}-to-${to}.csv`); toast.show('CSV downloaded', { tone: 'success' }); }}><Icon name="downloads" /> CSV</AsyncButton>
-        <button type="button" className="btn sm" onClick={() => { document.body.classList.add('printing-report'); requestAnimationFrame(() => { print(); document.body.classList.remove('printing-report'); }); }}><Icon name="file" /> PDF</button>
+        <button type="button" className="btn sm" onClick={() => {
+          // the print-only layout stays until the dialog closes (print() doesn't block in every browser)
+          document.body.classList.add('printing-report');
+          addEventListener('afterprint', () => document.body.classList.remove('printing-report'), { once: true });
+          requestAnimationFrame(() => print());
+        }}><Icon name="file" /> PDF</button>
       </WinTools>
       <div className="app-toolbar">
         <Segmented label="Range" value={preset} onChange={setPreset} options={[{ value: '7', label: '7d' }, { value: '30', label: '30d' }, { value: '90', label: '90d' }, { value: '365', label: '1y' }, { value: 'custom', label: 'Custom' }]} />

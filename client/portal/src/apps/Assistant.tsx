@@ -2,7 +2,7 @@
 // that runs the real pipeline, and its rules and settings.
 import { useEffect, useRef, useState } from 'react';
 import type { AppProps } from './registry';
-import { useLoad } from '../hooks';
+import { useDebounced, useDraft, useLoad, useMedia, useUnsavedGuard } from '../hooks';
 import { del, post, put } from '../api';
 import { AsyncButton, Badge, Chart, Empty, ErrorState, Field, Modal, Segmented, SkeletonRows, Switch, useConfirm, useToast } from '../ui';
 import { Icon } from '../icons';
@@ -13,6 +13,10 @@ import logo from '../assets/ka-logo.png';
 type Tab = 'overview' | 'knowledge' | 'logs' | 'playground' | 'settings';
 const usd = (micros: number) => `$${(Number(micros) / 1e6).toFixed(Number(micros) < 10000 ? 4 : 2)}`;
 
+// Training hand-offs between tabs (in memory only): a weak answer → "Teach it" opens the knowledge
+// editor pre-filled; after saving → "Ask it again" opens the Playground with the question typed in.
+const handoff: { teach?: { question: string; answer?: string }; ask?: string } = {};
+
 export default function Assistant({ route, go }: AppProps){
   const tab: Tab = (['overview', 'knowledge', 'logs', 'playground', 'settings'] as Tab[]).includes(route.split('/')[0] as Tab) ? route.split('/')[0] as Tab : 'overview';
   return (
@@ -22,7 +26,7 @@ export default function Assistant({ route, go }: AppProps){
           <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => go(k)}>{l}</button>
         ))}
       </div>
-      {tab === 'knowledge' ? <Knowledge /> : tab === 'logs' ? <Logs id={route.split('/')[1]} go={go} /> : tab === 'playground' ? <Playground /> : tab === 'settings' ? <SettingsTab /> : <Overview go={go} />}
+      {tab === 'knowledge' ? <Knowledge go={go} /> : tab === 'logs' ? <Logs id={route.split('/')[1]} go={go} /> : tab === 'playground' ? <Playground /> : tab === 'settings' ? <SettingsTab /> : <Overview go={go} />}
     </div>
   );
 }
@@ -56,24 +60,57 @@ function Overview({ go }: { go: (r: string) => void }){
         </p>
       </section>
       <section className="card"><h3><span className="grow">Latest questions</span><button type="button" className="btn sm ghost" onClick={() => go('logs')}>All conversations</button></h3>
-        {!d.recent.length ? <p className="faint">No questions yet.</p> : <ul className="list">{d.recent.map((r: any, i: number) => <li key={i}><Icon name="messages" size={14} /><span className="grow truncate">{r.content}</span><span className="faint" style={{ fontSize: 12 }}>{ago(r.created_at)}</span></li>)}</ul>}
+        {!d.recent.length ? <p className="faint">No questions yet.</p> : <ul className="list">{d.recent.map((r: any, i: number) => (
+          <li key={i}><Icon name="messages" size={14} />
+            <button type="button" className="btn ghost truncate" style={{ flex: 1, justifyContent: 'flex-start', padding: 0, height: 'auto', fontWeight: 500 }} onClick={() => go(`logs/${r.conversation_id}`)}>{r.content}</button>
+            <span className="faint" style={{ fontSize: 12 }}>{ago(r.created_at)}</span></li>))}</ul>}
       </section>
     </div>
   );
 }
 
-function Knowledge(){
+type KbEdit = { id?: string; kind: string; title: string; body: string; enabled: boolean; question?: string };
+function Knowledge({ go }: { go: (r: string) => void }){
   const s = useLoad<{ sources: { id: string; kind: string; title: string; body: string; enabled: boolean; updated_at: string; chunks: number }[] }>('/assistant/kb');
-  const [edit, setEdit] = useState<{ id?: string; kind: string; title: string; body: string; enabled: boolean } | null>(null);
+  const [edit, setEditState] = useState<KbEdit | null>(null);
+  const [start, setStart] = useState('');
+  const [q, setQ] = useState('');
   const toast = useToast();
   const confirm = useConfirm();
+  const setEdit = (e: KbEdit | null) => { setEditState(e); setStart(e ? JSON.stringify(e) : ''); };
+  const dirty = !!edit && JSON.stringify(edit) !== start;
+  useUnsavedGuard(dirty);
+  // arriving from "Teach it" on a conversation: open a pre-filled FAQ entry
+  useEffect(() => {
+    const t = handoff.teach; if (!t) return;
+    handoff.teach = undefined;
+    setEdit({ kind: 'faq', title: t.question.slice(0, 120), body: `Q: ${t.question}\nA: `, enabled: true, question: t.question });
+  }, []);
+  const close = async () => { if (!dirty || await confirm({ title: 'Discard this text?', body: 'It hasn’t been saved.', confirm: 'Discard', danger: true })) setEdit(null); };
+  const save = async () => {
+    const e = edit!;
+    s.setData(e.id ? await put(`/assistant/kb/${e.id}`, e) : await post('/assistant/kb', e));
+    setEdit(null);
+    toast.show('Saved. The assistant uses it from the next question.', { tone: 'success', ms: 7000,
+      action: e.question ? { label: 'Ask it again', run: () => { handoff.ask = e.question; go('playground'); } } : { label: 'Try it', run: () => go('playground') } });
+  };
+  const list = (s.data?.sources || []).filter(k => !q || `${k.title} ${k.body}`.toLowerCase().includes(q.toLowerCase()));
   if (s.error && !s.data) return <ErrorState message={s.error} retry={s.reload} />;
   return (
     <div className="app-main">
       <div className="row between"><p className="muted" style={{ maxWidth: 620 }}>Write what the assistant should know: who you are, how you work, FAQs, turnaround times. Your published products, tips, portfolio titles and policies are added automatically.</p>
         <button type="button" className="btn primary" onClick={() => setEdit({ kind: 'text', title: '', body: '', enabled: true })}><Icon name="plus" /> Add knowledge</button></div>
-      {!s.data ? <SkeletonRows rows={4} /> : !s.data.sources.length ? <Empty icon="assistant" title="Nothing written yet" /> : (
-        <ul className="kb-list">{s.data.sources.map(k => (
+      <div className="kb-tips card">
+        <b>Training it well</b>
+        <ol>
+          <li>Read <button type="button" className="btn ghost sm" onClick={() => go('logs')}>Conversations</button> and press <b>Teach it</b> under any weak answer.</li>
+          <li>Write the fact the way you’d say it to a customer, one topic per paragraph.</li>
+          <li>Ask the same question in the <button type="button" className="btn ghost sm" onClick={() => go('playground')}>Playground</button> to check the new answer.</li>
+        </ol>
+      </div>
+      {(s.data?.sources.length || 0) > 3 && <div className="search" style={{ maxWidth: 360 }}><Icon name="search" /><input type="search" placeholder="Search what it knows" value={q} onChange={e => setQ(e.target.value)} aria-label="Search knowledge" /></div>}
+      {!s.data ? <SkeletonRows rows={4} /> : !s.data.sources.length ? <Empty icon="assistant" title="Nothing written yet">Start with a short “About me” and your most common questions.</Empty> : !list.length ? <Empty icon="search" title="No matches" /> : (
+        <ul className="kb-list">{list.map(k => (
           <li key={k.id} className={k.enabled ? '' : 'off'}>
             <button type="button" className="kb-item" onClick={() => setEdit({ id: k.id, kind: k.kind, title: k.title, body: k.body, enabled: k.enabled })}>
               <span className="row" style={{ gap: 6 }}><b>{k.title}</b><Badge>{k.kind}</Badge>{!k.enabled && <Badge tone="warning">off</Badge>}{/PLACEHOLDER|\[.+?\]/.test(k.body) && <Badge tone="danger">has blanks</Badge>}</span>
@@ -84,18 +121,22 @@ function Knowledge(){
         ))}</ul>
       )}
       {edit && (
-        <Modal wide title={edit.id ? 'Edit knowledge' : 'Add knowledge'} onClose={() => setEdit(null)} footer={<>
+        <Modal wide title={edit.question ? 'Teach the assistant' : edit.id ? 'Edit knowledge' : 'Add knowledge'} onClose={() => void close()} footer={<>
           {edit.id && <AsyncButton className="btn ghost" onClick={async () => { if (await confirm({ title: `Delete “${edit.title}”?`, confirm: 'Delete', danger: true })){ s.setData(await del(`/assistant/kb/${edit.id}`)); setEdit(null); } }}><Icon name="trash" /> Delete</AsyncButton>}
           <span className="grow" />
-          <button type="button" className="btn" onClick={() => setEdit(null)}>Cancel</button>
-          <AsyncButton className="btn primary" disabled={!edit.title.trim()} onClick={async () => { s.setData(edit.id ? await put(`/assistant/kb/${edit.id}`, edit) : await post('/assistant/kb', edit)); setEdit(null); toast.show('Saved. The assistant uses it from the next question.', { tone: 'success' }); }}>Save</AsyncButton>
+          <button type="button" className="btn" onClick={() => void close()}>Cancel</button>
+          <AsyncButton className="btn primary" disabled={!edit.title.trim() || !edit.body.trim() || /\nA:\s*$/.test(edit.body)} onClick={save}>Save</AsyncButton>
         </>}>
+          {edit.question && <p className="notice"><Icon name="info" /> <span>Someone asked: <b>“{edit.question}”</b>. Write the answer after <span className="mono">A:</span> the way you’d want it said.</span></p>}
           <div className="form-grid">
-            <Field label="Title"><input value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} maxLength={120} autoFocus placeholder="e.g. Commissions and turnaround" /></Field>
-            <Field label="Type"><Segmented label="Type" value={edit.kind} onChange={v => setEdit({ ...edit, kind: v })} options={[{ value: 'text', label: 'About' }, { value: 'faq', label: 'FAQ' }, { value: 'document', label: 'Document' }]} /></Field>
+            <Field label="Title"><input value={edit.title} onChange={e => setEditState({ ...edit, title: e.target.value })} maxLength={120} autoFocus={!edit.question} placeholder="e.g. Commissions and turnaround" /></Field>
+            <Field label="Type"><Segmented label="Type" value={edit.kind} onChange={v => setEditState({ ...edit, kind: v })} options={[{ value: 'text', label: 'About' }, { value: 'faq', label: 'FAQ' }, { value: 'document', label: 'Document' }]} /></Field>
           </div>
-          <Field label="Text" hint="Plain facts work best. Leave blank lines between topics; each paragraph is searched separately."><textarea rows={14} value={edit.body} onChange={e => setEdit({ ...edit, body: e.target.value })} /></Field>
-          <Switch checked={edit.enabled} onChange={v => setEdit({ ...edit, enabled: v })} label="The assistant may use this" />
+          <Field label="Text" hint={edit.kind === 'faq' ? 'One question and answer per paragraph: “Q: …” on one line, “A: …” on the next, then a blank line.' : 'Plain facts work best. Leave blank lines between topics; each paragraph is searched separately.'}>
+            <textarea rows={14} value={edit.body} onChange={e => setEditState({ ...edit, body: e.target.value })} autoFocus={!!edit.question}
+              onFocus={e => { if (edit.question){ const n = e.currentTarget.value.length; e.currentTarget.setSelectionRange(n, n); } }} /></Field>
+          <div className="row between"><Switch checked={edit.enabled} onChange={v => setEditState({ ...edit, enabled: v })} label="The assistant may use this" />
+            <span className="faint" style={{ fontSize: 12 }}>{edit.body.split(/\n\s*\n/).filter(x => x.trim()).length} searchable piece(s)</span></div>
         </Modal>
       )}
     </div>
@@ -104,8 +145,10 @@ function Knowledge(){
 
 function Logs({ id, go }: { id?: string; go: (r: string) => void }){
   const [q, setQ] = useState('');
+  const dq = useDebounced(q, 300);
+  const narrow = useMedia('(max-width: 760px)');
   const [aud, setAud] = useState<'all' | 'visitor' | 'buyer' | 'playground'>('all');
-  const s = useLoad<{ conversations: any[] }>(`/assistant/conversations?${new URLSearchParams({ q, ...(aud !== 'all' ? { audience: aud } : {}) })}`);
+  const s = useLoad<{ conversations: any[] }>(`/assistant/conversations?${new URLSearchParams({ q: dq, ...(aud !== 'all' ? { audience: aud } : {}) })}`);
   const c = useLoad<{ conversation: any; messages: any[] }>(id ? `/assistant/conversations/${id}` : null);
   const toast = useToast();
   const confirm = useConfirm();
@@ -113,9 +156,15 @@ function Logs({ id, go }: { id?: string; go: (r: string) => void }){
     c.setData(d => d ? { ...d, messages: d.messages.map(m => m.id === mid ? { ...m, rating } : m) } : d);
     try { await post(`/assistant/messages/${mid}/rate`, { rating }); } catch (e){ toast.error(e); c.reload(); }
   };
+  const teach = (mid: number) => {
+    const msgs = c.data!.messages, i = msgs.findIndex(m => m.id === mid);
+    const question = [...msgs.slice(0, i)].reverse().find(m => m.role === 'user')?.content || '';
+    handoff.teach = { question: question.slice(0, 500), answer: msgs[i]?.content };
+    go('knowledge');
+  };
   return (
-    <div className="msg-split has-open" style={{ flex: 1, minHeight: 0 }}>
-      <div className="msg-list">
+    <div className={'msg-split' + (id ? ' has-open' : '')} style={{ flex: 1, minHeight: 0 }}>
+      {(!narrow || !id) && <div className="msg-list">
         <div className="app-toolbar"><div className="search" style={{ maxWidth: 'none' }}><Icon name="search" /><input type="search" placeholder="Search what people asked" value={q} onChange={e => setQ(e.target.value)} aria-label="Search conversations" /></div>
           <select aria-label="Who" value={aud} onChange={e => setAud(e.target.value as typeof aud)} style={{ width: 'auto' }}><option value="all">Everyone</option><option value="visitor">Visitors</option><option value="buyer">Verified buyers</option><option value="playground">Playground</option></select></div>
         <div className="msg-scroll">
@@ -128,11 +177,11 @@ function Logs({ id, go }: { id?: string; go: (r: string) => void }){
             ))}</ul>
           )}
         </div>
-      </div>
-      <div className="msg-detail">
+      </div>}
+      {(!narrow || id) && <div className="msg-detail">
         {!id ? <Empty icon="messages" title="Pick a conversation">Read what people asked and how the assistant answered. Rate answers to spot what to add to the knowledge base.</Empty>
           : !c.data ? <SkeletonRows rows={6} /> : <>
-            <div className="row between"><div className="faint" style={{ fontSize: 12 }}>Started {dateTime(c.data.conversation.started_at)}{c.data.conversation.country ? ` · ${c.data.conversation.country}` : ''} · kept {90} days</div>
+            <div className="row between">{narrow && <button type="button" className="icon-btn" aria-label="Back to conversations" onClick={() => go('logs')}><Icon name="chevronLeft" /></button>}<div className="faint grow" style={{ fontSize: 12 }}>Started {dateTime(c.data.conversation.started_at)}{c.data.conversation.country ? ` · ${c.data.conversation.country}` : ''} · kept {90} days</div>
               <AsyncButton className="btn sm ghost" onClick={async () => { if (await confirm({ title: 'Delete this conversation?', confirm: 'Delete', danger: true })){ await del(`/assistant/conversations/${id}`); go('logs'); s.reload(); } }}><Icon name="trash" /></AsyncButton></div>
             <div className="chat-thread">{c.data.messages.map(m => (
               <div key={m.id} className={'chat-msg ' + m.role}>
@@ -143,19 +192,20 @@ function Logs({ id, go }: { id?: string; go: (r: string) => void }){
                     <span className="row" style={{ gap: 0 }}>
                       <button type="button" className={'icon-btn sm' + (m.rating === 1 ? ' star-on' : '')} aria-pressed={m.rating === 1} aria-label="Good answer" onClick={() => rate(m.id, m.rating === 1 ? 0 : 1)}>👍</button>
                       <button type="button" className={'icon-btn sm' + (m.rating === -1 ? ' star-on' : '')} aria-pressed={m.rating === -1} aria-label="Bad answer" onClick={() => rate(m.id, m.rating === -1 ? 0 : -1)}>👎</button>
+                      <button type="button" className={'btn sm ' + (m.rating === -1 ? 'primary' : 'ghost')} onClick={() => teach(m.id)} title="Add what it should have said to its knowledge"><Icon name="sparkle" size={13} /> Teach it</button>
                     </span></div>}
                 </div>
               </div>
             ))}</div>
           </>}
-      </div>
+      </div>}
     </div>
   );
 }
 
 function Playground(){
   const [msgs, setMsgs] = useState<{ role: 'user' | 'assistant'; content: string; meta?: any }[]>([]);
-  const [text, setText] = useState('');
+  const [text, setText] = useState(() => { const a = handoff.ask || ''; handoff.ask = undefined; return a; });
   const [busy, setBusy] = useState(false);
   const [conv, setConv] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<string | null>(null);
@@ -207,12 +257,12 @@ function Playground(){
 function SettingsTab(){
   const s = useLoad<{ value: any; revision: number }>('/settings/assistant');
   const ov = useLoad<any>('/assistant');
-  const [v, setV] = useState<any>(null);
+  const [v, setV] = useDraft<any>(s.data?.value);
   const toast = useToast();
-  useEffect(() => { if (s.data) setV(s.data.value); }, [s.data]);
+  const dirty = !!v && !!s.data && JSON.stringify(v) !== JSON.stringify(s.data.value);
+  useUnsavedGuard(dirty);
   if (s.error && !s.data) return <ErrorState message={s.error} retry={s.reload} />;
   if (!v) return <div className="pad"><SkeletonRows rows={8} /></div>;
-  const dirty = JSON.stringify(v) !== JSON.stringify(s.data!.value);
   return (
     <div className="app-main"><div className="stack-lg" style={{ maxWidth: 820 }}>
       <section className="card stack"><h3>On the site</h3>
@@ -231,7 +281,7 @@ function SettingsTab(){
         <Field label={`Daily cap: $${(v.dailyBudgetMicros / 1e6).toFixed(2)} (estimate)`} hint="When reached, the assistant tells visitors to use the Contact page until midnight India time, and you get one email.">
           <input type="range" min={0} max={5_000_000} step={50_000} value={v.dailyBudgetMicros} onChange={e => setV({ ...v, dailyBudgetMicros: Number(e.target.value) })} /></Field>
       </section>
-      <div className="row sticky-save"><AsyncButton className="btn primary" disabled={!dirty} onClick={async () => { const r = await put<{ value: any; revision: number }>('/settings/assistant', { value: v, revision: s.data!.revision }); s.setData(r); toast.show('Saved', { tone: 'success' }); }}>Save changes</AsyncButton></div>
+      <div className="row sticky-save"><AsyncButton className="btn primary" disabled={!dirty} onClick={async () => { const r = await put<{ value: any; revision: number }>('/settings/assistant', { value: v, revision: s.data!.revision }); s.setData(r); setV(r.value); toast.show('Saved', { tone: 'success' }); }}>Save changes</AsyncButton>{dirty && <span className="faint" style={{ fontSize: 12 }}>Unsaved changes</span>}</div>
       <section className="card stack"><h3>Rules it can never break</h3>
         <p className="muted" style={{ marginTop: -6 }}>Built into the server, not editable here. Card numbers are blocked before reaching the AI, and answers are filtered for private emails and secret keys.</p>
         {ov.data ? <ol className="rules-list">{ov.data.rules.map((r: string, i: number) => <li key={i}>{r}</li>)}</ol> : <SkeletonRows rows={4} cols={1} />}

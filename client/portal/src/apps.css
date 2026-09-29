@@ -65,6 +65,14 @@
 .scp-body{ padding:12px 14px 14px; display:grid; gap:4px; }
 .scp-title{ font:600 1rem/1.25 var(--font-display); } .scp-sum{ font-size:12px; color:rgba(239,236,232,.62); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .scp-price{ font-weight:700; color:#ff9438; font-size:13px; margin-top:4px; }
+.scp-prices{ display:flex; flex-wrap:wrap; gap:4px 12px; } .scp-prices s{ font-weight:500; }
+/* publish checklist in the product editor */
+.readiness{ gap:10px; } .readiness b{ font-size:var(--fs-sm); }
+.check-list{ list-style:none; margin:0; padding:0; display:grid; gap:6px; font-size:var(--fs-sm); }
+.check-list li{ display:flex; align-items:center; gap:8px; color:var(--text-2); }
+.check-list li.ok{ color:var(--text-3); } .check-list li.ok svg{ color:var(--success); }
+.check-list li.todo{ color:var(--text); } .check-list li.todo svg{ color:var(--warning); }
+.check-list li.soft svg{ color:var(--info); }
 
 /* orders */
 .timeline{ list-style:none; margin:0; padding:0; display:grid; }
@@ -216,3 +224,8 @@
 .app-main.fill > .vtable{ flex:1; min-height:0; height:auto; }
 
 .folder-nav > .row{ flex-wrap:nowrap; }
+
+/* Assistant: training steps above the knowledge list */
+.kb-tips{ display:grid; gap:6px; font-size:var(--fs-sm); }
+.kb-tips ol{ margin:0; padding-left:1.2em; display:grid; gap:4px; color:var(--text-2); }
+.kb-tips .btn.ghost.sm{ height:auto; padding:0 2px; vertical-align:baseline; color:var(--accent); }

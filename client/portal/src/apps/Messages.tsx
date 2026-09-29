@@ -35,7 +35,8 @@ export default function Messages({ route, go, active, open }: AppProps){
     s.setData({ ...prev, messages: prev.messages.filter(m => !sel.has(m.id)) });
     setSel(new Set());
     if (action === 'delete'){ toast.undoable(`Deleted ${ids.length} message${ids.length > 1 ? 's' : ''}`, () => post('/messages/bulk', { ids, action }), () => s.setData(prev)); return; }
-    try { await post('/messages/bulk', { ids, action }); toast.show(`Moved ${ids.length} to ${action}`, { tone: 'success' }); s.reload(); } catch (e){ s.setData(prev); toast.error(e); }
+    const n = `${ids.length} message${ids.length > 1 ? 's' : ''}`;
+    try { await post('/messages/bulk', { ids, action }); toast.show(action === 'spam' ? `Moved ${n} to Spam` : action === 'done' ? `Marked ${n} done` : `Marked ${n} read`, { tone: 'success' }); s.reload(); } catch (e){ s.setData(prev); toast.error(e); }
   };
   const list = (
     <div className="msg-list">
@@ -63,11 +64,19 @@ export default function Messages({ route, go, active, open }: AppProps){
         {s.error && !s.data ? <ErrorState message={s.error} retry={s.reload} /> : !s.data ? <div className="pad"><SkeletonRows rows={8} cols={2} /></div> : !s.data.messages.length ? (
           <Empty icon="inbox" title={box === 'spam' ? 'No spam' : q ? 'No matches' : 'Inbox zero'}>{box === 'inbox' && !q ? 'New contact messages land here and in your email.' : ''}</Empty>
         ) : (
-          <ul className="msg-items" aria-label="Messages">
+          <ul className="msg-items" aria-label="Messages: use the arrow keys to move" onKeyDown={e => {
+            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+            const ms = s.data!.messages, i = ms.findIndex(m => m.id === openId);
+            const next = ms[Math.min(ms.length - 1, Math.max(0, i + (e.key === 'ArrowDown' ? 1 : -1)))];
+            if (!next) return;
+            e.preventDefault(); go(next.id);
+            const ul = e.currentTarget;   // React clears currentTarget after the handler returns
+            requestAnimationFrame(() => ul.querySelector<HTMLElement>(`[data-id="${next.id}"]`)?.focus());
+          }}>
             {s.data.messages.map(m => (
               <li key={m.id} className={(m.id === openId ? 'open ' : '') + (m.status === 'new' ? 'unread' : '')}>
                 <input type="checkbox" aria-label={`Select message from ${m.name}`} checked={sel.has(m.id)} onChange={() => { const n = new Set(sel); n.has(m.id) ? n.delete(m.id) : n.add(m.id); setSel(n); }} />
-                <button type="button" className="msg-item" onClick={() => go(m.id)} aria-current={m.id === openId || undefined}>
+                <button type="button" className="msg-item" data-id={m.id} onClick={() => go(m.id)} aria-current={m.id === openId || undefined}>
                   <span className="row between"><b className="truncate">{m.name || m.email || 'Someone'}</b><time className="faint">{ago(m.created_at)}</time></span>
                   <span className="truncate msg-subj">{m.subject || '(no subject)'}</span>
                   <span className="truncate faint">{m.preview}</span>

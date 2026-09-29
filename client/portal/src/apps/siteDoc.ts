@@ -33,13 +33,21 @@ function withDefaults(d: SiteDoc): SiteDoc {
 }
 export function updateSite(fn: (d: SiteDoc) => SiteDoc){ if (state.doc) emit({ doc: fn(state.doc) }); }
 export function discardSite(){ if (state.saved) emit({ doc: { ...JSON.parse(state.saved), revision: state.doc!.revision } }); }
-export async function saveSite(){
-  if (!state.doc || state.saving) return;
+let inFlight: Promise<void> | null = null;
+export function saveSite(): Promise<void>{
+  if (inFlight) return inFlight;            // a second Save waits for the first instead of reporting a save that didn't happen
+  if (!state.doc) return Promise.resolve();
+  const sent = state.doc;
   emit({ saving: true });
-  try {
-    const r = withDefaults(await put<SiteDoc>('/site', state.doc));
-    emit({ doc: r, saved: norm(r), saving: false });
-  } catch (e){ emit({ saving: false }); throw e; }
+  inFlight = (async () => {
+    try {
+      const r = withDefaults(await put<SiteDoc>('/site', sent));
+      // edits typed while the save was in flight stay (and stay marked unsaved); only the revision moves on
+      emit({ doc: state.doc === sent ? r : { ...state.doc!, revision: r.revision }, saved: norm(r), saving: false });
+    } catch (e){ emit({ saving: false }); throw e; }
+    finally { inFlight = null; }
+  })();
+  return inFlight;
 }
 export function useSite(){
   const s = useSyncExternalStore(f => { subs.add(f); return () => subs.delete(f); }, () => state);

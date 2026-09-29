@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { AppProps } from './registry';
 import { useLoad } from '../hooks';
 import { del, post, put } from '../api';
-import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, Segmented, SkeletonRows, Switch, VirtualTable, useToast } from '../ui';
+import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, Segmented, SkeletonRows, Switch, VirtualTable, useConfirm, useToast } from '../ui';
 import type { Column } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
@@ -83,7 +83,7 @@ function toForm(c: Coupon | null, copy = false): Form {
   const local = (v: string | null) => v ? new Date(new Date(v).getTime() + 330 * 60e3).toISOString().slice(0, 16) : '';
   if (!c) return { code: '', description: '', kind: 'percent', percent: '10', amountInr: null, amountUsd: null, currencies: ['INR', 'USD'], startsAt: '', endsAt: '', maxUses: '', perEmailLimit: '1',
     firstOrderOnly: false, minOrderInr: null, minOrderUsd: null, maxDiscountInr: null, maxDiscountUsd: null, appliesTo: 'all', productIds: [], categoryId: '', stackable: false, paused: false };
-  return { code: copy ? c.code + '2' : c.code, description: c.description, kind: c.kind, percent: c.percent_bp ? String(c.percent_bp / 100) : '', amountInr: c.amount_inr, amountUsd: c.amount_usd,
+  return { code: copy ? (c.code.slice(0, 31) + '2') : c.code, description: c.description, kind: c.kind, percent: c.percent_bp ? String(c.percent_bp / 100) : '', amountInr: c.amount_inr, amountUsd: c.amount_usd,
     currencies: c.currencies, startsAt: local(c.starts_at), endsAt: local(c.ends_at), maxUses: c.max_uses?.toString() || '', perEmailLimit: c.per_email_limit?.toString() || '',
     firstOrderOnly: c.first_order_only, minOrderInr: c.min_order_inr || null, minOrderUsd: c.min_order_usd || null, maxDiscountInr: c.max_discount_inr, maxDiscountUsd: c.max_discount_usd,
     appliesTo: c.applies_to, productIds: c.product_ids || [], categoryId: c.category_id || '', stackable: c.stackable, paused: copy ? false : c.paused };
@@ -92,13 +92,35 @@ function toForm(c: Coupon | null, copy = false): Form {
 function Editor({ coupon, onClose, onSaved }: { coupon: Coupon | 'new' | { copy: Coupon }; onClose: () => void; onSaved: (d: { coupons: Coupon[] }) => void }){
   const existing = coupon !== 'new' && !('copy' in coupon) ? coupon : null;
   const [f, setF] = useState<Form>(() => coupon === 'new' ? toForm(null) : 'copy' in coupon ? toForm(coupon.copy, true) : toForm(coupon));
+  const [start] = useState(() => JSON.stringify(f));
+  const dirty = JSON.stringify(f) !== start;
+  const confirm = useConfirm();
+  // Esc, the ✕ and a click outside ask first when there are unsaved changes
+  const close = async () => { if (!dirty || await confirm({ title: 'Discard this code?', body: 'Your changes haven’t been saved.', confirm: 'Discard', danger: true })) onClose(); };
   const [tab, setTab] = useState<'rules' | 'uses'>('rules');
   const products = useLoad<{ products: { id: string; title: string; kind: string }[] }>(f.appliesTo === 'products' ? '/products' : null);
   const cats = useLoad<{ categories: { id: string; name: string; kind: string }[] }>(f.appliesTo === 'category' ? '/categories' : null);
   const uses = useLoad<{ uses: any[] }>(existing && tab === 'uses' ? `/coupons/${existing.id}/uses` : null);
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF(x => ({ ...x, [k]: v }));
   const iso = (v: string) => v ? new Date(v + ':00+05:30').toISOString() : null;
+  // the rules the server also enforces, explained before anything is sent
+  const problem = (() => {
+    if (f.code.length < 3) return 'The code needs at least 3 characters.';
+    if (!f.currencies.length) return 'Choose at least one currency it works for.';
+    if (f.kind === 'percent'){ const n = Number(f.percent); if (!(n > 0 && n <= 100)) return 'Percent off must be more than 0 and at most 100.'; }
+    else {
+      if (f.currencies.includes('INR') && !f.amountInr) return 'Set the amount off in ₹ (or untick buyers in India).';
+      if (f.currencies.includes('USD') && !f.amountUsd) return 'Set the amount off in $ (or untick everyone else).';
+    }
+    if (f.appliesTo === 'category' && !f.categoryId) return 'Choose the category it applies to.';
+    if (f.appliesTo === 'products' && !f.productIds.length) return 'Tick at least one product it applies to.';
+    if (f.startsAt && f.endsAt && f.endsAt <= f.startsAt) return 'The end must be after the start.';
+    if (f.maxUses === '0') return 'Total uses must be at least 1 (leave it empty for unlimited).';
+    if (f.perEmailLimit === '0') return 'Uses per email must be at least 1 (leave it empty for unlimited).';
+    return null;
+  })();
   const save = async () => {
+    if (problem) throw new Error(problem);
     const body = { code: f.code, description: f.description, kind: f.kind, percentBp: f.kind === 'percent' ? Math.round(Number(f.percent) * 100) : null,
       amountInr: f.amountInr, amountUsd: f.amountUsd, currencies: f.currencies, startsAt: iso(f.startsAt), endsAt: iso(f.endsAt),
       maxUses: f.maxUses || null, perEmailLimit: f.perEmailLimit || null, firstOrderOnly: f.firstOrderOnly, minOrderInr: f.minOrderInr || 0, minOrderUsd: f.minOrderUsd || 0,
@@ -107,9 +129,10 @@ function Editor({ coupon, onClose, onSaved }: { coupon: Coupon | 'new' | { copy:
   };
   const genCode = () => { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const r = crypto.getRandomValues(new Uint8Array(8)); set('code', 'KA-' + [...r].map(x => a[x % a.length]).join('')); };
   return (
-    <Modal wide title={existing ? `Edit ${existing.code}` : 'New discount code'} onClose={onClose} footer={<>
-      <button type="button" className="btn" onClick={onClose}>Cancel</button>
-      <AsyncButton className="btn primary" onClick={save}>{existing ? 'Save changes' : 'Create code'}</AsyncButton>
+    <Modal wide title={existing ? `Edit ${existing.code}` : 'New discount code'} onClose={() => void close()} footer={<>
+      {problem && tab === 'rules' && <span className="field-hint grow" role="status">{problem}</span>}
+      <button type="button" className="btn" onClick={() => void close()}>Cancel</button>
+      <AsyncButton className="btn primary" disabled={!!problem} onClick={save}>{existing ? 'Save changes' : 'Create code'}</AsyncButton>
     </>}>
       {existing && <div className="tabs" role="tablist" style={{ margin: '-8px -20px 0', padding: '0 20px' }}>
         {(['rules', 'uses'] as const).map(t => <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{t === 'rules' ? 'Rules' : `Uses (${existing.confirmed_uses})`}</button>)}

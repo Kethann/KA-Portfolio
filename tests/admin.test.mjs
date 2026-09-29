@@ -183,6 +183,12 @@ test('catalog: a for-sale item needs prices and a file; sold items archive inste
   assert.equal(p.file.filename, 'brush-pack.zip');
   const noPrice = await admin('PUT', `/api/admin/products/${p.id}`, { ...p, status: 'published', sellable: true, priceInr: 49900, priceUsd: null, updatedAt: p.updatedAt });
   assert.equal(noPrice.status, 400); assert.match(noPrice.json.error, /INR and a USD price/);
+  const tooLow = await admin('PUT', `/api/admin/products/${p.id}`, { ...p, status: 'published', sellable: true, priceInr: 50, priceUsd: 999, updatedAt: p.updatedAt });
+  assert.equal(tooLow.status, 400); assert.match(tooLow.json.error, /at least ₹1 and \$1/);
+  const badSale = await admin('PUT', `/api/admin/products/${p.id}`, { ...p, sellable: true, priceInr: 49900, priceUsd: 999, salePriceInr: 59900, updatedAt: p.updatedAt });
+  assert.equal(badSale.status, 400); assert.match(badSale.json.error, /lower than the normal price/);
+  const badWindow = await admin('PUT', `/api/admin/products/${p.id}`, { ...p, sellable: true, priceInr: 49900, priceUsd: 999, saleStartsAt: '2026-10-02T00:00:00Z', saleEndsAt: '2026-10-01T00:00:00Z', updatedAt: p.updatedAt });
+  assert.equal(badWindow.status, 400); assert.match(badWindow.json.error, /end after it starts/);
   const ok = await admin('PUT', `/api/admin/products/${p.id}`, { ...p, status: 'published', sellable: true, priceInr: 49900, priceUsd: 999, updatedAt: p.updatedAt });
   assert.equal(ok.status, 200, JSON.stringify(ok.json));
   assert.equal(ok.json.product.preview.prices.INR.amount, 49900);
