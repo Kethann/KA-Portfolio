@@ -21,7 +21,7 @@ test('the running portfolio serves the homepage, lazy panda and all built assets
     }
     for(const name of await readdir(resolve(root,'dist/assets'))){
       const response=await fetch(base+'/assets/'+name);assert.equal(response.status,200,name);assert((await response.arrayBuffer()).byteLength>0,name);
-      if(['gallery.js','poster.js','panda.js'].includes(name))assert.equal(response.headers.get('cache-control'),'no-cache');
+      if(['gallery.js','poster.js','panda.js','studio.js'].includes(name))assert.equal(response.headers.get('cache-control'),'no-cache');
       else assert.match(response.headers.get('cache-control'),/immutable/);
     }
     const portfolio=await fetch(base+'/api/portfolio');assert.equal(portfolio.status,200);assert(Array.isArray((await portfolio.json()).images));

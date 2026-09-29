@@ -67,7 +67,7 @@ app.get('/crystal',(req,res)=>res.sendFile(resolve(root,'index.html')));
 app.get(['/assets/creator.js','/assets/creator.css'],(req,res)=>{res.set('Cache-Control','no-cache');res.sendFile(resolve(root,'public',req.path.split('/').pop()));});
 app.use('/assets',express.static(resolve(root,'dist/assets'),{index:false,maxAge:'1y',immutable:true,setHeaders(res,file){
   // Entry URLs are stable; only content-hashed dependencies can be cached immutably.
-  if(/[/\\](gallery|poster|panda)\.js$/.test(file))res.setHeader('Cache-Control','no-cache');
+  if(/[/\\](gallery|poster|panda|studio)\.js$/.test(file))res.setHeader('Cache-Control','no-cache');
 }}));
 app.use('/dist/assets',express.static(resolve(root,'dist/assets'),{index:false,maxAge:0}));
 app.get(['/creator','/creator/'],(req,res)=>{res.set('Cache-Control','no-store');res.sendFile(resolve(root,'public/creator.html'));});

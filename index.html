@@ -1149,14 +1149,19 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
    the bar is position:fixed, so nothing else on the page moves. Kept in the last stylesheet before the nav markup:
    the nav script measures the bar while the page is still parsing, so these rules must already apply by then.
    Later stylesheets never set the properties used here. */
-:root{ --nav-ms:300ms; --nav-ease:cubic-bezier(.22,.8,.24,1); }
+:root{
+  --nav-ms:300ms; --nav-ease:cubic-bezier(.22,.8,.24,1);
+  /* one size scale for the bar; large screens and TVs raise it (see the end of this block) */
+  --nav-size:44px; --nav-icon:18px; --nav-font:11px; --nav-lines:1; --nav-ring:2px;
+}
 .nav-item{
   display:inline-flex; align-items:center; justify-content:flex-start;
-  box-sizing:border-box; min-width:44px; min-height:44px; padding:0 13px; margin:0;
-  font-size:11px; letter-spacing:.08em; line-height:1; color:rgba(255,255,255,0.74);
+  box-sizing:border-box; min-width:var(--nav-size); min-height:var(--nav-size);
+  padding:0 calc((var(--nav-size) - var(--nav-icon)) / 2); margin:0;
+  font-size:var(--nav-font); letter-spacing:.08em; line-height:1; color:rgba(255,255,255,0.74);
   transition:color .2s ease;
 }
-.nav-ico{ display:block; width:18px; height:18px; flex:none; transition:transform .2s var(--nav-ease); }
+.nav-ico{ display:block; width:var(--nav-icon); height:var(--nav-icon); flex:none; transition:transform .2s var(--nav-ease); }
 /* The label box is the one thing whose size animates: 0 when collapsed, its measured text width when
    selected (--label-w is set per item by measureNavLabels() in the nav script). overflow:hidden clips it. */
 .nav-label{ display:block; flex:none; width:0; overflow:hidden; transition:width var(--nav-ms) var(--nav-ease); }
@@ -1173,13 +1178,13 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
 .nav-item:hover{ color:var(--ink); }
 .nav-item:hover .nav-ico{ transform:translateY(-1px); }
 .nav-item:active .nav-ico{ transform:scale(.9); }
-.nav-item:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+.nav-item:focus-visible{ outline:var(--nav-ring) solid var(--amber); outline-offset:2px; }
 .nav-item[data-preview]{ color:#fff; }
 /* name tag for icon-only items: pointer hover (fine pointers only) and keyboard focus */
 .nav-item::after{
   content:attr(aria-label); position:absolute; top:calc(100% + 12px); left:50%; z-index:2;
   padding:6px 10px; border-radius:9px; white-space:nowrap; pointer-events:none;
-  font-size:10px; letter-spacing:.1em; line-height:1; color:var(--ink);
+  font-size:calc(var(--nav-font) - 1px); letter-spacing:.1em; line-height:1; color:var(--ink);
   background:rgba(14,12,16,.9); border:1px solid rgba(255,255,255,.12); box-shadow:0 8px 20px rgba(0,0,0,.35);
   opacity:0; transform:translate(-50%,-3px);
   transition:opacity .2s ease, transform .2s var(--nav-ease);
@@ -1192,7 +1197,7 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
 
 /* ---- menu button: three lines morph into an X ---- */
 .expand-trigger{ position:relative; flex:none; }
-.menu-lines{ position:relative; display:block; width:18px; height:14px; }
+.menu-lines{ position:relative; display:block; width:18px; height:14px; transform:scale(var(--nav-lines)); }
 .menu-lines i{
   position:absolute; left:0; width:18px; height:1.8px; border-radius:2px; background:currentColor;
   transition:transform var(--nav-ms) var(--nav-ease), opacity var(--nav-ms) var(--nav-ease);
@@ -1214,12 +1219,61 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
   transition:opacity var(--nav-ms) var(--nav-ease), transform var(--nav-ms) var(--nav-ease), visibility 0s;
 }
 .expand-panel .expand-tool-item{ min-height:44px; white-space:nowrap; }
+.expand-panel{ min-width:220px; }
+.menu-badge{
+  margin-left:auto; padding:3px 8px; border-radius:999px; flex:none;
+  font-family:var(--font-mono), ui-monospace, monospace; font-size:9.5px; letter-spacing:.08em; text-transform:uppercase;
+  color:#ffd9b8; background:rgba(255,148,56,.12); border:1px solid rgba(255,170,120,.32);
+}
 
 @media(max-width:600px){
   #site-nav{ gap:2px; }
-  .nav-item{ padding:0 13px; font-size:11px; letter-spacing:.06em; }
-  .expand-trigger{ width:44px; height:44px; }
+  .nav-item{ letter-spacing:.06em; }
 }
+/* Large desktop, 4K and TV screens: the bar grows with the screen and focus rings get heavier so a
+   remote's arrow-key focus is easy to follow from a sofa. */
+@media (min-width:1900px){ :root{ --nav-size:52px; --nav-icon:21px; --nav-font:13px; --nav-lines:1.17; --nav-ring:3px; } }
+@media (min-width:2500px){ :root{ --nav-size:62px; --nav-icon:25px; --nav-font:15.5px; --nav-lines:1.4; --nav-ring:4px; } }
+@media (min-width:3400px){ :root{ --nav-size:78px; --nav-icon:31px; --nav-font:19px; --nav-lines:1.75; --nav-ring:5px; } }
+.expand-trigger{ width:var(--nav-size); height:var(--nav-size); }
+.expand-trigger:focus-visible{ outline-width:var(--nav-ring); }
+@media (min-width:1900px){
+  .expand-panel .expand-tool-item{ min-height:calc(var(--nav-size) - 4px); font-size:calc(var(--nav-font) + 2px); }
+  .expand-panel{ min-width:calc(var(--nav-size) * 5.4); }
+}
+
+/* ---- notify-me form inside the Upscaler "coming soon" dialog ---- */
+.notify-form{ display:flex; flex-direction:column; gap:10px; text-align:left; }
+.notify-form[hidden]{ display:none; }
+.notify-form label{ font-size:13px; color:var(--ink); }
+.notify-optional{ color:var(--ink-dim); }
+.notify-row{ display:flex; gap:10px; flex-wrap:wrap; }
+.notify-row input{
+  flex:1 1 200px; min-width:0; min-height:46px; box-sizing:border-box; padding:12px 16px; border-radius:14px;
+  font:inherit; font-size:16px; color:var(--ink); background:rgba(0,0,0,.28); border:1px solid rgba(255,255,255,.16);
+}
+.notify-row input:focus{ outline:none; border-color:rgba(255,148,56,.6); box-shadow:0 0 0 3px rgba(255,148,56,.16); }
+.notify-row input[aria-invalid="true"]{ border-color:rgba(255,156,156,.6); }
+.notify-row .upscaler-btn{ min-height:46px; flex:0 0 auto; }
+.notify-row .upscaler-btn:disabled{ opacity:.55; cursor:default; }
+.ka-turnstile:empty{ display:none; }
+.notify-status{ margin:0; min-height:1.3em; font-size:13px; color:var(--ink-dim); }
+.notify-status[data-state="ok"]{ color:#8fe0a8; }
+.notify-status[data-state="error"]{ color:#ff9c9c; }
+.notify-fine{ margin:0; font-size:12px; color:var(--ink-faint, rgba(237,235,232,.45)); }
+@media (max-width:420px){ .notify-row .upscaler-btn{ width:100%; } }
+
+/* ---- toast: one short announced message ---- */
+.ka-toast{
+  position:fixed; left:50%; bottom:max(20px, env(safe-area-inset-bottom)); z-index:300;
+  max-width:min(520px, calc(100vw - 32px)); padding:12px 18px; border-radius:14px; box-sizing:border-box;
+  font-size:14px; color:var(--ink); pointer-events:none;
+  opacity:0; transform:translate(-50%, 12px); transition:opacity .25s ease, transform .3s var(--nav-ease);
+}
+.ka-toast.show{ opacity:1; transform:translate(-50%, 0); }
+.ka-toast[data-state="error"]{ border-color:rgba(255,156,156,.35); }
+@media (prefers-reduced-motion: reduce){ .ka-toast{ transition:opacity .15s ease; transform:translate(-50%,0); } }
+html.ka-modal-open{ overflow:hidden; }
 @media (prefers-reduced-motion: reduce){
   .nav-item, .nav-label, .nav-label > span, .nav-ico, .nav-item::after, .menu-lines i{ transition:none; }
   .nav-item:hover .nav-ico, .nav-item:active .nav-ico{ transform:none; }
@@ -1249,13 +1303,18 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
       <span class="menu-lines" aria-hidden="true"><i></i><i></i><i></i></span>
     </button>
     <div class="expand-panel glass-panel" id="expand-panel" role="menu" aria-label="Menu">
+      <button type="button" class="expand-tool-item" role="menuitem" data-menu-action="typography" tabindex="-1">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20c3.5-.2 5.2-2 6.4-5.2L14 5.5"/><path d="m14 5.5 3.2-1.8 2.3 2.3-1.8 3.2-4.6 1.7z"/><path d="M4 20h7"/></svg>
+        <span>Typography</span>
+      </button>
+      <button type="button" class="expand-tool-item" role="menuitem" data-menu-action="upscaler" tabindex="-1">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 16l3-3 2 2 3-4"/><path d="M15 3v4h4M9 21v-4H5"/></svg>
+        <span>Image Upscaler</span>
+        <span class="menu-badge">Coming soon</span>
+      </button>
       <button type="button" class="expand-tool-item" role="menuitem" data-menu-action="portfolio" tabindex="-1">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
         <span>Portfolio</span>
-      </button>
-      <button type="button" class="expand-tool-item" role="menuitem" data-menu-action="assistant" tabindex="-1">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"/><path d="M9 11h.01M12 11h.01M15 11h.01"/></svg>
-        <span>Ask the assistant</span>
       </button>
     </div>
   </div>
@@ -1596,299 +1655,196 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
   <p class="footer-copyright">&copy; 2026 Kethan Artzz</p>
 </footer>
 
-<div id="upscaler-modal" role="dialog" aria-modal="true" aria-label="Image Upscaler" aria-hidden="true" hidden>
+<div id="upscaler-modal" role="dialog" aria-modal="true" aria-labelledby="upscaler-title" aria-describedby="upscaler-copy" hidden>
   <div class="upscaler-backdrop" id="upscaler-backdrop"></div>
   <div class="upscaler-card">
-    <button class="upscaler-close" id="upscaler-close" aria-label="Close Image Upscaler">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    <button class="upscaler-close" id="upscaler-close" type="button" aria-label="Close">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
     <div class="upscaler-head">
-      <span class="eyebrow">Real AI super-resolution</span>
-      <h2>Image Upscaler</h2>
-      <p>Upload a photo and real deep-learning models reconstruct genuine detail at 4&times; resolution -- Real-ESRGAN sharpens the whole image, and CodeFormer automatically restores any faces it finds, no matter the subject.</p>
+      <span class="eyebrow" id="upscaler-eyebrow">Under development</span>
+      <h2 id="upscaler-title">Image Upscaler</h2>
+      <p id="upscaler-copy">A tool that sharpens and enlarges your images is being built. It isn&rsquo;t available yet.</p>
     </div>
-
-    <div class="upscaler-stage" id="upscaler-stage" data-state="drop">
-      <!-- drop state -->
-      <div class="upscaler-panel" data-panel="drop">
-        <label class="upscaler-dropzone" id="upscaler-dropzone" for="upscaler-file" tabindex="0">
-          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M12 4l-5 5M12 4l5 5"/><path d="M3 16v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"/></svg>
-          <span class="dz-title">Drag &amp; drop an image, or click to browse</span>
-          <span class="dz-sub">JPG, PNG, or WebP -- up to 12&nbsp;MB</span>
-          <input type="file" id="upscaler-file" accept="image/png,image/jpeg,image/webp" hidden>
-        </label>
+    <form class="notify-form" id="notify-form" novalidate>
+      <label for="notify-email">Get one email when it launches <span class="notify-optional">(optional)</span></label>
+      <div class="notify-row">
+        <input type="email" id="notify-email" name="email" autocomplete="email" inputmode="email" required maxlength="254" placeholder="you@example.com" aria-describedby="notify-status">
+        <button type="submit" class="upscaler-btn primary" id="notify-submit">Notify me</button>
       </div>
-
-      <!-- loading model / processing state -->
-      <div class="upscaler-panel" data-panel="working" hidden>
-        <div class="upscaler-spinner" aria-hidden="true"></div>
-        <p class="upscaler-status" id="upscaler-status" role="status" aria-live="polite">Loading enhancement model&hellip;</p>
-        <div class="upscaler-progress"><div class="upscaler-progress-bar" id="upscaler-progress-bar"></div></div>
-      </div>
-
-      <!-- result state -->
-      <div class="upscaler-panel" data-panel="result" hidden>
-        <div class="upscaler-compare" id="upscaler-compare">
-          <img class="uc-after" id="upscaler-after" alt="Enhanced image">
-          <div class="uc-before-wrap" id="upscaler-before-wrap">
-            <img class="uc-before" id="upscaler-before" alt="Original image">
-          </div>
-          <div class="uc-handle" id="upscaler-handle" aria-hidden="true"><span></span></div>
-          <input type="range" class="uc-slider" id="upscaler-slider" min="0" max="100" value="50" aria-label="Before/after comparison position">
-        </div>
-        <p class="upscaler-result-meta" id="upscaler-result-meta"></p>
-        <div class="upscaler-actions">
-          <a class="upscaler-btn primary" id="upscaler-download" download="enhanced.png">Download enhanced image</a>
-          <a class="upscaler-btn" id="upscaler-fullsize" target="_blank" rel="noopener">View full size</a>
-          <button class="upscaler-btn" type="button" id="upscaler-again">Upscale another</button>
-        </div>
-      </div>
-
-      <!-- error state -->
-      <div class="upscaler-panel" data-panel="error" hidden>
-        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <p class="upscaler-error-msg" id="upscaler-error-msg">Something went wrong.</p>
-        <button class="upscaler-btn" type="button" id="upscaler-retry">Try again</button>
-      </div>
-    </div>
+      <input type="text" name="website" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <div class="ka-turnstile" id="notify-turnstile"></div>
+      <p class="notify-status" id="notify-status" role="status" aria-live="polite"></p>
+      <p class="notify-fine">Your email is used only for this one message.</p>
+    </form>
   </div>
 </div>
 
 <script>
-// ==================================================================== IMAGE UPSCALER ==
-// GOD MODE v39: real server-side super-resolution + automatic face restoration.
-//
-// The v37 build ran EDSR-base alone -- a genuine trained CNN, but not face-specialized, and the
-// heavier Real-ESRGAN/GFPGAN/CodeFormer stack was passed over at the time for its CPU-only build
-// fragility (basicsr's dependency chain). This round takes that stack on deliberately, in a
-// dedicated venv with a CUDA-matched torch/torchvision pin (see server/gfpgan-venv), because
-// automatic face-specific restoration is now a real requirement, not just a nice-to-have:
-//
-//   Models:  Real-ESRGAN (RealESRGAN_x4plus, RRDBNet) for general super-resolution on the whole
-//            image, paired with CodeFormer for face restoration. CodeFormer's own face detector
-//            (facexlib/RetinaFace) runs automatically on every request -- no image-type selection,
-//            no user input: 0 faces found means the output is simply the Real-ESRGAN pass alone
-//            (the automatic general-enhancement fallback), 1+ faces means each is restored and
-//            blended back into the Real-ESRGAN-enhanced background.
-//   Why:     confirmed by direct testing on this host's actual GPU (GTX 1650, no Tensor Cores):
-//            fp16 (half=True) silently produces corrupted all-black output on this card -- a
-//            known issue CodeFormer's own reference code independently hard-codes a GPU-name
-//            check for. This build carries that same fix (half=False on affected cards).
-//   Where:   server/upscale_service_codeformer.py (FastAPI, its own venv) does the actual
-//            inference; server/enhance.js spawns and proxies to it; the browser only ever talks
-//            to this site's own /api/enhance -- no client-side ML runtime, no model download
-//            in-browser. The result's model label (see resultMeta below) reflects, per request,
-//            whether CodeFormer actually restored a face or Real-ESRGAN ran alone.
-//
-// This also fully resolves the earlier responsiveness concern by construction: inference now
-// happens in a separate OS process on the server, so there is no client main-thread work heavy
-// enough to block the page regardless of image size -- the browser is simply waiting on a
-// network response the entire time, same as any other async fetch.
+// ==================================================================== PUBLIC SERVICES ==
+// Shared by every public form (contact, notify-me, checkout, downloads):
+//   kaPublicConfig()      -> Promise of the public settings (never secrets): Turnstile SITE key,
+//                            feature toggles and editable copy. Fetched once, cached.
+//   kaTurnstile(el)       -> Promise of {token(), reset(), remove()}; loads Cloudflare Turnstile
+//                            only when a form needs it. With no site key configured (local
+//                            development) it resolves to a no-op whose token() is "".
+(function(){
+  "use strict";
+  var configPromise = null;
+  window.kaPublicConfig = function(){
+    if (!configPromise){
+      configPromise = fetch(kaApiUrl("/api/public-config"), { headers:{ "Accept":"application/json" } })
+        .then(function(res){ return res.ok ? res.json() : {}; })
+        .catch(function(){ return {}; });
+    }
+    return configPromise;
+  };
+  var scriptPromise = null;
+  function loadTurnstile(){
+    if (window.turnstile) return Promise.resolve(window.turnstile);
+    if (!scriptPromise){
+      scriptPromise = new Promise(function(resolve, reject){
+        var s = document.createElement("script");
+        s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+        s.async = true; s.defer = true;
+        s.onload = function(){ window.turnstile ? resolve(window.turnstile) : reject(new Error("Turnstile unavailable")); };
+        s.onerror = function(){ scriptPromise = null; reject(new Error("Turnstile could not load")); };
+        document.head.appendChild(s);
+      });
+    }
+    return scriptPromise;
+  }
+  // kaToast(text, state): one short, announced message at the bottom of the screen ("error" | "ok" | "").
+  var toastEl = null, toastTimer = 0;
+  window.kaToast = function(text, state){
+    if (!toastEl){
+      toastEl = document.createElement("div");
+      toastEl.className = "ka-toast glass-panel";
+      toastEl.setAttribute("role", state === "error" ? "alert" : "status");
+      document.body.appendChild(toastEl);
+    }
+    clearTimeout(toastTimer);
+    toastEl.textContent = text;
+    toastEl.dataset.state = state || "";
+    toastEl.classList.remove("show");
+    void toastEl.offsetWidth;
+    toastEl.classList.add("show");
+    toastTimer = setTimeout(function(){ toastEl.classList.remove("show"); }, 4200);
+  };
+  var NOOP = { token:function(){ return ""; }, reset:function(){}, remove:function(){} };
+  window.kaTurnstile = function(container){
+    return window.kaPublicConfig().then(function(cfg){
+      var siteKey = cfg && cfg.turnstileSiteKey;
+      if (!siteKey || !container) return NOOP;
+      return loadTurnstile().then(function(ts){
+        var current = "";
+        container.innerHTML = "";
+        var id = ts.render(container, {
+          sitekey: siteKey, theme: "dark", size: "flexible", appearance: "interaction-only",
+          callback: function(t){ current = t; },
+          "expired-callback": function(){ current = ""; },
+          "error-callback": function(){ current = ""; }
+        });
+        return {
+          token: function(){ return current || (ts.getResponse(id) || ""); },
+          reset: function(){ current = ""; try{ ts.reset(id); }catch(e){} },
+          remove: function(){ try{ ts.remove(id); }catch(e){} container.innerHTML = ""; }
+        };
+      });
+    });
+  };
+})();
+
+// ==================================================================== IMAGE UPSCALER (COMING SOON) ==
+// The upscaler itself is not public yet. The menu opens this dialog; its wording and the
+// "coming soon" state come from the portal (Studio app) through kaPublicConfig().upscaler.
+// The optional notify-me email goes to /api/notify (Turnstile + rate limited on the server).
 (function(){
   "use strict";
   var modal = document.getElementById("upscaler-modal");
+  if (!modal) return;
   var backdrop = document.getElementById("upscaler-backdrop");
   var closeBtn = document.getElementById("upscaler-close");
-  var openBtn = document.getElementById("open-upscaler");
-  var stage = document.getElementById("upscaler-stage");
-  var dropzone = document.getElementById("upscaler-dropzone");
-  var fileInput = document.getElementById("upscaler-file");
-  var statusEl = document.getElementById("upscaler-status");
-  var progressBar = document.getElementById("upscaler-progress-bar");
-  var afterImg = document.getElementById("upscaler-after");
-  var beforeImg = document.getElementById("upscaler-before");
-  var beforeWrap = document.getElementById("upscaler-before-wrap");
-  var handle = document.getElementById("upscaler-handle");
-  var slider = document.getElementById("upscaler-slider");
-  var resultMeta = document.getElementById("upscaler-result-meta");
-  var downloadBtn = document.getElementById("upscaler-download");
-  var fullsizeBtn = document.getElementById("upscaler-fullsize");
-  var againBtn = document.getElementById("upscaler-again");
-  var errorMsg = document.getElementById("upscaler-error-msg");
-  var retryBtn = document.getElementById("upscaler-retry");
-  var panels = Array.prototype.slice.call(stage.querySelectorAll("[data-panel]"));
-  if (!modal || !openBtn) return;
+  var form = document.getElementById("notify-form");
+  var emailEl = document.getElementById("notify-email");
+  var submitBtn = document.getElementById("notify-submit");
+  var statusEl = document.getElementById("notify-status");
+  var tsBox = document.getElementById("notify-turnstile");
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var lastFocused = null, widget = null, sending = false, closeTimer = 0;
+  var EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-  var MAX_FILE_BYTES = 12 * 1024 * 1024;
-  var REQUEST_TIMEOUT_MS = 90000;
-  var uReducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (window.matchMedia){
-    window.matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change", function(e){ uReducedMotion = e.matches; });
+  function setStatus(text, state){ statusEl.textContent = text; statusEl.dataset.state = state || ""; }
+  function applyCopy(cfg){
+    var u = cfg && cfg.upscaler;
+    if (!u) return;
+    if (u.title) document.getElementById("upscaler-title").textContent = u.title;
+    if (u.text) document.getElementById("upscaler-copy").textContent = u.text;
+    if (u.badge) document.getElementById("upscaler-eyebrow").textContent = u.badge;
+    form.hidden = u.notifyEnabled === false;
   }
-
-  var lastFocused = null;
-  var lastObjectUrls = []; // revoked on each new run / modal close to avoid leaking blob: URLs
-
-  function revokeTrackedUrls(){
-    lastObjectUrls.forEach(function(u){ try{ URL.revokeObjectURL(u); }catch(e){} });
-    lastObjectUrls = [];
-  }
-  function trackUrl(u){ lastObjectUrls.push(u); return u; }
-
-  function showPanel(name){
-    panels.forEach(function(p){ p.hidden = p.getAttribute("data-panel") !== name; });
-    stage.dataset.state = name;
-  }
-  function setProgress(fraction){
-    progressBar.style.width = (Math.max(0, Math.min(1, fraction || 0)) * 100) + "%";
-  }
-  function setBeforeAfterSlider(percent){
-    beforeWrap.style.width = percent + "%";
-    handle.style.left = percent + "%";
-  }
-
-  // There's no real per-byte progress from a single server round-trip the way there was with
-  // in-browser patch-based processing -- this eases toward ~92% while the request is in flight
-  // (never claiming false completion) and only snaps to 100% once the response actually arrives.
-  function startFakeProgress(){
-    setProgress(0.06);
-    var p = 0.06;
-    var timer = setInterval(function(){
-      p += (0.92 - p) * 0.06;
-      setProgress(p);
-    }, 220);
-    return function stop(){ clearInterval(timer); };
-  }
-
-  function humanFileSize(bytes){
-    if (bytes < 1024) return bytes + " B";
-    var units = ["KB", "MB", "GB"];
-    var i = -1;
-    do{ bytes /= 1024; i++; }while(bytes >= 1024 && i < units.length - 1);
-    return bytes.toFixed(1) + " " + units[i];
-  }
-
-  function runEnhance(file){
-    revokeTrackedUrls();
-    showPanel("working");
-    statusEl.textContent = "Uploading image…";
-    var stopProgress = startFakeProgress();
-
-    var beforeUrl = trackUrl(URL.createObjectURL(file));
-    beforeImg.src = beforeUrl;
-
-    var controller = ("AbortController" in window) ? new AbortController() : null;
-    var timedOut = false;
-    var timer = setTimeout(function(){
-      timedOut = true;
-      if (controller) controller.abort();
-    }, REQUEST_TIMEOUT_MS);
-
-    statusEl.textContent = "Enhancing with a real super-resolution model… this can take a little while.";
-    fetch(kaApiUrl("/api/enhance"), {
-      method: "POST",
-      headers: { "Content-Type": file.type },
-      body: file,
-      signal: controller ? controller.signal : undefined,
-    }).then(function(res){
-      clearTimeout(timer);
-      if (!res.ok){
-        return res.json().catch(function(){ return {}; }).then(function(body){
-          throw new Error(body.error || ("The enhancement service returned an error (" + res.status + ")."));
-        });
-      }
-      var meta = {
-        model: res.headers.get("x-enhance-model"),
-        seconds: res.headers.get("x-enhance-seconds"),
-        resized: res.headers.get("x-enhance-input-resized") === "1",
-        inW: res.headers.get("x-enhance-input-width"),
-        inH: res.headers.get("x-enhance-input-height"),
-        outW: res.headers.get("x-enhance-output-width"),
-        outH: res.headers.get("x-enhance-output-height"),
-      };
-      return res.blob().then(function(blob){ return { blob: blob, meta: meta }; });
-    }).then(function(out){
-      stopProgress();
-      setProgress(1);
-      var afterUrl = trackUrl(URL.createObjectURL(out.blob));
-      afterImg.src = afterUrl;
-      downloadBtn.href = afterUrl;
-      fullsizeBtn.href = afterUrl;
-
-      var dims = out.meta.outW && out.meta.outH
-        ? (out.meta.resized
-            ? "Input resized before enhancing, then reconstructed to " + out.meta.outW + "×" + out.meta.outH + " (4×)."
-            : "Enhanced to " + out.meta.outW + "×" + out.meta.outH + " (4× resolution).")
-        : "Enhanced (4× resolution).";
-      var modelNote = out.meta.model ? "Real AI model: " + out.meta.model : "Real AI super-resolution";
-      var timeNote = out.meta.seconds ? " · " + Math.round(parseFloat(out.meta.seconds)) + "s server-side" : "";
-      var sizeNote = " · " + humanFileSize(out.blob.size);
-      resultMeta.textContent = modelNote + timeNote + sizeNote + " · " + dims;
-
-      slider.value = "50";
-      setBeforeAfterSlider(50);
-      showPanel("result");
-    }).catch(function(err){
-      stopProgress();
-      clearTimeout(timer);
-      console.error("[upscaler]", err);
-      errorMsg.textContent = timedOut
-        ? "This is taking longer than expected. Please try a smaller image or try again."
-        : ((err && err.message) ? err.message : "Something went wrong while enhancing this image. Please try again.");
-      showPanel("error");
-    });
-  }
-
-  function handleFile(file){
-    if (!file) return;
-    if (!/^image\/(png|jpeg|webp)$/.test(file.type)){
-      errorMsg.textContent = "Please choose a JPG, PNG, or WebP image.";
-      showPanel("error");
-      return;
-    }
-    if (file.size > MAX_FILE_BYTES){
-      errorMsg.textContent = "Please choose an image smaller than 12 MB.";
-      showPanel("error");
-      return;
-    }
-    runEnhance(file);
-  }
-
-  fileInput.addEventListener("change", function(){ handleFile(fileInput.files && fileInput.files[0]); fileInput.value = ""; });
-  dropzone.addEventListener("dragover", function(e){ e.preventDefault(); dropzone.classList.add("drag-over"); });
-  dropzone.addEventListener("dragleave", function(){ dropzone.classList.remove("drag-over"); });
-  dropzone.addEventListener("drop", function(e){
-    e.preventDefault();
-    dropzone.classList.remove("drag-over");
-    handleFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
-  });
-  dropzone.addEventListener("keydown", function(e){
-    if (e.key === "Enter" || e.key === " "){ e.preventDefault(); fileInput.click(); }
-  });
-  slider.addEventListener("input", function(){ setBeforeAfterSlider(Number(slider.value)); });
-  retryBtn.addEventListener("click", function(){ showPanel("drop"); setProgress(0); });
-  againBtn.addEventListener("click", function(){ showPanel("drop"); setProgress(0); });
-
-  function onModalKeydown(e){
-    if (e.key === "Escape"){ closeModal(); return; }
+  function onKeydown(e){
+    if (e.key === "Escape"){ e.preventDefault(); close(); return; }
     if (e.key !== "Tab") return;
-    var focusable = modal.querySelectorAll('button, a[href], input, [tabindex]:not([tabindex="-1"])');
+    var focusable = Array.prototype.filter.call(modal.querySelectorAll('button, a[href], input:not([type="hidden"]):not(.hp-field), iframe, [tabindex]:not([tabindex="-1"])'),
+      function(el){ return !el.disabled && el.offsetParent !== null; });
     if (!focusable.length) return;
     var first = focusable[0], last = focusable[focusable.length - 1];
     if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
     else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
   }
-  function openModal(){
+  function open(){
+    if (!modal.hidden && modal.classList.contains("open")) return;
+    clearTimeout(closeTimer);
     lastFocused = document.activeElement;
     modal.hidden = false;
-    modal.setAttribute("aria-hidden", "false");
     requestAnimationFrame(function(){ modal.classList.add("open"); });
-    showPanel("drop");
-    setProgress(0);
-    dropzone.focus();
-    document.addEventListener("keydown", onModalKeydown);
+    document.addEventListener("keydown", onKeydown);
+    document.documentElement.classList.add("ka-modal-open");
+    setStatus("", "");
+    window.kaPublicConfig().then(applyCopy);
+    if (!widget) window.kaTurnstile(tsBox).then(function(w){ widget = w; }).catch(function(){ widget = null; });
+    emailEl.focus({ preventScroll:true });
   }
-  function closeModal(){
+  function close(){
+    if (modal.hidden) return;
     modal.classList.remove("open");
-    modal.setAttribute("aria-hidden", "true");
-    document.removeEventListener("keydown", onModalKeydown);
-    setTimeout(function(){ modal.hidden = true; }, uReducedMotion ? 0 : 320);
-    if (lastFocused && lastFocused.focus) lastFocused.focus();
+    document.removeEventListener("keydown", onKeydown);
+    document.documentElement.classList.remove("ka-modal-open");
+    closeTimer = setTimeout(function(){ modal.hidden = true; }, reduced.matches ? 0 : 320);
+    if (lastFocused && lastFocused.focus) lastFocused.focus({ preventScroll:true });
   }
-
-  openBtn.addEventListener("click", openModal);
-  closeBtn.addEventListener("click", closeModal);
-  backdrop.addEventListener("click", closeModal);
+  window.kaOpenUpscaler = open;
+  closeBtn.addEventListener("click", close);
+  backdrop.addEventListener("click", close);
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
+    if (sending) return;
+    var email = emailEl.value.trim();
+    if (!EMAIL.test(email)){
+      emailEl.setAttribute("aria-invalid", "true");
+      setStatus("Enter a valid email address.", "error");
+      emailEl.focus();
+      return;
+    }
+    emailEl.removeAttribute("aria-invalid");
+    sending = true; submitBtn.disabled = true;
+    setStatus("Saving…", "");
+    fetch(kaApiUrl("/api/notify"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email, topic: "upscaler", website: form.website.value, turnstileToken: widget ? widget.token() : "" })
+    }).then(function(res){
+      return res.json().catch(function(){ return {}; }).then(function(body){ return { ok: res.ok, body: body }; });
+    }).then(function(r){
+      if (!r.ok) throw new Error((r.body && r.body.error) || "Couldn’t save that right now. Please try again.");
+      setStatus("Done. You’ll get one email when it launches.", "ok");
+      form.reset();
+    }).catch(function(err){
+      setStatus(err && err.message ? err.message : "Couldn’t save that right now. Please try again.", "error");
+      if (widget) widget.reset();
+    }).then(function(){ sending = false; submitBtn.disabled = false; });
+  });
 })();
 </script>
 
@@ -6642,7 +6598,7 @@ function movePill(immediate){
   if (!target) return;
   function paint(){ navPill.style.transform = "translateX(" + pillX.toFixed(2) + "px)"; navPill.style.width = pillW.toFixed(2) + "px"; }
   if (reducedMotion || immediate){ pillX = target.offsetLeft; pillW = target.offsetWidth; paint(); return; }
-  var fromX = pillX, fromW = pillW, start = performance.now(), settle = 0;
+  var fromX = pillX, fromW = pillW, start = performance.now(), settle = 0, still = 0;
   function step(now){
     var t = Math.min(1, (now - start) / NAV_MS), k = navEase(t);
     // The target's own box is still opening (its label grid track is transitioning), so its
@@ -6651,9 +6607,10 @@ function movePill(immediate){
     var nextX = fromX + (x - fromX) * k, nextW = fromW + (w - fromW) * k;
     var moved = Math.abs(nextX - pillX) > .05 || Math.abs(nextW - pillW) > .05;
     pillX = nextX; pillW = nextW; paint();
-    // After the curve ends, follow for a few more frames only if the CSS transition is still
-    // settling (it can start a frame later than this loop), so the pill always lands exactly.
-    if (t < 1 || (moved && ++settle < 12)) pillRAF = requestAnimationFrame(step);
+    // After the curve ends, keep following the item while its CSS transition is still running
+    // (a busy device can start or stretch it), and stop once it has stayed still for 6 frames.
+    if (t >= 1){ still = moved ? 0 : still + 1; settle++; }
+    if (t < 1 || (still < 6 && settle < 90)) pillRAF = requestAnimationFrame(step);
     else pillRAF = null;
   }
   pillRAF = requestAnimationFrame(step);
@@ -6876,15 +6833,33 @@ expandPanel.addEventListener("click", function(e){
   var item = e.target.closest("[data-menu-action]");
   if (!item) return;
   var action = item.getAttribute("data-menu-action");
-  closeExpand(false);
+  // Dialogs remember what had focus and return it on close; that must be the menu button,
+  // not an item inside the menu that is about to be hidden.
+  closeExpand(action !== "portfolio");
   if (action === "portfolio"){
     switchSection("portfolio", true);
-  } else if (action === "assistant"){
-    var launcher = document.getElementById("assistant-launcher");
-    if (launcher && launcher.getAttribute("aria-expanded") !== "true") launcher.click();
-    else expandTrigger.focus();
+  } else if (action === "upscaler"){
+    if (window.kaOpenUpscaler) window.kaOpenUpscaler();
+  } else if (action === "typography"){
+    openTypographyStudio();
   }
 });
+// The Typography studio is its own lazily loaded bundle (dist/assets/studio.js): nothing of it is
+// downloaded until someone opens it from the menu.
+var studioLoading = false;
+function openTypographyStudio(){
+  if (studioLoading) return;
+  studioLoading = true;
+  expandTrigger.setAttribute("aria-busy", "true");
+  import("./dist/assets/studio.js").then(function(module){
+    module.openStudio({ returnFocus: expandTrigger });
+  }).catch(function(){
+    window.kaToast("The Typography studio couldn’t load. Check your connection and try again.", "error");
+  }).then(function(){
+    studioLoading = false;
+    expandTrigger.removeAttribute("aria-busy");
+  });
+}
 document.addEventListener("keydown", function(e){
   if (!expandOpen) return;
   if (e.key === "Escape"){ e.preventDefault(); closeExpand(true); return; }
