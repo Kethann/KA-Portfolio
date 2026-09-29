@@ -22,3 +22,6 @@ tmp/
 .env.*
 !.env.example
 tests/.delivery-*
+
+# build output (Vercel builds from source on every deploy)
+dist/

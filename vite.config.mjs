@@ -11,7 +11,7 @@ export default defineConfig({
   root:'client',
   preview:{host:'127.0.0.1',strictPort:true},
   build:{
-    outDir:'../dist',emptyOutDir:false,
+    outDir:'../dist',emptyOutDir:true,   // each Vercel deployment is atomic; a clean output never ships stale chunks
     rollupOptions:{
       // The crystal homepage imports mount() at runtime, outside Vite's HTML graph.
       preserveEntrySignatures:'strict',
