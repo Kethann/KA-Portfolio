@@ -1,15 +1,14 @@
 // Event-level regression checks; no claim of browser rendering or visual QA.
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
-const acorn=require(path.resolve(__dirname,'../../../Portfolio-main/node_modules/acorn/dist/acorn.js'));
+// Self-contained: TypeScript's parser and postcss come from this project's own node_modules.
+const ts=require('typescript'),postcss=require('postcss');
+function functionsIn(code){const out=new Map(),sf=ts.createSourceFile('inline.js',code,ts.ScriptTarget.Latest,true,ts.ScriptKind.JS);(function visit(n){if(ts.isFunctionDeclaration(n)&&n.name)out.set(n.name.text,code.slice(n.getStart(sf),n.end));ts.forEachChild(n,visit);})(sf);return out;}
 const html=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
-const postcss=require(path.resolve(__dirname,'../../../Portfolio-main/node_modules/postcss/lib/postcss.js'));
 // Parse real <style> elements only: script text can mention "<style>" in comments or strings.
 const markupOnly=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');
 for(const style of markupOnly.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)) postcss.parse(style[1]);
 const script=[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]).find(s=>s.includes('function mountCoverflow'));
-const funcs=new Map();
-function walk(n){if(!n||typeof n!=='object')return;if(n.type==='FunctionDeclaration')funcs.set(n.id.name,script.slice(n.start,n.end));Object.values(n).forEach(v=>Array.isArray(v)?v.forEach(walk):walk(v));}
-walk(acorn.parse(script,{ecmaVersion:'latest'}));
+const funcs=functionsIn(script);
 class Element{
   constructor(tag='div'){
     this.tag=tag;this.children=[];this.attrs={};this.events={};this.hidden=false;this.offsetLeft=0;this.offsetWidth=100;this.clientWidth=390;this.style={setProperty(){}};
@@ -98,9 +97,7 @@ console.log('PASS: CSS parses; nav hold/drag/release-before-paint; cancellation;
 Object.defineProperty(Element.prototype,'parentNode',{get(){return this.parent||null;}});
 Element.prototype.remove=function(){if(this.parent){this.parent.children=this.parent.children.filter(e=>e!==this);this.parent=null;}};
 const chatScript=[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]).find(s=>s.includes('function sendMessage(text)'));
-const chatFuncs=new Map();
-function walkChat(n){if(!n||typeof n!=='object')return;if(n.type==='FunctionDeclaration')chatFuncs.set(n.id.name,chatScript.slice(n.start,n.end));Object.values(n).forEach(v=>Array.isArray(v)?v.forEach(walkChat):walkChat(v));}
-walkChat(acorn.parse(chatScript,{ecmaVersion:'latest'}));
+const chatFuncs=functionsIn(chatScript);
 const messagesEl=new Element(),panel=new Element(),launcher=new Element(),input=new Element(),sendBtn=new Element();
 let reads=0;const chatEvents=[];
 const packets=['data: {"text":"Hello"}\n\n','data: [DONE]\n\n'];

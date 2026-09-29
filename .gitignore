@@ -14,3 +14,11 @@ server/weights/
 tmp/
 *.log
 
+
+# local data (PGlite database, storage, outbox), Vercel CLI state, env files
+.data/
+.vercel/
+.env
+.env.*
+!.env.example
+tests/.delivery-*

@@ -11,5 +11,4 @@ for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)){
     if(source.parseDiagnostics.length)throw new Error(ts.flattenDiagnosticMessageText(source.parseDiagnostics[0].messageText,'\n'));
   }else new vm.Script(match[2],{filename:file});
 }
-new vm.Script(fs.readFileSync(path.resolve(__dirname,'../../public/creator.js'),'utf8'),{filename:'creator.js'});
-console.log(`PASS: all ${count} inline scripts and creator.js parse successfully.`);
+console.log(`PASS: all ${count} inline scripts parse successfully.`);

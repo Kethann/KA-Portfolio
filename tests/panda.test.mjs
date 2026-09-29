@@ -4,6 +4,9 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
 import * as THREE from 'three';
+import {setMaxListeners} from 'node:events';
+// Browsers put no cap on listeners per AbortSignal; Node's EventTarget warns above 10. Match the browser.
+class BrowserAbortController extends AbortController{constructor(){super();setMaxListeners(0,this.signal);}}
 const compile=async name=>ts.transpileModule(await readFile(new URL(`../client/src/${name}.ts`,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const activity={};vm.runInNewContext(await compile('panda-activity'),{exports:activity});
 const geometry={};vm.runInNewContext(await compile('panda-character'),{exports:geometry,require:name=>name==='three'?THREE:activity});
@@ -60,7 +63,7 @@ test('controller pauses hidden/reduced/detached rendering, resumes, and cleans u
   const exported={},context={exports:exported,require:name=>name==='three'?{...THREE,WebGLRenderer:Renderer}:name==='./panda-activity'?activity:name==='./panda-travel'?travel:{
     createPanda:()=>({root:new THREE.Group(),activities:activity.activities,update:(...args)=>updates.push(args),dispose(){}})
   },document,matchMedia:()=>media,navigator:{hardwareConcurrency:8},devicePixelRatio:2,crypto:{getRandomValues:array=>{array[0]=12;return array;}},
-    AbortController,ResizeObserver:Observer,IntersectionObserver:Observer,
+    AbortController:BrowserAbortController,ResizeObserver:Observer,IntersectionObserver:Observer,
     requestAnimationFrame:fn=>{rafs.set(++id,fn);return id;},cancelAnimationFrame:key=>rafs.delete(key)};
   vm.runInNewContext(controllerCode,context);
   const tick=now=>{const callbacks=[...rafs.values()];rafs.clear();callbacks.forEach(fn=>fn(now));};
@@ -168,7 +171,7 @@ test('live panda controller tears, casts a fresh thread, greets once, and cancel
  class Observer{observe(){}disconnect(){}}
  class Renderer{domElement=new Element();setClearColor(){}setPixelRatio(){}setSize(){}render(){}dispose(){}}
  vm.runInNewContext(controllerCode,{exports:exported,require:name=>name==='three'?{...THREE,WebGLRenderer:Renderer}:name==='./panda-activity'?activity:name==='./panda-travel'?travel:{createPanda:()=>({root:new THREE.Group(),activities:activity.activities,update(){},climb(){},wave:t=>waves.push(t),dispose(){}})},
-  document,window:{visualViewport:{height:640}},matchMedia:()=>media,navigator:{hardwareConcurrency:8},devicePixelRatio:1,crypto:{getRandomValues:a=>a.fill(12)},AbortController,ResizeObserver:Observer,IntersectionObserver:Observer,
+  document,window:{visualViewport:{height:640}},matchMedia:()=>media,navigator:{hardwareConcurrency:8},devicePixelRatio:1,crypto:{getRandomValues:a=>a.fill(12)},AbortController:BrowserAbortController,ResizeObserver:Observer,IntersectionObserver:Observer,
   requestAnimationFrame:fn=>{frames.set(++id,fn);return id;},cancelAnimationFrame:id=>frames.delete(id)});
  const dispose=await exported.mountPanda(host,launcher);
  assert.equal(host.parentElement,launcher,'idle panda must zoom and pan with the chat button');

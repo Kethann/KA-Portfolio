@@ -1371,6 +1371,7 @@ html.ka-modal-open{ overflow:hidden; }
           <span class="field-error" id="err-message"></span>
         </label>
         <input type="text" name="website" tabindex="-1" autocomplete="off" class="hp-field" aria-hidden="true">
+        <div class="ka-turnstile field-full" id="contact-turnstile"></div>
         <button class="contact-submit field-full" type="submit">Send message</button>
         <p class="contact-status field-full" id="contact-status" role="status" aria-live="polite"></p>
       </form>
@@ -7412,6 +7413,17 @@ Object.keys(CONTACT_RULES).forEach(function(key){
   rule.el.addEventListener("input", function(){ if (touched) validateContactField(key); updateContactSubmitState(); });
 });
 updateContactSubmitState();
+// Bot check (Cloudflare Turnstile): loaded the first time someone starts using the form, not on
+// page load, so the hero never waits for it. Invisible unless Cloudflare needs an interaction.
+var contactTurnstile = null, contactTurnstileLoading = false;
+function ensureContactTurnstile(){
+  if (contactTurnstile || contactTurnstileLoading || !window.kaTurnstile) return;
+  contactTurnstileLoading = true;
+  window.kaTurnstile(document.getElementById("contact-turnstile")).then(function(w){ contactTurnstile = w; })
+    .catch(function(){}).then(function(){ contactTurnstileLoading = false; });
+}
+contactForm.addEventListener("focusin", ensureContactTurnstile);
+contactForm.addEventListener("pointerdown", ensureContactTurnstile);
 contactForm.addEventListener("submit", function(e){
   e.preventDefault();
   if(contactSending)return;
@@ -7423,6 +7435,7 @@ contactForm.addEventListener("submit", function(e){
     subject: (data.get("subject") || "").toString().trim(),
     message: (data.get("message") || "").toString().trim(),
     website: (data.get("website") || "").toString(), // honeypot -- left empty by real visitors
+    turnstileToken: contactTurnstile ? contactTurnstile.token() : ""
   };
   var allValid = Object.keys(CONTACT_RULES).reduce(function(acc, key){
     return validateContactField(key) && acc;
@@ -7455,7 +7468,11 @@ contactForm.addEventListener("submit", function(e){
     var message = (err && err.name === "AbortError") ? "The request took too long -- please try again." :
       ((err && err.message) || "Something went wrong -- please try again, or reach out via Behance.");
     return { ok: false, message: message };
-  }).then(function(outcome){ clearTimeout(abortTimer); return outcome; });
+  }).then(function(outcome){
+    clearTimeout(abortTimer);
+    if (contactTurnstile) contactTurnstile.reset();   // a token is single-use: fresh one for the next send
+    return outcome;
+  });
   KaRocket.send(submitBtn, card, request).then(function(outcome){
     contactStatus.textContent = outcome.ok ? "Message sent -- thanks for reaching out, I'll get back to you soon." : outcome.message;
     contactStatus.dataset.state = outcome.ok ? "ok" : "error";

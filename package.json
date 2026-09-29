@@ -3,34 +3,41 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "KA crystal-logo hero + portfolio gallery, with a small Node backend for the portfolio AI assistant.",
+  "description": "KA portfolio + store: static site, portable Web API handlers (Vercel today), Supabase Postgres/Storage.",
   "scripts": {
     "prestart": "npm run build",
-    "start": "node server/index.js",
+    "start": "node server/platform/node-dev.js",
     "dev": "npm start",
     "build": "node generator/scripts/verify_scripts.cjs && tsc --noEmit && vite build && node --test tests/gallery-build.test.mjs tests/delivery.test.mjs && node generator/scripts/verify_startup.cjs",
+    "build:vercel": "node generator/scripts/verify_scripts.cjs && tsc --noEmit && vite build",
     "frontend": "vite",
-    "test": "node --test tests/workstacks.test.mjs tests/assistant.test.mjs tests/gallery-state.test.mjs tests/creator.test.mjs tests/creator-ui.test.mjs tests/mobile-ui.test.mjs tests/paper-motion.test.mjs tests/liquid-glass.test.mjs tests/folder.test.mjs tests/gallery.test.mjs tests/folder-shelf.test.mjs tests/poster.test.mjs tests/panda.test.mjs"
+    "test": "node --test --test-concurrency=1 tests/ && node generator/scripts/verify_ui.cjs",
+    "db:import-legacy": "node scripts/import-legacy.mjs",
+    "db:migrate": "node scripts/db-migrate.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
-    "cors": "^2.8.6",
     "dotenv": "^16.4.5",
-    "express": "^4.21.1",
-    "geoip-lite": "^2.0.3",
     "gsap": "^3.12.7",
+    "postgres": "3.4.9",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "three": "^0.185.1"
+    "three": "^0.185.1",
+    "ua-parser-js": "1.0.41"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@types/three": "^0.185.4",
+    "postcss": "8.5.28",
     "typescript": "^5.7.2",
     "vite": "^6.4.3"
   },
   "overrides": {
     "qs": "^6.16.0"
+  },
+  "engines": {
+    "node": ">=20.10"
   }
 }
