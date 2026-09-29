@@ -7,7 +7,7 @@ import { get, put } from '../api';
 export type SiteImage = { id: string; slug: string; title: string; cat: string; description: string; technologies: string[]; link: string; downloadable?: boolean; src?: string; widths: number[]; full: number; width?: number; height?: number };
 export type SiteDoc = {
   revision: number; details: Record<string, any> & { customFonts: { family: string; url: string }[] }; folders: string[]; images: SiteImage[];
-  notice: { enabled: boolean; text: string; tone: 'info' | 'warning' }; visibility: { navGallery: boolean; navAbout: boolean };
+  notice: { enabled: boolean; text: string; tone: 'info' | 'warning' }; visibility: { navGallery: boolean; navAbout: boolean; autoFullscreen?: boolean };
   stacks: { loop: boolean; covers: Record<string, string> }; layoutOverrides: Record<string, Record<string, { x: number; y: number; scale: number }>>;
   branding: { enabled: boolean; logoUrl: string }; elementStyles: Record<string, any>; socialLinks: { label: string; url: string; icon: string }[];
 };
@@ -27,7 +27,7 @@ export async function loadSite(force = false){
   } catch (e: any){ emit({ error: e.message, loading: false }); }
 }
 function withDefaults(d: SiteDoc): SiteDoc {
-  return { ...d, notice: d.notice || { enabled: false, text: '', tone: 'info' }, visibility: d.visibility || { navGallery: true, navAbout: true },
+  return { ...d, notice: d.notice || { enabled: false, text: '', tone: 'info' }, visibility: { navGallery: d.visibility?.navGallery ?? true, navAbout: d.visibility?.navAbout ?? true, autoFullscreen: d.visibility?.autoFullscreen ?? true },
     stacks: d.stacks || { loop: true, covers: {} }, layoutOverrides: d.layoutOverrides || { mobile: {}, tablet: {}, desktop: {} }, branding: d.branding || { enabled: false, logoUrl: '' },
     elementStyles: d.elementStyles || {}, socialLinks: d.socialLinks || [], details: { ...d.details, customFonts: d.details?.customFonts || [] } };
 }

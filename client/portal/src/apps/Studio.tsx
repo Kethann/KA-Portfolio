@@ -73,6 +73,10 @@ export default function Studio({ active }: AppProps){
                 <Switch checked={d.visibility.navGallery} onChange={v => updateSite(x => ({ ...x, visibility: { ...x.visibility, navGallery: v } }))} label="Show the gallery in the nav" />
                 <Switch checked={d.visibility.navAbout} onChange={v => updateSite(x => ({ ...x, visibility: { ...x.visibility, navAbout: v } }))} label="Show About in the nav" />
               </div>
+              <div className="stack"><div className="eyebrow">Full screen</div>
+                <Switch checked={d.visibility.autoFullscreen !== false} onChange={v => updateSite(x => ({ ...x, visibility: { ...x.visibility, autoFullscreen: v } }))} label="Go full screen on a visitor’s first tap or click" />
+                <p className="field-hint">Browsers only allow full screen after the visitor interacts, so it starts on their first tap, click or key press. If they leave full screen it isn’t forced again during that visit. iPhone Safari never allows it: there the ☰ menu offers Add to Home Screen instead.</p>
+              </div>
             </>}
 
             {section === 'social' && <Social doc={d} />}
