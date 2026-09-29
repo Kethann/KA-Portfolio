@@ -161,10 +161,11 @@ export function Dock({ pulse, compact }: { pulse: any; compact: boolean }){
         if (!el) continue;
         const r = el.getBoundingClientRect(), d = Math.abs(x - (r.left + r.width / 2)), range = 150;
         el.style.setProperty('--s', String(1 + 0.55 * Math.max(0, Math.cos(Math.min(d / range, 1) * Math.PI / 2)) ** 2));
+        el.style.setProperty('--lx', String(Math.max(-1, Math.min(1, (x - (r.left + r.width / 2)) / range))));   // glass sheen leans toward the pointer
       }
     });
   };
-  const reset = () => { cancelAnimationFrame(raf.current); for (const el of items.current) el?.style.setProperty('--s', '1'); };
+  const reset = () => { cancelAnimationFrame(raf.current); for (const el of items.current){ el?.style.setProperty('--s', '1'); el?.style.setProperty('--lx', '0'); } };
   const click = (id: string) => {
     const w = desk.wins.find(x => x.id === id);
     if (w && !w.min && desk.focused === id && !compact) desk.minimize(id);
