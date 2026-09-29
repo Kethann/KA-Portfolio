@@ -6930,6 +6930,21 @@ renderNavItems(); // builds the bar, measures the labels and places the pill (us
   else if (params.get("tip")) switchSection("tips");
   else if (page === "store" || page === "tips" || page === "contact") switchSection(page);
 })();
+// Opens a site link ("/?product=poster-kit", "/?tip=…", "/?page=contact") without reloading the page:
+// the address bar updates (so it can be shared), the right section opens, and an already-loaded store
+// is told which item to show. Returns false for anything it doesn't handle.
+window.kaOpenLink = function(href){
+  var u; try { u = new URL(href, location.href); } catch(e){ return false; }
+  if (u.origin !== location.origin || (u.pathname !== "/" && u.pathname !== "/index.html")) return false;
+  var product = u.searchParams.get("product"), tip = u.searchParams.get("tip"), page = u.searchParams.get("page");
+  var section = product ? "store" : tip ? "tips" : (page === "store" || page === "tips" || page === "contact") ? page : null;
+  if (!section) return false;
+  try { history.pushState(null, "", u.pathname + u.search); } catch(e){}
+  switchSection(section);
+  if (product) window.dispatchEvent(new CustomEvent("ka-open-product", { detail: product }));
+  if (tip) window.dispatchEvent(new CustomEvent("ka-open-tip", { detail: tip }));
+  return true;
+};
 requestAnimationFrame(function(){ nav.classList.add("revealed"); });
 document.fonts?.ready.then(measureNavLabels);
 document.fonts?.addEventListener?.("loadingdone", measureNavLabels); // a font requested later (e.g. the mono label face) also re-measures
@@ -8103,6 +8118,9 @@ body:has(.assistant-panel.open) .site-section{ filter:brightness(0.7); transitio
 .assistant-msg{ font-size:var(--step--1); line-height:1.5; max-width:88%; }
 .assistant-msg.user{ align-self:flex-end; background:rgba(255,148,56,0.16); border-radius:14px 14px 2px 14px; padding:8px 12px; }
 .assistant-msg.bot{ align-self:flex-start; color:var(--ink); }
+.assistant-link{ display:inline-flex; align-items:center; gap:4px; margin:1px 2px; padding:1px 9px; border-radius:999px; background:rgba(255,148,56,.14); border:1px solid rgba(255,148,56,.35); color:#ffb070; font-weight:600; text-decoration:none; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; vertical-align:baseline; }
+.assistant-link:hover,.assistant-link:focus-visible{ background:rgba(255,148,56,.24); color:#ffd0a6; outline:none; }
+.assistant-link::after{ content:"↗"; font-size:.85em; opacity:.8; }
 .assistant-msg.bot .cursor{ display:inline-block; width:6px; height:1em; background:var(--amber); margin-left:2px; vertical-align:text-bottom; animation:blinkCursor 1s step-end infinite; }
 @keyframes blinkCursor{ 50%{ opacity:0; } }
 .assistant-typing{ display:flex; gap:4px; align-self:flex-start; padding:4px 0; }
@@ -8244,9 +8262,26 @@ function addTypingIndicator(){
 function removeChips(){ chipsEl.innerHTML = ""; }
 chipsEl.addEventListener("wheel", function(e){ if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && chipsEl.scrollWidth > chipsEl.clientWidth){ chipsEl.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
 
+// On phones and tablets the keyboard shrinks the visual viewport but not the layout one: publish its
+// height as --kb so the input sits above it, and follow rotation.
+function syncKeyboard(){
+  var vv = window.visualViewport, a = document.activeElement;
+  var typing = opened && !!a && panel.contains(a) && /^(INPUT|TEXTAREA)$/.test(a.tagName);   // a rotation alone must not look like a keyboard
+  var kb = vv && typing ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;
+  panel.style.setProperty("--kb", (kb > 60 ? kb : 0) + "px");
+  if (opened && followChat) messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+if (window.visualViewport){ window.visualViewport.addEventListener("resize", syncKeyboard); window.visualViewport.addEventListener("scroll", syncKeyboard); }
+window.addEventListener("orientationchange", function(){ setTimeout(syncKeyboard, 250); });
+window.addEventListener("resize", syncKeyboard);
+panel.addEventListener("focusin", function(){ setTimeout(syncKeyboard, 60); });
+panel.addEventListener("focusout", function(){ setTimeout(syncKeyboard, 60); });
+
 function openPanel(){
   if (opened) return;
   opened = true;
+  document.body.classList.add("ka-chat-open");
+  syncKeyboard();
   clearTimeout(closeTimer);panel.classList.remove("closing");
   panel.hidden = false;
   launcher.setAttribute("aria-expanded", "true");
@@ -8258,7 +8293,7 @@ function openPanel(){
     if (storedName && storedHistory.length){
       // Returning visitor, same device, already has context -- restore it instead of greeting again.
       history = storedHistory;
-      history.forEach(function(m){ addMessage(m.role === "assistant" ? "bot" : "user", m.content, true); });
+      history.forEach(function(m){ var el = addMessage(m.role === "assistant" ? "bot" : "user", m.content, true); if (m.role === "assistant") linkify(el, m.content); });
     } else if (storedName){
       addMessage("bot", pickGreeting(storedName));
       addQuickReplies();
@@ -8266,7 +8301,8 @@ function openPanel(){
       addNamePrompt();
     }
   }
-  input.focus();
+  // touch screens: don't pop the keyboard over the panel before anything is read (the input is one tap away)
+  if (window.matchMedia("(pointer: coarse)").matches) closeBtn.focus({ preventScroll:true }); else input.focus();
 }
 function addQuickReplies(){
   QUICK_REPLIES.forEach(function(q){
@@ -8304,6 +8340,8 @@ function addNamePrompt(){
 function closePanel(){
   if (!opened) return;
   opened = false;
+  document.body.classList.remove("ka-chat-open");
+  syncKeyboard();
   launcher.setAttribute("aria-expanded", "false");
   document.dispatchEvent(new CustomEvent("ka-chat-state",{detail:{open:false}}));
   panel.classList.remove("open");
@@ -8348,9 +8386,42 @@ sendBtn.addEventListener("click", function(){
   if (text) { removeChips(); sendMessage(text); input.value = ""; autoGrow(); }
 });
 
+// Answers become clickable: site links (/?product=…) open in place, web links in a new tab.
+// Built with DOM nodes only (never innerHTML), so answer text can't inject markup.
+var LINK_RE = /(\/\?(?:product|tip|page)=[a-z0-9-]+|https?:\/\/[^\s<>()"']+[^\s<>()"'.,;:!?]|\*\*[^*\n]{1,120}\*\*)/gi;
+function linkify(el, text){
+  if (!el || !text) return;
+  text = text.replace(/^[ \t]*[-*][ \t]+/gm, "• ");   // list dashes become bullets
+  LINK_RE.lastIndex = 0;
+  var frag = document.createDocumentFragment(), last = 0, m;
+  while ((m = LINK_RE.exec(text))){
+    if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+    if (m[0].slice(0, 2) === "**"){ var b = document.createElement("strong"); b.textContent = m[0].slice(2, -2); frag.appendChild(b); last = m.index + m[0].length; continue; }
+    var a = document.createElement("a"), href = m[0];
+    a.href = href; a.className = "assistant-link";
+    a.textContent = /^\/\?product=/.test(href) ? "View item" : /^\/\?tip=/.test(href) ? "Read tip" : /^\/\?page=/.test(href) ? "Open page" : href.replace(/^https?:\/\/(www\.)?/, "");
+    a.title = href;
+    if (/^https?:/i.test(href) && href.indexOf(location.origin) !== 0){ a.target = "_blank"; a.rel = "noopener noreferrer"; }
+    frag.appendChild(a); last = m.index + href.length;
+  }
+  if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+  el.textContent = ""; el.appendChild(frag);
+}
+messagesEl.addEventListener("click", function(e){
+  var a = e.target.closest && e.target.closest("a.assistant-link");
+  if (!a || a.target === "_blank" || !window.kaOpenLink) return;
+  if (window.kaOpenLink(a.getAttribute("href"))){
+    e.preventDefault();
+    // on phones and tablets the panel covers the page: get out of the way so the item is visible
+    if (window.matchMedia("(max-width: 1024px)").matches) closePanel();
+  }
+});
+
 function sendMessage(text){
   if (streaming) return;
   streaming = true;
+  var namePrompt = messagesEl.querySelector(".assistant-name-prompt");
+  if (namePrompt) namePrompt.remove();
   messagesEl.setAttribute("aria-busy","true");panel.setAttribute("aria-busy","true");followChat=true;
   sendBtn.disabled = true;
   addMessage("user", text);
@@ -8431,6 +8502,7 @@ function sendMessage(text){
       if (fullText) history.push({ role: "assistant", content: fullText });
       history = history.slice(-12);
       saveChatHistory();
+      if (botEl && fullText){ var doneEl = botEl, doneText = fullText; setTimeout(function(){ linkify(doneEl, doneText); }, window.kaGhost ? 700 : 0); }
       streaming = false; sendBtn.disabled = false;messagesEl.setAttribute("aria-busy","false");panel.setAttribute("aria-busy","false");
     }
     return pump();
@@ -8848,17 +8920,6 @@ window.matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change",
 .assistant-panel.open{transition:opacity .3s ease,transform .4s var(--ease-standard);}
 .assistant-panel.closing{transition:opacity .2s ease,transform .25s ease;transform:scale(.97);}
 body:has(.assistant-panel.open) #site-nav,body:has(.assistant-panel.open) .site-section{filter:none;}
-.assistant-panel{z-index:72;}
-.assistant-close,.assistant-chip{min-height:44px;}
-.assistant-close{min-width:44px;}
-.assistant-messages{overflow-wrap:anywhere;}
-.nav-pill{transition:border-radius .24s ease,opacity .25s ease;}
-@media(max-width:760px){:root{--glass-blur:blur(10.8px) saturate(125%);}}
-@media(max-width:600px){.assistant-panel{bottom:calc(max(16px,env(safe-area-inset-bottom)) + 74px);min-height:0;max-height:calc(100dvh - max(16px,env(safe-area-inset-bottom)) - max(12px,env(safe-area-inset-top)) - 86px);}}
-@media(max-height:500px){.assistant-panel{top:8px;bottom:8px;max-height:calc(100dvh - 16px);min-height:0;}.assistant-head{padding:12px 16px;}.assistant-chips{padding-bottom:8px;}}
-@media(prefers-reduced-motion:reduce){.assistant-panel,.assistant-panel.open,.assistant-panel.closing{transform:none;transition:opacity .15s ease;}}
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){:root{--glass-bg:#211d24;--glass-bg-heavy:#17151d;}}
-
 </style>
 
 <style>
@@ -8898,6 +8959,26 @@ footer.site-footer{border:0;box-shadow:none;flex-wrap:wrap;gap:16px 24px;backgro
   .assistant-chips{flex-wrap:nowrap;overflow-x:auto;flex-shrink:0;padding-bottom:8px}
   .assistant-chip{flex:0 0 auto}
   .assistant-head{padding:10px 14px}
+}
+/* Tablets. Portrait: a bottom sheet (tall, narrow screen: widest room for messages, top of the page
+   still visible). Landscape: a full-height side panel on the right (the page stays visible on the
+   left). Fixed sizes, so the panel doesn't grow and jump as answers stream in. Rotating (or the keyboard
+   opening) morphs between the two instead of jumping; typed text, the thread and its scroll stay. */
+@media (min-width:601px) and (max-width:1366px) and (min-height:521px) and (pointer:coarse) and (orientation:portrait){
+  .assistant-panel{left:max(16px,env(safe-area-inset-left));right:max(16px,env(safe-area-inset-right));top:auto;width:auto;
+    bottom:calc(max(16px,env(safe-area-inset-bottom)) + var(--kb,0px));height:min(62svh,calc(100svh - 110px - var(--kb,0px)));max-height:none;min-height:0;
+    border-radius:24px;transform-origin:bottom center;}
+}
+@media (min-width:601px) and (max-width:1366px) and (min-height:521px) and (pointer:coarse) and (orientation:landscape){
+  .assistant-panel{right:max(16px,env(safe-area-inset-right));left:auto;top:max(16px,env(safe-area-inset-top));width:min(420px,44vw);
+    bottom:calc(max(16px,env(safe-area-inset-bottom)) + var(--kb,0px));height:auto;max-height:none;min-height:0;border-radius:24px;transform-origin:right center;}
+}
+@media (min-width:601px) and (max-width:1366px) and (min-height:521px) and (pointer:coarse){
+  body.ka-chat-open .assistant-launcher{opacity:0;pointer-events:none;}
+  .assistant-panel.open{transition:opacity .3s ease,transform .4s var(--ease-standard),top .32s ease,bottom .32s ease,left .32s ease,right .32s ease,width .32s ease,height .32s ease,border-radius .32s ease;}
+}
+@media (min-width:601px) and (max-width:1366px) and (pointer:coarse) and (prefers-reduced-motion:reduce){
+  .assistant-panel.open{transition:opacity .2s ease;}
 }
 </style>
 <script>

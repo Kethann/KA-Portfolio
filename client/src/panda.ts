@@ -61,12 +61,18 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
     host.classList.toggle('panda-traveler',travelling);
     const launch=launcher.getBoundingClientRect(),rect=host.getBoundingClientRect();
     const width=host.offsetWidth||rect.width,height=host.offsetHeight||rect.height;
-    if(travel.open&&!panel.hidden){const bounds=panel.getBoundingClientRect();lastPerch={x:bounds.left+bounds.width/2-width/2,y:Math.max(4,bounds.top-height-8)};}
+    // Perch above the open chat; if it fills the top of the screen (tablet side panel), hang beside it;
+    // if there's no room at all (phone sheet), bow out while the chat is open instead of covering its header.
+    let tucked=false;
+    if(travel.open&&!panel.hidden){const b=panel.getBoundingClientRect();
+      if(b.top>=height+12)lastPerch={x:b.left+b.width/2-width/2,y:b.top-height-8};
+      else if(b.left>=width+20)lastPerch={x:b.left-width-12,y:b.top+14};
+      else{lastPerch={x:b.left+b.width/2-width/2,y:4};tucked=true;}}
     const home={x:launch.left+launch.width/2-width/2,y:launch.bottom-height-(compact?30:26)};
     const pose=travelPose(travel,lastPerch,home,(window.visualViewport?.offsetTop||0)+(window.visualViewport?.height||innerHeight),height);
     lastPosition={x:pose.x,y:pose.y};
     host.style.transform=travelling?`translate3d(${pose.x}px,${pose.y}px,0) rotate(${pose.rotation}deg)`:'translateX(-50%)';
-    host.style.opacity=String(pose.opacity);host.dataset.travel=travel.stage;
+    host.style.opacity=String(tucked&&travel.stage==='perched'?0:pose.opacity);host.dataset.travel=travel.stage;
     if(thread&&rope&&loose){
       const returning=travel.stage==='return';
       threadX=pose.x+width*.5;threadY=Math.max(0,pose.y+height*.2);
@@ -89,6 +95,8 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
       }else if(travel.stage==='fall'){
         const paths=threadPaths(snapX,snapY,0,.58,0,travel.elapsed);
         thread.style.opacity=String(paths.opacity);rope.setAttribute('d',paths.upper);loose.setAttribute('d',paths.lower);
+      }else if(tucked&&travel.stage==='perched'){
+        thread.style.opacity='0';
       }else if(pose.thread>0){
         const paths=threadPaths(threadX,threadY,media.matches?0:tension.x,hit,time-disturbed,null);
         rope.setAttribute('d',paths.upper);loose.setAttribute('d','');thread.style.opacity=String(pose.thread);

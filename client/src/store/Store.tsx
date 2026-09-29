@@ -43,17 +43,23 @@ export function Store({ onBuy, onResend, initialProduct }: StoreProps){
     artifacts: (data?.products || []).filter(p => p.kind === 'artifacts')
   }), [data]);
 
-  // ?product=slug deep link: open that item once the catalog is in.
-  const deepLinked = useRef(false);
+  // ?product=slug deep link on first load, and later requests from the page (e.g. a link in the
+  // assistant's answer): open that item once the catalog is in.
+  const [wanted, setWanted] = useState<string | null>(initialProduct || null);
   useEffect(() => {
-    if (!data || deepLinked.current || !initialProduct) return;
-    deepLinked.current = true;
-    const p = data.products.find(x => x.slug === initialProduct);
+    const on = (e: Event) => { const slug = (e as CustomEvent<string>).detail; if (typeof slug === 'string') setWanted(slug); };
+    addEventListener('ka-open-product', on);
+    return () => removeEventListener('ka-open-product', on);
+  }, []);
+  useEffect(() => {
+    if (!data || !wanted) return;
+    setWanted(null);
+    const p = data.products.find(x => x.slug === wanted);
     if (!p) return;
     changeTab(p.kind);
     const list = byKind[p.kind];
     setLightbox({ items: list, index: list.indexOf(p), mediaIndex: 0, opener: null });
-  }, [data, initialProduct, byKind]);
+  }, [data, wanted, byKind]);
 
   return <div className="kas-store">
     <div className="kas-bar">

@@ -41,7 +41,7 @@ function Overview({ go }: { go: (r: string) => void }){
     <div className="app-main">
       <div className="row between">
         <div className="row"><img src={logo} alt="" width={40} height={40} className="ka-avatar" /><div><h2 className="section-title">KA Assistant</h2>
-          <p className="faint">{d.settings.enabled ? 'On' : 'Off'} · {d.provider.name === 'anthropic' ? 'Anthropic' : 'Google Gemini'} · <span className="mono">{d.provider.model}</span></p></div></div>
+          <p className="faint">{d.settings.enabled ? 'On' : 'Off'} · {d.provider.name === 'anthropic' ? 'Anthropic' : 'Google Gemini'} · <span className="mono" title="Tried in this order: when one is out of free quota or busy, the next answers">{(d.provider.chain || [d.provider.model]).join(' → ')}</span></p></div></div>
         {!d.provider.configured && <Badge tone="danger">{d.provider.keyVar} is not set</Badge>}
       </div>
       <div className="kpis">
