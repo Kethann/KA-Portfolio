@@ -58,7 +58,13 @@ for(const hz of [30,60,144]) test(`flight at ${hz} Hz preserves response and use
   assert.match(rocket.style.transform,/scale\(0\.850\)/);
   assert.doesNotMatch(rocket.style.transform,/NaN|Infinity/);
   assert.equal(h.frames.size,0);
+  // light impact: exactly the configured handful of sparks, and one ring
+  assert.equal(h.api.defaults.sparks,3);
+  assert.equal(h.nodes.filter(n=>n.className==='rk-spark').length,3);
+  assert.equal(h.nodes.filter(n=>n.className==='rk-ring').length,1);
   h.flush();assert.equal(rocket.parentNode.parentNode,null);
+  // every overlay node leaves the page with the layer
+  assert.equal(h.nodes.find(n=>n.className==='rk-layer').parentNode,null);
 });
 
 test('retina trail resolution adapts to screen and memory budget',async()=>{
@@ -66,9 +72,9 @@ test('retina trail resolution adapts to screen and memory budget',async()=>{
     const h=harness(settings), result={ok:true};
     const flight=h.api.fly(h.button,h.card,Promise.resolve(result));
     const canvas=h.nodes.find(n=>n.className==='rk-trail');
-    const budget=settings.memory<=2?1500000:4000000;
+    const budget=settings.memory<=2?1000000:2500000;
     assert.ok(canvas.width*canvas.height<=budget+5000);
-    if(settings.width===390) assert.equal(canvas.width,1170);
+    if(settings.width===390) assert.equal(canvas.width,780); // soft dots are capped at 2x
     h.window.innerWidth+=1;h.step(1);
     assert.equal(await flight,result);assert.equal(h.frames.size,0);h.flush();
   }

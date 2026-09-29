@@ -3,7 +3,9 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 const acorn=require(path.resolve(__dirname,'../../../Portfolio-main/node_modules/acorn/dist/acorn.js'));
 const html=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
 const postcss=require(path.resolve(__dirname,'../../../Portfolio-main/node_modules/postcss/lib/postcss.js'));
-for(const style of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)) postcss.parse(style[1]);
+// Parse real <style> elements only: script text can mention "<style>" in comments or strings.
+const markupOnly=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');
+for(const style of markupOnly.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)) postcss.parse(style[1]);
 const script=[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]).find(s=>s.includes('function mountCoverflow'));
 const funcs=new Map();
 function walk(n){if(!n||typeof n!=='object')return;if(n.type==='FunctionDeclaration')funcs.set(n.id.name,script.slice(n.start,n.end));Object.values(n).forEach(v=>Array.isArray(v)?v.forEach(walk):walk(v));}
@@ -25,31 +27,56 @@ class Element{
   getBoundingClientRect(){return {left:0,top:0,width:390,height:300};}
   setPointerCapture(id){this.capture=id;}hasPointerCapture(id){return this.capture===id;}releasePointerCapture(){this.capture=null;}
   focus(){this.focused=true;}scrollTo(options){this.scroll=options;}
+  querySelector(s){return s==='h1, h2'?this.heading||null:null;}
 }
 let time=0,id=0;const timers=new Map(),rafs=new Map();
 const window=new Element();window.innerWidth=390;
 const nav=new Element(),pill=new Element();
-const items=['contact','portfolio','gallery'].map((name,i)=>{const e=new Element('button');e.className='nav-item';e.setAttribute('data-section',name);e.offsetLeft=6+i*100;nav.appendChild(e);return e;});
-const sections=Object.fromEntries(items.map(e=>{const name=e.getAttribute('data-section'),s=new Element();s.hidden=name!=='portfolio';return [name,s];}));
-const c=vm.createContext({console,window,document:{createElement:t=>new Element(t)},nav,navItemsContainer:nav,navPill:pill,navItems:items,sections,
-  activeSection:'portfolio',mobileNavQuery:{matches:false},reducedMotion:false,pillX:106,pillW:100,pillVX:0,pillRAF:0,lastPillT:0,sectionTimer:null,galleryTeardown:()=>{},galleryCoverflowEl:new Element(),
+// Nav pages: Contact, About (which also shows the Portfolio section), Store. Portfolio is a section, not a nav item.
+const items=['contact','about','store'].map((name,i)=>{const e=new Element('button');e.className='nav-item';e.setAttribute('data-section',name);e.offsetLeft=6+i*100;nav.appendChild(e);return e;});
+const sections=Object.fromEntries(['contact','about','portfolio','store','gallery'].map(name=>{const s=new Element();s.name=name;s.hidden=!(name==='about'||name==='portfolio');s.heading=new Element('h2');return [name,s];}));
+const visible=()=>Object.values(sections).filter(s=>!s.hidden).map(s=>s.name).sort().join(',');
+window.playAboutIntro=()=>{c.intros=(c.intros||0)+1;};
+const c=vm.createContext({console,window,document:{createElement:t=>new Element(t),getElementById:()=>new Element()},nav,navItemsContainer:nav,navPill:pill,navItems:items,sections,
+  PAGE_SECTIONS:{about:['about','portfolio'],contact:['contact'],gallery:['gallery'],store:['store'],tips:['tips']},
+  activeSection:'about',reducedMotion:false,pillX:106,pillW:100,pillRAF:0,NAV_MS:300,sectionTimer:null,sectionSwitching:false,pendingScroll:null,galleryTeardown:()=>{},galleryCoverflowEl:new Element(),
   performance:{now:()=>time},requestAnimationFrame:fn=>{rafs.set(++id,fn);return id;},cancelAnimationFrame:i=>rafs.delete(i),
   setTimeout:fn=>{timers.set(++id,fn);return id;},clearTimeout:i=>timers.delete(i),
   ResizeObserver:class{observe(){}disconnect(){}},POSTERS:[],IMG_BASE:'images/',
   buildPicture:()=>new Element('picture'),isPinned:()=>false,setPinned(){},sampleDominantColor:(p,cb)=>cb('#c88'),openLightbox:(p,i)=>{c.opened=i;}});
 function timersOnce(){const tasks=[...timers.values()];timers.clear();tasks.forEach(f=>f());}
 function frames(){for(let n=0;n<100&&rafs.size;n++){time+=16.667;const callbacks=[...rafs.values()];rafs.clear();callbacks.forEach(f=>f(time));}}
-for(const name of ['clamp','movePill','switchSection','mountCoverflow','refreshNavItemRefs']) vm.runInContext(funcs.get(name),c);
+for(const name of ['clamp','cubicBezier','movePill','navPage','pageSections','focusSectionHeading','switchSection','mountCoverflow','refreshNavItemRefs']) vm.runInContext(funcs.get(name),c);
+vm.runInContext('var navEase=cubicBezier(.22,.8,.24,1);',c);
 const start=script.indexOf('// Pointer capture keeps a held selection');
 vm.runInContext(script.slice(start,script.indexOf('var sectionTimer',start)),c);
+// One easing curve, pinned at both ends and never going backwards.
+assert.equal(c.navEase(0),0);assert.equal(c.navEase(1),1);
+for(let t=0,prev=0;t<=1;t+=.05){const v=c.navEase(t);assert(v>=prev-1e-9,'ease must not reverse');prev=v;}
+// Press on About, slide to Store, release before the next paint: Store opens, About + Portfolio close.
 nav.emit('pointerdown',{target:items[1],clientX:150});timersOnce();assert(nav.classList.contains('is-holding'));
 nav.emit('pointermove',{target:items[1],clientX:250});
-// Release before RAF: the final pointer position must still commit correctly.
 nav.emit('pointerup',{target:items[1],clientX:250});timersOnce();frames();
-assert.equal(c.activeSection,'gallery');assert.equal(sections.gallery.hidden,false);assert.equal(c.navDrag,null);
-c.switchSection('contact');c.switchSection('portfolio');timersOnce();frames();
-assert.equal(c.activeSection,'portfolio');assert.equal(Object.values(sections).filter(s=>!s.hidden).length,1);assert(!sections.portfolio.hidden);
-nav.emit('pointerdown',{target:items[1],clientX:150});nav.emit('pointermove',{target:items[1],clientX:20});nav.emit('pointercancel');frames();assert.equal(c.activeSection,'portfolio');assert.equal(c.navDrag,null);
+assert.equal(c.activeSection,'store');assert.equal(visible(),'store');assert.equal(c.navDrag,null);
+assert.equal(items[2].getAttribute('aria-current'),'page');assert.equal(items[1].getAttribute('aria-current'),null);
+// The pill finishes exactly on the selected item.
+assert.equal(parseFloat(pill.style.width),items[2].offsetWidth);assert(pill.style.transform.startsWith('translateX('+items[2].offsetLeft.toFixed(2)+'px)'));
+// Rapid changes: only the last page is shown, and About always brings Portfolio with it.
+c.switchSection('contact');c.switchSection('about');timersOnce();timersOnce();frames();
+assert.equal(c.activeSection,'about');assert.equal(visible(),'about,portfolio');
+// Portfolio from another page: About opens, the poster-wall intro is skipped, the view lands on Portfolio.
+c.switchSection('contact');timersOnce();timersOnce();assert.equal(visible(),'contact');
+const introsBefore=c.intros||0;
+sections.portfolio.scrolled=0;sections.portfolio.scrollIntoView=function(){this.scrolled++;};
+c.switchSection('portfolio',true);timersOnce();frames();
+assert.equal(c.activeSection,'about');assert.equal(visible(),'about,portfolio');assert.equal(sections.portfolio.scrolled,1);
+assert.equal(c.intros||0,introsBefore,'no poster-wall flash when jumping to Portfolio');
+assert(sections.about.classList.contains('about-intro-done'));
+assert(sections.portfolio.heading.focused,'focus moves to the Portfolio heading');
+// Portfolio while already on About: scroll only, no page switch.
+c.switchSection('portfolio');assert.equal(sections.portfolio.scrolled,2);assert.equal(c.activeSection,'about');timersOnce();
+// Cancelled drag keeps the current page.
+nav.emit('pointerdown',{target:items[1],clientX:150});nav.emit('pointermove',{target:items[1],clientX:20});nav.emit('pointercancel');frames();assert.equal(c.activeSection,'about');assert.equal(c.navDrag,null);
 assert(nav.emit('click',{target:items[0]}).stopped);assert(!nav.emit('click',{target:items[0],detail:0}).stopped,'keyboard click suppressed');
 nav.emit('pointerdown',{target:items[1],clientX:150});nav.emit('pointermove',{target:items[1],clientX:225});frames();
 assert(pill.style.transform.includes('scale('));assert.notEqual(pill.style.borderRadius,'999px');
@@ -80,8 +107,10 @@ const packets=['data: {"text":"Hello"}\n\n','data: [DONE]\n\n'];
 const chat=vm.createContext({console,window,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},navigator:{language:'en'},TextDecoder,history:[],opened:false,streaming:false,followChat:true,closeTimer:null,reducedMotion:false,
   kaApiUrl:path=>path, // mirrors the real KA_API_BASE=''-by-default helper at the top of index.html (see the "API BASE CONFIG" script block)
   messagesEl,panel,launcher,input,sendBtn,chipsEl:new Element(),QUICK_REPLIES:[],pickGreeting:()=>"Welcome",
+  // returning visitor with no saved conversation: greeted by name, nothing restored, nothing persisted
+  getVisitorName:()=>"Tester",loadStoredChatHistory:()=>[],saveChatHistory(){},addQuickReplies(){},
   document:{createElement:t=>new Element(t),dispatchEvent:event=>chatEvents.push(event)},requestAnimationFrame:c.requestAnimationFrame,setTimeout:c.setTimeout,clearTimeout:c.clearTimeout,
-  fetch:()=>Promise.resolve({ok:true,body:{getReader:()=>({read:()=>Promise.resolve(reads<packets.length?{done:false,value:new TextEncoder().encode(packets[reads++])}:{done:true})})}})});
+  fetch:()=>Promise.resolve({ok:true,headers:{get:name=>name.toLowerCase()==='content-type'?'text/event-stream':null},body:{getReader:()=>({read:()=>Promise.resolve(reads<packets.length?{done:false,value:new TextEncoder().encode(packets[reads++])}:{done:true})})}})});
 for(const name of ['addMessage','addTypingIndicator','removeChips','openPanel','closePanel','sendMessage']) vm.runInContext(chatFuncs.get(name),chat);
 (async()=>{
   chat.openPanel();chat.closePanel();chat.openPanel();timersOnce();frames();

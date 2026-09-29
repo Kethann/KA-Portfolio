@@ -50,6 +50,10 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
      every @media(max-width:600px) rule in this file silently never applies on a real device,
      and everything renders zoomed out (tiny nav/hamburger/chat bubble) until pinch-zoomed. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- the first rel="icon" is the one the Creator Portal's favicon setting replaces (applyFavicon) -->
+<link rel="icon" type="image/png" sizes="64x64" href="images/favicon-64.png">
+<link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32.png">
+<link rel="apple-touch-icon" href="images/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <!-- Poppins/Playfair Display/Space Grotesk are the creator panel's other typography choices (see
@@ -664,13 +668,14 @@ p, li{ text-wrap:pretty; }
 .rk-trail{ position:absolute; inset:0; width:100%; height:100%; }
 .rk-rocket{ position:absolute; left:0; top:0; will-change:transform,opacity; }
 .rk-rocket svg{ display:block; overflow:visible; }
+/* impact: a thin ring and a few small sparks -- no shadows or glow layers */
 .rk-ring{
-  position:absolute; width:60px; height:60px; margin:-30px 0 0 -30px; border-radius:50%;
-  border:2px solid rgba(255,190,130,0.95); box-shadow:0 0 24px 4px rgba(255,120,60,0.55), inset 0 0 18px rgba(255,150,80,0.45);
+  position:absolute; width:48px; height:48px; margin:-24px 0 0 -24px; border-radius:50%;
+  border:1.5px solid rgba(255,196,146,0.8);
   will-change:transform,opacity;
 }
-.rk-spark{ position:absolute; width:6px; height:6px; margin:-3px 0 0 -3px; border-radius:50%;
-  background:radial-gradient(circle, #fff3dc, #ff9a52 60%, transparent 72%); will-change:transform,opacity; }
+.rk-spark{ position:absolute; width:4px; height:4px; margin:-2px 0 0 -2px; border-radius:50%;
+  background:#ffc690; will-change:transform,opacity; }
 .field-error{
   display:none; font-family:'Manrope', ui-sans-serif, sans-serif; font-size:11.5px;
   letter-spacing:normal; text-transform:none; color:#ff9c9c; min-height:0;
@@ -1137,6 +1142,101 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
    every load, whether or not a notice was ever actually enabled. This is what actually hides it
    again whenever the attribute is present. */
 #site-notice[hidden]{ display:none; }
+/* ============================================================ NAV v3: icon items that open into the bronze pill ======
+   Every item is an icon until selected; the selected one opens its label inside the pill. One duration and one
+   curve (--nav-ms / --nav-ease, mirrored by NAV_MS / navEase in the nav script) for the label track, the label
+   fade/slide, the pill and the menu glyph. The only layout property that animates is the label's grid track;
+   the bar is position:fixed, so nothing else on the page moves. Kept in the last stylesheet before the nav markup:
+   the nav script measures the bar while the page is still parsing, so these rules must already apply by then.
+   Later stylesheets never set the properties used here. */
+:root{ --nav-ms:300ms; --nav-ease:cubic-bezier(.22,.8,.24,1); }
+.nav-item{
+  display:inline-flex; align-items:center; justify-content:flex-start;
+  box-sizing:border-box; min-width:44px; min-height:44px; padding:0 13px; margin:0;
+  font-size:11px; letter-spacing:.08em; line-height:1; color:rgba(255,255,255,0.74);
+  transition:color .2s ease;
+}
+.nav-ico{ display:block; width:18px; height:18px; flex:none; transition:transform .2s var(--nav-ease); }
+/* The label box is the one thing whose size animates: 0 when collapsed, its measured text width when
+   selected (--label-w is set per item by measureNavLabels() in the nav script). overflow:hidden clips it. */
+.nav-label{ display:block; flex:none; width:0; overflow:hidden; transition:width var(--nav-ms) var(--nav-ease); }
+.nav-label > span{
+  display:inline-block; padding-left:8px; white-space:nowrap; vertical-align:middle;
+  opacity:0; transform:translateX(-4px);
+  transition:opacity var(--nav-ms) var(--nav-ease), transform var(--nav-ms) var(--nav-ease);
+}
+.nav-item[aria-current="page"]{ color:rgba(255,250,245,1); }
+.nav-item[aria-current="page"] .nav-label{ width:var(--label-w, auto); }
+.nav-item[aria-current="page"] .nav-label > span{ opacity:1; transform:none; }
+/* re-measuring (fonts loaded, resize) must land instantly, never animate */
+#site-nav.nav-measuring .nav-label, #site-nav.nav-measuring .nav-label > span{ transition:none !important; }
+.nav-item:hover{ color:var(--ink); }
+.nav-item:hover .nav-ico{ transform:translateY(-1px); }
+.nav-item:active .nav-ico{ transform:scale(.9); }
+.nav-item:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+.nav-item[data-preview]{ color:#fff; }
+/* name tag for icon-only items: pointer hover (fine pointers only) and keyboard focus */
+.nav-item::after{
+  content:attr(aria-label); position:absolute; top:calc(100% + 12px); left:50%; z-index:2;
+  padding:6px 10px; border-radius:9px; white-space:nowrap; pointer-events:none;
+  font-size:10px; letter-spacing:.1em; line-height:1; color:var(--ink);
+  background:rgba(14,12,16,.9); border:1px solid rgba(255,255,255,.12); box-shadow:0 8px 20px rgba(0,0,0,.35);
+  opacity:0; transform:translate(-50%,-3px);
+  transition:opacity .2s ease, transform .2s var(--nav-ease);
+}
+@media (hover:hover) and (pointer:fine){
+  .nav-item:not([aria-current="page"]):hover::after{ opacity:1; transform:translate(-50%,0); }
+}
+.nav-item:not([aria-current="page"]):focus-visible::after{ opacity:1; transform:translate(-50%,0); }
+#site-nav.is-holding .nav-item::after{ opacity:0; }
+
+/* ---- menu button: three lines morph into an X ---- */
+.expand-trigger{ position:relative; flex:none; }
+.menu-lines{ position:relative; display:block; width:18px; height:14px; }
+.menu-lines i{
+  position:absolute; left:0; width:18px; height:1.8px; border-radius:2px; background:currentColor;
+  transition:transform var(--nav-ms) var(--nav-ease), opacity var(--nav-ms) var(--nav-ease);
+}
+.menu-lines i:nth-child(1){ top:0; }
+.menu-lines i:nth-child(2){ top:6.1px; }
+.menu-lines i:nth-child(3){ top:12.2px; }
+.expand-trigger[aria-expanded="true"] .menu-lines i:nth-child(1){ transform:translateY(6.1px) rotate(45deg); }
+.expand-trigger[aria-expanded="true"] .menu-lines i:nth-child(2){ opacity:0; transform:scaleX(.2); }
+.expand-trigger[aria-expanded="true"] .menu-lines i:nth-child(3){ transform:translateY(-6.1px) rotate(-45deg); }
+.expand-trigger[aria-expanded="true"]{ color:var(--ink); }
+/* closed menu is out of the accessibility tree and the tab order, after its fade finishes */
+.expand-panel{
+  visibility:hidden;
+  transition:opacity var(--nav-ms) var(--nav-ease), transform var(--nav-ms) var(--nav-ease), visibility 0s linear var(--nav-ms);
+}
+.expand-panel.open{
+  visibility:visible;
+  transition:opacity var(--nav-ms) var(--nav-ease), transform var(--nav-ms) var(--nav-ease), visibility 0s;
+}
+.expand-panel .expand-tool-item{ min-height:44px; white-space:nowrap; }
+
+@media(max-width:600px){
+  #site-nav{ gap:2px; }
+  .nav-item{ padding:0 13px; font-size:11px; letter-spacing:.06em; }
+  .expand-trigger{ width:44px; height:44px; }
+}
+@media (prefers-reduced-motion: reduce){
+  .nav-item, .nav-label, .nav-label > span, .nav-ico, .nav-item::after, .menu-lines i{ transition:none; }
+  .nav-item:hover .nav-ico, .nav-item:active .nav-ico{ transform:none; }
+  .expand-panel, .expand-panel.open{ transition:opacity .15s ease, visibility 0s linear .15s; transform:none; }
+  .expand-panel.open{ transition:opacity .15s ease, visibility 0s; }
+}
+
+/* headings that receive focus when the menu jumps to them (not interactive, so no ring) */
+.site-section h1[tabindex="-1"]:focus, .site-section h2[tabindex="-1"]:focus{ outline:none; }
+
+/* ---- Portfolio now follows About > Featured Work: less top room than it had as the first section ---- */
+#section-portfolio #folder-shelf.folder-shelf{ padding-top:clamp(32px, 6vw, 72px); }
+
+/* ---- Store / Tips placeholders (Phase 2 replaces their content) ---- */
+.soon-wrap{ max-width:880px; margin:0 auto; padding:120px clamp(20px,5vw,48px) 100px; text-align:center; min-height:60vh; box-sizing:border-box; }
+.soon-wrap h2{ font-size:var(--step-4); margin:0 0 12px; }
+.soon-wrap p{ margin:0; color:var(--ink-dim); }
 </style>
 
 <div id="site-notice" role="status" hidden><p id="site-notice-text"></p><button type="button" id="site-notice-close" aria-label="Dismiss notice">&times;</button></div>
@@ -1145,10 +1245,19 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
   <div class="nav-pill" id="nav-pill" aria-hidden="true"></div>
   <div class="nav-items" id="nav-items"></div>
   <div class="expand-menu-wrap">
-    <button class="expand-trigger" id="expand-trigger" aria-expanded="false" aria-controls="expand-panel" aria-label="More options" title="More">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    <button class="expand-trigger" id="expand-trigger" type="button" aria-expanded="false" aria-controls="expand-panel" aria-haspopup="menu" aria-label="Menu">
+      <span class="menu-lines" aria-hidden="true"><i></i><i></i><i></i></span>
     </button>
-    <div class="expand-panel glass-panel" id="expand-panel" role="menu"></div>
+    <div class="expand-panel glass-panel" id="expand-panel" role="menu" aria-label="Menu">
+      <button type="button" class="expand-tool-item" role="menuitem" data-menu-action="portfolio" tabindex="-1">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span>Portfolio</span>
+      </button>
+      <button type="button" class="expand-tool-item" role="menuitem" data-menu-action="assistant" tabindex="-1">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"/><path d="M9 11h.01M12 11h.01M15 11h.01"/></svg>
+        <span>Ask the assistant</span>
+      </button>
+    </div>
   </div>
 </nav>
 
@@ -1173,21 +1282,6 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
 
 
 <div class="hero-spacer" aria-hidden="true"></div>
-
-<section class="site-section" id="section-portfolio" data-section="portfolio">
-  <div class="folder-shelf" id="folder-shelf">
-    <div class="gallery-head">
-      <h2 id="portfolio-title" data-ka-editable="portfolioTitle">Portfolio</h2>
-      <p id="portfolio-intro" data-ka-editable="portfolioIntro">Choose a category to browse</p>
-    </div>
-    <div class="fav-filter">
-      <button class="fav-chip active" id="fav-chip-all" type="button">All</button>
-      <button class="fav-chip" id="fav-chip-pinned" type="button">Pinned</button>
-    </div>
-    <div class="folder-grid" id="folder-grid"></div>
-  </div>
-  <div id="portfolio-coverflow"></div>
-</section>
 
 <section class="site-section" id="section-gallery" data-section="gallery" hidden>
   <div id="gallery-coverflow"></div>
@@ -1232,6 +1326,21 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
       </div>
      </div>
     </div>
+  </div>
+</section>
+
+<!-- Store and Tips: destinations in the nav now; their catalog and posts arrive in Phase 2. -->
+<section class="site-section" id="section-store" data-section="store" hidden>
+  <div class="soon-wrap">
+    <h2>Store</h2>
+    <p>Artzz and Artifacts are almost ready. Check back soon.</p>
+  </div>
+</section>
+
+<section class="site-section" id="section-tips" data-section="tips" hidden>
+  <div class="soon-wrap">
+    <h2>Tips</h2>
+    <p>Short design and development tips are on the way.</p>
   </div>
 </section>
 
@@ -1375,11 +1484,13 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
 }
 </style>
 
-<section class="site-section" id="section-about" data-section="about" hidden>
+<section class="site-section about-intro-done" id="section-about" data-section="about">
   <div class="about-glow about-glow-a" aria-hidden="true"></div>
   <div class="about-glow about-glow-b" aria-hidden="true"></div>
 
-  <div class="poster-wall-intro" id="poster-wall-intro" aria-hidden="true">
+  <!-- starts finished (transparent): About is the landing page, so this full-screen overlay must not
+       cover the hero on load. playAboutIntro() replays it on later visits to About. -->
+  <div class="poster-wall-intro pw-done" id="poster-wall-intro" aria-hidden="true">
     <img class="pw-thumb pw-1" src="images/tiger-blue-480.webp" alt="">
     <img class="pw-thumb pw-2" src="images/devara-11-days-480.webp" alt="">
     <img class="pw-thumb pw-3" src="images/devara-14-days-480.webp" alt="">
@@ -1442,6 +1553,23 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
       <div id="about-work-stacks"></div>
     </div>
   </div>
+</section>
+
+<!-- Portfolio lives at the bottom of the About page, right after Featured Work. It stays its own
+     section (same markup, styles and animations); switchSection() shows and hides it with About. -->
+<section class="site-section" id="section-portfolio" data-section="portfolio">
+  <div class="folder-shelf" id="folder-shelf">
+    <div class="gallery-head">
+      <h2 id="portfolio-title" data-ka-editable="portfolioTitle">Portfolio</h2>
+      <p id="portfolio-intro" data-ka-editable="portfolioIntro">Choose a category to browse</p>
+    </div>
+    <div class="fav-filter">
+      <button class="fav-chip active" id="fav-chip-all" type="button">All</button>
+      <button class="fav-chip" id="fav-chip-pinned" type="button">Pinned</button>
+    </div>
+    <div class="folder-grid" id="folder-grid"></div>
+  </div>
+  <div id="portfolio-coverflow"></div>
 </section>
 
 <div id="lightbox" role="dialog" aria-modal="true" aria-label="Poster viewer">
@@ -6411,75 +6539,317 @@ var nav = document.getElementById("site-nav");
 var navPill = document.getElementById("nav-pill");
 var navItemsContainer = document.getElementById("nav-items");
 
-// ---- [responsive nav] single source of truth for every nav destination. A future 5th/6th
-// section is just one more entry here -- nothing else in this system needs touching.
+// ---- Single source of truth for every nav destination. Items are icon-only until selected; the
+// selected item opens into the bronze pill and shows its label. One icon grid for all of them:
+// 24px viewBox, 1.8 stroke, round caps and joins (the same drawing style as the menu glyphs).
+var NAV_ICONS = {
+  contact: '<path d="M21.5 2.5 10.6 13.4"/><path d="M21.5 2.5 14.6 21.5l-4-8.1-8.1-4z"/>',
+  about: '<circle cx="12" cy="8" r="3.8"/><path d="M4.5 20.5c1.2-3.9 4.1-5.8 7.5-5.8s6.3 1.9 7.5 5.8"/>',
+  store: '<path d="M5 8h14l-1.1 11.2a2 2 0 0 1-2 1.8H8.1a2 2 0 0 1-2-1.8z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
+  tips: '<path d="M9 18h6M10 21.5h4"/><path d="M12 2.5a6.5 6.5 0 0 0-4 11.6c.7.6 1 1.3 1 2.1V17h6v-.8c0-.8.3-1.5 1-2.1a6.5 6.5 0 0 0-4-11.6z"/>'
+};
 var NAV_ITEMS = [
   { name:"contact", label:"Contact" },
-  { name:"portfolio", label:"Portfolio" },
-  // { name:"gallery", label:"Gallery" }, // removed from the nav; the Gallery section and FolderScene code are kept, unused
-  { name:"about", label:"About" }
+  { name:"about", label:"About" },
+  { name:"store", label:"Store" },
+  { name:"tips", label:"Tips" }
 ];
 var ALL_NAV_ITEMS = NAV_ITEMS.slice();
-var navVisibleStart = 0; // index of the first item currently shown in the bar
-var mobileNavQuery = window.matchMedia("(max-width:600px)");
-function navSlotCount(){ return mobileNavQuery.matches ? 3 : 4; }
-function navVisibleSlice(){
-  var slotCount = navSlotCount();
-  navVisibleStart = Math.max(0, Math.min(navVisibleStart, NAV_ITEMS.length - slotCount));
-  return { slotCount:slotCount, start:navVisibleStart, items:NAV_ITEMS.slice(navVisibleStart, navVisibleStart + slotCount) };
-}
 var navItems = []; // re-queried after every render -- see refreshNavItemRefs()
 function refreshNavItemRefs(){
   navItems = Array.prototype.slice.call(navItemsContainer.querySelectorAll(".nav-item"));
 }
-// Full, non-animated rebuild -- used on first load and whenever the mobile/desktop breakpoint
-// itself changes. The drag-triggered single-step shift (shiftConveyor, defined further down
-// near the drag handlers) animates instead of calling this.
 function renderNavItems(){
-  var v = navVisibleSlice();
   navItemsContainer.innerHTML = "";
-  v.items.forEach(function(item){
+  NAV_ITEMS.forEach(function(item){
     var btn = document.createElement("button");
     btn.className = "nav-item"; btn.type = "button";
     btn.setAttribute("data-section", item.name);
+    btn.setAttribute("aria-label", item.label);   // the name for icon-only buttons; the visible label below is decorative
     if (item.name === activeSection) btn.setAttribute("aria-current", "page");
-    btn.textContent = item.label;
+    btn.innerHTML = '<svg class="nav-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+      (NAV_ICONS[item.name] || "") + '</svg><span class="nav-label" aria-hidden="true"><span>' + escapeHtml(item.label) + '</span></span>';
     navItemsContainer.appendChild(btn);
   });
   refreshNavItemRefs();
-  renderExpandMenu();
+  measureNavLabels();
 }
-function renderExpandMenu(){
-  var v = navVisibleSlice();
-  var visibleNames = v.items.map(function(i){ return i.name; });
-  var parked = NAV_ITEMS.filter(function(i){ return visibleNames.indexOf(i.name) === -1; });
-  var panel = document.getElementById("expand-panel");
-  panel.innerHTML = "";
-  parked.forEach(function(item){
-    var a = document.createElement("a");
-    a.href = "#"; a.setAttribute("data-expand-link", ""); a.setAttribute("data-section", item.name);
-    a.setAttribute("role", "menuitem"); a.textContent = item.label;
-    panel.appendChild(a);
+// Each label's open width is its real rendered text width, measured (not guessed), so the selected
+// item opens exactly to fit it. Re-run whenever that width can change (web font arrives, resize,
+// breakpoint), with transitions suspended so the pill and label land together instantly.
+function measureNavLabels(){
+  nav.classList.add("nav-measuring");
+  navItems.forEach(function(btn){
+    var text = btn.querySelector(".nav-label > span");
+    // layout width, not getBoundingClientRect(): the bar scales in on load, and a transformed
+    // (scaled) measurement would clip the label. +1 covers offsetWidth's rounding.
+    if (text) btn.style.setProperty("--label-w", (text.offsetWidth + 1) + "px");
   });
-  expandLinks = Array.prototype.slice.call(panel.querySelectorAll("[data-expand-link]"));
-  // [always present] the trigger itself never leaves the layout -- it just reads visually
-  // quieter while nothing is parked (today's default 4 items exactly fill the desktop bar),
-  // staying ready for a 5th+ item the moment one actually overflows.
-  document.getElementById("expand-trigger").classList.toggle("is-empty", parked.length === 0);
+  void nav.offsetWidth; // apply the new widths before transitions come back
+  nav.classList.remove("nav-measuring");
+  movePill(true);
 }
 
-// Specular response is owned by the shared liquid-glass controller below.
-// ---- v22: expand "more" menu ----
+// ---- Sections. A nav page can span more than one section: About ends with the Portfolio section,
+// which is no longer a nav item of its own but is still reachable directly (menu, share links).
+var sections = {
+  contact: document.getElementById("section-contact"),
+  portfolio: document.getElementById("section-portfolio"),
+  gallery: document.getElementById("section-gallery"),
+  about: document.getElementById("section-about"),
+  store: document.getElementById("section-store"),
+  tips: document.getElementById("section-tips")
+};
+var PAGE_SECTIONS = { about:["about", "portfolio"], contact:["contact"], gallery:["gallery"], store:["store"], tips:["tips"] };
+function navPage(name){ return name === "portfolio" ? "about" : name; }
+function pageSections(page){
+  return (PAGE_SECTIONS[page] || [page]).map(function(n){ return sections[n]; }).filter(Boolean);
+}
+var galleryCoverflowEl = document.getElementById("gallery-coverflow");
+var galleryTeardown = null;
+var activeSection = "about"; // always a page name (see navPage)
+
+// ---- Bronze pill. One duration and one curve for everything that moves in the bar: the pill
+// travels with the same timing the CSS uses to open the selected item's label (--nav-ms/--nav-ease).
+var NAV_MS = 300;
+function cubicBezier(x1, y1, x2, y2){
+  function bx(t){ return ((1 - 3 * x2 + 3 * x1) * t + (3 * x2 - 6 * x1)) * t * t + 3 * x1 * t; }
+  function by(t){ return ((1 - 3 * y2 + 3 * y1) * t + (3 * y2 - 6 * y1)) * t * t + 3 * y1 * t; }
+  function dx(t){ return 3 * (1 - 3 * x2 + 3 * x1) * t * t + 2 * (3 * x2 - 6 * x1) * t + 3 * x1; }
+  return function(x){
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    var t = x;
+    for (var i = 0; i < 8; i++){               // Newton steps, then a bisection fallback
+      var err = bx(t) - x, d = dx(t);
+      if (Math.abs(err) < 1e-5) return by(t);
+      if (Math.abs(d) < 1e-6) break;
+      t -= err / d;
+    }
+    var lo = 0, hi = 1; t = x;
+    for (var j = 0; j < 20; j++){ var v = bx(t); if (Math.abs(v - x) < 1e-5) break; if (v < x) lo = t; else hi = t; t = (lo + hi) / 2; }
+    return by(t);
+  };
+}
+var navEase = cubicBezier(.22, .8, .24, 1);
+var pillX = 0, pillW = 0, pillRAF = null;
+
+function movePill(immediate){
+  var target = navItems.find(function(el){ return el.getAttribute("data-section") === activeSection; });
+  // e.g. About hidden from the nav by the creator while About is the page on screen
+  navPill.style.opacity = target ? "" : "0";
+  cancelAnimationFrame(pillRAF); pillRAF = null;
+  if (!target) return;
+  function paint(){ navPill.style.transform = "translateX(" + pillX.toFixed(2) + "px)"; navPill.style.width = pillW.toFixed(2) + "px"; }
+  if (reducedMotion || immediate){ pillX = target.offsetLeft; pillW = target.offsetWidth; paint(); return; }
+  var fromX = pillX, fromW = pillW, start = performance.now(), settle = 0;
+  function step(now){
+    var t = Math.min(1, (now - start) / NAV_MS), k = navEase(t);
+    // The target's own box is still opening (its label grid track is transitioning), so its
+    // live position and width are read every frame rather than once at the start.
+    var x = target.offsetLeft, w = target.offsetWidth;
+    var nextX = fromX + (x - fromX) * k, nextW = fromW + (w - fromW) * k;
+    var moved = Math.abs(nextX - pillX) > .05 || Math.abs(nextW - pillW) > .05;
+    pillX = nextX; pillW = nextW; paint();
+    // After the curve ends, follow for a few more frames only if the CSS transition is still
+    // settling (it can start a frame later than this loop), so the pill always lands exactly.
+    if (t < 1 || (moved && ++settle < 12)) pillRAF = requestAnimationFrame(step);
+    else pillRAF = null;
+  }
+  pillRAF = requestAnimationFrame(step);
+}
+// Final word on the pill's position: when a label finishes opening or closing, the pill snaps to the
+// selected item's settled box. Covers a busy main thread starting the CSS transition later than the
+// pill's own curve (the curve then ends before the item has finished growing).
+nav.addEventListener("transitionend", function(e){
+  if (e.propertyName !== "width" || !e.target.classList || !e.target.classList.contains("nav-label")) return;
+  if (!pillRAF && !navDrag) movePill(true);
+});
+// Pointer capture keeps a held selection attached even outside the control.
+// Native button clicks and arrow keys remain available without a gesture.
+var navDrag = null, suppressNavClickUntil = 0;
+function endNavDrag(commit){
+  if (!navDrag) return;
+  var drag = navDrag; navDrag = null;
+  clearTimeout(drag.holdTimer); cancelAnimationFrame(drag.raf);
+  nav.classList.remove("is-holding");
+  navPill.style.borderRadius = "999px";
+  if (!reducedMotion) navPill.classList.add("is-releasing");
+  navItems.forEach(function(el){ el.removeAttribute("data-preview"); });
+  if (nav.hasPointerCapture(drag.id)) nav.releasePointerCapture(drag.id);
+  suppressNavClickUntil = performance.now() + 450;
+  if (commit && drag.target){
+    var name = drag.target.getAttribute("data-section");
+    if (name !== activeSection) switchSection(name); else movePill();
+    drag.target.focus({ preventScroll:true });
+  } else movePill();
+}
+nav.addEventListener("pointerdown", function(e){
+  var button = e.target.closest(".nav-item");
+  if (!button || navDrag || !e.isPrimary || e.button !== 0) return;
+  cancelAnimationFrame(pillRAF); pillRAF = null;
+  navPill.classList.remove("is-releasing");
+  refreshNavItemRefs();
+  var rect = nav.getBoundingClientRect();
+  navDrag = { id:e.pointerId, target:button, x:e.clientX - rect.left, rect:rect, raf:0, lastX:e.clientX - rect.left, lastT:performance.now(),
+    bounds:navItems.map(function(el){ return { el:el, left:el.offsetLeft, width:el.offsetWidth }; }) };
+  nav.setPointerCapture(e.pointerId);
+  navDrag.holdTimer = setTimeout(function(){ if (navDrag) nav.classList.add("is-holding"); }, 160);
+  button.setAttribute("data-preview", "");
+});
+// Runs on every queued pointer frame AND synchronously on pointerup, so a fast drag that ends
+// before the next paint still commits to the item under its final coordinate.
+function processNavDragStep(drag){
+  var now = performance.now(), velocity = (drag.x - drag.lastX) / Math.max(8, now - drag.lastT);
+  var nearest = drag.bounds.reduce(function(best, b){ return Math.abs(drag.x - b.left - b.width / 2) < Math.abs(drag.x - best.left - best.width / 2) ? b : best; });
+  drag.target = nearest.el;
+  navItems.forEach(function(el){ el.toggleAttribute("data-preview", el === drag.target); });
+  pillW = nearest.width;
+  pillX = clamp(drag.x - pillW / 2, drag.bounds[0].left, drag.bounds[drag.bounds.length - 1].left + drag.bounds[drag.bounds.length - 1].width - pillW);
+  navPill.style.width = pillW + "px";
+  drag.lastX = drag.x; drag.lastT = now;
+  var distance = Math.abs(drag.x - nearest.left - nearest.width / 2);
+  var stretch = reducedMotion ? 1 : 1 + Math.min(.28, Math.abs(velocity) * .07 + distance * .002);
+  var squeeze = 1 / Math.pow(stretch, .48);
+  navPill.style.borderRadius = reducedMotion ? "999px" : velocity >= 0 ? "62% 38% 38% 62% / 48% 55% 45% 52%" : "38% 62% 62% 38% / 55% 48% 52% 45%";
+  navPill.style.setProperty("--liquid-light", velocity >= 0 ? "72%" : "28%");
+  navPill.style.transform = "translateX(" + pillX + "px) scale(" + stretch + "," + squeeze + ")";
+}
+nav.addEventListener("pointermove", function(e){
+  if (!navDrag || e.pointerId !== navDrag.id) return;
+  var drag = navDrag;
+  drag.x = e.clientX - drag.rect.left;
+  nav.classList.add("is-holding");
+  if (drag.raf) return;
+  drag.raf = requestAnimationFrame(function(){
+    if (navDrag !== drag) return;
+    drag.raf = 0;
+    processNavDragStep(drag);
+  });
+});
+nav.addEventListener("pointerup", function(e){
+  if (navDrag && e.pointerId === navDrag.id){
+    var drag = navDrag;
+    cancelAnimationFrame(drag.raf); drag.raf = 0;
+    drag.x = e.clientX - drag.rect.left;
+    processNavDragStep(drag);
+    endNavDrag(true);
+  }
+});
+nav.addEventListener("pointercancel", function(){ endNavDrag(false); });
+nav.addEventListener("lostpointercapture", function(){ endNavDrag(false); });
+nav.addEventListener("keydown", function(e){ if (e.key === "Escape" && navDrag){ e.preventDefault(); endNavDrag(false); } });
+nav.addEventListener("click", function(e){
+  if (e.detail !== 0 && performance.now() < suppressNavClickUntil && e.target.closest(".nav-item")){
+    e.preventDefault(); e.stopImmediatePropagation();
+  }
+}, true);
+window.addEventListener("blur", function(){ endNavDrag(false); });
+window.addEventListener("resize", function(){ endNavDrag(false); });
+
+var sectionTimer = null, sectionSwitching = false, pendingScroll = null;
+
+function focusSectionHeading(section){
+  var heading = section && section.querySelector("h1, h2");
+  if (!heading) return;
+  if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
+  heading.focus({ preventScroll:true });
+}
+// name: a page (contact / about / store / tips / gallery) or a section inside a page (portfolio).
+// focusTarget: move keyboard focus to the destination's heading (used by the menu).
+function switchSection(name, focusTarget){
+  var page = navPage(name);
+  var incoming = pageSections(page);
+  if (!incoming.length) return;
+  var scrollTarget = sections[name] || incoming[0];
+  if (page === activeSection){
+    if (sectionSwitching){ pendingScroll = { el:scrollTarget, focus:focusTarget }; return; }
+    scrollTarget.scrollIntoView?.({ behavior:reducedMotion ? "instant" : "smooth", block:"start" });
+    if (focusTarget) focusSectionHeading(scrollTarget);
+    return;
+  }
+  clearTimeout(sectionTimer);
+  var all = Object.values(sections).filter(Boolean);
+  var showing = all.filter(function(section){ return !section.hidden; });
+  all.forEach(function(section){ section.classList.remove("fading-in", "fading-out"); });
+  activeSection = page;
+  navItems.forEach(function(el){
+    if (el.getAttribute("data-section") === page) el.setAttribute("aria-current", "page"); else el.removeAttribute("aria-current");
+  });
+  movePill();
+
+  if (page === "gallery" && !galleryTeardown){
+    galleryTeardown = mountFolderGallery(galleryCoverflowEl, POSTERS, {});
+  }
+
+  showing.forEach(function(section){ section.classList.add("fading-out"); });
+  sectionSwitching = true; pendingScroll = { el:scrollTarget, focus:focusTarget };
+  var outMs = reducedMotion ? 150 : 300;
+  sectionTimer = setTimeout(function(){
+    all.forEach(function(section){
+      section.classList.remove("fading-out");
+      section.hidden = incoming.indexOf(section) === -1;
+    });
+    incoming.forEach(function(section){ section.classList.add("fading-in"); });
+    // [about page] poster-wall intro, replayed fresh every time About is opened from the nav; when
+    // the destination is Portfolio (further down the page) the flash is skipped and About is just shown.
+    if (page === "about"){
+      if (name === "about") window.playAboutIntro();
+      else { sections.about.classList.add("about-intro-done"); if (window.buildAboutWorkStrip) window.buildAboutWorkStrip(); }
+    }
+    // [contact card] "pop up" materialize -- layered on top of the section's own cross-fade,
+    // triggered fresh every time Contact becomes the active section (not just once ever).
+    if (page === "contact"){
+      var card = document.getElementById("contact-card");
+      card.classList.remove("in");
+      void card.offsetWidth; // restart the transition even if it's already mid-flight from a rapid nav switch
+      requestAnimationFrame(function(){ card.classList.add("in"); });
+    }
+    var go = pendingScroll || { el:scrollTarget };
+    sectionSwitching = false; pendingScroll = null;
+    go.el.scrollIntoView?.({ behavior:reducedMotion ? "instant" : "smooth", block:"start" });
+    if (go.focus) focusSectionHeading(go.el);
+    sectionTimer = setTimeout(function(){
+      incoming.forEach(function(section){ section.classList.remove("fading-in"); });
+    }, reducedMotion ? 150 : 350);
+  }, outMs);
+}
+
+// Delegated, not per-button: nav items are recreated by renderNavItems().
+navItemsContainer.addEventListener("click", function(e){
+  var btn = e.target.closest(".nav-item");
+  if (btn) switchSection(btn.getAttribute("data-section"));
+});
+// Arrow keys move between items and open the one they land on; Home/End jump to the ends.
+// Scoped to the nav items, so arrows inside the menu panel never switch pages.
+nav.addEventListener("keydown", function(e){
+  if (!e.target.closest || !e.target.closest(".nav-item")) return;
+  if (["ArrowRight", "ArrowLeft", "Home", "End"].indexOf(e.key) === -1) return;
+  var order = navItems.map(function(el){ return el.getAttribute("data-section"); });
+  if (!order.length) return;
+  var i = order.indexOf(e.target.closest(".nav-item").getAttribute("data-section"));
+  var next = e.key === "Home" ? order[0] : e.key === "End" ? order[order.length - 1]
+    : order[((i === -1 ? 0 : i) + (e.key === "ArrowRight" ? 1 : -1) + order.length) % order.length];
+  switchSection(next);
+  var btn = navItems.filter(function(el2){ return el2.getAttribute("data-section") === next; })[0];
+  if (btn) btn.focus();
+  e.preventDefault();
+});
+
+// ---- Menu button: a short sheet of destinations that aren't nav pages (Portfolio, the assistant).
+// Follows the ARIA menu-button pattern: Enter/Space/ArrowDown open it on the first item, arrows
+// and Home/End move, Escape closes and returns focus, Tab or an outside click closes.
 var expandTrigger = document.getElementById("expand-trigger");
 var expandPanel = document.getElementById("expand-panel");
-var expandLinks = []; // populated by renderExpandMenu() -- see the responsive-nav block above
+var menuItems = Array.prototype.slice.call(expandPanel.querySelectorAll('[role="menuitem"]'));
 var expandOpen = false;
 
-function openExpand(){
+function openExpand(focusFirst){
   if (expandOpen) return;
   expandOpen = true;
   expandTrigger.setAttribute("aria-expanded", "true");
   expandPanel.classList.add("open");
+  if (focusFirst && menuItems[0]) menuItems[0].focus();
 }
 function closeExpand(returnFocus){
   if (!expandOpen) return;
@@ -6488,351 +6858,60 @@ function closeExpand(returnFocus){
   expandPanel.classList.remove("open");
   if (returnFocus) expandTrigger.focus();
 }
-expandTrigger.addEventListener("click", function(){ expandOpen ? closeExpand(false) : openExpand(); });
+expandTrigger.addEventListener("click", function(e){
+  if (expandOpen) closeExpand(false); else openExpand(e.detail === 0); // keyboard activation lands on the first item
+});
+expandTrigger.addEventListener("keydown", function(e){
+  if (e.key === "ArrowDown" || e.key === "ArrowUp"){
+    e.preventDefault();
+    openExpand(false);
+    var item = e.key === "ArrowDown" ? menuItems[0] : menuItems[menuItems.length - 1];
+    if (item) item.focus();
+  }
+});
 document.addEventListener("click", function(e){
-  // closest(), not a direct attribute check -- a click centered on the trigger button lands on
-  // its inner <svg>/<path> icon, not the <button> itself, which otherwise made this handler treat
-  // the very click that opened the menu as an "outside" click and immediately close it again.
   if (expandOpen && !expandPanel.contains(e.target) && !e.target.closest("#expand-trigger")) closeExpand(false);
 });
 expandPanel.addEventListener("click", function(e){
-  // closest(), not a direct attribute check -- every [data-expand-link] entry is generated by
-  // renderExpandMenu() from NAV_ITEMS now (there's no more one-off #about-link special case),
-  // and a click can land on a child rather than the link itself.
-  var link = e.target.closest("[data-expand-link]");
-  if (!link) return;
+  var item = e.target.closest("[data-menu-action]");
+  if (!item) return;
+  var action = item.getAttribute("data-menu-action");
   closeExpand(false);
-  e.preventDefault();
-  var name = link.getAttribute("data-section");
-  if (name) switchSection(name);
+  if (action === "portfolio"){
+    switchSection("portfolio", true);
+  } else if (action === "assistant"){
+    var launcher = document.getElementById("assistant-launcher");
+    if (launcher && launcher.getAttribute("aria-expanded") !== "true") launcher.click();
+    else expandTrigger.focus();
+  }
 });
 document.addEventListener("keydown", function(e){
   if (!expandOpen) return;
-  if (e.key === "Escape"){ closeExpand(true); return; }
-  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-  var focusIdx = expandLinks.indexOf(document.activeElement);
-  var next = focusIdx === -1
-    ? 0
-    : (focusIdx + (e.key === "ArrowDown" ? 1 : -1) + expandLinks.length) % expandLinks.length;
-  expandLinks[next].focus();
+  if (e.key === "Escape"){ e.preventDefault(); closeExpand(true); return; }
+  if (e.key === "Tab"){ closeExpand(false); return; }
+  if (["ArrowDown", "ArrowUp", "Home", "End"].indexOf(e.key) === -1) return;
+  if (!menuItems.length) return;
+  var i = menuItems.indexOf(document.activeElement);
+  var next = e.key === "Home" ? 0 : e.key === "End" ? menuItems.length - 1
+    : i === -1 ? (e.key === "ArrowDown" ? 0 : menuItems.length - 1)
+    : (i + (e.key === "ArrowDown" ? 1 : -1) + menuItems.length) % menuItems.length;
+  menuItems[next].focus();
   e.preventDefault();
 });
 
-var sections = {
-  contact: document.getElementById("section-contact"),
-  portfolio: document.getElementById("section-portfolio"),
-  gallery: document.getElementById("section-gallery"),
-  about: document.getElementById("section-about")
-};
-var galleryCoverflowEl = document.getElementById("gallery-coverflow");
-var galleryTeardown = null;
-var activeSection = "portfolio";
-var pillX = 0, pillW = 0, pillVX = 0, pillRAF = null, lastPillT = 0;
-
-function movePill(immediate){
-  var target=navItems.find(function(el){return el.getAttribute('data-section')===activeSection;});
-  // [responsive nav] the active section's own item can now be parked in the menu (mobile, before
-  // it's dragged into view) -- hide the pill rather than leaving it stuck at a stale position.
-  navPill.style.opacity = target ? "" : "0";
-  if(!target) return;
-  var targetX=target.offsetLeft,targetW=target.offsetWidth;
-  cancelAnimationFrame(pillRAF);
-  function paint(){navPill.style.transform='translateX('+pillX+'px)';navPill.style.width=pillW+'px';}
-  if(reducedMotion || immediate){pillX=targetX;pillW=targetW;pillVX=0;paint();return;}
-  lastPillT=performance.now();
-  function step(now){
-    var dt=Math.min(.05,(now-lastPillT)/1000);lastPillT=now;
-    // Exact critically damped spring integration, stable at 30/60/120 Hz.
-    var omega=18,offset=pillX-targetX,c=pillVX+omega*offset,decay=Math.exp(-omega*dt);
-    pillX=targetX+(offset+c*dt)*decay;
-    pillVX=(pillVX-omega*c*dt)*decay;
-    pillW+=(targetW-pillW)*(1-Math.exp(-18*dt));
-    paint();
-    if(Math.abs(pillX-targetX)>.1 || Math.abs(pillVX)>.5 || Math.abs(pillW-targetW)>.1) pillRAF=requestAnimationFrame(step);
-    else {pillX=targetX;pillW=targetW;pillVX=0;paint();}
-  }
-  pillRAF=requestAnimationFrame(step);
-}
-// Pointer capture keeps a held selection attached even outside the control.
-// Native button clicks and arrow keys remain available without a gesture.
-var navDrag = null, suppressNavClickUntil = 0;
-function endNavDrag(commit){
-  if (!navDrag) return;
-  var drag=navDrag; navDrag=null;
-  clearTimeout(drag.holdTimer); cancelAnimationFrame(drag.raf);
-  nav.classList.remove('is-holding');
-  navPill.style.borderRadius='999px';
-  if(!reducedMotion) navPill.classList.add('is-releasing');
-  navItems.forEach(function(el){el.removeAttribute('data-preview');});
-  if (nav.hasPointerCapture(drag.id)) nav.releasePointerCapture(drag.id);
-  suppressNavClickUntil=performance.now()+450;
-  if (commit){
-    var name=drag.target.getAttribute('data-section');
-    if (name!==activeSection) switchSection(name); else movePill();
-    drag.target.focus({preventScroll:true});
-  } else movePill();
-}
-// ---- [FIFO conveyor, mobile-only] a single-step shift of the visible window, triggered when a
-// drag overshoots past the first/last visible item's edge (see pointermove below). Reuses the
-// existing nav-item enter/exit CSS classes -- transform/opacity only.
-var NAV_OVERSHOOT_TRIGGER = 36; // px past the edge to commit a shift
-var NAV_OVERSHOOT_FLICK = 0.9;  // px/ms release velocity that commits early (momentum)
-function shiftConveyor(dir){
-  var slotCount = navSlotCount();
-  var newStart = Math.max(0, Math.min(navVisibleStart + dir, NAV_ITEMS.length - slotCount));
-  if (newStart === navVisibleStart) return false;
-  var outgoingItem = NAV_ITEMS[dir > 0 ? navVisibleStart : navVisibleStart + slotCount - 1];
-  var incomingItem = NAV_ITEMS[dir > 0 ? newStart + slotCount - 1 : newStart];
-  navVisibleStart = newStart;
-
-  var outgoingEl = navItems.filter(function(el){ return el.getAttribute("data-section") === outgoingItem.name; })[0];
-  if (outgoingEl){
-    outgoingEl.style.setProperty("--exit-x", (dir > 0 ? "24px" : "-24px"));
-    outgoingEl.classList.add("nav-item-exiting");
-    // [stale-bounds fix] navItems was queried synchronously above, while the outgoing element is
-    // still physically in the DOM (removal is deferred so the exit transition can play) -- it
-    // stays that way, uncorrected, until the NEXT render/shift happens to re-query it. A drag
-    // that starts in the meantime would compute its bounds off a detached node (offsetLeft/Width
-    // both read 0 once removed), corrupting the very first/last edge the overshoot math depends
-    // on. Re-querying here, once the element actually leaves the DOM, keeps navItems honest at
-    // all times, not just immediately after a render.
-    setTimeout(function(){ if (outgoingEl.parentNode) outgoingEl.remove(); refreshNavItemRefs(); }, 320);
-  }
-  var incomingEl = document.createElement("button");
-  incomingEl.className = "nav-item nav-item-entering"; incomingEl.type = "button";
-  incomingEl.setAttribute("data-section", incomingItem.name);
-  if (incomingItem.name === activeSection) incomingEl.setAttribute("aria-current", "page");
-  incomingEl.textContent = incomingItem.label;
-  incomingEl.style.setProperty("--enter-x", dir > 0 ? "16px" : "-16px");
-  if (dir > 0) navItemsContainer.appendChild(incomingEl); else navItemsContainer.insertBefore(incomingEl, navItemsContainer.firstChild);
-  requestAnimationFrame(function(){ requestAnimationFrame(function(){ incomingEl.classList.remove("nav-item-entering"); }); });
-
-  renderExpandMenu();
-  refreshNavItemRefs();
-  return true;
-}
-nav.addEventListener('pointerdown',function(e){
-  var button=e.target.closest('.nav-item');
-  if (!button || navDrag || !e.isPrimary || e.button!==0) return;
-  cancelAnimationFrame(pillRAF);
-  navPill.classList.remove('is-releasing');
-  // [stale-bounds fix] belt-and-suspenders -- re-query right before building this gesture's
-  // bounds, rather than trusting that whatever last touched navItems (a render, a shift, its
-  // deferred cleanup) has already run by now. Cheap, and makes correctness here not depend on
-  // timing assumptions elsewhere.
-  refreshNavItemRefs();
-  var rect=nav.getBoundingClientRect();
-  navDrag={id:e.pointerId,target:button,x:e.clientX-rect.left,rect:rect,raf:0,lastX:e.clientX-rect.left,lastT:performance.now(),
-    bounds:navItems.map(function(el){return {el:el,left:el.offsetLeft,width:el.offsetWidth};})};
-  nav.setPointerCapture(e.pointerId);
-  navDrag.holdTimer=setTimeout(function(){if(navDrag) nav.classList.add('is-holding');},160);
-  button.setAttribute('data-preview','');
-});
-// [race-condition fix] this used to live only inside pointermove's rAF callback. Since that
-// callback is throttled to one per frame (`if(drag.raf) return;`), a fast drag ending in a
-// pointerup could fire BEFORE the final queued move's rAF ever ran -- pointerup used to just
-// pick the nearest item from the stale pre-shift bounds directly, silently skipping the
-// conveyor commit entirely on exactly the drags most likely to be flicked. Now it's a named
-// function so pointerup can run it synchronously on the final coordinate before deciding
-// anything, guaranteeing the last frame of motion is never dropped.
-function processNavDragStep(drag){
-    var now=performance.now(),velocity=(drag.x-drag.lastX)/Math.max(8,now-drag.lastT);
-    var firstB=drag.bounds[0], lastB=drag.bounds[drag.bounds.length-1];
-    var canConveyor = mobileNavQuery.matches && NAV_ITEMS.length > navSlotCount();
-    var overshoot=0, dir=0;
-    // dir here is "which edge got physically overshot" (-1 = pushed past the left edge, i.e. a
-    // leftward drag; +1 = pushed past the right edge, a rightward drag) -- used for the
-    // resistance stretch below, which should visually pull toward whichever edge is being
-    // pushed against. The CONVEYOR's advance/retreat direction is the opposite of this: per
-    // [direction fix, confirmed against real-device feel] overshooting the RIGHT edge (a
-    // rightward drag, dir=+1) is what ADVANCES the queue (reveals the next item, oldest-visible
-    // exits toward the menu) -- the opposite mapping read as backwards in hand, even though it
-    // matched a literal "drag left" reading of the spec. shiftConveyor is now called with dir
-    // directly, not -dir.
-    if (drag.x < firstB.left){ overshoot=firstB.left-drag.x; dir=-1; }
-    else if (drag.x > lastB.left+lastB.width){ overshoot=drag.x-(lastB.left+lastB.width); dir=1; }
-
-    if (canConveyor && overshoot>0){
-      var canShift = dir>0 ? (navVisibleStart+navSlotCount()<NAV_ITEMS.length) : (navVisibleStart>0);
-      var flick = Math.abs(velocity) > NAV_OVERSHOOT_FLICK;
-      if (canShift && (overshoot>NAV_OVERSHOOT_TRIGGER || (flick && overshoot>8)) && shiftConveyor(dir)){
-        // [reveal, don't navigate] a conveyor shift only ever means "bring this item into the
-        // bar" -- it's not the same gesture as tapping/selecting a section, so releasing right
-        // after a shift must not also switchSection() to whatever item the pointer happens to
-        // be nearest now. Marked here and checked in pointerup below.
-        drag.shifted = true;
-        // committed -- rebuild bounds against the freshly rendered items (excluding the one
-        // still mid-exit, which is about to detach and shouldn't count as a real boundary) and
-        // re-base the drag's own rect so the in-progress gesture continues without a jump.
-        drag.rect = nav.getBoundingClientRect();
-        drag.bounds = navItems.filter(function(el){return !el.classList.contains('nav-item-exiting');})
-          .map(function(el){return {el:el,left:el.offsetLeft,width:el.offsetWidth};});
-        drag.lastX=drag.x; drag.lastT=now;
-      } else {
-        // resistance -- extra elastic stretch beyond the normal drag cap, pill pinned at the
-        // edge, no shift yet (snaps back on release via the existing endNavDrag/movePill path).
-        // [smoother liquid] sqrt-eased rather than linear -- stretch grows fast at first touch
-        // then tapers as you keep pulling, reading as genuine rubber-band resistance instead of
-        // a constant-rate ramp.
-        var pull=Math.sqrt(Math.min(1,overshoot/60));
-        pillW = dir>0? lastB.width : firstB.width;
-        pillX = dir>0? (lastB.left+lastB.width-pillW) : firstB.left;
-        var rStretch=reducedMotion?1:1.22+pull*0.62;
-        var rSqueeze=1/Math.pow(rStretch,.48);
-        navPill.style.width=pillW+'px';
-        navPill.style.borderRadius=reducedMotion?'999px':dir>0?'62% 38% 38% 62% / 48% 55% 45% 52%':'38% 62% 62% 38% / 55% 48% 52% 45%';
-        navPill.style.setProperty('--liquid-light',dir>0?'72%':'28%');
-        navPill.style.transform='translateX('+pillX+'px) scale('+rStretch+','+rSqueeze+')';
-        drag.lastX=drag.x; drag.lastT=now;
-        return;
-      }
-    }
-
-    var nearest=drag.bounds.reduce(function(best,b){return Math.abs(drag.x-b.left-b.width/2)<Math.abs(drag.x-best.left-best.width/2)?b:best;});
-    drag.target=nearest.el;
-    navItems.forEach(function(el){el.toggleAttribute('data-preview',el===drag.target);});
-    pillW=nearest.width;
-    pillX=clamp(drag.x-pillW/2,drag.bounds[0].left,drag.bounds[drag.bounds.length-1].left+drag.bounds[drag.bounds.length-1].width-pillW);
-    pillVX=0;
-    navPill.style.width=pillW+'px';
-    drag.lastX=drag.x;drag.lastT=now;
-    var distance=Math.abs(drag.x-nearest.left-nearest.width/2);
-    var stretch=reducedMotion?1:1+Math.min(.28,Math.abs(velocity)*.07+distance*.002);
-    var squeeze=1/Math.pow(stretch,.48);
-    navPill.style.borderRadius=reducedMotion?'999px':velocity>=0?'62% 38% 38% 62% / 48% 55% 45% 52%':'38% 62% 62% 38% / 55% 48% 52% 45%';
-    navPill.style.setProperty('--liquid-light',velocity>=0?'72%':'28%');
-    navPill.style.transform='translateX('+pillX+'px) scale('+stretch+','+squeeze+')';
-}
-nav.addEventListener('pointermove',function(e){
-  if(!navDrag || e.pointerId!==navDrag.id) return;
-  var drag=navDrag;
-  drag.x=e.clientX-drag.rect.left;
-  nav.classList.add('is-holding');
-  if(drag.raf) return;
-  drag.raf=requestAnimationFrame(function(){
-    if(navDrag!==drag) return;
-    drag.raf=0;
-    processNavDragStep(drag);
-  });
-});
-nav.addEventListener('pointerup',function(e){
-  if(navDrag && e.pointerId===navDrag.id){
-    // Resolve the final event directly, even when it arrives before a paint -- cancel any
-    // still-pending rAF from the last move (it would otherwise run a frame late, after
-    // endNavDrag has already torn navDrag down) and process this exact final coordinate
-    // synchronously so a conveyor commit on the very last pixel of motion is never missed.
-    var drag=navDrag;
-    cancelAnimationFrame(drag.raf); drag.raf=0;
-    drag.x=e.clientX-drag.rect.left;
-    processNavDragStep(drag);
-    // [reveal, don't navigate] if this gesture ever triggered a conveyor shift, releasing just
-    // leaves the freshly-revealed item sitting in the bar -- it does NOT also switchSection() to
-    // it. Only a plain (no-shift) drag still commits like the original press-and-slide-to-select
-    // gesture always has.
-    endNavDrag(!drag.shifted);
-  }
-});
-nav.addEventListener('pointercancel',function(){endNavDrag(false);});
-nav.addEventListener('lostpointercapture',function(){endNavDrag(false);});
-nav.addEventListener('keydown',function(e){if(e.key==='Escape' && navDrag){e.preventDefault();endNavDrag(false);}});
-nav.addEventListener('click',function(e){
-  if(e.detail!==0 && performance.now()<suppressNavClickUntil && e.target.closest('.nav-item')){
-    e.preventDefault();e.stopImmediatePropagation();
-  }
-},true);
-window.addEventListener('blur',function(){endNavDrag(false);});
-window.addEventListener('resize',function(){endNavDrag(false);});
-
-var sectionTimer = null;
-
-function switchSection(name){
-  if (name === activeSection){
-    sections[name].scrollIntoView?.({behavior:reducedMotion?'instant':'smooth',block:'start'});
-    return;
-  }
-  clearTimeout(sectionTimer);
-  var from = Object.values(sections).find(function(section){return !section.hidden;}) || sections[activeSection];
-  Object.values(sections).forEach(function(section){
-    section.classList.remove('fading-in','fading-out');
-    if(section!==from) section.hidden=true;
-  });
-  var to = sections[name];
-  activeSection = name;
-  navItems.forEach(function(el){
-    var isActive = el.getAttribute("data-section") === name;
-    if (isActive) el.setAttribute("aria-current", "page"); else el.removeAttribute("aria-current");
-  });
-  movePill();
-
-  if (name === "gallery" && !galleryTeardown){
-    galleryTeardown = mountFolderGallery(galleryCoverflowEl, POSTERS, {});
-  }
-
-  from.classList.add("fading-out");
-  var outMs = reducedMotion ? 150 : 300;
-  sectionTimer = setTimeout(function(){
-    from.hidden = true;
-    from.classList.remove("fading-out");
-    to.hidden = false;
-    to.classList.add("fading-in");
-    to.scrollIntoView?.({behavior:reducedMotion?'instant':'smooth',block:'start'});
-    setTimeout(function(){ to.classList.remove("fading-in"); }, reducedMotion ? 150 : 350);
-    // [contact card] "pop up" materialize -- layered on top of the section's own cross-fade,
-    // triggered fresh every time Contact becomes the active section (not just once ever).
-    if (name === "contact"){
-      var card = document.getElementById("contact-card");
-      card.classList.remove("in");
-      void card.offsetWidth; // restart the transition even if it's already mid-flight from a rapid nav switch
-      requestAnimationFrame(function(){ card.classList.add("in"); });
-    }
-    // [about page] poster-wall intro, replayed fresh every time About becomes active -- same
-    // restart pattern as the contact card above (remove class, force reflow, re-add).
-    if (name === "about") window.playAboutIntro();
-  }, outMs);
-}
-
-// [responsive nav] delegated, not per-button -- nav-items are recreated by renderNavItems()/
-// shiftConveyor() as the visible set changes, so individual per-button listeners would leak.
-navItemsContainer.addEventListener("click", function(e){
-  var btn = e.target.closest(".nav-item");
-  if (btn) switchSection(btn.getAttribute("data-section"));
-});
-nav.addEventListener("keydown", function(e){
-  if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-  // cycles among whichever items are CURRENTLY visible in the bar -- always reads live, so it
-  // naturally follows however many slots are showing (3 mobile / 4 desktop) without a hardcoded list.
-  var order = navItems.map(function(el){ return el.getAttribute("data-section"); });
-  var i = order.indexOf(activeSection);
-  var next = order[((i === -1 ? 0 : i) + (e.key === "ArrowRight" ? 1 : -1) + order.length) % order.length];
-  switchSection(next);
-  var btn = navItems.filter(function(el2){ return el2.getAttribute("data-section") === next; })[0];
-  if (btn) btn.focus();
-  e.preventDefault();
-});
-mobileNavQuery.addEventListener("change", function(){
-  // breakpoint crossed (3 <-> 4 slots) -- reset to the front of the list rather than trying to
-  // preserve an in-between conveyor position across a slot-count change, and re-run the pill's
-  // immediate (non-spring) positioning since the active item's box may have moved/resized.
-  navVisibleStart = 0;
-  renderNavItems();
-  movePill(true);
-});
-
-renderNavItems(); // build the initial bar + menu before the first pill placement below
-movePill(true); // navigation is usable while the hero is playing
-requestAnimationFrame(function(){nav.classList.add('revealed');});
-document.fonts?.ready.then(function(){movePill(true);});
-window.addEventListener("resize", function(){ movePill(true); });
+renderNavItems(); // builds the bar, measures the labels and places the pill (usable while the hero plays)
+requestAnimationFrame(function(){ nav.classList.add("revealed"); });
+document.fonts?.ready.then(measureNavLabels);
+document.fonts?.addEventListener?.("loadingdone", measureNavLabels); // a font requested later (e.g. the mono label face) also re-measures
+// This script runs while the page is still parsing; once every stylesheet below it has applied,
+// measure again so the pill can never be left where an earlier layout put it.
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", measureNavLabels, { once:true });
+window.addEventListener("load", measureNavLabels, { once:true });
+window.addEventListener("resize", measureNavLabels);
 window.addEventListener("ka-sequence-complete", function(){
   movePill(true);
   setTimeout(function(){ nav.classList.add("revealed"); }, 300);
 });
-// safety net: if the crystal sequence already completed before this script ran (unlikely given
-// load order, but cheap to guard) or reduced motion means it's not worth waiting on animation
-// polish for, don't leave the nav permanently invisible
-if (reducedMotion){
-  window.addEventListener("ka-sequence-complete", function(){}, { once: true });
-}
 
 // ==================================================================== ABOUT PAGE ==
 (function(){
@@ -6946,7 +7025,8 @@ var KaRocket = (function(){
     wave: { amp: 3.5, freq: 1.2 },                  // sideways wobble: px, cycles per launch / return
     rotation: { bankDeg: 12, follow: 0.2 },       // roll into turns; heading smoothing per 60fps frame (0..1)
     scale: { start: 1, peak: 1.2, end: 0.85 },     // depth: plane size at take-off, biggest at the far side of the loop, smaller as it lands
-    trail: { ms: 380, size: 1.05 },
+    trail: { ms: 240, size: .6, hz: 30, alpha: .45 },   // lighter trail: ~65% fewer, smaller, shorter-lived, fainter points
+    sparks: 3,                   // impact sparks (was 9)
     easing: { launch: "easeInQuad", "return": "linear" },   // names from EASE below, or a function(t)
     timeoutMs: 20000             // stop waiting for the API after this long (then it counts as an error)
   };
@@ -6987,8 +7067,8 @@ var KaRocket = (function(){
     if (glowSprite) return glowSprite;
     var c = document.createElement("canvas"); c.width = c.height = 64;
     var g = c.getContext("2d"), r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-    r.addColorStop(0, "rgba(255,244,222,1)"); r.addColorStop(.28, "rgba(255,170,88,.62)");
-    r.addColorStop(.6, "rgba(255,72,32,.2)"); r.addColorStop(1, "rgba(255,40,20,0)");
+    // a small soft dot, no wide red halo
+    r.addColorStop(0, "rgba(255,238,214,1)"); r.addColorStop(.35, "rgba(255,170,100,.5)"); r.addColorStop(1, "rgba(255,120,60,0)");
     g.fillStyle = r; g.fillRect(0, 0, 64, 64);
     return (glowSprite = c);
   }
@@ -7034,7 +7114,7 @@ var KaRocket = (function(){
     return new Promise(function(resolve, reject){
       var vw = window.innerWidth, vh = window.innerHeight, small = vw < 600;
       var dpr = 1;
-      var pixelBudget = (navigator.deviceMemory||4)<=2 ? 1500000 : 4000000;
+      var pixelBudget = (navigator.deviceMemory||4)<=2 ? 1000000 : 2500000;
       var br = button.getBoundingClientRect(), W = Math.max(60, Math.round(br.width)), H = Math.max(24, Math.round(br.height));
       var paint = buttonPaint(button), L = cfg.fold.length * (small ? .85 : 1);
       var stages = foldStages(W, H, L), cy = stages.cy;
@@ -7062,7 +7142,7 @@ var KaRocket = (function(){
       if(!ctx){layer.remove();reject(new Error("Canvas unavailable"));return;}
       function fit(){
         vw = window.innerWidth; vh = window.innerHeight;
-        dpr = Math.min(window.devicePixelRatio||1,3,Math.sqrt(pixelBudget/Math.max(1,vw*vh)));
+        dpr = Math.min(window.devicePixelRatio||1,2,Math.sqrt(pixelBudget/Math.max(1,vw*vh)));   // soft dots gain nothing past 2x
         canvas.width = Math.round(vw * dpr); canvas.height = Math.round(vh * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
@@ -7140,16 +7220,16 @@ var KaRocket = (function(){
         rocket.animate([{ opacity: 1 }, { opacity: 0 }], { duration: cfg.impactMs, fill: "forwards", easing: "ease-out" });
         var ring = document.createElement("div"); ring.className = "rk-ring"; ring.style.left = F.x + "px"; ring.style.top = F.y + "px";
         layer.appendChild(ring);
-        ring.animate([{ transform: "scale(.25)", opacity: .95 }, { transform: "scale(3.4)", opacity: 0 }], { duration: 520, easing: "cubic-bezier(.16,1,.3,1)", fill: "forwards" });
-        for (var i = 0; i < 9; i++){
+        ring.animate([{ transform: "scale(.3)", opacity: .6 }, { transform: "scale(2.2)", opacity: 0 }], { duration: 360, easing: "cubic-bezier(.16,1,.3,1)", fill: "forwards" });
+        for (var i = 0; i < cfg.sparks; i++){
           var sp = document.createElement("div"); sp.className = "rk-spark"; sp.style.left = F.x + "px"; sp.style.top = F.y + "px";
           layer.appendChild(sp);
-          var a = Math.PI * 2 * i / 9 + Math.random() * .5, d = 60 + Math.random() * 70;
-          sp.animate([{ transform: "translate3d(0,0,0) scale(1)", opacity: 1 }, { transform: "translate3d(" + Math.cos(a) * d + "px," + Math.sin(a) * d + "px,0) scale(.2)", opacity: 0 }],
-            { duration: 460 + Math.random() * 160, easing: "cubic-bezier(.16,1,.3,1)", fill: "forwards" });
+          var a = Math.PI * 2 * i / cfg.sparks + Math.random() * .6, d = 28 + Math.random() * 24;
+          sp.animate([{ transform: "translate3d(0,0,0) scale(1)", opacity: .7 }, { transform: "translate3d(" + Math.cos(a) * d + "px," + Math.sin(a) * d + "px,0) scale(.3)", opacity: 0 }],
+            { duration: 300 + Math.random() * 80, easing: "cubic-bezier(.16,1,.3,1)", fill: "forwards" });
         }
         ctx.clearRect(0, 0, vw, vh);
-        cleanup(720);
+        cleanup(420);   // after the longest impact animation (ring 360ms, sparks <=380ms): the whole layer goes
         resolve(outcome);
       }
       function beginReturn(now){
@@ -7227,18 +7307,17 @@ var KaRocket = (function(){
         place(scale);
         // trail: glowing points shed from the tail, fading with age
         var tail = L * scale * .42;
-        if(now-lastTrailTime>=1000/60){
+        if(now-lastTrailTime>=1000/cfg.trail.hz){
           trail.push({ x: pos.x - Math.cos(heading) * tail, y: pos.y - Math.sin(heading) * tail, s: scale, t: now });lastTrailTime=now;
         }
         while (trail.length && now - trail[0].t > cfg.trail.ms) trail.shift();
         ctx.clearRect(0, 0, vw, vh);
         ctx.globalCompositeOperation = "lighter";
         for (var i = 0; i < trail.length; i++){
-          var age = (now - trail[i].t) / cfg.trail.ms, a = Math.pow(1 - age, 1.7) * .8, rad = L * trail[i].s * cfg.trail.size * (.55 + (1 - age) * .55);
+          var age = (now - trail[i].t) / cfg.trail.ms, a = Math.pow(1 - age, 1.7) * cfg.trail.alpha, rad = L * trail[i].s * cfg.trail.size * (.55 + (1 - age) * .55);
           ctx.globalAlpha = a; ctx.drawImage(sprite, trail[i].x - rad, trail[i].y - rad, rad * 2, rad * 2);
         }
-        var head = L * scale * 1.15;
-        ctx.globalAlpha = .55; ctx.drawImage(sprite, pos.x - head, pos.y - head, head * 2, head * 2);
+        // (the large glow that used to sit on the plane itself is gone)
         ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
         raf = requestAnimationFrame(safeTick);
       }
@@ -7423,12 +7502,15 @@ function resetContactForm(){
     CONTACT_RULES[key].err.classList.remove("show");
   });
 }
+var contactFlipping = false;   // one turn back at a time, however fast the result button is pressed
 document.getElementById("cc-action").addEventListener("click", function(){
   var card = document.getElementById("contact-card"), wasSuccess = card.dataset.state === "success";
-  if (contactSending) return;
+  if (contactSending || contactFlipping) return;
+  contactFlipping = true;
   if (wasSuccess) resetContactForm();
   contactStatus.textContent = ""; contactStatus.dataset.state = "";
   KaRocket.flipBack(card).then(function(){
+    contactFlipping = false;
     contactForm.classList.remove("is-sending");
     contactForm.querySelector(".contact-submit").classList.remove("is-launched", "is-sending");
     updateContactSubmitState();
@@ -7664,7 +7746,6 @@ function applySiteAppearance(data){
     });
     if (filtered.map(function(item){return item.name;}).join(',') !== NAV_ITEMS.map(function(item){return item.name;}).join(',')){
       NAV_ITEMS = filtered;
-      navVisibleStart = 0;
       renderNavItems();
     }
   }
