@@ -253,3 +253,35 @@ main{padding:20px clamp(18px,3vw,32px) calc(var(--dock-h) + 24px)}
 
 .folder-row{flex-wrap:wrap}
 .folder-row label{flex:1 1 200px;min-width:0}
+
+/* ---- drag-to-reorder handle (folders, projects, social links) -- mouse/pointer convenience,
+   the Move up/down buttons next to it remain the real accessible way to reorder. ---- */
+.drag-handle{flex:none;padding:4px 6px;font-size:16px;line-height:1;color:var(--muted);cursor:grab;touch-action:none;user-select:none;border-radius:6px}
+.drag-handle:hover{color:var(--ink);background:#ffffff0c}
+.folder-row.dragging,.image-row.dragging{opacity:.45}
+.folder-row.drag-over,.image-row.drag-over{outline:2px dashed var(--amber);outline-offset:2px}
+.image-row{position:relative}
+.image-row .drag-handle{position:absolute;top:8px;left:8px;z-index:1;background:#0d0b12b0;backdrop-filter:blur(6px)}
+@media(pointer:coarse){.drag-handle{display:none}} /* HTML5 drag-and-drop has no reliable touch support -- the buttons are the real control there */
+
+/* ---- inline warning within a folder row (an empty stack won't appear on the public site) ---- */
+.folder-warning{flex-basis:100%;margin:0;padding:8px 12px;border-radius:10px;background:#ff943818;border:1px solid #ff943840;color:#ffcb9a;font-size:12px;line-height:1.5}
+
+/* ---- social links list: label / URL / icon in one row, same rhythm as .folder-row ---- */
+.social-link-row select{flex:0 0 168px}
+@media(max-width:650px){.social-link-row select{flex-basis:100%}}
+
+/* ---- site identity: accent color swatch + hex field side by side ---- */
+input[type=color]{width:44px;height:44px;padding:2px;flex:none;cursor:pointer}
+#favicon-preview{display:flex;align-items:center;gap:12px;margin-top:10px}
+#favicon-preview img{width:32px;height:32px;object-fit:contain;border-radius:6px;background:#08070b;border:var(--glass-border)}
+#favicon-preview p.empty{padding:0;border:0;text-align:left;font-size:12px}
+
+/* ---- per-element entrance-animation controls (property panel + Appearance tab's own list) ---- */
+.anim-controls{display:grid;gap:10px}
+.anim-fields{grid-template-columns:1fr 1fr;gap:10px}
+.anim-fields:empty{display:none}
+#property-panel-body .anim-fields{grid-template-columns:1fr}
+/* Must come after the unscoped 2-column rule above (equal specificity, source order decides) so
+   it actually wins on narrow screens instead of the existing .field-grid mobile rule losing to it. */
+@media(max-width:650px){.anim-fields{grid-template-columns:1fr}}

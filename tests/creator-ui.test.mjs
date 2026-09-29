@@ -37,7 +37,7 @@ test('edits made during publishing remain dirty and retain the new server revisi
 test('navigation visibility can be turned off and back on in the same preview',()=>{
   const items=[{name:'contact'},{name:'portfolio'},{name:'gallery'},{name:'about'}];let renders=0;
   const context=vm.createContext({document:{documentElement:{style:{}},getElementById:()=>({hidden:true})},
-    ALL_NAV_ITEMS:items,NAV_ITEMS:items.slice(),applyElementStyles(){},applyLayoutOverrides(){},renderNavItems(){renders++;}});
+    ALL_NAV_ITEMS:items,NAV_ITEMS:items.slice(),applyElementStyles(){},applyElementAnimations(){},applyLayoutOverrides(){},renderNavItems(){renders++;}});
   vm.runInContext(publicFunctions.get('applySiteAppearance'),context);
   context.applySiteAppearance({visibility:{navGallery:false,navAbout:false}});assert.equal(context.NAV_ITEMS.length,2);
   context.applySiteAppearance({visibility:{navGallery:true,navAbout:true}});assert.equal(context.NAV_ITEMS.length,4);assert.equal(renders,2);

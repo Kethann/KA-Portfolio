@@ -11,12 +11,16 @@ export function Gallery({category,slugs,initialProjects,initialPortfolio,onBack}
   const [preview,setPreview]=useState<Project|null>(null),[fallback,setFallback]=useState(false);
   const scene=useRef<FolderHandle>(null),shelf=useRef<HTMLDivElement>(null),leaving=useRef(false),lastFolder=useRef('');
   const pendingPage=useRef<number|null>(null),returnTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const receivedUpdate=useRef(false);
   useEffect(()=>()=>{if(returnTimer.current!==null)clearTimeout(returnTimer.current);},[]);
   useEffect(()=>{if(pending&&state==='closed'){setData(pending);setPending(null);}},[pending,state]);
   useEffect(()=>{
     function update(event:Event){
       const site=(event as CustomEvent<Portfolio>).detail;
       if(!site||!Array.isArray(site.images)||!Array.isArray(site.folders))return;
+      receivedUpdate.current=true;
+      if(returnTimer.current!==null){clearTimeout(returnTimer.current);returnTimer.current=null;}
+      pendingPage.current=null;leaving.current=false;
       setData({...site,images:site.images.map(normalize)});setPending(null);setPage(0);setPreview(null);
       if(folder&&!site.folders.includes(folder)){setFolder('');setState('closed');}
     }
@@ -27,14 +31,14 @@ export function Gallery({category,slugs,initialProjects,initialPortfolio,onBack}
     if(initialPortfolio)return;
     const controller=new AbortController();
     fetch('/api/portfolio',{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error('Offline');return r.json();}).then((site:Portfolio)=>{
-      if(Array.isArray(site.images)&&Array.isArray(site.folders))setPending({...site,images:site.images.map(normalize)});
+      if(!controller.signal.aborted&&!receivedUpdate.current&&Array.isArray(site.images)&&Array.isArray(site.folders))setPending({...site,images:site.images.map(normalize)});
     }).catch(()=>{});return()=>controller.abort();
   },[initialPortfolio]);
   const all=useMemo(()=>data?.images||initialProjects.map(normalize),[data,initialProjects]);
   const folders=data?.folders||Array.from(new Set(all.map(p=>p.cat)));
   const collection=useMemo(()=>all.filter(p=>p.cat===folder&&(!slugs||slugs.includes(p.slug))),[all,folder,slugs]);
   const projects=useMemo(()=>collection.slice(page*5,page*5+5),[collection,page]);
-  const busy=['opening','closing','restoring','preview','returning'].includes(state);
+  const busy=!fallback&&['opening','closing','restoring','preview','returning'].includes(state);
   useEffect(()=>{
     if(folder||!lastFolder.current)return;
     Array.from(shelf.current?.querySelectorAll<HTMLButtonElement>('button[data-folder]')||[]).find(b=>b.dataset.folder===lastFolder.current)?.focus({preventScroll:true});
@@ -61,6 +65,10 @@ export function Gallery({category,slugs,initialProjects,initialPortfolio,onBack}
     leaving.current=true;scene.current?.toggle();
   }
   function closePreview(){setPreview(null);if(!fallback){leaving.current=true;scene.current?.restore();}}
+  function handleError(){
+    if(returnTimer.current!==null){clearTimeout(returnTimer.current);returnTimer.current=null;}
+    pendingPage.current=null;leaving.current=false;setState('closed');setFallback(true);
+  }
   function choose(name:string){lastFolder.current=name;leaving.current=false;setState('closed');setPage(0);setFallback(false);setFolder(name);}
   return <section className="embedded-gallery" aria-label="Project collections">
     <header className="gallery-toolbar" hidden={!!preview}><h2 className="gallery-title">{folder||'Selected work'}</h2>{folder&&<button className="return-link" disabled={busy} onClick={returnToShelf}>← All work</button>}</header>
@@ -70,7 +78,7 @@ export function Gallery({category,slugs,initialProjects,initialPortfolio,onBack}
       })}
       {!folders.length&&<p className="scene-empty">No collections yet.</p>}
     </div>:<div key={folder} className="folder-detail" hidden={!!preview} data-leaving={state==='returning'}>
-      <div className="scene-wrap">{projects.length>0&&!fallback?<FolderScene key={folder+'-'+page} ref={scene} autoOpen projects={projects} onState={handleState} onPreview={setPreview} onError={()=>setFallback(true)}/>:<div className="scene-empty"><p>{fallback?'Choose a project below.':'This folder is empty.'}</p></div>}
+      <div className="scene-wrap">{projects.length>0&&!fallback?<FolderScene key={folder+'-'+page} ref={scene} autoOpen projects={projects} onState={handleState} onPreview={setPreview} onError={handleError}/>:<div className="scene-empty"><p>{fallback?'Choose a project below.':'This folder is empty.'}</p></div>}
         <div className="scene-caption"><p className="sr-only" role="status">{state==='opening'?'Opening folder.':state==='closing'?'Returning projects to the folder.':state==='open'?'Choose a project.':''}</p>
         {!!projects.length&&!fallback&&<button className="folder-toggle" disabled={busy} onClick={()=>state==='closed'?scene.current?.toggle():returnToShelf()}>{state==='opening'?'Opening…':state==='closing'?'Closing…':state==='closed'?data?.details.openLabel||'Open folder':data?.details.closeLabel||'Close folder'}</button>}</div>
       </div>

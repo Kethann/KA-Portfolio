@@ -23,7 +23,7 @@ export default function App(){
   const collection=useMemo(()=>data?.images.filter(project=>project.cat===folder)||[],[data,folder]);
   const projects=useMemo(()=>collection.slice(page*5,page*5+5),[collection,page]);
   if(!data)return <main className="loading"><span className="wordmark">KA</span><p role="status">{error||'Opening the archive…'}</p>{error&&<button onClick={()=>location.reload()}>Try again</button>}</main>;
-  const content=data.details,closed=state==='closed';
+  const content=data.details,closed=state==='closed'||webglError;
   const closePreview=()=>{if(webglError)setPreview(null);else scene.current?.restore();};
   return <><ArtBackdrop/><header className="site-header"><a className="wordmark" href="#work" aria-label={content.creatorName+' home'}>KA<span>{content.creatorName}</span></a><nav aria-label="Main navigation"><a href="#work">Selected work</a><a href="#contact">Let’s talk <span aria-hidden="true">↗</span></a></nav></header>
     <main><section id="work" className="work"><div className="work-heading"><span className="eyebrow">An independent creative archive</span><h1>{content.portfolioTitle}</h1><p>{content.tagline}</p></div><div className="folder-picker" aria-label="Project folders">{data.folders.map(name=><button key={name} aria-pressed={folder===name} disabled={!closed&&!webglError} onClick={()=>{setFolder(name);setPage(0);}}>{name}</button>)}</div>

@@ -30,6 +30,15 @@ test('the running portfolio serves the homepage, lazy panda and all built assets
       assert.equal(response.headers.get('cache-control'),'no-cache','creator assets must not be cached immutably');
     }
     const missing=await fetch(base+'/api/not-a-route');assert.equal(missing.status,404);assert.equal(typeof (await missing.json()).error,'string');
+    for(const messages of [null,[],[{role:'user',content:' '}],[{role:'user',content:'x'.repeat(4001)}],
+      [{role:'user',content:'Hello'},{role:'assistant',content:'Hi'}]]){
+      const response=await fetch(base+'/api/assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages})});
+      assert.equal(response.status,400);assert.equal(typeof (await response.json()).error,'string');
+    }
+    const unsupported=await fetch(base+'/api/contact',{method:'POST',headers:{'Content-Type':'application/json; charset=invalid'},body:'{}'});
+    assert.equal(unsupported.status,415);assert.equal(typeof (await unsupported.json()).error,'string');
+    const malformed=await fetch(base+'/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:'{'});
+    assert.equal(malformed.status,400);
   }finally{
     if(server)await new Promise(resolve=>server.close(resolve));
     assert(dataDir.startsWith(testRoot+sep));await rm(dataDir,{recursive:true,force:true});

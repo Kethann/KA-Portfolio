@@ -706,6 +706,11 @@ footer.site-footer{
   backdrop-filter:blur(22px) saturate(160%);
   -webkit-backdrop-filter:blur(22px) saturate(160%);
 }
+/* Social links (creator-panel controlled, see renderSocialLinks()) render as this container's
+   children -- display:contents keeps the container itself out of the footer's own flex layout so
+   each rendered <a> is still a direct flex item with the same gap/wrap as when they were
+   hand-written here, whether the creator has 0, 1, or 8 of them. */
+#footer-links{ display:contents; }
 .footer-link{
   display:inline-flex; align-items:center; gap:9px; text-decoration:none;
   background:var(--glass-bg); border:var(--glass-border);
@@ -1459,15 +1464,7 @@ html.ka-preview-editing [data-ka-editable]:hover{ outline-color:#FF9438; }
 </div>
 
 <footer class="site-footer">
-  <a class="footer-link" href="https://www.behance.net/KethanArtzz" target="_blank" rel="noopener noreferrer">
-    <span class="mono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor" role="img" focusable="false"><path d="M16.969 16.927a2.561 2.561 0 0 0 1.901.677 2.501 2.501 0 0 0 1.531-.475c.362-.235.636-.584.779-.99h2.585a5.091 5.091 0 0 1-1.9 2.896 5.292 5.292 0 0 1-3.091.88 5.839 5.839 0 0 1-2.284-.433 4.871 4.871 0 0 1-1.723-1.211 5.657 5.657 0 0 1-1.08-1.874 7.057 7.057 0 0 1-.383-2.393c-.005-.8.129-1.595.396-2.349a5.313 5.313 0 0 1 5.088-3.604 4.87 4.87 0 0 1 2.376.563c.661.362 1.231.87 1.668 1.485a6.2 6.2 0 0 1 .943 2.133c.194.821.263 1.666.205 2.508h-7.699c-.063.79.184 1.574.688 2.187ZM6.947 4.084a8.065 8.065 0 0 1 1.928.198 4.29 4.29 0 0 1 1.49.638c.418.303.748.711.958 1.182.241.579.357 1.203.341 1.83a3.506 3.506 0 0 1-.506 1.961 3.726 3.726 0 0 1-1.503 1.287 3.588 3.588 0 0 1 2.027 1.437c.464.747.697 1.615.67 2.494a4.593 4.593 0 0 1-.423 2.032 3.945 3.945 0 0 1-1.163 1.413 5.114 5.114 0 0 1-1.683.807 7.135 7.135 0 0 1-1.928.259H0V4.084h6.947Zm-.235 12.9c.308.004.616-.029.916-.099a2.18 2.18 0 0 0 .766-.332c.228-.158.411-.371.534-.619.142-.317.208-.663.191-1.009a2.08 2.08 0 0 0-.642-1.715 2.618 2.618 0 0 0-1.696-.505h-3.54v4.279h3.471Zm13.635-5.967a2.13 2.13 0 0 0-1.654-.619 2.336 2.336 0 0 0-1.163.259 2.474 2.474 0 0 0-.738.62 2.359 2.359 0 0 0-.396.792c-.074.239-.12.485-.137.734h4.769a3.239 3.239 0 0 0-.679-1.785l-.002-.001Zm-13.813-.648a2.254 2.254 0 0 0 1.423-.433c.399-.355.607-.88.56-1.413a1.916 1.916 0 0 0-.178-.891 1.298 1.298 0 0 0-.495-.533 1.851 1.851 0 0 0-.711-.274 3.966 3.966 0 0 0-.835-.073H3.241v3.631h3.293v-.014ZM21.62 5.122h-5.976v1.527h5.976V5.122Z"/></svg></span><span class="label">Behance</span>
-  </a>
-  <a class="footer-link" href="https://www.instagram.com/kethan_artzz" target="_blank" rel="noopener noreferrer">
-    <span class="mono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor" role="img" focusable="false"><path d="M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077"/></svg></span><span class="label">Instagram</span>
-  </a>
-  <a class="footer-link" href="https://x.com/v_kethan" target="_blank" rel="noopener noreferrer" aria-label="Kethan on X (Twitter)">
-    <span class="mono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor" role="img" focusable="false"><path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg></span><span class="label">X / Twitter</span>
-  </a>
+  <div id="footer-links" aria-label="Social links"></div>
   <p class="footer-copyright">&copy; 2026 Kethan Artzz</p>
 </footer>
 
@@ -5726,6 +5723,57 @@ var POSTERS = [
 
 var CATEGORIES = ["Film Posters", "Key Art", "Social"];
 var IMG_BASE = "images/";
+
+// ---- social/footer links (creator-panel controlled, see server's socialLinks + renderSocialLinks()) ----
+// Same fallback-then-replace pattern as POSTERS/CATEGORIES above: this hardcoded list paints
+// immediately, applyPortfolioData() below swaps it for the creator's real list once /api/portfolio
+// answers. Icon keys must match server/creator.js's SOCIAL_ICONS allowlist exactly.
+var SOCIAL_LINKS = [
+  { label:"Behance", url:"https://www.behance.net/KethanArtzz", icon:"behance" },
+  { label:"Instagram", url:"https://www.instagram.com/kethan_artzz", icon:"instagram" },
+  { label:"X / Twitter", url:"https://x.com/v_kethan", icon:"x" }
+];
+var SOCIAL_ICON_SVG = {
+  behance:'<svg viewBox="0 0 24 24" fill="currentColor" role="img" focusable="false"><path d="M16.969 16.927a2.561 2.561 0 0 0 1.901.677 2.501 2.501 0 0 0 1.531-.475c.362-.235.636-.584.779-.99h2.585a5.091 5.091 0 0 1-1.9 2.896 5.292 5.292 0 0 1-3.091.88 5.839 5.839 0 0 1-2.284-.433 4.871 4.871 0 0 1-1.723-1.211 5.657 5.657 0 0 1-1.08-1.874 7.057 7.057 0 0 1-.383-2.393c-.005-.8.129-1.595.396-2.349a5.313 5.313 0 0 1 5.088-3.604 4.87 4.87 0 0 1 2.376.563c.661.362 1.231.87 1.668 1.485a6.2 6.2 0 0 1 .943 2.133c.194.821.263 1.666.205 2.508h-7.699c-.063.79.184 1.574.688 2.187ZM6.947 4.084a8.065 8.065 0 0 1 1.928.198 4.29 4.29 0 0 1 1.49.638c.418.303.748.711.958 1.182.241.579.357 1.203.341 1.83a3.506 3.506 0 0 1-.506 1.961 3.726 3.726 0 0 1-1.503 1.287 3.588 3.588 0 0 1 2.027 1.437c.464.747.697 1.615.67 2.494a4.593 4.593 0 0 1-.423 2.032 3.945 3.945 0 0 1-1.163 1.413 5.114 5.114 0 0 1-1.683.807 7.135 7.135 0 0 1-1.928.259H0V4.084h6.947Zm-.235 12.9c.308.004.616-.029.916-.099a2.18 2.18 0 0 0 .766-.332c.228-.158.411-.371.534-.619.142-.317.208-.663.191-1.009a2.08 2.08 0 0 0-.642-1.715 2.618 2.618 0 0 0-1.696-.505h-3.54v4.279h3.471Zm13.635-5.967a2.13 2.13 0 0 0-1.654-.619 2.336 2.336 0 0 0-1.163.259 2.474 2.474 0 0 0-.738.62 2.359 2.359 0 0 0-.396.792c-.074.239-.12.485-.137.734h4.769a3.239 3.239 0 0 0-.679-1.785l-.002-.001Zm-13.813-.648a2.254 2.254 0 0 0 1.423-.433c.399-.355.607-.88.56-1.413a1.916 1.916 0 0 0-.178-.891 1.298 1.298 0 0 0-.495-.533 1.851 1.851 0 0 0-.711-.274 3.966 3.966 0 0 0-.835-.073H3.241v3.631h3.293v-.014ZM21.62 5.122h-5.976v1.527h5.976V5.122Z"/></svg>',
+  instagram:'<svg viewBox="0 0 24 24" fill="currentColor" role="img" focusable="false"><path d="M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="currentColor" role="img" focusable="false"><path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg>',
+  linkedin:'<svg viewBox="0 0 24 24" fill="currentColor" role="img" focusable="false"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.446-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 1 1 0-4.124 2.062 2.062 0 0 1 0 4.124zM7.114 20.452H3.558V9h3.556v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003Z"/></svg>',
+  youtube:'<svg viewBox="0 0 24 24" fill="currentColor" role="img" focusable="false"><path d="M23.498 6.186a2.994 2.994 0 0 0-2.107-2.117C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.391.524A2.994 2.994 0 0 0 .502 6.186 31.36 31.36 0 0 0 0 12a31.36 31.36 0 0 0 .502 5.814 2.994 2.994 0 0 0 2.107 2.117c1.886.524 9.391.524 9.391.524s7.505 0 9.391-.524a2.994 2.994 0 0 0 2.107-2.117A31.36 31.36 0 0 0 24 12a31.36 31.36 0 0 0-.502-5.814ZM9.545 15.568V8.432L15.818 12l-6.273 3.568Z"/></svg>',
+  website:'<svg viewBox="0 0 24 24" fill="currentColor" role="img" focusable="false"><path d="M14 3a1 1 0 1 0 0 2h3.586l-9.293 9.293a1 1 0 1 0 1.414 1.414L19 6.414V10a1 1 0 1 0 2 0V4a1 1 0 0 0-1-1h-6ZM5 5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5a1 1 0 1 0-2 0v5H5V7h5a1 1 0 0 0 0-2H5Z"/></svg>',
+  email:'<svg viewBox="0 0 24 24" fill="currentColor" role="img" focusable="false"><path d="M2 5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5Zm2.217.5 7.783 6.06 7.783-6.06H4.217ZM20 7.34l-7.386 5.75a1 1 0 0 1-1.228 0L4 7.34V19h16V7.34Z"/></svg>'
+};
+// Renders the footer's social/contact links from data (creator panel controlled). Safe to call
+// repeatedly (e.g. once with the hardcoded fallback, again once /api/portfolio answers, again on
+// every live-preview edit) -- it always fully replaces the previous set rather than patching it,
+// so there's never a stale link left behind from an earlier list.
+function renderSocialLinks(links){
+  var root = document.getElementById("footer-links");
+  if (!root) return;
+  root.replaceChildren();
+  (links || []).forEach(function(link){
+    if (!link || !link.url) return;
+    var icon = SOCIAL_ICON_SVG[link.icon] ? link.icon : "website";
+    var a = document.createElement("a");
+    a.className = "footer-link";
+    a.href = link.url;
+    a.dataset.icon = icon;
+    a.setAttribute("aria-label", link.label || icon);
+    if (icon !== "email") { a.target = "_blank"; a.rel = "noopener noreferrer"; }
+    var mono = document.createElement("span");
+    mono.className = "mono"; mono.setAttribute("aria-hidden", "true");
+    mono.innerHTML = SOCIAL_ICON_SVG[icon];
+    var label = document.createElement("span");
+    label.className = "label"; label.textContent = link.label || "";
+    a.append(mono, label);
+    root.appendChild(a);
+    // wireFooterLinkGhost is defined in a later inline <script> block (same document, same global
+    // scope) -- by the time this actually runs from applyPortfolioData() (after the real fetch, or
+    // any later live-preview edit) that script has long since executed. On the very first
+    // fallback-data paint it may not exist yet; typeof never throws on an undeclared name, so this
+    // just skips the hover-ghost flourish for that one instant and the plain link still works fine.
+    if (typeof wireFooterLinkGhost === "function") wireFooterLinkGhost(a);
+  });
+}
 var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 // [v26 Task 4] every reducedMotion check in this script block already reads the variable at
 // interaction time (click/hover/render), not just once at construction -- so simply keeping
@@ -6356,6 +6404,7 @@ document.getElementById("fav-chip-pinned").addEventListener("click", function(){
 document.addEventListener("ka-pins-changed", buildFolders);
 
 buildFolders();
+renderSocialLinks(SOCIAL_LINKS);
 
 // ==================================================================== NAV + SECTIONS ==
 var nav = document.getElementById("site-nav");
@@ -7412,6 +7461,7 @@ function applyPortfolioData(data){
     };
   });
   CATEGORIES = data.folders.slice();
+  renderSocialLinks(Array.isArray(data.socialLinks) && data.socialLinks.length ? data.socialLinks : SOCIAL_LINKS);
   favFilter = "all";
   var chipAll = document.getElementById("fav-chip-all"), chipPin = document.getElementById("fav-chip-pinned");
   if (chipAll) chipAll.classList.add("active");
@@ -7482,6 +7532,94 @@ function applyElementStyles(styles){
     el.style.color = style.color || "";
   });
 }
+// ---- per-element entrance animation (Creator Portal "Text animation" panel + the live-preview
+// property panel's own Animation section) -- an After-Effects-lite timing control: pick a preset,
+// a duration/delay, an easing curve and whether it plays on load or once scrolled into view.
+// One unified engine plays it for BOTH triggers (see playElementAnimation), so the studio's live
+// preview and the real public page can never visually drift from each other. ----
+var ANIM_KEYFRAMES = {
+  fade: function(){ return [{opacity:0},{opacity:1}]; },
+  "slide-up": function(){ return [{opacity:0,transform:"translate3d(0,24px,0)"},{opacity:1,transform:"translate3d(0,0,0)"}]; },
+  "slide-down": function(){ return [{opacity:0,transform:"translate3d(0,-24px,0)"},{opacity:1,transform:"translate3d(0,0,0)"}]; },
+  "slide-left": function(){ return [{opacity:0,transform:"translate3d(24px,0,0)"},{opacity:1,transform:"translate3d(0,0,0)"}]; },
+  "slide-right": function(){ return [{opacity:0,transform:"translate3d(-24px,0,0)"},{opacity:1,transform:"translate3d(0,0,0)"}]; },
+  "scale-in": function(){ return [{opacity:0,transform:"scale(.92)"},{opacity:1,transform:"scale(1)"}]; },
+  pop: function(){ return [{opacity:0,transform:"scale(1.08)"},{opacity:1,transform:"scale(1)"}]; }
+};
+var ANIM_EASE_CSS = {linear:"linear",ease:"ease","ease-in":"ease-in","ease-out":"ease-out","ease-in-out":"ease-in-out",bounce:"cubic-bezier(.34,1.56,.64,1)"};
+var kaElemAnim = {}; // id -> {key: last-applied config as JSON (dedupe guard), anim: the live Animation, observer: its scroll-trigger IntersectionObserver}
+function playElementAnimation(el, cfg, state){
+  var build = ANIM_KEYFRAMES[cfg.preset];
+  if (!build) return;
+  if (state.anim){ try{ state.anim.cancel(); }catch(e){} state.anim = null; }
+  el.style.opacity = ""; el.style.transform = ""; // clear any earlier finished animation's held end-state first
+  if (reducedMotion || !el.animate) return; // reduced motion / no WAAPI: land straight on the (already-default) end state, no motion
+  try{ state.anim = el.animate(build(), {duration:cfg.duration, delay:cfg.delay, easing:ANIM_EASE_CSS[cfg.easing] || "ease-out", fill:"both"}); }
+  catch(e){}
+}
+function applyElementAnimations(styles){
+  PREVIEW_DRAGGABLE_IDS.forEach(function(id){
+    var el = document.getElementById(id);
+    if (!el) return;
+    var cfg = styles && styles[id] && styles[id].animation;
+    var state = kaElemAnim[id] || (kaElemAnim[id] = {key:"", anim:null, observer:null});
+    if (state.observer){ try{ state.observer.disconnect(); }catch(e){} state.observer = null; }
+    if (!cfg){
+      // Nothing configured for this element -- if one WAS configured a moment ago (the admin just
+      // cleared it back to "Site default"), drop the held end-state so it returns to plain CSS.
+      if (state.key){ if (state.anim){ try{ state.anim.cancel(); }catch(e){} state.anim = null; } el.style.opacity = ""; el.style.transform = ""; state.key = ""; }
+      return;
+    }
+    var key = JSON.stringify(cfg);
+    if (key === state.key) return; // unchanged since the last call -- never replay on an unrelated edit (e.g. typing elsewhere)
+    state.key = key;
+    if (cfg.trigger === "load" || typeof IntersectionObserver !== "function"){
+      playElementAnimation(el, cfg, state);
+    }else{
+      // 'scroll': a one-shot reveal, not the repeating in/out toggle revealOnScroll() uses elsewhere
+      // -- the expected, standard behavior for an admin-authored entrance animation.
+      var obs = new IntersectionObserver(function(entries){
+        if (entries.some(function(e){ return e.isIntersecting; })){ obs.disconnect(); state.observer = null; playElementAnimation(el, cfg, state); }
+      }, {threshold:0.12, rootMargin:"0px 0px -6% 0px"});
+      obs.observe(el);
+      state.observer = obs;
+    }
+  });
+}
+// ---- accent color + favicon (Creator Portal "Site identity") ----
+// The site's two CSS custom properties that everything else already reads through (--amber is
+// used by 44 rules, --accent-glass by 7 -- nav highlights, buttons, focus rings, chip borders,
+// hover glows) are overridden here in one place, exactly like --font-heading/--glass-blur above.
+// A handful of deeply-baked decorative gradients (the hero's own WebGL shard colors) don't read
+// these variables and intentionally keep their own fixed palette -- this covers the site's actual
+// UI accent, not the 3D artwork itself.
+function kaHexToRgb(hex){
+  var m = /^#?([0-9a-f]{6})$/i.exec(String(hex || "").trim());
+  if (!m) return null;
+  var n = parseInt(m[1], 16);
+  return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 };
+}
+function kaShade(rgb, amount){ // amount<0 darkens, >0 lightens, toward 0/255 per channel
+  var f = function(c){ return Math.max(0, Math.min(255, Math.round(c + (amount<0 ? c : 255-c) * amount))); };
+  return { r:f(rgb.r), g:f(rgb.g), b:f(rgb.b) };
+}
+var kaAccentApplied = "";
+function applyAccentColor(hex){
+  if (hex === kaAccentApplied) return; // cheap no-op guard -- this can be called on every live-preview edit
+  var rgb = kaHexToRgb(hex);
+  if (!rgb) return;
+  kaAccentApplied = hex;
+  var root = document.documentElement.style;
+  root.setProperty("--amber", hex);
+  var light = kaShade(rgb, 0.24), deep = kaShade(rgb, -0.18);
+  root.setProperty("--accent-glass", "linear-gradient(180deg, rgba(" + light.r + "," + light.g + "," + light.b + ",0.58), rgba(" + deep.r + "," + deep.g + "," + deep.b + ",0.42))");
+}
+function applyFavicon(url){
+  var link = document.querySelector('link[rel="icon"]');
+  if (!link){ link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
+  if (url){ if (!link.dataset.kaDefault) link.dataset.kaDefault = link.getAttribute("href") || ""; link.href = url; }
+  else if (link.dataset.kaDefault !== undefined){ link.href = link.dataset.kaDefault; }
+}
 function applySiteAppearance(data){
   var root = document.documentElement.style;
   if (data.details){
@@ -7493,8 +7631,11 @@ function applySiteAppearance(data){
     // assistant panel, expand menu) already reads backdrop-filter from this one custom property --
     // overriding it here is a real, site-wide effect, not a per-surface reimplementation.
     if (typeof data.details.glassBlur === "number") root.setProperty("--glass-blur", "blur(" + (data.details.glassBlur * 0.9 * (window.matchMedia("(max-width:760px)").matches ? 0.667 : 1)).toFixed(1) + "px) saturate(135%)");
+    if (data.details.accentColor) applyAccentColor(data.details.accentColor);
+    applyFavicon(data.details.faviconUrl || "");
   }
   applyElementStyles(data.elementStyles);
+  applyElementAnimations(data.elementStyles);
   var noticeEl = document.getElementById("site-notice");
   var noticeText = document.getElementById("site-notice-text");
   if (data.notice && data.notice.enabled && data.notice.text){
@@ -8249,7 +8390,13 @@ var tctx = trailCanvas.getContext("2d");
 if(!tctx)return;
 var trailPoints = [], cursorFrame = 0, cursorLoopActive = false;
 var finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
-var TRAIL_LIFETIME = 850;
+var coarsePointer = window.matchMedia("(pointer: coarse)");
+// Touch has no real "hover" -- every touch trail sample is competing with the finger's own
+// scroll/swipe/drag work on the same main thread. A lighter budget (fewer points, one fewer
+// stroke pass, a shorter memory) keeps the trail from ever being the thing that makes a swipe
+// stutter, while still reading as a smooth, continuous line.
+var TRAIL_MAX_POINTS = coarsePointer.matches ? 40 : 70;
+var TRAIL_LIFETIME = coarsePointer.matches ? 620 : 850;
 var rawX = 0, rawY = 0, rawTime = 0, havePointer = false, lastPushTime = 0;
 function resizeTrail(){
   var pixels = kaLayoutW() * kaLayoutH();
@@ -8293,7 +8440,7 @@ function updateCursor(now){
       if (!lastPushTime || now - lastPushTime >= 10){
         trailPoints.push({x:rawX,y:rawY,time:now});
         lastPushTime = now;
-        if (trailPoints.length>70) trailPoints.shift();
+        if (trailPoints.length>TRAIL_MAX_POINTS) trailPoints.shift();
       }
     } else if (now - rawTime > TRAIL_LIFETIME){
       // pointer has been at rest long enough that sampling more would just pin a static trail
@@ -8311,14 +8458,18 @@ function updateCursor(now){
     // empty space. A deep warm red instead of near-black, so dragging across the bright crystal
     // logo reads as a dark ember/red accent (matching the site's own warm palette) rather than a
     // literal black mark. Same single smoothed path, same gradient shape.
-    var shadowGradient = tctx.createLinearGradient(tail.x, tail.y, head.x, head.y);
-    shadowGradient.addColorStop(0, "rgba(120,20,10,0)");
-    shadowGradient.addColorStop(0.4, "rgba(120,20,10,"+(0.18*headLife)+")");
-    shadowGradient.addColorStop(1, "rgba(160,30,12,"+(0.5*headLife)+")");
-    tctx.strokeStyle = shadowGradient;
-    tctx.lineWidth = 2.1 + headLife*2.28; // [35% then 30% smaller] was 4.6 + headLife*5
-    smoothTrailPath(tctx, trailPoints);
-    tctx.stroke();
+    // Skipped on touch: one fewer full-path stroke per frame, since every frame here is stealing
+    // time from whatever the finger is actually doing (scrolling, swiping the image stacks).
+    if(!coarsePointer.matches){
+      var shadowGradient = tctx.createLinearGradient(tail.x, tail.y, head.x, head.y);
+      shadowGradient.addColorStop(0, "rgba(120,20,10,0)");
+      shadowGradient.addColorStop(0.4, "rgba(120,20,10,"+(0.18*headLife)+")");
+      shadowGradient.addColorStop(1, "rgba(160,30,12,"+(0.5*headLife)+")");
+      tctx.strokeStyle = shadowGradient;
+      tctx.lineWidth = 2.1 + headLife*2.28; // [35% then 30% smaller] was 4.6 + headLife*5
+      smoothTrailPath(tctx, trailPoints);
+      tctx.stroke();
+    }
     var gradient = tctx.createLinearGradient(tail.x, tail.y, head.x, head.y);
     gradient.addColorStop(0, "rgba(230,196,150,0)");
     gradient.addColorStop(0.4, "rgba(230,196,150,"+(0.28*headLife)+")");
@@ -8361,6 +8512,14 @@ function trackTrailPointer(event){
   if(overNav){stopCursorLoop();return;}
   var interactive=path.some(function(el){return el.matches && el.id!=="assistant-launcher" && el.matches("button,a,input,textarea,select,[role='button']");});
   if(interactive){stopCursorLoop();return;}
+  // The image stacks (.work-stacks) run their own drag/spring physics loop on touch -- a finger
+  // scrubbing or swiping the carousel there is a real-time gesture, not a place to also be
+  // painting. Only skip it for touch: on mouse the carousel doesn't drag on hover, so the trail
+  // painting over it there was already fine and stays as-is.
+  if(event.pointerType==='touch'){
+    var overGallery=path.some(function(el){return el.closest && el.closest(".work-stacks");});
+    if(overGallery){stopCursorLoop();return;}
+  }
   rawX=event.clientX; rawY=event.clientY; rawTime=performance.now(); havePointer=true;
   startCursorLoop();
 }
@@ -8635,9 +8794,13 @@ footer.site-footer{
   opacity:1 !important; filter:none !important;
   transition:transform .3s var(--ease-snappy);
 }
-.footer-link[href*="behance"]{ --brand: 60,130,255; }
-.footer-link[href*="instagram"]{ --brand: 240,90,140; }
-.footer-link[href*="x.com"], .footer-link[href*="twitter"]{ --brand: 235,235,245; }
+.footer-link[data-icon="behance"]{ --brand: 60,130,255; }
+.footer-link[data-icon="instagram"]{ --brand: 240,90,140; }
+.footer-link[data-icon="x"]{ --brand: 235,235,245; }
+.footer-link[data-icon="linkedin"]{ --brand: 65,140,225; }
+.footer-link[data-icon="youtube"]{ --brand: 255,70,70; }
+.footer-link[data-icon="website"]{ --brand: 200,200,210; }
+.footer-link[data-icon="email"]{ --brand: 255,180,120; }
 .footer-link .mono{
   width:54px; height:54px; border-radius:50%; display:grid; place-items:center; position:relative; overflow:hidden;
   color:inherit; font-size:0;
@@ -8723,60 +8886,60 @@ footer.site-footer{ padding-bottom:56px; row-gap:34px; }
 // Hover (or keyboard focus) a footer logo: the network's name surfaces from a coloured blur, letter by letter,
 // in random order, and dissolves the same way when you leave. Touch screens show the names as plain text.
 // Reduced motion: the name just appears (CSS), no animation.
+// [social links became creator-panel data] this used to run once over the footer's hand-written
+// <a> tags; the footer now renders them from data (see renderSocialLinks() further down, which is
+// what actually calls wireFooterLinkGhost() per link, whenever the set of links changes -- not just
+// once at parse time, since the creator can add/remove/reorder links live in the studio preview).
+var kaFooterGhostReduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+var kaFooterGhostTouch = window.matchMedia && window.matchMedia("(hover: none)").matches;
 (function(){
   var footer = document.querySelector("footer.site-footer");
-  if (!footer) return;
-  var links = Array.prototype.slice.call(footer.querySelectorAll(".footer-link"));
-  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var touch = window.matchMedia && window.matchMedia("(hover: none)").matches;
-  // the links were also registered with the older fade-in helper; drop that, they are always visible now
-  links.forEach(function(a){
-    a.classList.remove("reveal-fade", "is-visible");
-    if (window.scrollRevealObserver) try { window.scrollRevealObserver.unobserve(a); } catch (e) {}
-  });
-  if (reduce || touch) return;
-  footer.classList.add("ghost-on");
+  if (footer && !kaFooterGhostReduce && !kaFooterGhostTouch) footer.classList.add("ghost-on");
+})();
+function wireFooterLinkGhost(a){
+  // the link was also registered with the older fade-in helper; drop that, it's always visible now
+  a.classList.remove("reveal-fade", "is-visible");
+  if (window.scrollRevealObserver) try { window.scrollRevealObserver.unobserve(a); } catch (e) {}
+  var label = a.querySelector(".label"); if (!label) return;
+  var text = label.textContent.trim();
+  if (!a.getAttribute("aria-label")) a.setAttribute("aria-label", text);      // keep the accessible name
+  if (kaFooterGhostReduce || kaFooterGhostTouch) return;                      // touch/reduced motion: plain visible text, no per-letter reveal
   var clamp = function(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); };
   var easeOut = function(t){ return 1 - Math.pow(1 - t, 3); };
   var SPAN = 0.55;
-  links.forEach(function(a){
-    var label = a.querySelector(".label"); if (!label) return;
-    var text = label.textContent.trim();
-    if (!a.getAttribute("aria-label")) a.setAttribute("aria-label", text);      // keep the accessible name
-    var brand = (getComputedStyle(a).getPropertyValue("--brand") || "255,255,255").trim();
-    label.textContent = ""; label.setAttribute("aria-hidden", "true");
-    var units = [], ts = [];
-    Array.prototype.forEach.call(text, function(ch){
-      var u = document.createElement("span"); u.className = "fl"; u.textContent = ch === " " ? " " : ch; u.style.color = "transparent";
-      label.appendChild(u); units.push(u); ts.push(0);
-    });
-    var t = 0, dir = 0, raf = 0, last = 0;
-    function reroll(){ for (var i = 0; i < ts.length; i++) ts[i] = Math.random() * (1 - SPAN); }
-    function render(){
-      for (var i = 0; i < units.length; i++){
-        var w = clamp((t - ts[i]) / SPAN, 0, 1), s = units[i].style;
-        if (w >= 1){ s.color = "#fff"; s.textShadow = "0 0 14px rgba(" + brand + ",0.55)"; continue; }
-        if (w <= 0){ s.color = "transparent"; s.textShadow = "none"; continue; }
-        var e = easeOut(w), b = (1 - e) * 9;
-        s.color = "rgba(255,255,255," + (e * e).toFixed(3) + ")";
-        s.textShadow = "0 0 " + b.toFixed(1) + "px rgba(255,255,255," + ((1 - e) * .7).toFixed(2) + "), 0 0 " + (b * 1.9).toFixed(1) + "px rgba(" + brand + "," + ((1 - e) * .95).toFixed(2) + ")";
-      }
-    }
-    function tick(now){
-      raf = 0;
-      var dt = Math.min(64, now - last) || 16; last = now;
-      t = clamp(t + dir * dt / (dir > 0 ? 560 : 340), 0, 1);
-      render();
-      if ((dir > 0 && t < 1) || (dir < 0 && t > 0)) raf = requestAnimationFrame(tick);
-    }
-    function go(d){ if (d > 0 && t === 0) reroll(); dir = d; if (!raf){ last = performance.now(); raf = requestAnimationFrame(tick); } }
-    a.addEventListener("pointerenter", function(e){ if (e.pointerType === "mouse" || e.pointerType === "pen") go(1); });
-    a.addEventListener("pointerleave", function(){ go(-1); });
-    a.addEventListener("focus", function(){ go(1); });
-    a.addEventListener("blur", function(){ go(-1); });
-    render();
+  var brand = (getComputedStyle(a).getPropertyValue("--brand") || "255,255,255").trim();
+  label.textContent = ""; label.setAttribute("aria-hidden", "true");
+  var units = [], ts = [];
+  Array.prototype.forEach.call(text, function(ch){
+    var u = document.createElement("span"); u.className = "fl"; u.textContent = ch === " " ? " " : ch; u.style.color = "transparent";
+    label.appendChild(u); units.push(u); ts.push(0);
   });
-})();
+  var t = 0, dir = 0, raf = 0, last = 0;
+  function reroll(){ for (var i = 0; i < ts.length; i++) ts[i] = Math.random() * (1 - SPAN); }
+  function render(){
+    for (var i = 0; i < units.length; i++){
+      var w = clamp((t - ts[i]) / SPAN, 0, 1), s = units[i].style;
+      if (w >= 1){ s.color = "#fff"; s.textShadow = "0 0 14px rgba(" + brand + ",0.55)"; continue; }
+      if (w <= 0){ s.color = "transparent"; s.textShadow = "none"; continue; }
+      var e = easeOut(w), b = (1 - e) * 9;
+      s.color = "rgba(255,255,255," + (e * e).toFixed(3) + ")";
+      s.textShadow = "0 0 " + b.toFixed(1) + "px rgba(255,255,255," + ((1 - e) * .7).toFixed(2) + "), 0 0 " + (b * 1.9).toFixed(1) + "px rgba(" + brand + "," + ((1 - e) * .95).toFixed(2) + ")";
+    }
+  }
+  function tick(now){
+    raf = 0;
+    var dt = Math.min(64, now - last) || 16; last = now;
+    t = clamp(t + dir * dt / (dir > 0 ? 560 : 340), 0, 1);
+    render();
+    if ((dir > 0 && t < 1) || (dir < 0 && t > 0)) raf = requestAnimationFrame(tick);
+  }
+  function go(d){ if (d > 0 && t === 0) reroll(); dir = d; if (!raf){ last = performance.now(); raf = requestAnimationFrame(tick); } }
+  a.addEventListener("pointerenter", function(e){ if (e.pointerType === "mouse" || e.pointerType === "pen") go(1); });
+  a.addEventListener("pointerleave", function(){ go(-1); });
+  a.addEventListener("focus", function(){ go(1); });
+  a.addEventListener("blur", function(){ go(-1); });
+  render();
+}
 </script>
 <style>
 /* ============================================================ GHOST LETTERS + CHAT (v4) =======================
@@ -9124,6 +9287,31 @@ html{ font-size:calc(100% * var(--text-scale, 1) * var(--screen-scale, 1)); }
     busy = false;
     it.text = el.textContent;
   }
+  // Hover-replay: re-runs the same handwriting reveal for a single word's letters only, independent
+  // of the scroll-driven `it.r` -- safe because "ink" items never blur back out (reversible=false) and
+  // tick() stops touching them once fully written, so this owns their styling exclusively after that.
+  function replayWord(w){
+    var letters = w.__letters, rots = w.__rots, glow = w.__glow;
+    if (!letters || !letters.length || w.__replaying) return;
+    w.__replaying = true;
+    var n = letters.length, span = n + CFG.stretch, start = performance.now(), dur = 480;
+    function frame(now){
+      var t = clamp((now - start) / dur, 0, 1);
+      for (var i = 0; i < n; i++){
+        var li = clamp((t * span - i) / CFG.stretch, 0, 1);
+        var s = letters[i].style;
+        if (li >= 1){ s.cssText = ""; continue; }
+        if (li <= 0){ s.cssText = "opacity:0"; continue; }
+        var e = easeOut(li), pen = li * (1 - li) * 4;
+        s.opacity = String(clamp(li * 2.6, 0, 1));
+        s.clipPath = "inset(-20% " + ((1 - e) * 100).toFixed(1) + "% -20% -10%)";
+        s.transform = "translate3d(" + ((1 - e) * -.09).toFixed(3) + "em," + ((1 - e) * .05).toFixed(3) + "em,0) rotate(" + ((1 - e) * rots[i]).toFixed(2) + "deg)";
+        s.textShadow = "0 0 " + (pen * .5).toFixed(2) + "em rgba(" + glow + "," + (pen * .85).toFixed(2) + ")";
+      }
+      if (t < 1) requestAnimationFrame(frame); else w.__replaying = false;
+    }
+    requestAnimationFrame(frame);
+  }
   function build(it){
     var el = it.el;
     it.ink = inkRGB(el);
@@ -9138,11 +9326,15 @@ html{ font-size:calc(100% * var(--text-scale, 1) * var(--screen-scale, 1)); }
         if (!tok) return;
         if (/^\s+$/.test(tok)){ el.appendChild(document.createTextNode(" ")); return; }
         var w = document.createElement("span"); w.className = "ink-w"; w.setAttribute("aria-hidden", "true");
+        w.__letters = []; w.__rots = []; w.__glow = it.glow;
         Array.prototype.forEach.call(tok, function(ch){
           var l = document.createElement("span"); l.className = "ink-l"; l.textContent = ch; l.style.opacity = "0";
-          w.appendChild(l); it.letters.push(l); it.rots.push((Math.random() * 2 - 1) * 4); it.shown.push(-1);
+          var rot = (Math.random() * 2 - 1) * 4;
+          w.appendChild(l); it.letters.push(l); it.rots.push(rot); it.shown.push(-1);
+          w.__letters.push(l); w.__rots.push(rot);
         });
         el.appendChild(w);
+        w.addEventListener("mouseenter", function(){ replayWord(w); });
       });
       busy = false;
       it.text = el.textContent; it.mode = "ink";

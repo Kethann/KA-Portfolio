@@ -43,32 +43,95 @@ function StackGrid({id,stacks,reduced,onOpen}:{id:string;stacks:Stack[];reduced:
   const rootRef=useRef<HTMLDivElement>(null);
   const [entered,setEntered]=useState(reduced||entrancePlayed.has(id));
   const keys=stacks.map(s=>s.name).join('|');
+  const canHover=useMedia('(hover: hover) and (pointer: fine)');
+  const coarse=useMedia('(pointer: coarse)');
+  // Magnetic pull: covers near the cursor lean toward it (tilt in 3D, lift, fan their card edges), eased every frame.
+  // Only the inner deck moves (transform + custom properties), so it never fights the entrance animation.
+  useEffect(()=>{
+    if(!canHover||reduced)return;
+    const root=rootRef.current;if(!root)return;
+    const state=new Map<HTMLElement,{x:number;y:number;rx:number;ry:number;s:number;f:number}>();
+    let raf=0,px=0,py=0,inside=false;
+    const tick=()=>{
+      raf=0;let busy=false;
+      root.querySelectorAll<HTMLElement>('.stack').forEach(el=>{
+        const m=state.get(el)||{x:0,y:0,rx:0,ry:0,s:1,f:0};state.set(el,m);
+        let tx=0,ty=0,trx=0,tryy=0,ts=1,tf=0;
+        if(inside){
+          const r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height*.42,dx=px-cx,dy=py-cy,R=Math.max(r.width,r.height*.7)*1.05;
+          const prox=Math.max(0,1-Math.hypot(dx,dy)/R);
+          if(prox>0){tx=dx*.12*prox;ty=dy*.12*prox-5*prox;trx=-(dy/r.height)*11*prox;tryy=(dx/r.width)*13*prox;ts=1+.05*prox;tf=prox;}
+        }
+        const k=inside?.17:.12;
+        m.x+=(tx-m.x)*k;m.y+=(ty-m.y)*k;m.rx+=(trx-m.rx)*k;m.ry+=(tryy-m.ry)*k;m.s+=(ts-m.s)*k;m.f+=(tf-m.f)*k;
+        if(Math.abs(tx-m.x)>.04||Math.abs(ty-m.y)>.04||Math.abs(trx-m.rx)>.03||Math.abs(tryy-m.ry)>.03||Math.abs(ts-m.s)>.0005||Math.abs(tf-m.f)>.004)busy=true;
+        else{m.x=tx;m.y=ty;m.rx=trx;m.ry=tryy;m.s=ts;m.f=tf;}
+        const st=el.style;
+        st.setProperty('--mx',m.x.toFixed(2)+'px');st.setProperty('--my',m.y.toFixed(2)+'px');
+        st.setProperty('--rx',m.rx.toFixed(2)+'deg');st.setProperty('--ry',m.ry.toFixed(2)+'deg');
+        st.setProperty('--ms',m.s.toFixed(4));st.setProperty('--fan',m.f.toFixed(3));
+      });
+      if(busy)raf=requestAnimationFrame(tick);
+    };
+    const kick=()=>{if(!raf)raf=requestAnimationFrame(tick);};
+    const move=(e:PointerEvent)=>{if(e.pointerType!=='mouse')return;px=e.clientX;py=e.clientY;inside=true;kick();};
+    const leave=()=>{inside=false;kick();};
+    root.addEventListener('pointermove',move,{passive:true});root.addEventListener('pointerleave',leave);
+    return()=>{root.removeEventListener('pointermove',move);root.removeEventListener('pointerleave',leave);cancelAnimationFrame(raf);};
+  },[canHover,reduced,keys]);
   useEffect(()=>{
     if(entered||!stacks.length)return;
     const root=rootRef.current;if(!root)return;
-    let started=false,timer=0;
+    let started=false,io:IntersectionObserver|undefined;
+    const cleanup=()=>{io?.disconnect();window.removeEventListener('scroll',check);window.removeEventListener('resize',check);};
+    // Close enough to the screen to be worth playing the entrance for. Hidden panels (zero size) never count.
+    const inView=()=>{const r=root.getBoundingClientRect(),vh=window.innerHeight||1;return r.width>0&&r.height>0&&r.bottom>0&&r.top<vh*.88;};
     function play(){
-      if(started||entrancePlayed.has(id))return;started=true;entrancePlayed.add(id);
-      const box=root!.getBoundingClientRect(),els=Array.from(root!.querySelectorAll<HTMLElement>('.stack'));
-      const anims=els.map((el,i)=>{
-        const r=el.getBoundingClientRect(),padX=Math.min(80,box.width*.08),padY=Math.min(60,box.height*.1);
-        // Scattered start: a random spot inside the panel bounds with a random tilt.
-        const tx=box.left+padX+Math.random()*Math.max(1,box.width-2*padX),ty=box.top+padY+Math.random()*Math.max(1,box.height-2*padY);
-        const dx=tx-(r.left+r.width/2),dy=ty-(r.top+r.height/2),rot=(Math.random()*40-20).toFixed(1);
-        return el.animate([
-          {transform:`translate3d(${dx}px,${dy}px,0) rotate(${rot}deg) scale(.9)`,opacity:0},
-          {transform:'translate3d(0,0,0) rotate(0deg) scale(1)',opacity:1}
-        ],{duration:1000,delay:i*110,easing:'cubic-bezier(.34,1.32,.64,1)',fill:'both'});
-      });
-      Promise.all(anims.map(a=>a.finished.catch(()=>undefined))).then(()=>{setEntered(true);anims.forEach(a=>{try{a.commitStyles();a.cancel();}catch{/* element already gone */}});});
+      if(started||entrancePlayed.has(id))return;started=true;entrancePlayed.add(id);cleanup();
+      // Whatever happens below (an older phone browser without Animation.finished / commitStyles, a throw, a
+      // hidden tab), the stacks are forced visible once the entrance should long since have ended: never stuck hidden.
+      const els=Array.from(root!.querySelectorAll<HTMLElement>('.stack'));
+      // Touch/tablet: a plain rise-and-fade, not the full scatter-from-random-position entrance.
+      // The scattered version reads great on a mouse but costs a getBoundingClientRect() and a
+      // WAAPI animation per card that can visibly stall mid-flight on a slower phone GPU (the
+      // "stack not fully visible" glitch) -- a shorter, single-axis motion resolves quickly and
+      // can't get caught half-scattered.
+      const light=coarse;
+      const stagger=light?60:110,dur=light?520:1000;
+      window.setTimeout(()=>setEntered(true),1000+els.length*stagger+(light?400:900));
+      try{
+        const box=root!.getBoundingClientRect();
+        const anims=els.map((el,i)=>{
+          if(light){
+            return el.animate([
+              {transform:'translate3d(0,16px,0) scale(.96)',opacity:0},
+              {transform:'translate3d(0,0,0) scale(1)',opacity:1}
+            ],{duration:dur,delay:i*stagger,easing:'cubic-bezier(.2,.9,.25,1)',fill:'both'});
+          }
+          const r=el.getBoundingClientRect(),padX=Math.min(80,box.width*.08),padY=Math.min(60,box.height*.1);
+          // Scattered start: a random spot inside the panel bounds with a random tilt.
+          const tx=box.left+padX+Math.random()*Math.max(1,box.width-2*padX),ty=box.top+padY+Math.random()*Math.max(1,box.height-2*padY);
+          const dx=tx-(r.left+r.width/2),dy=ty-(r.top+r.height/2),rot=(Math.random()*40-20).toFixed(1);
+          return el.animate([
+            {transform:`translate3d(${dx}px,${dy}px,0) rotate(${rot}deg) scale(.9)`,opacity:0},
+            {transform:'translate3d(0,0,0) rotate(0deg) scale(1)',opacity:1}
+          ],{duration:dur,delay:i*stagger,easing:'cubic-bezier(.34,1.32,.64,1)',fill:'both'});
+        });
+        const finish=()=>{setEntered(true);anims.forEach(a=>{try{a.commitStyles();a.cancel();}catch{/* older engine or element gone */}});};
+        const fins=anims.map(a=>a.finished);
+        if(fins.every(Boolean))Promise.all(fins.map(f=>f.catch(()=>undefined))).then(finish);
+      }catch{setEntered(true);}
     }
-    if(typeof IntersectionObserver!=='function'){play();return;}
-    const io=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){io.disconnect();play();}},{threshold:.2});
-    io.observe(root);
-    // If the panel is never observed as visible (hidden tab, odd layout), still reveal the stacks.
-    timer=window.setTimeout(()=>{io.disconnect();play();},4000);
-    return()=>{io.disconnect();clearTimeout(timer);};
-  },[entered,keys]);
+    function check(){if(inView())play();}
+    if(typeof IntersectionObserver==='function'){
+      io=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting))check();},{rootMargin:'0px 0px -12% 0px',threshold:0.01});
+      io.observe(root);
+    }
+    // A phone browser that never reports the panel as visible still gets the entrance as you scroll near it.
+    window.addEventListener('scroll',check,{passive:true});window.addEventListener('resize',check);
+    const first=requestAnimationFrame(check);
+    return()=>{cancelAnimationFrame(first);cleanup();};
+  },[entered,keys,coarse]);
   return <div className={'stack-grid'+(entered?' is-entered':' is-pending')} ref={rootRef}>
     {stacks.map(s=>{
       const count=s.items.length,others=s.items.filter(i=>i.slug!==s.cover.slug);
@@ -309,6 +372,17 @@ function ShareButton({project,stackName}:{project:Project;stackName:string}){
     setOpen(o=>!o);
   }
   async function copy(){setOpen(false);tell((await copyText(url))?'Link copied':'Could not copy the link');btn.current?.focus({preventScroll:true});}
+  function menuKey(event:ReactKeyboardEvent<HTMLDivElement>){
+    if(!['ArrowDown','ArrowUp','ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+    event.stopPropagation();
+    if(event.key==='ArrowLeft'||event.key==='ArrowRight')return;
+    event.preventDefault();
+    const items=Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]'));
+    if(!items.length)return;
+    const index=items.indexOf((event.currentTarget.getRootNode() as Document|ShadowRoot).activeElement as HTMLElement);
+    const next=event.key==='Home'?0:event.key==='End'?items.length-1:mod(index+(event.key==='ArrowDown'?1:-1),items.length);
+    items[next].focus({preventScroll:true});
+  }
   const enc=encodeURIComponent,items:{label:string;href:string;dot:string}[]=[
     {label:'WhatsApp',href:`https://wa.me/?text=${enc(text+' '+url)}`,dot:'#25d366'},
     {label:'X (Twitter)',href:`https://twitter.com/intent/tweet?text=${enc(text)}&url=${enc(url)}`,dot:'#e7e7ea'},
@@ -321,7 +395,7 @@ function ShareButton({project,stackName}:{project:Project;stackName:string}){
     <button type="button" ref={btn} className="vw-share" onClick={click} aria-haspopup={canNative&&coarse?undefined:'menu'} aria-expanded={canNative&&coarse?undefined:open} aria-label={`Share ${project.title}`} title="Share">
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="6.5" cy="12" r="2.6"/><circle cx="17.5" cy="5.6" r="2.6"/><circle cx="17.5" cy="18.4" r="2.6"/><path d="M8.8 10.8l6.4-3.8M8.8 13.2l6.4 3.8"/></svg>
     </button>
-    {open&&<div className="vw-menu" role="menu" aria-label="Share this image">
+    {open&&<div className="vw-menu" role="menu" aria-label="Share this image" onKeyDown={menuKey}>
       <button type="button" role="menuitem" onClick={copy}><i className="d" style={{background:'#ffe2c4'}}/>Copy link</button>
       {items.map(i=><a key={i.label} role="menuitem" href={i.href} target="_blank" rel="noopener noreferrer" onClick={()=>setOpen(false)}><i className="d" style={{background:i.dot}}/>{i.label}</a>)}
       {canNative&&<button type="button" role="menuitem" onClick={()=>{setOpen(false);void nativeShare();}}><i className="d" style={{background:'#c9b8ff'}}/>More apps…</button>}
@@ -437,7 +511,7 @@ function Coverflow({stack,loop,reduced,canHover,onClose,pins,onPin,startSlug}:{s
       shadow.style.opacity=(m.o*.85).toFixed(3);
       shadow.style.transform=`translate3d(${(m.x*.5).toFixed(2)}px,${(14+m.o*12).toFixed(2)}px,0) scale(${(.92+m.o*.16).toFixed(3)})`;
     }
-    return busy||on;
+    return busy;
   },[]);
 
   const frame=useCallback((t:number)=>{
@@ -462,6 +536,23 @@ function Coverflow({stack,loop,reduced,canHover,onClose,pins,onPin,startSlug}:{s
   },[layout,magnet]);
   const kick=useCallback(()=>{if(!st.current.raf)st.current.raf=requestAnimationFrame(frame);},[frame]);
 
+  // Trackpad two-finger swipe / horizontal wheel / Shift+wheel scrubs the carousel with the same spring, then snaps.
+  useEffect(()=>{
+    const stage=stageRef.current;if(!stage)return;
+    let timer=0;
+    const onWheel=(e:WheelEvent)=>{
+      const horizontal=Math.abs(e.deltaX)>Math.abs(e.deltaY)||e.shiftKey;
+      if(!horizontal)return;                                        // vertical wheel keeps scrolling the page
+      e.preventDefault();
+      const s=st.current,raw=Math.abs(e.deltaX)>0?e.deltaX:e.deltaY,d=raw*(e.deltaMode===1?32:e.deltaMode===2?400:1);
+      s.dragging=false;s.vel=0;
+      s.target=clampTarget(s.target+d/Math.max(120,s.cw*1.05));
+      report();kick();
+      clearTimeout(timer);timer=window.setTimeout(()=>{s.target=clampTarget(Math.round(s.target));report();kick();},140);
+    };
+    stage.addEventListener('wheel',onWheel,{passive:false});
+    return()=>{stage.removeEventListener('wheel',onWheel);clearTimeout(timer);};
+  },[kick]);// eslint-disable-line react-hooks/exhaustive-deps
   // Opened from a shared link: start on that image, already in the full viewer.
   useLayoutEffect(()=>{
     if(!startSlug)return;
@@ -550,6 +641,7 @@ function Coverflow({stack,loop,reduced,canHover,onClose,pins,onPin,startSlug}:{s
   function key(e:ReactKeyboardEvent<HTMLDivElement>){
     if(e.key==='ArrowRight'){e.preventDefault();go(1);}
     else if(e.key==='ArrowLeft'){e.preventDefault();go(-1);}
+    else if((e.key==='Enter'||e.key===' ')&&e.target===stageRef.current){e.preventDefault();openViewer();}
   }
 
   const atStart=!loop&&active<=0,atEnd=!loop&&active>=n-1;
@@ -609,7 +701,7 @@ export function WorkStacks({folders,images,stacks:settings,id='work',filter='all
     pendingLink.current='';
     setStartSlug(slug);setOpen(hit.cat);
     try{const u=new URL(window.location.href);u.searchParams.delete('image');window.history.replaceState(null,'',u.pathname+u.search+u.hash);}catch{/* not critical */}
-    requestAnimationFrame(()=>rootRef.current?.scrollIntoView({behavior:'smooth',block:'start'}));
+    requestAnimationFrame(()=>rootRef.current?.scrollIntoView({behavior:reduced?'instant':'smooth',block:'start'}));
   },[images]);
   const current=stacks.find(s=>s.name===open);
   const close=useCallback(()=>{setOpen(null);setStartSlug('');const el=opener.current;if(el)requestAnimationFrame(()=>el.isConnected&&el.focus({preventScroll:true}));},[]);

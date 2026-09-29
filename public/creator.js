@@ -7,6 +7,17 @@ let csrf='',site=null,messages=[],dirty=false;
 const FONT_CHOICES=['Fraunces','Manrope','Sora','Poppins','Playfair Display','Space Grotesk','system-ui'];
 // Type style presets: each just sets the display + text fonts together.
 const TYPE_PRESETS={editorial:['Fraunces','Manrope'],modern:['Sora','Manrope'],technical:['Space Grotesk','Manrope'],classic:['Playfair Display','Manrope']};
+// Mirrors server/creator.js's SOCIAL_ICONS/DEFAULT_SOCIAL_LINKS and index.html's SOCIAL_ICON_SVG
+// exactly (same hand-kept-in-sync convention as FONT_CHOICES above).
+const SOCIAL_ICONS=[['behance','Behance'],['instagram','Instagram'],['x','X / Twitter'],['linkedin','LinkedIn'],['youtube','YouTube'],['website','Website / other'],['email','Email']];
+const DEFAULT_SOCIAL_LINKS=[{label:'Behance',url:'https://www.behance.net/KethanArtzz',icon:'behance'},{label:'Instagram',url:'https://www.instagram.com/kethan_artzz',icon:'instagram'},{label:'X / Twitter',url:'https://x.com/v_kethan',icon:'x'}];
+// Mirrors server/creator.js's ANIM_PRESETS/ANIM_EASINGS/ANIM_TRIGGERS exactly.
+const ANIM_PRESETS=[['','Site default (no animation)'],['fade','Fade in'],['slide-up','Slide up'],['slide-down','Slide down'],['slide-left','Slide in from the right'],['slide-right','Slide in from the left'],['scale-in','Scale in'],['pop','Pop']];
+const ANIM_EASINGS=[['linear','Linear'],['ease','Ease'],['ease-in','Ease in'],['ease-out','Ease out'],['ease-in-out','Ease in-out'],['bounce','Bounce']];
+const ANIM_TRIGGERS=[['scroll','Once scrolled into view'],['load','As soon as the page loads']];
+// ELEMENT_NAMES (the elements that can carry a font/color override and, now, an entrance animation)
+// is declared further down, right where the property panel that introduced it already lives; both
+// it and the Appearance tab's "Text animation" list (renderAnimationPanel()) read the same constant.
 // [fix] this never actually auto-dismissed -- it only ever set text/error state, nothing anywhere
 // cleared either back out, so the last message (e.g. "Signed in.") just sat there permanently.
 // Error messages stay put (the admin needs to actually read and act on those); success/info
@@ -48,7 +59,11 @@ async function loadStudio(){
   if(site.details.glassBlur===undefined)site.details.glassBlur=18;
   site.branding=site.branding||{enabled:false,logoUrl:''};
   site.elementStyles=site.elementStyles||{};
+  if(site.details.accentColor===undefined)site.details.accentColor='#FF9438';
+  if(site.details.faviconUrl===undefined)site.details.faviconUrl='';
+  site.socialLinks=Array.isArray(site.socialLinks)?site.socialLinks:DEFAULT_SOCIAL_LINKS.slice();
   renderTypography();renderNoticeForm();renderVisibilityForm();renderLayoutPanel();renderBranding();
+  renderIdentity();renderAnimationPanel();renderSocialLinksPanel();
   renderInbox();renderFolders();renderImages(); // renderInbox() already calls renderOverview() itself
   setupPreview();syncPreview();
 }
@@ -158,6 +173,66 @@ function setupSplitDivider(){
 // into site.details and reuse the exact same markDirty()->syncPreview() path every other field
 // already goes through, so the preview, the #details form, and this panel never drift out of sync.
 const ELEMENT_NAMES={'assistant-launcher':'Chat launcher','site-notice':'Notice banner','portfolio-title':'Portfolio heading','portfolio-intro':'Portfolio intro text','contact-title':'Contact heading','contact-intro':'Contact intro text'};
+// Entrance-animation controls for one element (id), appended into `container`. Shared by the
+// live-preview property panel (one element, the one just clicked) and the Appearance tab's "Text
+// animation" list (every animatable element at once) -- one implementation, so the two can never
+// drift out of sync with each other or with what the server actually accepts (ANIM_PRESETS etc.).
+function renderAnimationControls(container,id){
+  const wrap=el('div',undefined,'anim-controls');
+  const presetLabel=el('label','Animation'),presetSelect=el('select');
+  for(const[value,label]of ANIM_PRESETS){const opt=el('option',label);opt.value=value;presetSelect.append(opt);}
+  const current=(site.elementStyles[id]||{}).animation;
+  presetSelect.value=current?current.preset:'';
+  presetLabel.append(presetSelect);wrap.append(presetLabel);
+  const fields=el('div',undefined,'field-grid anim-fields');wrap.append(fields);
+  function anim(){return(site.elementStyles[id]||{}).animation;}
+  function renderFields(){
+    fields.replaceChildren();
+    const a=anim();if(!a)return;
+    const durationLabel=el('label','Duration (ms)'),durationInput=el('input');
+    durationInput.type='number';durationInput.min='100';durationInput.max='3000';durationInput.step='50';durationInput.value=a.duration;
+    durationInput.addEventListener('change',()=>{const a2=anim();if(!a2)return;a2.duration=Math.min(3000,Math.max(100,Number(durationInput.value)||600));markDirty();});
+    durationLabel.append(durationInput);fields.append(durationLabel);
+    const delayLabel=el('label','Delay (ms)'),delayInput=el('input');
+    delayInput.type='number';delayInput.min='0';delayInput.max='3000';delayInput.step='50';delayInput.value=a.delay;
+    delayInput.addEventListener('change',()=>{const a2=anim();if(!a2)return;a2.delay=Math.min(3000,Math.max(0,Number(delayInput.value)||0));markDirty();});
+    delayLabel.append(delayInput);fields.append(delayLabel);
+    const easingLabel=el('label','Easing'),easingSelect=el('select');
+    for(const[value,label]of ANIM_EASINGS){const opt=el('option',label);opt.value=value;easingSelect.append(opt);}
+    easingSelect.value=a.easing;
+    easingSelect.addEventListener('change',()=>{const a2=anim();if(!a2)return;a2.easing=easingSelect.value;markDirty();});
+    easingLabel.append(easingSelect);fields.append(easingLabel);
+    const triggerLabel=el('label','Plays'),triggerSelect=el('select');
+    for(const[value,label]of ANIM_TRIGGERS){const opt=el('option',label);opt.value=value;triggerSelect.append(opt);}
+    triggerSelect.value=a.trigger;
+    triggerSelect.addEventListener('change',()=>{const a2=anim();if(!a2)return;a2.trigger=triggerSelect.value;markDirty();});
+    triggerLabel.append(triggerSelect);fields.append(triggerLabel);
+  }
+  presetSelect.addEventListener('change',()=>{
+    if(!presetSelect.value){
+      if(site.elementStyles[id])delete site.elementStyles[id].animation;
+      if(site.elementStyles[id]&&!Object.keys(site.elementStyles[id]).length)delete site.elementStyles[id];
+    }else{
+      site.elementStyles[id]=site.elementStyles[id]||{};
+      const prior=site.elementStyles[id].animation||{};
+      site.elementStyles[id].animation={preset:presetSelect.value,duration:prior.duration||600,delay:prior.delay||0,easing:prior.easing||'ease-out',trigger:prior.trigger||'scroll'};
+    }
+    markDirty();renderFields();
+  });
+  renderFields();
+  container.append(wrap);
+}
+// Appearance tab's own list: every animatable element in one place, so the admin doesn't have to
+// hunt for each one in the live preview to set its timing.
+function renderAnimationPanel(){
+  const root=$('#animation-items');if(!root)return;root.replaceChildren();
+  Object.entries(ELEMENT_NAMES).forEach(([id,label])=>{
+    const item=el('div',undefined,'layout-item');
+    item.append(el('h3',label));
+    renderAnimationControls(item,id);
+    root.append(item);
+  });
+}
 function openPropertyPanel(sel){
   const body=$('#property-panel-body');body.replaceChildren();
   body.append(el('h2',ELEMENT_NAMES[sel.id]||sel.id));
@@ -202,6 +277,7 @@ function openPropertyPanel(sel){
     markDirty();
   });
   colorRow.append(colorInput,colorClear);colorLabel.append(colorRow);body.append(colorLabel);
+  renderAnimationControls(body,sel.id);
   body.append(button('Reset position',()=>{
     LAYOUT_BREAKPOINTS.forEach(bp=>{if(site.layoutOverrides[bp])delete site.layoutOverrides[bp][sel.id];});
     markDirty();
@@ -310,6 +386,38 @@ $('#branding-logo-upload').addEventListener('change',async event=>{
     const result=await uploadFile(file);
     site.branding.logoUrl=result.src;markDirty();renderBranding();
     status('Logo added to draft. Save to publish.');
+  }catch(error){status(error.message,true);}
+  finally{event.target.disabled=false;event.target.value='';}
+});
+// Site identity: accent color (picker + hex, kept in sync both ways) and the public-site favicon
+// (distinct from the studio's own header logo above -- see server/creator.js's comment on the same
+// distinction).
+function renderIdentity(){
+  const form=$('#identity-form');if(!form)return;
+  const hex=site.details.accentColor||'#FF9438';
+  form.elements.accentColorPicker.value=/^#[0-9a-fA-F]{6}$/.test(hex)?hex:'#FF9438';
+  form.elements.accentColorHex.value=hex;
+  form.elements.accentColorPicker.oninput=()=>{form.elements.accentColorHex.value=form.elements.accentColorPicker.value;site.details.accentColor=form.elements.accentColorPicker.value;markDirty();};
+  form.elements.accentColorHex.addEventListener('change',()=>{
+    const value=form.elements.accentColorHex.value.trim();
+    if(!/^#[0-9a-fA-F]{6}$/.test(value)){form.elements.accentColorHex.value=site.details.accentColor;return status('Enter a 6-digit hex color like #FF9438.',true);}
+    site.details.accentColor=value;form.elements.accentColorPicker.value=value;markDirty();
+  });
+  renderFaviconPreview();
+}
+function renderFaviconPreview(){
+  const root=$('#favicon-preview');if(!root)return;root.replaceChildren();
+  if(!site.details.faviconUrl){root.append(el('p','Using the site default favicon.','empty'));return;}
+  const img=el('img');img.src=site.details.faviconUrl;img.alt='';img.width=32;img.height=32;
+  root.append(img,button('Remove',()=>{site.details.faviconUrl='';markDirty();renderFaviconPreview();},'danger'));
+}
+$('#favicon-upload').addEventListener('change',async event=>{
+  const file=event.target.files[0];if(!file)return;
+  event.target.disabled=true;
+  try{
+    const result=await uploadFile(file);
+    site.details.faviconUrl=result.src;markDirty();renderFaviconPreview();
+    status('Favicon added to draft. Save to publish.');
   }catch(error){status(error.message,true);}
   finally{event.target.disabled=false;event.target.value='';}
 });
@@ -509,26 +617,81 @@ $('#messages-modal-close').addEventListener('click',closeMessagesModal);
 $('#messages-modal-backdrop').addEventListener('click',closeMessagesModal);
 document.querySelector('[data-action="messages"]').addEventListener('click',openMessagesModal);
 function reorder(array,index,delta){const target=index+delta;if(target<0||target>=array.length)return;[array[index],array[target]]=[array[target],array[index]];markDirty();}
+// Drag-to-reorder (mouse/pointer convenience): give a row a `.drag-handle` child and call this on
+// it during render, passing the row's own current index. Native HTML5 drag-and-drop doesn't reach
+// touch/keyboard users, so the Move up/down buttons stay as the real, accessible way to reorder --
+// this only ever supplements them, never replaces them.
+function makeDragHandle(row,handle,list,index,onReorder){
+  handle.draggable=true;
+  handle.addEventListener('dragstart',e=>{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(index));row.classList.add('dragging');});
+  handle.addEventListener('dragend',()=>row.classList.remove('dragging'));
+  row.addEventListener('dragover',e=>{if(e.dataTransfer.types.includes('text/plain')){e.preventDefault();e.dataTransfer.dropEffect='move';row.classList.add('drag-over');}});
+  row.addEventListener('dragleave',()=>row.classList.remove('drag-over'));
+  row.addEventListener('drop',e=>{
+    e.preventDefault();row.classList.remove('drag-over');
+    const from=Number(e.dataTransfer.getData('text/plain'));
+    if(!Number.isFinite(from)||from===index)return;
+    const[item]=list.splice(from,1);list.splice(index,0,item);
+    markDirty();onReorder();
+  });
+}
 function renderFolders(){
   const root=$('#folders');root.replaceChildren();
   site.folders.forEach((name,i)=>{
-    const row=el('div',undefined,'folder-row'),input=el('input');input.value=name;input.maxLength=70;input.setAttribute('aria-label','Folder name');
+    const row=el('div',undefined,'folder-row');
+    const handle=el('span','⠿','drag-handle');handle.setAttribute('aria-hidden','true');handle.title='Drag to reorder';row.append(handle);
+    const input=el('input');input.value=name;input.maxLength=70;input.setAttribute('aria-label','Folder name');
     input.addEventListener('change',()=>{const next=input.value.trim();if(!next||site.folders.some((f,j)=>j!==i&&f===next)){input.value=name;return status('Use a unique, nonempty folder name.',true);}site.folders[i]=next;site.images.forEach(image=>{if(image.cat===name)image.cat=next;});site.stacks.covers=site.stacks.covers||{};if(site.stacks.covers[name]){site.stacks.covers[next]=site.stacks.covers[name];delete site.stacks.covers[name];}markDirty();renderFolders();renderImages();});
     row.append(input,button('↑',()=>{reorder(site.folders,i,-1);renderFolders();}),button('↓',()=>{reorder(site.folders,i,1);renderFolders();}),button('Remove',()=>{const inside=site.images.filter(image=>image.cat===name).length;if(!confirm(inside?'Delete the stack “'+name+'” and its '+inside+' image'+(inside===1?'':'s')+'? This can’t be undone.':'Delete the stack “'+name+'”? This can’t be undone.'))return;if(inside)site.images=site.images.filter(image=>image.cat!==name);delete (site.stacks.covers||{})[name];site.folders.splice(i,1);markDirty();renderFolders();renderImages();},'danger'));
     row.querySelectorAll('button')[0].setAttribute('aria-label','Move '+name+' up');row.querySelectorAll('button')[1].setAttribute('aria-label','Move '+name+' down');
+    const count=site.images.filter(image=>image.cat===name).length;
+    if(!count)row.append(el('p','⚠ No images yet — this stack won’t appear on the public site until you add one.','folder-warning'));
     const coverLabel=el('label','Stack cover'),cover=el('select');cover.setAttribute('aria-label','Cover image for '+name);
     const first=el('option','First image (default)');first.value='';cover.append(first);
     site.images.filter(image=>image.cat===name).forEach(image=>{const o=el('option',image.title||image.slug);o.value=image.slug;cover.append(o);});
     cover.value=(site.stacks.covers||{})[name]&&site.images.some(image=>image.slug===site.stacks.covers[name]&&image.cat===name)?site.stacks.covers[name]:'';
     cover.addEventListener('change',()=>{site.stacks.covers=site.stacks.covers||{};if(cover.value)site.stacks.covers[name]=cover.value;else delete site.stacks.covers[name];markDirty();});
     coverLabel.append(cover);row.append(coverLabel);root.append(row);
+    makeDragHandle(row,handle,site.folders,i,renderFolders);
   });
 }
+// ==================================================================== SOCIAL LINKS ==
+function renderSocialLinksPanel(){
+  const root=$('#social-links');if(!root)return;root.replaceChildren();
+  if(!site.socialLinks.length)root.append(el('p','No links yet. Add one below.','empty'));
+  site.socialLinks.forEach((link,i)=>{
+    const row=el('div',undefined,'folder-row social-link-row');
+    const handle=el('span','⠿','drag-handle');handle.setAttribute('aria-hidden','true');handle.title='Drag to reorder';row.append(handle);
+    const labelInput=el('input');labelInput.value=link.label||'';labelInput.maxLength=60;labelInput.placeholder='Label';labelInput.setAttribute('aria-label','Link label');
+    labelInput.addEventListener('change',()=>{link.label=labelInput.value.trim();markDirty();});
+    const urlInput=el('input');urlInput.value=link.url||'';urlInput.maxLength=300;urlInput.placeholder='https://…';urlInput.className='grow';urlInput.setAttribute('aria-label','Link URL');
+    urlInput.addEventListener('change',()=>{link.url=urlInput.value.trim();markDirty();});
+    const iconSelect=el('select');iconSelect.setAttribute('aria-label','Icon');
+    for(const[value,label]of SOCIAL_ICONS){const opt=el('option',label);opt.value=value;iconSelect.append(opt);}
+    iconSelect.value=link.icon||'website';
+    iconSelect.addEventListener('change',()=>{
+      link.icon=iconSelect.value;
+      // Switching to/from Email flips the URL placeholder + a light autofix so a plain address
+      // (or a leftover https:// link) doesn't silently fail publish-time validation.
+      if(link.icon==='email'&&link.url&&!link.url.startsWith('mailto:'))urlInput.value=link.url='mailto:'+link.url.replace(/^https?:\/\//,'');
+      urlInput.placeholder=link.icon==='email'?'mailto:you@example.com':'https://…';
+      markDirty();
+    });
+    row.append(labelInput,urlInput,iconSelect,button('↑',()=>{reorder(site.socialLinks,i,-1);renderSocialLinksPanel();}),button('↓',()=>{reorder(site.socialLinks,i,1);renderSocialLinksPanel();}),button('Remove',()=>{site.socialLinks.splice(i,1);markDirty();renderSocialLinksPanel();},'danger'));
+    root.append(row);
+    makeDragHandle(row,handle,site.socialLinks,i,renderSocialLinksPanel);
+  });
+}
+$('#add-social-link').addEventListener('click',()=>{
+  if(site.socialLinks.length>=8)return status('Use up to 8 social links.',true);
+  site.socialLinks.push({label:'',url:'',icon:'website'});markDirty();renderSocialLinksPanel();
+});
 function renderImages(){
   const root=$('#images');root.replaceChildren();
   if(!site.images.length)root.append(el('p','Add your first image to start the stack.','empty'));
   site.images.forEach((image,i)=>{
     const row=el('article',undefined,'image-row'),img=el('img');img.src=image.src||'/images/'+image.slug+'-480.webp';img.alt=image.title;img.loading='lazy';
+    const handle=el('span','⠿','drag-handle');handle.setAttribute('aria-hidden','true');handle.title='Drag to reorder';row.append(handle);
     const fields=el('div',undefined,'fields');fields.append(field('Title',image.title,value=>image.title=value));
     const description=el('label','Description'),area=el('textarea');area.value=image.description||'';area.maxLength=4000;area.addEventListener('change',()=>{image.description=area.value;markDirty();});description.append(area);fields.append(description);
     fields.append(field('Technologies (comma separated)',(image.technologies||[]).join(', '),value=>image.technologies=value.split(',').map(v=>v.trim()).filter(Boolean)),field('Project URL',image.link||'',value=>image.link=value));
@@ -536,6 +699,7 @@ function renderImages(){
     const replace=el('label','Replace image'),file=el('input');file.type='file';file.accept='image/png,image/jpeg,image/webp';file.addEventListener('change',async()=>{if(!file.files[0])return;file.disabled=true;try{const result=await uploadFile(file.files[0]);image.src=result.src;markDirty();renderImages();status('Image replaced in draft. Save portfolio to publish.');}catch(error){status(error.message,true);}finally{file.disabled=false;}});replace.append(file);fields.append(replace);
     const downloadRow=el('label','','row'),downloadBox=el('input');downloadBox.type='checkbox';downloadBox.checked=image.downloadable!==false;downloadBox.addEventListener('change',()=>{image.downloadable=downloadBox.checked;markDirty();});downloadRow.append(downloadBox,document.createTextNode('Visitors can download this image'));fields.append(downloadRow);
     const actions=el('div',undefined,'actions');actions.append(button('Move up',()=>{reorder(site.images,i,-1);renderImages();}),button('Move down',()=>{reorder(site.images,i,1);renderImages();}),button('Remove',()=>{if(!confirm('Remove “'+(image.title||'this image')+'” from the portfolio? This can’t be undone.'))return;site.images.splice(i,1);markDirty();renderImages();},'danger'));row.append(img,fields,actions);root.append(row);
+    makeDragHandle(row,handle,site.images,i,renderImages);
   });
 }
 // ==================================================================== STUDIO ASSISTANT ==
@@ -552,6 +716,7 @@ function applyPatch(patch){
   markDirty();
   for(const input of $('#details').elements) if(input.name)input.value=site.details[input.name]||'';
   renderTypography();renderNoticeForm();renderVisibilityForm();renderLayoutPanel();
+  renderIdentity();renderAnimationPanel();renderSocialLinksPanel();
   renderFolders();renderImages();
 }
 $('#assistant-form').addEventListener('submit',async event=>{
@@ -582,7 +747,7 @@ $('#split').classList.toggle('dashboard-mode',document.querySelector('[data-tab]
 $('#message-filter').addEventListener('change',renderInbox);
 $('#refresh').addEventListener('click',async()=>{try{messages=await api('/creator/messages');renderInbox();status('Inbox updated.');}catch(error){status(error.message,true);}});
 $('#details').addEventListener('input',()=>{Object.assign(site.details,Object.fromEntries(new FormData($('#details'))));markDirty();});$('#details').addEventListener('submit',e=>e.preventDefault());
-for(const form of document.querySelectorAll('#typography,#notice-form,#visibility-form,#branding-form'))form.addEventListener('submit',event=>event.preventDefault());
+for(const form of document.querySelectorAll('#typography,#notice-form,#visibility-form,#branding-form,#identity-form'))form.addEventListener('submit',event=>event.preventDefault());
 $('#add-folder').addEventListener('submit',event=>{event.preventDefault();const name=event.target.elements.name.value.trim();if(!name||site.folders.includes(name))return status('Choose a unique folder name.',true);site.folders.push(name);event.target.reset();markDirty();renderFolders();});
 $('#upload').addEventListener('change',async event=>{
   if(!site.folders.length){event.target.value='';return status('Add a folder first.',true);}

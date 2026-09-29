@@ -7,6 +7,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const MAX_HISTORY_MESSAGES = 12;
+export const MAX_MESSAGE_LENGTH = 4000;
 export const MODEL = "gemini-3.6-flash";
 export const MAX_TOKENS = 800;
 
@@ -48,16 +49,20 @@ ${JSON.stringify(knowledge, null, 2)}`;
 // moderation API (or the model's own judgment via the system prompt rule above, which is doing
 // most of the real work already) before relying on this for anything adversarial.
 export function looksAbusiveOrOffTopic(text){
-  if (!text || typeof text !== "string") return true;
-  if (text.length > 4000) return true;
+  if (typeof text !== "string" || !text.trim()) return true;
+  if (text.length > MAX_MESSAGE_LENGTH) return true;
   return false;
 }
 
 export function clampHistory(messages){
   if (!Array.isArray(messages)) return [];
-  return messages.slice(-MAX_HISTORY_MESSAGES).filter(m =>
-    m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string"
-  );
+  const history = messages.filter(m =>
+    m && (m.role === "user" || m.role === "assistant") &&
+    typeof m.content === "string" && m.content.trim() && m.content.length <= MAX_MESSAGE_LENGTH
+  ).slice(-MAX_HISTORY_MESSAGES).map(({role,content}) => ({role,content}));
+  // A rolling window can start on an assistant reply. Gemini requires a user first.
+  const firstUser = history.findIndex(m => m.role === "user");
+  return firstUser < 0 ? [] : history.slice(firstUser);
 }
 
 // onDelta(textChunk) is called for every streamed token chunk; onDone()/onError(err) close out
@@ -67,7 +72,7 @@ export async function streamAssistantReply({ apiKey, knowledge, locale, messages
     const genAI = new GoogleGenerativeAI(apiKey);
     const system = buildSystemPrompt(knowledge, locale);
     const history = clampHistory(messages);
-    if (history.length === 0) throw new Error("No user message to reply to.");
+    if (history.at(-1)?.role !== "user") throw new Error("No user message to reply to.");
 
     const model = genAI.getGenerativeModel({
       model: MODEL,

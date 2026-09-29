@@ -13,6 +13,22 @@ const save=(path,data)=>{writeFileSync(path+'.tmp',JSON.stringify(data,null,2),{
 // raw CSS -- this is what makes it safe to drop the value straight into a stylesheet on the
 // public page (see index.html's applySiteAppearance) with no injection risk.
 export const FONT_CHOICES=['Fraunces','Manrope','Sora','Poppins','Playfair Display','Space Grotesk','system-ui'];
+// Social/footer links (Creator Portal "Social" tab): a short allowlisted set of icon glyphs --
+// index.html's SOCIAL_ICON_SVG map must have an entry for each of these, kept in sync by hand
+// the same way FONT_CHOICES is (see public/creator.js's own copy of this exact list).
+export const SOCIAL_ICONS=['behance','instagram','x','linkedin','youtube','website','email'];
+export const DEFAULT_SOCIAL_LINKS=[
+  {label:'Behance',url:'https://www.behance.net/KethanArtzz',icon:'behance'},
+  {label:'Instagram',url:'https://www.instagram.com/kethan_artzz',icon:'instagram'},
+  {label:'X / Twitter',url:'https://x.com/v_kethan',icon:'x'}
+];
+// Per-element entrance animation (Creator Portal "Text animation" panel + the live-preview
+// property panel) -- an allowlisted preset/easing/trigger, same "never free text" idiom as fonts
+// above, so this can be dropped straight into a WAAPI call on the public page with no injection
+// risk and no way to hand it a value the player on the public side doesn't recognize.
+export const ANIM_PRESETS=['fade','slide-up','slide-down','slide-left','slide-right','scale-in','pop'];
+export const ANIM_EASINGS=['linear','ease','ease-in','ease-out','ease-in-out','bounce'];
+export const ANIM_TRIGGERS=['load','scroll'];
 // Lightweight drag-and-drop (Part C, scoped down deliberately): only elements that were ALREADY
 // free-floating (position:fixed, nothing else laid out relative to them) are draggable -- the
 // site's actual structural layout (nav, grid, cards) stays exactly as hand-tuned, untouched by
@@ -95,7 +111,7 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
   let site=JSON.parse(readFileSync(sitePath,'utf8'));
   // Upgrade older saved collections without replacing artwork or edited copy.
   const defaults=JSON.parse(readFileSync(resolve(root,'server/portfolio-seed.json'),'utf8'));
-  const DEFAULT_APPEARANCE={headingFont:'Fraunces',bodyFont:'Manrope',textScale:1,customFonts:[],glassBlur:18};
+  const DEFAULT_APPEARANCE={headingFont:'Fraunces',bodyFont:'Manrope',textScale:1,customFonts:[],glassBlur:18,accentColor:'#FF9438',faviconUrl:''};
   const DEFAULT_NOTICE={enabled:false,text:'',tone:'info'};
   const DEFAULT_VISIBILITY={navGallery:true,navAbout:true};
   const DEFAULT_STACKS={loop:true,covers:{}};
@@ -109,6 +125,9 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
     layoutOverrides:{...DEFAULT_LAYOUT,...site.layoutOverrides},
     branding:{...DEFAULT_BRANDING,...site.branding},
     elementStyles:{...site.elementStyles},
+    // Existing sites keep whatever they already have; a brand-new/legacy site without this field
+    // yet gets the site's original hand-written footer links so nothing goes blank on upgrade.
+    socialLinks:Array.isArray(site.socialLinks)?site.socialLinks:DEFAULT_SOCIAL_LINKS,
     paperArtwork:undefined,
     images:site.images.map(project=>({id:project.slug,description:'',technologies:[],link:'',downloadable:true,...project}))};
   delete upgraded.paperArtwork;
@@ -309,11 +328,12 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
   // markDirty()/mutate path every other control uses) and still has to click Publish, which still
   // runs through the exact same validation as every other edit above.
   const CREATOR_SCHEMA_NOTES=`Editable top-level fields and their shapes:
-- details: {creatorName, tagline, portfolioTitle, portfolioIntro, contactTitle, contactIntro, openLabel, closeLabel, projectLabel, contactButton} (all short strings), plus headingFont/bodyFont (one of ${JSON.stringify(FONT_CHOICES)}, or a family already listed in details.customFonts), textScale (number 0.85-1.2), and glassBlur (number 0-40, the site's glass-panel blur intensity in pixels). Never invent a new customFonts entry -- only pick among ones already in the current draft.
-- elementStyles: object keyed by one of ${JSON.stringify(DRAGGABLE_IDS)}, value {font?, color?} (font must be an allowed font as above; color must be a 6-digit hex string like "#ff9438"). Only include keys/fields actually being changed.
+- details: {creatorName, tagline, portfolioTitle, portfolioIntro, contactTitle, contactIntro, openLabel, closeLabel, projectLabel, contactButton} (all short strings), plus headingFont/bodyFont (one of ${JSON.stringify(FONT_CHOICES)}, or a family already listed in details.customFonts), textScale (number 0.85-1.2), glassBlur (number 0-40, the site's glass-panel blur intensity in pixels), accentColor (a 6-digit hex string like "#ff9438", the site's main UI accent color), and faviconUrl (an already-uploaded image path -- never invent one). Never invent a new customFonts entry -- only pick among ones already in the current draft.
+- elementStyles: object keyed by one of ${JSON.stringify(DRAGGABLE_IDS)}, value {font?, color?, animation?} (font must be an allowed font as above; color must be a 6-digit hex string like "#ff9438"; animation is {preset: one of ${JSON.stringify(ANIM_PRESETS)}, duration: number 100-3000 (ms), delay: number 0-3000 (ms), easing: one of ${JSON.stringify(ANIM_EASINGS)}, trigger: one of ${JSON.stringify(ANIM_TRIGGERS)} ("load" plays once immediately, "scroll" plays once the element scrolls into view}). Only include keys/fields actually being changed.
 - notice: {enabled: boolean, text: string up to 220 chars, tone: "info"|"warning"}.
 - visibility: {navGallery: boolean, navAbout: boolean}.
 - branding: {enabled: boolean, logoUrl: string}. Never invent a new logoUrl -- only toggle enabled using the logoUrl already in the current draft.
+- socialLinks: array of {label, url, icon (one of ${JSON.stringify(SOCIAL_ICONS)})} up to 8 entries, in display order. icon "email" requires url to start with "mailto:"; every other icon requires "https://" or "http://".
 - folders: array of unique short strings.
 - images: array of {id, slug, title, cat (must be one of folders), description, technologies (array of strings), link, downloadable}. Never invent a new image's src/slug -- only edit fields of images already present in the current draft.`;
   router.post('/creator/assistant',async(req,res)=>{
@@ -368,9 +388,24 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
     // real, working knob, not a per-surface reimplementation.
     const glassBlur=Number(input.details?.glassBlur);
     details.glassBlur=Number.isFinite(glassBlur)?Math.min(40,Math.max(0,glassBlur)):18;
-    // Per-element font/color overrides (Creator Portal's floating property panel) -- keyed by the
-    // same DRAGGABLE_IDS allowlist as layoutOverrides above, same "reject unknown ids outright"
-    // idiom. A null/empty value means "use the site default", not "invalid".
+    // Site accent color (Creator Portal "Site identity"): overrides --amber/--accent-glass site-wide
+    // (see index.html's applyAccentColor). Falls back to the site's original amber rather than
+    // rejecting the save outright -- a blank/invalid color here is never worth failing the whole
+    // publish over.
+    const accentColor=text(input.details?.accentColor,20);
+    details.accentColor=/^#[0-9a-fA-F]{6}$/.test(accentColor)?accentColor:'#FF9438';
+    // Public-site favicon (distinct from Studio branding above, which only affects the creator
+    // studio's own header) -- same upload-then-reference pattern as the studio logo.
+    const faviconUrl=text(input.details?.faviconUrl,300);
+    if(faviconUrl){
+      const uploaded=/^\/uploads\/[a-f0-9-]{36}\.(png|jpg|webp)$/.test(faviconUrl)&&existsSync(resolve(uploads,faviconUrl.split('/').pop()));
+      if(!uploaded) return fail(res,400,'Upload the favicon image before saving.');
+      details.faviconUrl=faviconUrl;
+    }else details.faviconUrl='';
+    // Per-element font/color/animation overrides (Creator Portal's floating property panel, and
+    // the "Text animation" panel) -- keyed by the same DRAGGABLE_IDS allowlist as layoutOverrides
+    // above, same "reject unknown ids outright" idiom. A null/empty value means "use the site
+    // default", not "invalid".
     const elementStyles={};
     if(input.elementStyles&&typeof input.elementStyles==='object'){
       for(const [id,style] of Object.entries(input.elementStyles)){
@@ -386,7 +421,38 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
           if(!/^#[0-9a-fA-F]{6}$/.test(color)) return fail(res,400,'Colors must be a 6-digit hex value.');
           clean.color=color;
         }
+        // Entrance animation timing (the "AE-editor-like" controls): a preset must be present and
+        // allowlisted for the whole sub-object to count -- an animation with an unrecognized/blank
+        // preset is the same as "not configured", it's simply dropped rather than saved half-set.
+        if(style.animation&&typeof style.animation==='object'&&ANIM_PRESETS.includes(style.animation.preset)){
+          const duration=Number(style.animation.duration),delay=Number(style.animation.delay);
+          clean.animation={
+            preset:style.animation.preset,
+            duration:Number.isFinite(duration)?Math.min(3000,Math.max(100,Math.round(duration))):600,
+            delay:Number.isFinite(delay)?Math.min(3000,Math.max(0,Math.round(delay))):0,
+            easing:ANIM_EASINGS.includes(style.animation.easing)?style.animation.easing:'ease-out',
+            trigger:ANIM_TRIGGERS.includes(style.animation.trigger)?style.animation.trigger:'scroll',
+          };
+        }
         if(Object.keys(clean).length) elementStyles[id]=clean;
+      }
+    }
+    // Social/footer links (Creator Portal "Social" tab) -- an ordered list the admin fully
+    // controls; email links use mailto: instead of https:, checked separately from the project
+    // link validation just above since "javascript:"-style schemes must still be rejected there too.
+    const socialLinks=[];
+    if(Array.isArray(input.socialLinks)){
+      if(input.socialLinks.length>8) return fail(res,400,'Use up to 8 social links.');
+      for(const link of input.socialLinks){
+        if(!link||typeof link!=='object') return fail(res,400,'Invalid social link.');
+        const label=text(link.label,60),url=text(link.url,300),icon=SOCIAL_ICONS.includes(link.icon)?link.icon:'website';
+        if(!label||!url) return fail(res,400,'Each social link needs a label and a URL.');
+        if(icon==='email'){
+          if(!/^mailto:[^@\s]+@[^@\s]+\.[^@\s]+$/.test(url)) return fail(res,400,'Email links must start with mailto: and include a valid address.');
+        }else{
+          try{if(!['https:','http:'].includes(new URL(url).protocol))throw new Error();}catch{return fail(res,400,'Social links must start with https://, http://, or mailto:.');}
+        }
+        socialLinks.push({label,url,icon});
       }
     }
     // Studio branding logo (Creator Portal's own header only -- never the public site/hero).
@@ -455,7 +521,7 @@ export async function createCreatorRouter({root,dataDir=process.env.CREATOR_DATA
         if(folders.includes(folder)&&images.some(i=>i.slug===slug&&i.cat===folder)) stacks.covers[folder]=slug;
       }
     }
-    const next={revision:site.revision+1,typeV2:true,details,folders,images,notice,visibility,stacks,layoutOverrides,branding,elementStyles};save(sitePath,next);site=next;res.json(site);
+    const next={revision:site.revision+1,typeV2:true,details,folders,images,notice,visibility,stacks,layoutOverrides,branding,elementStyles,socialLinks};save(sitePath,next);site=next;res.json(site);
   });
   return {router,uploads};
 }

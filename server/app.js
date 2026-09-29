@@ -83,7 +83,13 @@ app.post("/api/assistant", async (req, res) => {
 
   const { messages, locale, projectId } = req.body || {};
   const history = clampHistory(messages);
-  const lastUserMessage = [...history].reverse().find(m => m.role === "user");
+  const lastUserMessage = history.at(-1);
+  const submittedMessage = Array.isArray(messages) ? messages.at(-1) : null;
+
+  if(submittedMessage?.role !== 'user' || lastUserMessage?.role !== 'user' || looksAbusiveOrOffTopic(submittedMessage?.content)){
+    res.status(400).json({error:'End your conversation with a message of 1 to 4,000 characters.'});
+    return;
+  }
 
   if (!lastUserMessage || looksAbusiveOrOffTopic(lastUserMessage.content)){
     res.status(200).json({
@@ -128,8 +134,8 @@ app.post("/api/assistant", async (req, res) => {
 app.use('/api',(req,res)=>res.status(404).json({error:'This API endpoint does not exist.'}));
 app.use((err,req,res,next)=>{
   if(res.headersSent) return next(err);
-  const status=err.type==='entity.too.large'?413:err instanceof SyntaxError?400:500;
-  res.status(status).json({error:status===413?'The file or request is too large.':status===400?'Invalid request.':'Unable to save right now. Please try again.'});
+  const status=Number.isInteger(err.status)&&err.status>=400&&err.status<500?err.status:500;
+  res.status(status).json({error:status===413?'The file or request is too large.':status===415?'Unsupported request encoding or content type.':status<500?'Invalid request.':'Unable to complete the request right now. Please try again.'});
 });
 
 return app;

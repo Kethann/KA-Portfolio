@@ -255,3 +255,13 @@
 /* header and viewer sit exactly on the panel's content edge */
 .cf-head{padding-left:0;padding-right:0}
 .vw{padding-left:0;padding-right:0}
+
+/* ---- stack covers: magnetic lean (values are set every frame by the panel script) ---- */
+.stack{perspective:900px}
+.stack .deck{transform-style:preserve-3d;transform:translate3d(var(--mx,0px),var(--my,0px),0) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) scale(var(--ms,1));transition:none;will-change:transform}
+.stack:hover .deck,.stack:focus-visible .deck{transform:translate3d(var(--mx,0px),var(--my,-6px),0) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) scale(var(--ms,1))}
+.stack .deck .layer{transition:none}
+.stack .deck .l1,.stack:hover .deck .l1,.stack:focus-visible .deck .l1,.stack:hover .l1,.stack:focus-visible .l1{transform:translate3d(calc(10px + var(--fan,0) * 13px),calc(-8px - var(--fan,0) * 3px),0) rotate(calc(3.6deg + var(--fan,0) * 3.6deg))}
+.stack .deck .l2,.stack:hover .deck .l2,.stack:focus-visible .deck .l2,.stack:hover .l2,.stack:focus-visible .l2{transform:translate3d(calc(-11px - var(--fan,0) * 13px),calc(-13px - var(--fan,0) * 4px),0) rotate(calc(-4.4deg - var(--fan,0) * 3.8deg))}
+@media (hover:hover){.stack:hover{--fan:.6}}
+@media (prefers-reduced-motion:reduce){.stack .deck,.stack .deck .layer{transition:none;will-change:auto}}
