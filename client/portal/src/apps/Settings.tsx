@@ -5,24 +5,27 @@ import type { ReactNode } from 'react';
 import type { AppProps } from './registry';
 import { useDraft, useLoad, usePref, useUnsavedGuard } from '../hooks';
 import { del, get, post, put } from '../api';
-import { AsyncButton, Badge, Empty, ErrorState, Field, Segmented, SkeletonRows, Switch, useConfirm, useToast, SearchBox } from '../ui';
+import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, Segmented, SkeletonRows, Switch, useConfirm, useToast, SearchBox } from '../ui';
 import { Icon } from '../icons';
 import { ago, bytes, dateTime } from '../format';
 import { qrMatrix, qrPath } from '../qr';
 
-type Sec = 'security' | 'store' | 'messages' | 'reports' | 'categories' | 'system' | 'backups' | 'audit' | 'appearance';
-const SECTIONS: [Sec, string, string][] = [['security', 'Account & security', 'shield'], ['store', 'Store & tax', 'products'], ['messages', 'Messages', 'messages'], ['reports', 'Email reports', 'reports'],
+type Sec = 'security' | 'team' | 'store' | 'messages' | 'reports' | 'categories' | 'system' | 'backups' | 'audit' | 'appearance';
+const SECTIONS: [Sec, string, string][] = [['security', 'Account & security', 'shield'], ['team', 'Team', 'visitors'], ['store', 'Store & tax', 'products'], ['messages', 'Messages', 'messages'], ['reports', 'Email reports', 'reports'],
   ['categories', 'Categories', 'tag'], ['system', 'System status', 'info'], ['backups', 'Backups', 'archive'], ['audit', 'Activity log', 'list'], ['appearance', 'Appearance', 'studio']];
 
 export default function Settings({ route, go }: AppProps){
-  const sec: Sec = SECTIONS.some(s => s[0] === route) ? route as Sec : 'security';
+  const me = useLoad<{ role: 'owner' | 'admin' }>('/account');
+  const isOwner = me.data?.role === 'owner';
+  const sections = SECTIONS.filter(s => s[0] !== 'team' || isOwner);   // only owners manage the team
+  const sec: Sec = sections.some(s => s[0] === route) ? route as Sec : 'security';
   return (
     <div className="content-split">
       <nav className="folder-nav" aria-label="Settings sections">
-        {SECTIONS.map(([k, l, ic]) => <button key={k} type="button" className={'folder-btn' + (k === sec ? ' on' : '')} aria-current={k === sec || undefined} onClick={() => go(k)}><Icon name={ic} size={14} /><span className="grow truncate">{l}</span></button>)}
+        {sections.map(([k, l, ic]) => <button key={k} type="button" className={'folder-btn' + (k === sec ? ' on' : '')} aria-current={k === sec || undefined} onClick={() => go(k)}><Icon name={ic} size={14} /><span className="grow truncate">{l}</span></button>)}
       </nav>
       <div className="app-main"><div style={{ maxWidth: 820, width: '100%' }} className="stack-lg">
-        {sec === 'security' ? <Security /> : sec === 'store' ? <StoreSettings /> : sec === 'messages' ? <MessageSettings /> : sec === 'reports' ? <ReportSettings />
+        {sec === 'security' ? <Security /> : sec === 'team' ? <Team /> : sec === 'store' ? <StoreSettings /> : sec === 'messages' ? <MessageSettings /> : sec === 'reports' ? <ReportSettings />
           : sec === 'categories' ? <Categories /> : sec === 'system' ? <System /> : sec === 'backups' ? <Backups /> : sec === 'audit' ? <Audit /> : <Appearance />}
       </div></div>
     </div>
@@ -321,13 +324,13 @@ function Audit(){
   const [q, setQ] = useState('');
   if (s.error && !s.data) return <ErrorState message={s.error} retry={s.reload} />;
   if (!s.data) return <SkeletonRows rows={10} />;
-  const rows = s.data.entries.filter(e => !q || `${e.action} ${e.target || ''}`.toLowerCase().includes(q.toLowerCase()));
+  const rows = s.data.entries.filter(e => !q || `${e.action} ${e.target || ''} ${e.actor || ''}`.toLowerCase().includes(q.toLowerCase()));
   return (
     <Section title="Activity log" desc="Sign-ins and every change made in the portal, newest first.">
       <SearchBox value={q} onChange={setQ} placeholder="Filter, e.g. login or coupon" label="Filter the log" />
       {!rows.length ? <Empty icon="list" title="Nothing matches" /> : <ul className="list">{rows.map(e => (
         <li key={e.id}><Badge tone={/failed|deleted|revoked|disabled|_off/.test(e.action) ? 'danger' : /login|owner/.test(e.action) ? 'info' : 'neutral'}>{e.action.replace(/_/g, ' ')}</Badge>
-          <span className="grow truncate faint mono" style={{ fontSize: 12 }}>{e.target || ''}</span><span className="faint mono" style={{ fontSize: 12 }}>{e.ip || ''}</span><span className="faint" style={{ fontSize: 12 }}>{dateTime(e.at)}</span></li>
+          <span className="grow truncate faint mono" style={{ fontSize: 12 }}>{e.target || ''}</span>{e.actor && <span className="faint" style={{ fontSize: 12 }} title="Who did it">{e.actor}</span>}<span className="faint mono" style={{ fontSize: 12 }}>{e.ip || ''}</span><span className="faint" style={{ fontSize: 12 }}>{dateTime(e.at)}</span></li>
       ))}</ul>}
     </Section>
   );
@@ -346,4 +349,104 @@ function Appearance(){
       <div><button type="button" className="btn" disabled={!tour} onClick={() => { setTour(false); location.reload(); }}>Show the welcome tour again</button></div>
     </Section>
   );
+}
+
+// ---- Team (owners only) ------------------------------------------------------------------------
+type Person = { id: string; email: string; name: string; role: 'owner' | 'admin'; twoFactor: boolean; mustChangePassword: boolean; disabledAt: string | null;
+  createdAt: string; lockedUntil: string | null; lastSeenAt: string | null; activeSessions: number; you: boolean };
+// 16 characters from letters and digits that can't be mistaken for each other (no 0/O, 1/l/I)
+function tempPassword(){
+  const a = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', r = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(r, x => a[x % a.length]).join('').replace(/(.{4})(?!$)/g, '$1-');
+}
+function Team(){
+  const s = useLoad<{ people: Person[] }>('/team');
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [adding, setAdding] = useState(false);
+  const [resetting, setResetting] = useState<Person | null>(null);
+  const [reveal, setReveal] = useState<{ title: string; email: string; password: string } | null>(null);
+  if (s.error && !s.data) return <ErrorState message={s.error} retry={s.reload} />;
+  if (!s.data) return <SkeletonRows rows={5} />;
+  const act = async (p: Person, fn: () => Promise<{ people: Person[] }>, done: string) => { s.setData(await fn()); toast.show(done, { tone: 'success' }); };
+  return <>
+    <Section title="Team" desc="People who can sign in to this portal. Owners can do everything, including managing this list; admins can use the whole portal except this page.">
+      <div><button type="button" className="btn primary" onClick={() => setAdding(true)}><Icon name="plus" /> Add a person</button></div>
+      <ul className="team-list">{s.data.people.map(p => (
+        <li key={p.id} className={p.disabledAt ? 'is-off' : ''}>
+          <span className="team-avatar" aria-hidden="true">{(p.name || p.email).slice(0, 1).toUpperCase()}</span>
+          <span className="grow" style={{ minWidth: 0 }}>
+            <span className="row" style={{ gap: 6 }}><b className="truncate">{p.name || p.email.split('@')[0]}</b>
+              <Badge tone={p.role === 'owner' ? 'accent' : 'neutral'}>{p.role}</Badge>
+              {p.you && <Badge tone="info">you</Badge>}
+              {p.disabledAt && <Badge tone="danger">access off</Badge>}
+              {p.mustChangePassword && !p.disabledAt && <Badge tone="warning">hasn’t set a password yet</Badge>}
+              {p.twoFactor && <Badge tone="success">2FA</Badge>}
+              {p.lockedUntil && new Date(p.lockedUntil) > new Date() && <Badge tone="warning">locked out for now</Badge>}</span>
+            <span className="faint truncate" style={{ fontSize: 12, display: 'block' }}>{p.email} · {p.lastSeenAt ? `active ${ago(p.lastSeenAt)}` : 'never signed in'}{p.activeSessions ? ` · ${p.activeSessions} device${p.activeSessions === 1 ? '' : 's'}` : ''}</span>
+          </span>
+          {!p.you && <span className="row team-actions" style={{ gap: 4 }}>
+            <select aria-label={`Role for ${p.email}`} value={p.role} onChange={e => void act(p, () => put(`/team/${p.id}`, { role: e.target.value }), 'Role changed').catch(toast.error)} style={{ width: 'auto' }}>
+              <option value="admin">Admin</option><option value="owner">Owner</option></select>
+            <button type="button" className="btn sm ghost" onClick={() => setResetting(p)}>Reset password</button>
+            {p.activeSessions > 0 && <AsyncButton className="btn sm ghost" onClick={() => act(p, () => post(`/team/${p.id}/sign-out`), `${p.email} was signed out everywhere`)}>Sign out</AsyncButton>}
+            <AsyncButton className="btn sm ghost" onClick={async () => {
+              if (!p.disabledAt && !(await confirm({ title: `Switch off ${p.email}?`, body: 'They’re signed out at once and can’t sign in until you switch them back on. Nothing they made is deleted.', confirm: 'Switch off', danger: true }))) return;
+              await act(p, () => post(`/team/${p.id}/access`, { enabled: !!p.disabledAt }), p.disabledAt ? 'Access switched back on' : 'Access switched off');
+            }}>{p.disabledAt ? 'Switch on' : 'Switch off'}</AsyncButton>
+            <AsyncButton className="icon-btn sm" title={`Delete ${p.email}`} onClick={async () => {
+              if (!(await confirm({ title: `Delete ${p.email}?`, body: 'Their account and every session are removed. The activity log keeps what they did.', confirm: 'Delete', danger: true, typeToConfirm: p.email }))) return;
+              await act(p, () => del(`/team/${p.id}`), 'Removed from the team');
+            }}><Icon name="trash" size={13} /></AsyncButton>
+          </span>}
+        </li>
+      ))}</ul>
+    </Section>
+    {adding && <AddPerson onClose={() => setAdding(false)} onAdded={(d, email, password) => { s.setData(d); setAdding(false); setReveal({ title: 'Person added', email, password }); }} />}
+    {resetting && <ResetPassword person={resetting} onClose={() => setResetting(null)} onDone={(d, password) => { s.setData(d); setReveal({ title: 'Password reset', email: resetting.email, password }); setResetting(null); }} />}
+    {reveal && <Reveal {...reveal} onClose={() => setReveal(null)} />}
+  </>;
+}
+function PasswordField({ value, onChange }: { value: string; onChange: (v: string) => void }){
+  return <span className="input-with-btn"><input className="mono" value={value} onChange={e => onChange(e.target.value)} aria-label="Temporary password" minLength={12} />
+    <button type="button" className="icon-btn" title="Make a new one" aria-label="Generate a password" onClick={() => onChange(tempPassword())}><Icon name="refresh" /></button></span>;
+}
+(PasswordField as any).labelable = true;
+function AddPerson({ onClose, onAdded }: { onClose: () => void; onAdded: (d: { people: Person[] }, email: string, password: string) => void }){
+  const [f, setF] = useState({ name: '', email: '', role: 'admin' as 'admin' | 'owner', password: tempPassword() });
+  const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim()) && f.password.length >= 12;
+  return <Modal title="Add a person" onClose={onClose} footer={<>
+    <button type="button" className="btn" onClick={onClose}>Cancel</button>
+    <AsyncButton className="btn primary" disabled={!ok} onClick={async () => onAdded(await post('/team', { ...f, email: f.email.trim() }), f.email.trim().toLowerCase(), f.password)}>Add to the team</AsyncButton>
+  </>}>
+    <div className="form-grid">
+      <Field label="Name"><input value={f.name} onChange={e => setF({ ...f, name: e.target.value })} maxLength={80} autoFocus placeholder="e.g. Asha" /></Field>
+      <Field label="Email"><input type="email" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} maxLength={254} placeholder="name@example.com" /></Field>
+    </div>
+    <Field label="Role"><Segmented label="Role" value={f.role} onChange={v => setF({ ...f, role: v })} options={[{ value: 'admin', label: 'Admin' }, { value: 'owner', label: 'Owner' }]} /></Field>
+    <p className="field-hint" style={{ marginTop: -6 }}>{f.role === 'owner' ? 'Owners can do everything, including adding and removing people.' : 'Admins can use the whole portal except the Team page.'}</p>
+    <Field label="Temporary password" hint="They’ll choose their own the first time they sign in. At least 12 characters."><PasswordField value={f.password} onChange={v => setF({ ...f, password: v })} /></Field>
+  </Modal>;
+}
+function ResetPassword({ person, onClose, onDone }: { person: Person; onClose: () => void; onDone: (d: { people: Person[] }, password: string) => void }){
+  const [password, setPassword] = useState(tempPassword());
+  return <Modal title={`Reset the password for ${person.email}`} onClose={onClose} footer={<>
+    <button type="button" className="btn" onClick={onClose}>Cancel</button>
+    <AsyncButton className="btn primary" disabled={password.length < 12} onClick={async () => onDone(await post(`/team/${person.id}/password`, { password }), password)}>Reset password</AsyncButton>
+  </>}>
+    <p className="muted" style={{ marginTop: 0 }}>They’re signed out everywhere and must choose their own password with this temporary one.</p>
+    <Field label="Temporary password"><PasswordField value={password} onChange={setPassword} /></Field>
+  </Modal>;
+}
+function Reveal({ title, email, password, onClose }: { title: string; email: string; password: string; onClose: () => void }){
+  const toast = useToast();
+  const url = `${location.origin}/portal/`;
+  const text = `KA Portal: ${url}\nEmail: ${email}\nTemporary password: ${password}\nYou'll choose your own password when you first sign in.`;
+  return <Modal title={title} onClose={onClose} footer={<>
+    <button type="button" className="btn" onClick={onClose}>Done</button>
+    <button type="button" className="btn primary" onClick={async () => { try { await navigator.clipboard.writeText(text); toast.show('Sign-in details copied', { tone: 'success' }); } catch { toast.show('Copy isn’t allowed here: select the text instead', { tone: 'error' }); } }}><Icon name="copy" /> Copy sign-in details</button>
+  </>}>
+    <p className="muted" style={{ marginTop: 0 }}>Send these to them privately (not in a public chat). The password isn’t shown again.</p>
+    <dl className="kv card"><dt>Portal</dt><dd className="mono">{url}</dd><dt>Email</dt><dd className="mono">{email}</dd><dt>Password</dt><dd className="mono" style={{ userSelect: 'all' }}>{password}</dd></dl>
+  </Modal>;
 }

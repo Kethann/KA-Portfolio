@@ -10,6 +10,7 @@ import { registerCheckout } from './handlers/checkout.js';
 import { registerLegal } from './handlers/legal.js';
 
 import { registerAuth, requireAdmin } from './admin/auth.js';
+import { registerTeam } from './admin/team.js';
 import { registerCatalog } from './admin/catalog.js';
 import { registerSales } from './admin/sales.js';
 import { registerContent } from './admin/content.js';
@@ -28,6 +29,7 @@ registerLegal(route);
 // ---- creator portal: every /api/admin/* route below the auth endpoints runs requireAdmin first
 router.setGuard('admin', requireAdmin);
 registerAuth(route);
+registerTeam(route);
 registerCatalog(route);
 registerSales(route);
 registerContent(route);

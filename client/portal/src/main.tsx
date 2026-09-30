@@ -6,7 +6,7 @@ import './tokens.css';
 import './portal.css';
 import './apps.css';
 import { api, onSignedOut, setCsrf } from './api';
-import { AuthScreen } from './shell/Auth';
+import { AuthScreen, ChoosePassword } from './shell/Auth';
 import type { Session } from './shell/Auth';
 import { DeskProvider, useDesk } from './shell/desk';
 import { Window } from './shell/Window';
@@ -25,8 +25,8 @@ function App(){
     try {
       const st = await api<{ needsSetup: boolean; signedIn: boolean }>('GET', '/setup-status');
       if (st.signedIn){
-        const s = await api<{ email: string; csrf: string }>('GET', '/session');
-        setCsrf(s.csrf); setBoot({ state: 'in', session: { email: s.email, csrf: s.csrf } }); return;
+        const s = await api<{ email: string; csrf: string; role: 'owner' | 'admin'; name: string; mustChangePassword: boolean }>('GET', '/session');
+        setCsrf(s.csrf); setBoot({ state: 'in', session: { email: s.email, csrf: s.csrf, role: s.role, name: s.name, mustChangePassword: s.mustChangePassword } }); return;
       }
       setBoot({ state: st.needsSetup ? 'setup' : 'login' });
     } catch (e: any){
@@ -41,6 +41,9 @@ function App(){
     <div className="boot" role="alert"><img src={logo} alt="" width={64} height={64} /><p>{boot.message}</p><button type="button" className="btn" onClick={start}>Try again</button></div>
   );
   if (boot.state === 'setup' || boot.state === 'login') return <AuthScreen mode={boot.state} onSignedIn={(s) => setBoot({ state: 'in', session: s })} />;
+  if (boot.session.mustChangePassword) return <ChoosePassword session={boot.session}
+    onDone={() => setBoot({ state: 'in', session: { ...boot.session, mustChangePassword: false } })}
+    onSignOut={() => { void api('POST', '/logout').catch(() => {}); setCsrf(''); setBoot({ state: 'login' }); }} />;
   return (
     <ToastProvider>
       <ConfirmProvider>

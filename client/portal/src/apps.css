@@ -240,3 +240,10 @@
 .quota-rank{ width:18px; text-align:right; }
 .rule-row{ display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:start; }
 .rule-row > .faint{ padding-top:8px; }
+
+/* Settings > Team */
+.team-list{ list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+.team-list li{ display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface-1); flex-wrap:wrap; }
+.team-list li.is-off{ opacity:.7; }
+.team-avatar{ width:34px; height:34px; flex:none; border-radius:50%; display:grid; place-items:center; font-weight:700; color:#fff; background:linear-gradient(150deg, var(--accent), #b3402a); }
+.team-actions{ flex-wrap:wrap; justify-content:flex-end; }

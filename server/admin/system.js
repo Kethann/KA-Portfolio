@@ -92,7 +92,7 @@ export async function backupLink(ctx){
 export async function auditLog(ctx){
   const db = await getDb();
   const limit = Math.min(500, Number(ctx.url.searchParams.get('limit')) || 200);
-  return json({ entries: await db.query(`select id, at, action, target, data, ip from audit_log order by at desc limit ${limit}`) });
+  return json({ entries: await db.query(`select id, at, action, target, data, ip, actor from audit_log order by at desc limit ${limit}`) });
 }
 
 // Deletes visitor records older than N days (the privacy policy's retention promise).

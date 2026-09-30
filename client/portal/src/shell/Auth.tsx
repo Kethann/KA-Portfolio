@@ -7,7 +7,7 @@ import { Icon } from '../icons';
 import { Spinner } from '../ui';
 import logo from '../assets/ka-logo.png';
 
-export type Session = { email: string; csrf: string };
+export type Session = { email: string; csrf: string; role?: 'owner' | 'admin'; name?: string; mustChangePassword?: boolean };
 
 export function AuthScreen({ mode, onSignedIn, overlay }: { mode: 'setup' | 'login'; onSignedIn: (s: Session) => void; overlay?: boolean }){
   const [email, setEmail] = useState('');
@@ -30,7 +30,7 @@ export function AuthScreen({ mode, onSignedIn, overlay }: { mode: 'setup' | 'log
       const r = await api<{ csrf: string; email: string }>('POST', mode === 'setup' ? '/setup' : '/login', body);
       setCsrf(r.csrf);
       setPassword(''); setCode('');
-      onSignedIn({ email: r.email, csrf: r.csrf });
+      onSignedIn({ email: r.email, csrf: r.csrf, role: (r as any).role, name: (r as any).name, mustChangePassword: !!(r as any).mustChangePassword });
     } catch (err){
       const e2 = err as ApiError;
       if (e2.code === 'totp_required'){ setNeedCode(true); setError(''); }
@@ -64,6 +64,50 @@ export function AuthScreen({ mode, onSignedIn, overlay }: { mode: 'setup' | 'log
         <button type="submit" className="btn primary block" disabled={busy}>{busy ? <Spinner /> : <Icon name={mode === 'setup' ? 'shield' : 'lock'} />} {mode === 'setup' ? 'Create account' : needCode ? 'Verify' : 'Sign in'}</button>
         {needCode && <button type="button" className="btn ghost block" onClick={() => { setNeedCode(false); setCode(''); setError(''); }}>Use a different account</button>}
         <p className="auth-foot"><Icon name="shield" size={13} /> Private area · not indexed by search engines</p>
+      </form>
+    </div>
+  );
+}
+
+// First sign-in with a temporary password (someone added by the owner): choose your own before the
+// desktop opens. The server refuses everything else until this is done.
+export function ChoosePassword({ session, onDone, onSignOut }: { session: Session; onDone: () => void; onSignOut: () => void }){
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [again, setAgain] = useState('');
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const mismatch = !!again && next !== again;
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (busy || next.length < 12 || next !== again) return;
+    setBusy(true); setError('');
+    try { await api('POST', '/password', { current, next }); onDone(); }
+    catch (err){ setError((err as ApiError).message); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="auth" role="main" aria-labelledby="cp-title">
+      <form className="auth-card" onSubmit={submit} noValidate>
+        <img className="auth-logo" src={logo} alt="" width={84} height={84} />
+        <h1 id="cp-title">Welcome{session.name ? `, ${session.name.split(' ')[0]}` : ''}</h1>
+        <p className="auth-sub">You signed in with a temporary password. Choose your own to continue. Only you will know it.</p>
+        <label className="field"><span className="field-label">Temporary password</span>
+          <input type={show ? 'text' : 'password'} autoComplete="current-password" value={current} onChange={e => setCurrent(e.target.value)} required autoFocus /></label>
+        <label className="field"><span className="field-label">New password</span>
+          <span className="input-with-btn">
+            <input type={show ? 'text' : 'password'} autoComplete="new-password" value={next} onChange={e => setNext(e.target.value)} required minLength={12} />
+            <button type="button" className="icon-btn" onClick={() => setShow(s => !s)} aria-label={show ? 'Hide passwords' : 'Show passwords'} aria-pressed={show}><Icon name={show ? 'eyeOff' : 'eye'} /></button>
+          </span>
+          <span className="field-hint">At least 12 characters. A short sentence works well.</span></label>
+        <label className="field"><span className="field-label">New password again</span>
+          <input type={show ? 'text' : 'password'} autoComplete="new-password" value={again} onChange={e => setAgain(e.target.value)} required />
+          {mismatch && <span className="field-error" role="alert">The two new passwords don’t match.</span>}</label>
+        <div className="auth-error" role="alert" aria-live="assertive">{error}</div>
+        <button type="submit" className="btn primary block" disabled={busy || !current || next.length < 12 || next !== again}>{busy ? <Spinner /> : <Icon name="lock" />} Save and continue</button>
+        <button type="button" className="btn ghost block" onClick={onSignOut}>Sign out</button>
+        <p className="auth-foot"><Icon name="shield" size={13} /> Signed in as {session.email}</p>
       </form>
     </div>
   );
