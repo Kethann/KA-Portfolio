@@ -275,7 +275,7 @@
 .kdp-field input{ width:100%; min-width:0; box-sizing:border-box; }
 
 /* ---- pass design options (Studio > Checkout pass) --------------------------------------------- */
-.kco-brand img{ border-radius:6px; object-fit:contain; image-rendering:auto; }
+.kco-brand img{ border-radius:0; object-fit:contain; background:none; filter:drop-shadow(0 1px 3px rgba(0,0,0,.45)); }
 .kco-scrim{ opacity:calc(0.35 + var(--kco-dim, .55)); }
 .pass-no-foil .kco-foil{ display:none; }
 .pass-text-top .kco-main{ align-self:start; padding-top:3%; }

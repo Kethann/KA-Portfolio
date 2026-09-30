@@ -25,10 +25,13 @@ const DEVICES = { desktop: { w: 1440, h: 900, label: 'Desktop' }, tablet: { w: 8
 type Device = keyof typeof DEVICES;
 type Section = 'identity' | 'type' | 'notice' | 'social' | 'elements' | 'arrange' | 'pass';
 
-export default function Studio({ active }: AppProps){
+const SECTIONS: Section[] = ['identity', 'type', 'notice', 'social', 'elements', 'arrange', 'pass'];
+export default function Studio({ active, route }: AppProps){
   const site = useSite();
   const toast = useToast();
-  const [section, setSection] = useState<Section>('identity');
+  // #studio/pass (e.g. from a product's "Design the checkout pass" button) opens that section
+  const [section, setSection] = useState<Section>(() => SECTIONS.includes(route as Section) ? route as Section : 'identity');
+  useEffect(() => { if (SECTIONS.includes(route as Section)) setSection(route as Section); }, [route]);
   const [device, setDevice] = useState<Device>('desktop');
   const [selected, setSelected] = useState<string>('portfolio-title');
   useEffect(() => { void loadSite(); }, []);
@@ -252,7 +255,7 @@ function PassSettingsForm({ doc }: { doc: SiteDoc }){
     <p className="muted">The pass buyers see while they check out. Changes show in the preview straight away and go live when you publish.</p>
     <Field label="Label next to the logo" hint={`${p.label.length}/24`}><input value={p.label} maxLength={24} onChange={e => set({ label: e.target.value })} placeholder="KA PASS" /></Field>
     <div className="field"><span className="field-label">Logo</span>
-      <div className="row"><img src={p.logoUrl || '/images/icon-192.png'} alt="" width={40} height={40} style={{ borderRadius: 8, objectFit: 'contain', background: '#0e0c10' }} />
+      <div className="row"><img src={p.logoUrl || '/images/ka-logo.png'} alt="" width={40} height={40} style={{ borderRadius: 8, objectFit: 'contain', background: '#0e0c10' }} />
         {p.logoUrl ? <button type="button" className="btn sm ghost" onClick={() => set({ logoUrl: '' })}>Use the KA logo</button> : <Badge>KA logo</Badge>}</div>
       <Uploader kind="image" accept="image/png,image/webp,image/avif" label="Upload your own logo" onUploaded={u => set({ logoUrl: u.publicUrl || '' })}>Square PNG or WebP with a transparent background, 256×256 or larger, stays sharp</Uploader>
     </div>

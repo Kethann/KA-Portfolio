@@ -20,9 +20,9 @@ type Product = {
 };
 type Kind = 'all' | 'artzz' | 'artifacts';
 
-export default function Products({ route, go, active }: AppProps){
+export default function Products({ route, go, active, open }: AppProps){
   if (route === 'new') return <NewProduct go={go} />;
-  if (route) return <Editor id={route} go={go} active={active} />;
+  if (route) return <Editor id={route} go={go} active={active} open={open} />;
   return <List go={go} />;
 }
 
@@ -142,7 +142,7 @@ function NewProduct({ go }: { go: (r: string) => void }){
   );
 }
 
-function Editor({ id, go, active }: { id: string; go: (r: string) => void; active: boolean }){
+function Editor({ id, go, active, open }: { id: string; go: (r: string) => void; active: boolean; open: AppProps['open'] }){
   const toast = useToast();
   const confirm = useConfirm();
   const s = useLoad<{ product: Product }>(`/products/${id}`);
@@ -326,6 +326,11 @@ function Editor({ id, go, active }: { id: string; go: (r: string) => void; activ
               <dt>License</dt><dd>{license?.name || '—'}</dd>
               <dt>Published</dt><dd>{saved.publishedAt ? ago(saved.publishedAt) : 'never'}</dd>
             </dl>
+            <div className="card stack">
+              <div className="eyebrow">Checkout pass</div>
+              <p className="field-hint" style={{ margin: 0 }}>The ticket buyers see while paying: its logo, label, fonts and where the text sits. One design for every product.</p>
+              <button type="button" className="btn sm" onClick={() => open('studio', 'pass')}><Icon name="studio" /> Design the checkout pass</button>
+            </div>
             <p className="field-hint"><kbd>Ctrl</kbd> <kbd>S</kbd> saves. Publishing checks for images, prices and a file.</p>
           </aside>
         </div>

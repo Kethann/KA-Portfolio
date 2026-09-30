@@ -120,7 +120,7 @@ export function PassCard({ product, currency, amount, free, email, orderId, phas
           <span className="kco-scrim" aria-hidden="true" /><span className="kco-foil" aria-hidden="true" />
           <span className="kco-sheen" aria-hidden="true" /><span className="kco-noise" aria-hidden="true" />
           <div className="kco-card-top">
-            <span className="kco-brand"><img src={pass.logoUrl || '/images/icon-192.png'} alt="" width={pass.logoSize} height={pass.logoSize} style={{ width: pass.logoSize, height: pass.logoSize }} decoding="async" />{pass.label}</span>
+            <span className="kco-brand"><img src={pass.logoUrl || '/images/ka-logo.png'} alt="" width={pass.logoSize} height={pass.logoSize} style={{ width: pass.logoSize, height: pass.logoSize }} decoding="async" />{pass.label}</span>
             {pass.showTag && <span className="kco-tag">{pass.tagText || (free ? 'Free download' : 'Instant download')}</span>}
           </div>
           <div className="kco-main">
