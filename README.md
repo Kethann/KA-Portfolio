@@ -38,14 +38,14 @@ npm start
 ```
 
 Startup builds the frontend, checks its delivery, and serves the homepage, creator studio,
-contact inbox, gallery, and APIs through **http://127.0.0.1:8787**.
-Open **http://127.0.0.1:8787/creator** for the private studio.
+contact inbox, gallery, and APIs through **http://127.0.0.1:9878**.
+Open **http://127.0.0.1:9878/creator** for the private studio.
 `npm run dev` uses this same startup. Restart after frontend edits.
 
 Vite preview, Live Server, and Python static servers cannot run the Node APIs.
 `npm run frontend` remains an optional standalone gallery development tool, not the complete app.
 The optional Python image worker uses loopback port 8799 internally; all browser requests
-still go through 8787. Set `ENHANCE_ENABLED=0` to disable that worker.
+still go through 9878. Set `ENHANCE_ENABLED=0` to disable that worker.
 Do not run a second app process against the same data directory.
 
 Existing files are preserved. Builds keep older generated assets; unused uploaded images

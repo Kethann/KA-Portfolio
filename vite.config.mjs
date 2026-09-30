@@ -1,16 +1,15 @@
-import {defineConfig} from 'vite';
+import {defineConfig,loadEnv} from 'vite';
 import {fileURLToPath} from 'node:url';
-import {readFileSync,writeFileSync,cpSync,mkdirSync} from 'node:fs';
+import {readFileSync,writeFileSync,cpSync} from 'node:fs';
 const local=path=>fileURLToPath(new URL(path,import.meta.url));
+const localEnv=loadEnv('development',process.cwd(),'');
+const localApiPort=process.env.KA_API_PORT||localEnv.KA_API_PORT||process.env.PORT||localEnv.PORT||'9878';
+const localApi=`http://127.0.0.1:${localApiPort}`;
 export default defineConfig({
   plugins:[{name:'stage-crystal-homepage',apply:'build',closeBundle(){
     // Vercel serves dist/ only: publish the crystal homepage (root index.html) as dist/index.html, as server/app.js does locally.
     writeFileSync(local('./dist/index.html'),readFileSync(local('./index.html'),'utf8').replaceAll('./dist/assets/','./assets/'));
     cpSync(local('./images'),local('./dist/images'),{recursive:true});
-    // Firebase Hosting publishes dist/ rather than Vercel's project root.
-    // Keep the deployed portal entry available there.
-    mkdirSync(local('./dist/portal'),{recursive:true});
-    cpSync(local('./client/portal/index.html'),local('./dist/portal/index.html'));
   }},{name:'local-crystal-runtime',generateBundle(){this.emitFile({type:'asset',fileName:'assets/three-r128.min.js',source:readFileSync(local('./public/three-r128.min.js'))});}}],
   root:'client',
   preview:{host:'127.0.0.1',strictPort:true},
@@ -23,5 +22,5 @@ export default defineConfig({
       output:{entryFileNames:chunk=>['gallery','poster','panda','studio','store'].includes(chunk.name)?'assets/'+chunk.name+'.js':'assets/[name]-[hash].js'}
     }
   },
-  server:{host:'127.0.0.1',fs:{strict:true,allow:[local('./client'),local('./node_modules')],deny:['.env','.env.*','*.{crt,pem}','**/.git/**','**/server/data/**']},proxy:{'/api':'http://127.0.0.1:8787','/images':'http://127.0.0.1:8787','/uploads':'http://127.0.0.1:8787','/creator':'http://127.0.0.1:8787','/assets':'http://127.0.0.1:8787'}}
+  server:{host:'127.0.0.1',fs:{strict:true,allow:[local('./client'),local('./node_modules')],deny:['.env','.env.*','*.{crt,pem}','**/.git/**','**/server/data/**']},proxy:{'/api':localApi,'/images':localApi,'/uploads':localApi,'/creator':localApi,'/assets':localApi}}
 });

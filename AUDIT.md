@@ -11,8 +11,8 @@ Existing uncommitted edits were preserved. Pre-edit copies of the main affected 
 Run `npm start` from the parent workspace or this app directory. It builds and verifies the
 frontend before starting the app. `npm run dev` uses the same entry point.
 
-- Public site: http://127.0.0.1:8787
-- Private creator studio: http://127.0.0.1:8787/creator
+- Public site: http://127.0.0.1:9878
+- Private creator studio: http://127.0.0.1:9878/creator
 - Optional image worker: loopback port 8799, accessed by the browser through `/api/enhance`
 - Set `ENHANCE_ENABLED=0` to disable the optional worker.
 
