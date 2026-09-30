@@ -273,3 +273,15 @@
 .kdp-form{ background:rgba(22,18,26,.97); }
 .kdp-row{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
 .kdp-field input{ width:100%; min-width:0; box-sizing:border-box; }
+
+/* ---- pass design options (Studio > Checkout pass) --------------------------------------------- */
+.kco-brand img{ border-radius:6px; object-fit:contain; image-rendering:auto; }
+.kco-scrim{ opacity:calc(0.35 + var(--kco-dim, .55)); }
+.pass-no-foil .kco-foil{ display:none; }
+.pass-text-top .kco-main{ align-self:start; padding-top:3%; }
+.pass-text-center .kco-main{ align-self:center; }
+.pass-text-top .kco-scrim{ background:linear-gradient(180deg, rgba(10,8,11,.86) 0%, rgba(10,8,11,.3) 55%, rgba(10,8,11,.7) 100%); }
+.pass-text-center .kco-scrim{ background:radial-gradient(120% 80% at 50% 55%, rgba(10,8,11,.78), rgba(10,8,11,.2) 70%), linear-gradient(180deg, rgba(10,8,11,.5), transparent 30%); }
+.pass-price-left .kco-main{ flex-direction:row-reverse; }
+.pass-price-left .kco-main .kco-title{ text-align:right; }
+.pass-price-below .kco-main{ flex-direction:column; align-items:flex-start; gap:4px; }

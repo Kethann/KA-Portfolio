@@ -2,14 +2,19 @@
 // tablet or phone frames) before anything is published. In "Arrange" mode, elements can be dragged
 // and scaled right in the preview; positions are stored per screen size.
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { PassCard } from '../../../src/store/checkout/PassCard';
+import type { Product } from '../../../src/store/api';
+import storeCss from '../../../src/store/store.css?inline';
+import checkoutCss from '../../../src/store/checkout/checkout.css?inline';
 import type { AppProps } from './registry';
 import { Badge, ErrorState, Field, Segmented, SkeletonRows, Switch, useToast } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
 import { Uploader, useSaveKey } from './common';
 import { SiteSaveBar } from './Content';
-import { loadSite, saveSite, updateSite, useSite } from './siteDoc';
-import type { SiteDoc } from './siteDoc';
+import { loadSite, saveSite, thumb, updateSite, useSite, PASS_DRAFT_DEFAULTS } from './siteDoc';
+import type { SiteDoc, PassDraft } from './siteDoc';
 
 const FONTS = ['Fraunces', 'Manrope', 'Sora', 'Poppins', 'Playfair Display', 'Space Grotesk', 'system-ui'];
 const ACCENTS = ['#FF9438', '#E0303E', '#F5C451', '#4FD08A', '#6AA8FF', '#B98CFF', '#FF6FAE', '#EDEBE8'];
@@ -18,7 +23,7 @@ const ICONS = ['behance', 'instagram', 'x', 'linkedin', 'youtube', 'website', 'e
 const ANIMS = ['', 'fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'scale-in', 'pop'];
 const DEVICES = { desktop: { w: 1440, h: 900, label: 'Desktop' }, tablet: { w: 820, h: 1180, label: 'Tablet' }, mobile: { w: 390, h: 844, label: 'Phone' } } as const;
 type Device = keyof typeof DEVICES;
-type Section = 'identity' | 'type' | 'notice' | 'social' | 'elements' | 'arrange';
+type Section = 'identity' | 'type' | 'notice' | 'social' | 'elements' | 'arrange' | 'pass';
 
 export default function Studio({ active }: AppProps){
   const site = useSite();
@@ -38,7 +43,7 @@ export default function Studio({ active }: AppProps){
       <div className="studio">
         <div className="studio-panel">
           <div className="studio-nav" role="tablist" aria-label="Studio sections">
-            {([['identity', 'Colour'], ['type', 'Type'], ['notice', 'Banner & nav'], ['social', 'Links'], ['elements', 'Elements'], ['arrange', 'Arrange']] as [Section, string][]).map(([k, l]) => (
+            {([['identity', 'Colour'], ['type', 'Type'], ['notice', 'Banner & nav'], ['social', 'Links'], ['elements', 'Elements'], ['arrange', 'Arrange'], ['pass', 'Checkout pass']] as [Section, string][]).map(([k, l]) => (
               <button key={k} type="button" role="tab" aria-selected={section === k} className={section === k ? 'on' : ''} onClick={() => setSection(k)}>{l}</button>
             ))}
           </div>
@@ -83,6 +88,8 @@ export default function Studio({ active }: AppProps){
 
             {section === 'elements' && <Elements doc={d} selected={selected} setSelected={setSelected} />}
 
+            {section === 'pass' && <PassSettingsForm doc={d} />}
+
             {section === 'arrange' && <>
               <p className="muted">Drag elements in the preview to move them; drag the orange dot to resize. Positions are saved separately for desktop, tablet and phone.</p>
               <Field label="Screen size"><Segmented label="Screen size" value={device} onChange={setDevice} options={Object.entries(DEVICES).map(([k, v]) => ({ value: k as Device, label: v.label }))} /></Field>
@@ -94,7 +101,7 @@ export default function Studio({ active }: AppProps){
             </>}
           </div>
         </div>
-        <Preview doc={d} device={device} setDevice={setDevice} arrange={section === 'arrange'} onSelect={id => { setSelected(id); }} />
+        {section === 'pass' ? <PassPreview doc={d} /> : <Preview doc={d} device={device} setDevice={setDevice} arrange={section === 'arrange'} onSelect={id => { setSelected(id); }} />}
       </div>
     </div>
   );
@@ -233,6 +240,67 @@ function Preview({ doc, device, setDevice, arrange, onSelect }: { doc: SiteDoc; 
           <iframe key={`${device}-${nonce}`} ref={frame} src="/?preview=1" title="Live preview of the homepage" style={{ width: dev.w, height: dev.h, transform: `scale(${scale})` }} />
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---- Checkout pass: the ticket buyers see at checkout -------------------------------------------
+function PassSettingsForm({ doc }: { doc: SiteDoc }){
+  const p = doc.passCard;
+  const set = (patch: Partial<PassDraft>) => updateSite(x => ({ ...x, passCard: { ...x.passCard, ...patch } }));
+  return <>
+    <p className="muted">The pass buyers see while they check out. Changes show in the preview straight away and go live when you publish.</p>
+    <Field label="Label next to the logo" hint={`${p.label.length}/24`}><input value={p.label} maxLength={24} onChange={e => set({ label: e.target.value })} placeholder="KA PASS" /></Field>
+    <div className="field"><span className="field-label">Logo</span>
+      <div className="row"><img src={p.logoUrl || '/images/icon-192.png'} alt="" width={40} height={40} style={{ borderRadius: 8, objectFit: 'contain', background: '#0e0c10' }} />
+        {p.logoUrl ? <button type="button" className="btn sm ghost" onClick={() => set({ logoUrl: '' })}>Use the KA logo</button> : <Badge>KA logo</Badge>}</div>
+      <Uploader kind="image" accept="image/png,image/webp,image/avif" label="Upload your own logo" onUploaded={u => set({ logoUrl: u.publicUrl || '' })}>Square PNG or WebP with a transparent background, 256×256 or larger, stays sharp</Uploader>
+    </div>
+    <Field label={`Logo size · ${p.logoSize}px`}><input type="range" min={16} max={44} value={p.logoSize} onChange={e => set({ logoSize: Number(e.target.value) })} /></Field>
+    <div className="stack"><Switch checked={p.showTag} onChange={v => set({ showTag: v })} label="Show the tag in the top corner" />
+      {p.showTag && <Field label="Tag text" hint="Empty = “Instant download” (or “Free download” for free items)"><input value={p.tagText} maxLength={30} onChange={e => set({ tagText: e.target.value })} placeholder="Instant download" /></Field>}</div>
+    <div className="form-grid">
+      <Field label="Title font"><select value={p.titleFont} onChange={e => set({ titleFont: e.target.value })}><option value="">Site heading font</option>{fontList(doc).map(f => <option key={f} value={f}>{f}</option>)}</select></Field>
+      <Field label="Price font"><select value={p.priceFont} onChange={e => set({ priceFont: e.target.value })}><option value="">Monospace (default)</option>{fontList(doc).map(f => <option key={f} value={f}>{f}</option>)}</select></Field>
+    </div>
+    <Field label="Title and price sit at the"><Segmented label="Text position" value={p.textPosition} onChange={v => set({ textPosition: v })} options={[{ value: 'top', label: 'Top' }, { value: 'center', label: 'Middle' }, { value: 'bottom', label: 'Bottom' }]} /></Field>
+    <Field label="Price goes"><Segmented label="Price position" value={p.pricePosition} onChange={v => set({ pricePosition: v })} options={[{ value: 'right', label: 'Right' }, { value: 'left', label: 'Left' }, { value: 'below', label: 'Below the title' }]} /></Field>
+    <div className="form-grid">
+      <Field label="Stamp after payment" hint={`${p.stampText.length}/12`}><input value={p.stampText} maxLength={12} onChange={e => set({ stampText: e.target.value })} placeholder="PAID" /></Field>
+      <Field label={`Darken the artwork · ${p.dim}%`} hint="More keeps text readable on bright art"><input type="range" min={0} max={90} value={p.dim} onChange={e => set({ dim: Number(e.target.value) })} /></Field>
+    </div>
+    <Switch checked={p.foil} onChange={v => set({ foil: v })} label="Holographic shimmer that follows the tilt" />
+    <div><button type="button" className="btn sm ghost" onClick={() => set({ ...PASS_DRAFT_DEFAULTS })}>Reset the pass to defaults</button></div>
+  </>;
+}
+
+// The real pass component (the same code and styles the store uses), drawn in its own shadow root so
+// the store's styles can't touch the portal's.
+function PassPreview({ doc }: { doc: SiteDoc }){
+  const host = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [target, setTarget] = useState<HTMLElement | null>(null);
+  const [paid, setPaid] = useState(false);
+  useEffect(() => {
+    const h = host.current; if (!h) return;
+    const root = h.shadowRoot || h.attachShadow({ mode: 'open' });
+    const style = document.createElement('style'); style.textContent = storeCss + '\n' + checkoutCss + '\n:host{display:block}.kpp{display:grid;place-items:center;width:100%;box-sizing:border-box;padding:36px 20px;min-height:100%}.kpp .kco-card-wrap{width:420px;max-width:100%}';
+    const t = document.createElement('div'); t.style.width = '100%'; root.replaceChildren(style, t); setTarget(t);   // the card sizes from this width
+  }, []);
+  const img = doc.images.find(i => i.src || i.widths.length) || doc.images[0];
+  const product = { id: 'preview', slug: 'preview', kind: 'artzz', title: img?.title || 'All Hail the Tiger', summary: '', description: '', category: null, tags: [], techTags: [], version: '',
+    sellable: true, free: false, prices: {} as Product['prices'], license: { key: 'personal', name: 'Personal', summary: '' }, demoUrl: '', previewUrl: '',
+    media: img ? [{ url: thumb(img, 1024), alt: '', width: null, height: null }] : [], delivery: { linkHours: 48, maxDownloads: 5 } } as Product;
+  return (
+    <div className="studio-preview">
+      <div className="row between" style={{ padding: '8px 12px' }}>
+        <Segmented label="Preview state" value={paid ? 'paid' : 'before'} onChange={v => setPaid(v === 'paid')} options={[{ value: 'before', label: 'Before payment' }, { value: 'paid', label: 'Paid' }]} />
+        <span className="faint" style={{ fontSize: 12 }}>Live preview · move the pointer over the card</span>
+      </div>
+      <div className="preview-stage" ref={host} style={{ background: 'radial-gradient(80% 60% at 50% 40%, #241a1c, #0c0a0d)' }} />
+      {target && createPortal(<div className="kpp"><PassCard product={product} currency="INR" amount={49900} free={false} email="buyer@example.com" orderId="KA-8H2KQ4ZP"
+        phase={paid ? 'success' : 'idle'} method={paid ? { type: 'card', network: 'Visa', last4: '4242' } : null} flipped={false} onFlip={() => {}} reduced={false}
+        cardRef={cardRef} settings={doc.passCard} /></div>, target)}
     </div>
   );
 }

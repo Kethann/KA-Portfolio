@@ -10,7 +10,12 @@ export type SiteDoc = {
   notice: { enabled: boolean; text: string; tone: 'info' | 'warning' }; visibility: { navGallery: boolean; navAbout: boolean; autoFullscreen?: boolean };
   stacks: { loop: boolean; covers: Record<string, string> }; layoutOverrides: Record<string, Record<string, { x: number; y: number; scale: number }>>;
   branding: { enabled: boolean; logoUrl: string }; elementStyles: Record<string, any>; socialLinks: { label: string; url: string; icon: string }[];
+  passCard: PassDraft;
 };
+export type PassDraft = { label: string; logoUrl: string; logoSize: number; showTag: boolean; tagText: string; titleFont: string; priceFont: string;
+  textPosition: 'bottom' | 'center' | 'top'; pricePosition: 'right' | 'left' | 'below'; stampText: string; foil: boolean; dim: number };
+export const PASS_DRAFT_DEFAULTS: PassDraft = { label: 'KA PASS', logoUrl: '', logoSize: 24, showTag: true, tagText: '', titleFont: '', priceFont: '',
+  textPosition: 'bottom', pricePosition: 'right', stampText: 'PAID', foil: true, dim: 55 };
 type State = { doc: SiteDoc | null; saved: string; error: string | null; loading: boolean; saving: boolean };
 let state: State = { doc: null, saved: '', error: null, loading: false, saving: false };
 const subs = new Set<() => void>();
@@ -29,7 +34,7 @@ export async function loadSite(force = false){
 function withDefaults(d: SiteDoc): SiteDoc {
   return { ...d, notice: d.notice || { enabled: false, text: '', tone: 'info' }, visibility: { navGallery: d.visibility?.navGallery ?? true, navAbout: d.visibility?.navAbout ?? true, autoFullscreen: d.visibility?.autoFullscreen ?? true },
     stacks: d.stacks || { loop: true, covers: {} }, layoutOverrides: d.layoutOverrides || { mobile: {}, tablet: {}, desktop: {} }, branding: d.branding || { enabled: false, logoUrl: '' },
-    elementStyles: d.elementStyles || {}, socialLinks: d.socialLinks || [], details: { ...d.details, customFonts: d.details?.customFonts || [] } };
+    elementStyles: d.elementStyles || {}, socialLinks: d.socialLinks || [], passCard: { ...PASS_DRAFT_DEFAULTS, ...(d.passCard || {}) }, details: { ...d.details, customFonts: d.details?.customFonts || [] } };
 }
 export function updateSite(fn: (d: SiteDoc) => SiteDoc){ if (state.doc) emit({ doc: fn(state.doc) }); }
 export function discardSite(){ if (state.saved) emit({ doc: { ...JSON.parse(state.saved), revision: state.doc!.revision } }); }

@@ -7898,7 +7898,11 @@ function applySiteAppearance(data){
   } else {
     noticeEl.hidden = true;
   }
-  if (typeof window !== "undefined") window.kaAutoFullscreen = !(data.visibility && data.visibility.autoFullscreen === false);
+  if (typeof window !== "undefined"){
+    window.kaAutoFullscreen = !(data.visibility && data.visibility.autoFullscreen === false);
+    window.kaPassCard = data.passCard || null;   // the checkout pass design (Studio > Checkout pass)
+    try { window.dispatchEvent(new CustomEvent("ka-pass-card")); } catch(e){}
+  }
   if (data.visibility && typeof NAV_ITEMS !== "undefined"){
     var filtered = ALL_NAV_ITEMS.filter(function(item){
       if (item.name === "gallery" && data.visibility.navGallery === false) return false;

@@ -1,7 +1,7 @@
 // The live 3D "pass" above the checkout form: product, license, amount (counting), the buyer's
 // email as it is typed, and after payment how it was paid. Tilt follows the pointer (or the
 // phone's motion sensor where no permission prompt is needed); tap or Enter flips it.
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatPrice, type Currency, type Product } from '../api';
 import type { Phase, PaymentMethod } from './machine';
 
@@ -80,19 +80,35 @@ function methodText(m: PaymentMethod | null){
   return ({ upi: 'UPI', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI', paylater: 'Pay later' } as Record<string, string>)[m.type] || m.type;
 }
 
+// The pass design from the portal (Studio > Checkout pass); every field has a default.
+export interface PassSettings { label: string; logoUrl: string; logoSize: number; showTag: boolean; tagText: string; titleFont: string; priceFont: string;
+  textPosition: 'bottom' | 'center' | 'top'; pricePosition: 'right' | 'left' | 'below'; stampText: string; foil: boolean; dim: number }
+export const PASS_DEFAULTS: PassSettings = { label: 'KA PASS', logoUrl: '', logoSize: 24, showTag: true, tagText: '', titleFont: '', priceFont: '',
+  textPosition: 'bottom', pricePosition: 'right', stampText: 'PAID', foil: true, dim: 55 };
+declare global { interface Window { kaPassCard?: Partial<PassSettings> | null } }
+function usePassSettings(override?: Partial<PassSettings>): PassSettings {
+  const [live, setLive] = useState(() => window.kaPassCard || null);
+  useEffect(() => { const on = () => setLive(window.kaPassCard || null); addEventListener('ka-pass-card', on); return () => removeEventListener('ka-pass-card', on); }, []);
+  return { ...PASS_DEFAULTS, ...(live || {}), ...(override || {}) };
+}
+const fam = (f: string, fallback: string) => (f ? (f === 'system-ui' ? 'system-ui' : `'${f}', ${fallback}`) : undefined);
+
 export interface PassCardProps {
   product: Product; currency: Currency; amount: number; free: boolean; email: string; orderId: string | null;
   phase: Phase; method: PaymentMethod | null; flipped: boolean; onFlip(): void; reduced: boolean; cardRef: React.RefObject<HTMLDivElement>;
+  settings?: Partial<PassSettings>;   // the portal's live preview passes its draft here
 }
 
-export function PassCard({ product, currency, amount, free, email, orderId, phase, method, flipped, onFlip, reduced, cardRef }: PassCardProps){
+export function PassCard({ product, currency, amount, free, email, orderId, phase, method, flipped, onFlip, reduced, cardRef, settings }: PassCardProps){
+  const pass = usePassSettings(settings);
   const tiltRef = useRef<HTMLDivElement>(null);
   useTilt(tiltRef, !reduced);
   const shown = email.trim().slice(0, 40);
-  const kindLabel = product.kind === 'artzz' ? 'ARTZZ' : 'ARTIFACTS';
+
   const thumb = product.media[0];
   const tone = phase === 'success' ? 'ok' : phase === 'failed' ? 'bad' : ['creating', 'paying', 'confirming'].includes(phase) ? 'busy' : 'idle';
-  return <div className={`kco-card-wrap tone-${tone}`} ref={cardRef} data-phase={phase}>
+  return <div className={`kco-card-wrap tone-${tone} pass-text-${pass.textPosition} pass-price-${pass.pricePosition} ${pass.foil ? '' : 'pass-no-foil'}`} ref={cardRef} data-phase={phase}
+    style={{ ['--kco-dim' as string]: String(pass.dim / 100) } as React.CSSProperties}>
     <div className="kco-tilt" ref={tiltRef}>
       <div className={`kco-card ${flipped ? 'is-flipped' : ''}`} role="button" tabIndex={0}
         aria-label={`${product.title} pass. ${flipped ? 'Showing license details' : 'Showing summary'}. Press Enter to flip.`} aria-pressed={flipped}
@@ -104,12 +120,12 @@ export function PassCard({ product, currency, amount, free, email, orderId, phas
           <span className="kco-scrim" aria-hidden="true" /><span className="kco-foil" aria-hidden="true" />
           <span className="kco-sheen" aria-hidden="true" /><span className="kco-noise" aria-hidden="true" />
           <div className="kco-card-top">
-            <span className="kco-brand"><img src="/images/favicon-64.png" alt="" width="20" height="20" />{kindLabel} PASS</span>
-            <span className="kco-tag">{free ? 'Free download' : 'Instant download'}</span>
+            <span className="kco-brand"><img src={pass.logoUrl || '/images/icon-192.png'} alt="" width={pass.logoSize} height={pass.logoSize} style={{ width: pass.logoSize, height: pass.logoSize }} decoding="async" />{pass.label}</span>
+            {pass.showTag && <span className="kco-tag">{pass.tagText || (free ? 'Free download' : 'Instant download')}</span>}
           </div>
           <div className="kco-main">
-            <div className="kco-title"><strong>{product.title}</strong><small>{product.license ? `${product.license.name} license` : 'Digital download'}</small></div>
-            <div className="kco-amount"><CountingPrice amount={amount} currency={currency} reduced={reduced} free={free} /></div>
+            <div className="kco-title"><strong style={{ fontFamily: fam(pass.titleFont, 'serif') }}>{product.title}</strong><small>{product.license ? `${product.license.name} license` : 'Digital download'}</small></div>
+            <div className="kco-amount" style={{ fontFamily: fam(pass.priceFont, 'monospace') }}><CountingPrice amount={amount} currency={currency} reduced={reduced} free={free} /></div>
           </div>
           <div className="kco-stub">
             <span className="kco-email" aria-hidden="true">
@@ -117,7 +133,7 @@ export function PassCard({ product, currency, amount, free, email, orderId, phas
             </span>
             <span className="kco-order">{method && phase === 'success' ? methodText(method) : orderId || 'KA-••••••••'}</span>
           </div>
-          {phase === 'success' && <span className="kco-stamp" aria-hidden="true">{free ? 'YOURS' : 'PAID'}</span>}
+          {phase === 'success' && <span className="kco-stamp" aria-hidden="true">{free ? 'YOURS' : pass.stampText}</span>}
         </div>
         <div className="kco-face kco-back" aria-hidden={!flipped}>
           <span className="kco-stripe" aria-hidden="true" />

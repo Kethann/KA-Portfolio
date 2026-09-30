@@ -150,5 +150,25 @@ export function validateSiteDocument(input, current, seed){
   if (input.stacks?.covers && typeof input.stacks.covers === 'object'){
     for (const [folder, slug] of Object.entries(input.stacks.covers)) if (folders.includes(folder) && images.some(i => i.slug === slug && i.cat === folder)) stacks.covers[folder] = slug;
   }
-  return { typeV2: true, details, folders, images, notice, visibility, stacks, layoutOverrides, branding, elementStyles, socialLinks };
+  // The checkout pass (Studio > Checkout pass): label, logo, fonts and where things sit on the card.
+  const pc = input.passCard && typeof input.passCard === 'object' ? input.passCard : {};
+  const pickOf = (v, list, fb) => list.includes(v) ? v : fb;
+  const num = (v, lo, hi, fb) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : fb; };
+  const passLogo = text(pc.logoUrl, 600);
+  if (passLogo && !isImageUrl(passLogo)) throw bad('Upload the pass logo before saving.');
+  const passCard = {
+    label: text(pc.label, 24) || 'KA PASS',
+    logoUrl: passLogo,
+    logoSize: num(pc.logoSize, 16, 44, 24),
+    showTag: pc.showTag !== false,
+    tagText: text(pc.tagText, 30),
+    titleFont: allowedFonts.includes(pc.titleFont) ? pc.titleFont : '',
+    priceFont: allowedFonts.includes(pc.priceFont) ? pc.priceFont : '',
+    textPosition: pickOf(pc.textPosition, ['bottom', 'center', 'top'], 'bottom'),
+    pricePosition: pickOf(pc.pricePosition, ['right', 'left', 'below'], 'right'),
+    stampText: text(pc.stampText, 12) || 'PAID',
+    foil: pc.foil !== false,
+    dim: num(pc.dim, 0, 90, 55),
+  };
+  return { typeV2: true, details, folders, images, notice, visibility, stacks, layoutOverrides, branding, elementStyles, socialLinks, passCard };
 }
