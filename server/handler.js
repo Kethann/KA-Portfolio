@@ -28,6 +28,7 @@ registerLegal(route);
 
 // ---- creator portal: every /api/admin/* route below the auth endpoints runs requireAdmin first
 router.setGuard('admin', requireAdmin);
+router.setGuard('afterAdminWrite', pub.bumpLiveVersion);
 registerAuth(route);
 registerTeam(route);
 registerCatalog(route);
@@ -42,6 +43,7 @@ registerAssistantAdmin(route);
 // ---- public site
 route('GET', '/api/public-config', pub.publicConfig);
 route('GET', '/api/portfolio', pub.portfolio);
+route('GET', '/api/live', pub.liveVersion);
 route('POST', '/api/contact', pub.contact);
 route('POST', '/api/notify', pub.notify);
 route('POST', '/api/assistant', assistant);

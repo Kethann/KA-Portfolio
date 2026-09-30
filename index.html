@@ -7954,6 +7954,37 @@ function applyLayoutOverrides(data){
   });
 }
 loadPortfolioFromAPI();
+// ---- live updates: what's published in the portal appears on open pages without a reload.
+// /api/live is a tiny version number that moves after every portal change. It's checked every 15s
+// while the page is visible and at once when the tab comes back; a portal open in this same browser
+// also says so straight away. When it moves, the site settings (typography, banner, pass design,
+// portfolio...) are re-applied and the store/tips re-read their lists in the background.
+(function(){
+  var last = null, busy = false, timer = 0;
+  function refresh(){
+    loadPortfolioFromAPI();
+    try { window.dispatchEvent(new CustomEvent("ka-content-changed")); } catch(e){}
+  }
+  function check(){
+    if (busy || document.hidden) return;
+    busy = true;
+    fetch(kaApiUrl("/api/live"), { cache: "no-store" }).then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
+      busy = false;
+      if (!d || typeof d.v !== "number") return;
+      if (last !== null && d.v !== last) refresh();
+      last = d.v;
+    }).catch(function(){ busy = false; });
+  }
+  check();
+  timer = setInterval(check, 15000);
+  document.addEventListener("visibilitychange", function(){ if (!document.hidden) check(); });
+  window.addEventListener("focus", check);
+  window.addEventListener("online", check);
+  try {
+    var ch = new BroadcastChannel("ka-live");
+    ch.onmessage = function(){ setTimeout(check, 150); };
+  } catch(e){}
+})();
 // Re-apply on resize/orientation change so switching the live-preview device size (or just
 // resizing a real browser window past 760/1024px) picks up that breakpoint's own saved offsets
 // instead of keeping whatever the previous breakpoint's offset happened to be.

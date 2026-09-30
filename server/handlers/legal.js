@@ -27,7 +27,7 @@ nav.pages a[aria-current]{color:var(--ink);border-color:var(--accent)}
 .note{padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.03)}
 </style></head>
 <body><main><a class="back" href="/">&larr; Back to the site</a>${bodyHtml}</main></body></html>`;
-  return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=0, s-maxage=60, stale-while-revalidate=300', 'X-Content-Type-Options': 'nosniff' } });
+  return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' } });
 }
 const nav = (current) => `<nav class="pages" aria-label="Legal pages">${Object.entries(LEGAL_TITLES).map(([slug, t]) =>
   `<a href="/legal/${slug}"${slug === current ? ' aria-current="page"' : ''}>${esc(t)}</a>`).join('')}</nav>`;

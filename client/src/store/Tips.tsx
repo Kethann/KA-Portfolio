@@ -15,13 +15,15 @@ export function Tips({ initialTip }: { initialTip?: string | null }){
   const [error, setError] = useState('');
   const [open, setOpen] = useState<string | null>(initialTip || null);
   const [attempt, setAttempt] = useState(0);
+  const quiet = useRef(false);   // a background refresh after a publish: no loading state
   const q = useDebounced(query.trim(), 250);
   const listTop = useRef<HTMLDivElement>(null);
   const lastOpener = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const ctrl = new AbortController();
-    setState('loading');
+    if (!quiet.current) setState('loading');
+    quiet.current = false;
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     if (category) params.set('category', category);
@@ -32,6 +34,13 @@ export function Tips({ initialTip }: { initialTip?: string | null }){
     }).catch(e => { if (e.name !== 'AbortError'){ setError(e.message); setState('error'); } });
     return () => ctrl.abort();
   }, [q, category, page, attempt]);
+
+  // a tip was published or changed in the portal: re-read the first page quietly
+  useEffect(() => {
+    const on = () => { if (page === 0){ quiet.current = true; setAttempt(a => a + 1); } };
+    addEventListener('ka-content-changed', on);
+    return () => removeEventListener('ka-content-changed', on);
+  }, [page]);
 
   // new search or filter starts from the first page
   useEffect(() => { setPage(0); }, [q, category]);

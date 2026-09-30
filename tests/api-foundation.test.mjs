@@ -27,7 +27,7 @@ test('portfolio is seeded once and keeps the shape the homepage reads', async ()
   assert.equal(a.status, 200);
   assert.equal(a.json.revision, b.json.revision);
   assert(a.json.images.every(i => i.slug && i.title && i.cat));
-  assert.match(a.headers.get('cache-control'), /s-maxage/);
+  assert.equal(a.headers.get('cache-control'), 'no-cache', 'revalidated every time, so a publish shows at once'); assert.ok(a.headers.get('etag'));
 });
 
 test('contact stores the message, lowercases the email and notifies the owner', async () => {

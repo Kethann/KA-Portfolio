@@ -12,8 +12,23 @@ import { readFileSync } from 'node:fs';
 // new URL(..., import.meta.url) lets Vercel's file tracer see and bundle the JSON (createRequire it can't).
 const seed = JSON.parse(readFileSync(new URL('../portfolio-seed.json', import.meta.url), 'utf8'));
 
-// Short shared caching for public, non-personal reads; edits show up within seconds.
-export const PUBLIC_CACHE = { 'Cache-Control': 'public, max-age=0, s-maxage=10, stale-while-revalidate=60' };
+// Public, non-personal reads are never kept by a CDN and are rechecked by the browser every time, so a
+// publish from the portal shows up on the very next request. The router adds an ETag, so an unchanged
+// answer costs a tiny 304 instead of the whole document.
+export const PUBLIC_CACHE = { 'Cache-Control': 'no-cache' };
+
+// The content version: bumped after every successful change made in the portal. Open pages ask for it
+// every few seconds (a few bytes) and reload their content only when it moves.
+export async function liveVersion(){
+  const db = await getDb();
+  const row = await db.maybeOne(`select revision from settings where key = 'live'`);
+  return json({ v: row ? row.revision : 0 });
+}
+export async function bumpLiveVersion(){
+  const db = await getDb();
+  await db.query(`insert into settings (key, value) values ('live', '{}'::jsonb)
+    on conflict (key) do update set revision = settings.revision + 1, updated_at = now()`);
+}
 
 export function currencyFor(country){ return country === 'IN' ? 'INR' : 'USD'; }
 

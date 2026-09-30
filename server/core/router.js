@@ -7,7 +7,7 @@
 //   webhook  no origin check; the handler verifies the provider's signature itself
 import { HttpError, errorResponse, assertSameOrigin, json } from './http.js';
 import { env } from './env.js';
-import { safeEqual } from './crypto.js';
+import { safeEqual, sha256hex } from './crypto.js';
 
 export function createRouter(){
   const routes = [];
@@ -39,7 +39,12 @@ export function createRouter(){
           assertSameOrigin(request, []);          // the portal is same-origin only, for every method
           await guards.admin(ctx);
         }
-        const res = await r.handler(ctx);
+        let res = await r.handler(ctx);
+        // a change made in the portal: tell open pages their content moved (never fails the request)
+        if (r.access === 'admin' && request.method !== 'GET' && request.method !== 'HEAD' && res.ok && guards.afterAdminWrite)
+          await Promise.resolve().then(() => guards.afterAdminWrite(ctx)).catch(() => {});
+        // revalidated public reads get an ETag, so "nothing changed" is a 304 without a body
+        if (res.status === 200 && (request.method === 'GET' || request.method === 'HEAD') && res.headers.get('cache-control') === 'no-cache') res = await withEtag(request, res);
         return res;
       } catch (err){
         if (!(err instanceof HttpError)) logError(r, err);
@@ -51,6 +56,16 @@ export function createRouter(){
   }
   function setGuard(access, fn){ guards[access] = fn; }
   return { route, dispatch, routes, setGuard };
+}
+
+async function withEtag(request, res){
+  const body = await res.text();
+  const etag = `W/"${sha256hex(body).slice(0, 32)}"`;
+  const headers = new Headers(res.headers);
+  headers.set('ETag', etag);
+  const tags = (request.headers.get('if-none-match') || '').split(',').map(s => s.trim());
+  if (tags.includes(etag) || tags.includes('*')){ headers.delete('Content-Length'); return new Response(null, { status: 304, headers }); }
+  return new Response(request.method === 'HEAD' ? null : body, { status: res.status, headers });
 }
 
 function allowedOrigins(){

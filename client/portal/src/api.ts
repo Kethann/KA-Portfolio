@@ -16,6 +16,11 @@ export function onDataChanged(fn: (path: string) => void){
   const h = (e: Event) => fn((e as CustomEvent<string>).detail);
   window.addEventListener(CHANGED, h); return () => window.removeEventListener(CHANGED, h);
 }
+// Site tabs open in this browser pick up a publish at once (others notice within 15 seconds).
+let live: BroadcastChannel | null = null;
+function tellSiteTabs(){
+  try { (live ||= new BroadcastChannel('ka-live')).postMessage('changed'); } catch { /* old browser: they still poll */ }
+}
 export function onSignedOut(fn: () => void){ window.addEventListener(SIGNED_OUT, fn); return () => window.removeEventListener(SIGNED_OUT, fn); }
 
 export async function api<T = any>(method: string, path: string, body?: unknown, opts: { signal?: AbortSignal; raw?: boolean } = {}): Promise<T>{
@@ -39,7 +44,10 @@ export async function api<T = any>(method: string, path: string, body?: unknown,
     if (res.status === 401 && (code === 'signed_out' || !code) && !path.startsWith('/login') && !path.startsWith('/setup')) window.dispatchEvent(new Event(SIGNED_OUT));
     throw new ApiError(message, res.status, code, data);
   }
-  if (method !== 'GET' && !/^\/(login|logout|setup|markdown|search|uploads$)/.test(path)) window.dispatchEvent(new CustomEvent(CHANGED, { detail: path }));
+  if (method !== 'GET' && !/^\/(login|logout|setup|markdown|search|uploads$)/.test(path)){
+    window.dispatchEvent(new CustomEvent(CHANGED, { detail: path }));
+    tellSiteTabs();
+  }
   return data as T;
 }
 

@@ -28,6 +28,13 @@ export function Store({ onBuy, onResend, initialProduct }: StoreProps){
     return () => ctrl.abort();
   }, []);
   useEffect(load, [load]);
+  // something was published in the portal: re-read the catalog quietly (what's on screen stays until the new list arrives)
+  useEffect(() => {
+    let stop: (() => void) | undefined;
+    const on = () => { stop?.(); stop = load(); };
+    addEventListener('ka-content-changed', on);
+    return () => { removeEventListener('ka-content-changed', on); stop?.(); };
+  }, [load]);
 
   // Currency: remembered choice first, otherwise the country suggestion from the server.
   useEffect(() => {
