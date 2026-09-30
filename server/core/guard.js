@@ -1,14 +1,12 @@
 // Abuse protection shared by public endpoints: database-backed rate limits (work across
 // serverless instances) and Cloudflare Turnstile verification.
-import { getDb } from './db.js';
+import { rateLimitHit } from './atomic.js';
 import { env, isProduction } from './env.js';
 import { HttpError } from './http.js';
 
 // Throws 429 when `key` has been used more than `max` times in `windowSeconds`.
 export async function rateLimit(key, max, windowSeconds){
-  const db = await getDb();
-  const row = await db.one('select rate_limit_hit($1, $2, $3) as ok', [key, windowSeconds, max]);
-  if (!row.ok) throw new HttpError(429, 'Too many attempts. Please wait a few minutes and try again.', { retryAfter: windowSeconds, code: 'rate_limited' });
+  if (!await rateLimitHit(key, windowSeconds, max)) throw new HttpError(429, 'Too many attempts. Please wait a few minutes and try again.', { retryAfter: windowSeconds, code: 'rate_limited' });
 }
 
 // Turnstile. Fails closed in production when the secret is missing; outside production it can be

@@ -14,6 +14,10 @@ import { mapDbError } from './catalog.js';
 import { audit } from './auth.js';
 
 const TZ = 'Asia/Kolkata';
+// Reports group by India time. IST is a fixed +05:30 (no daylight saving), so shifting the stored UTC time by
+// 330 minutes gives exactly the Asia/Kolkata calendar day / ISO week (Monday) / month.
+export const istPeriod = (col, group = 'day') => group === 'month' ? `strftime('%Y-%m-01', ${col}, '+330 minutes')`
+  : group === 'week' ? `date(${col}, '+330 minutes', 'weekday 0', '-6 days')` : `strftime('%Y-%m-%d', ${col}, '+330 minutes')`;
 
 // "YYYY-MM-DD" (IST) date range -> UTC instants; defaults to the last 30 days
 export function range(url){
@@ -45,28 +49,28 @@ const PAID = `('paid','delivered','refunded')`;
 export async function overview(ctx){
   const { from, to, start, end } = range(ctx.url);
   const db = await getDb();
-  const revenue = await db.query(`select currency, coalesce(sum(total),0)::bigint as gross, coalesce(sum(coalesce(refund_amount,0)) filter (where status='refunded'),0)::bigint as refunded, count(*)::int as orders
+  const revenue = await db.query(`select currency, coalesce(sum(total),0) as gross, coalesce(sum(coalesce(refund_amount,0)) filter (where status='refunded'),0) as refunded, count(*) as orders
     from orders where status in ${PAID} and not is_free and paid_at >= $1 and paid_at < $2 group by currency`, [start, end]);
   const counts = await db.one(`select
-      count(*) filter (where status in ${PAID})::int as paid,
-      count(*) filter (where is_free and status in ${PAID})::int as free,
-      count(*) filter (where status = 'failed')::int as failed,
-      count(*) filter (where status = 'mismatch')::int as mismatch,
-      count(*)::int as started
+      count(*) filter (where status in ${PAID}) as paid,
+      count(*) filter (where is_free and status in ${PAID}) as free,
+      count(*) filter (where status = 'failed') as failed,
+      count(*) filter (where status = 'mismatch') as mismatch,
+      count(*) as started
     from orders where created_at >= $1 and created_at < $2`, [start, end]);
-  const failedAttempts = (await db.one(`select count(*)::int as n from order_events where type = 'payment_failed' and created_at >= $1 and created_at < $2`, [start, end])).n;
-  const top = await db.query(`select i.product_id, i.title, o.currency, count(*)::int as sold, sum(i.total)::bigint as revenue
+  const failedAttempts = (await db.one(`select count(*) as n from order_events where type = 'payment_failed' and created_at >= $1 and created_at < $2`, [start, end])).n;
+  const top = await db.query(`select i.product_id, i.title, o.currency, count(*) as sold, sum(i.total) as revenue
     from order_items i join orders o on o.id = i.order_id where o.status in ('paid','delivered') and o.paid_at >= $1 and o.paid_at < $2
     group by i.product_id, i.title, o.currency order by sold desc, revenue desc limit 8`, [start, end]);
-  const series = await db.query(`select to_char(date_trunc('day', paid_at at time zone '${TZ}'), 'YYYY-MM-DD') as day, currency, sum(total)::bigint as revenue, count(*)::int as orders
+  const series = await db.query(`select ${istPeriod('paid_at')} as day, currency, sum(total) as revenue, count(*) as orders
     from orders where status in ('paid','delivered') and not is_free and paid_at >= $1 and paid_at < $2 group by 1, 2 order by 1`, [start, end]);
-  const visitors = await db.one(`select count(distinct session_id)::int as sessions from visits where visited_at >= $1 and visited_at < $2 and not is_bot`, [start, end]);
-  const live = await db.one(`select count(distinct session_id)::int as n from visits where last_seen_at > now() - interval '5 minutes' and not is_bot`);
+  const visitors = await db.one(`select count(distinct session_id) as sessions from visits where visited_at >= $1 and visited_at < $2 and not is_bot`, [start, end]);
+  const live = await db.one(`select count(distinct session_id) as n from visits where last_seen_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-5 minutes') and not is_bot`);
   // `target` is what the portal opens when the line is clicked (the order or message itself)
-  const activity = await db.query(`(select 'order' as kind, e.type as what, o.public_id as ref, o.email as who, e.created_at as at, o.id::text as target from order_events e join orders o on o.id = e.order_id
+  const activity = await db.query(`select * from (select 'order' as kind, e.type as what, o.public_id as ref, o.email as who, e.created_at as at, o.id as target from order_events e join orders o on o.id = e.order_id
         where e.type in ('paid','delivered','refunded','payment_failed','mismatch','delivery_email_failed','refund_requested') order by e.created_at desc limit 12)
-    union all (select 'message', status, subject, email, created_at, id::text from messages where status <> 'spam' order by created_at desc limit 6)
-    union all (select 'signup', topic, topic, email, created_at, null from notify_signups order by created_at desc limit 4)
+    union all select * from (select 'message', status, subject, email, created_at, id from messages where status <> 'spam' order by created_at desc limit 6)
+    union all select * from (select 'signup', topic, topic, email, created_at, null from notify_signups order by created_at desc limit 4)
     order by at desc limit 15`);
   return json({ from, to, revenue, counts: { ...counts, failedAttempts }, conversion: counts.started ? Math.round((counts.paid / counts.started) * 1000) / 10 : null,
     top, series, visitors: visitors.sessions, liveVisitors: live.n, activity });
@@ -77,7 +81,7 @@ function orderFilters(url){
   const where = [], args = [];
   const add = (sql, v) => { args.push(v); where.push(sql.replace('?', `$${args.length}`)); };
   const status = url.searchParams.get('status');
-  if (status === 'attention') where.push(`(o.status = 'mismatch' or (o.status = 'paid' and o.paid_at < now() - interval '30 minutes'))`);
+  if (status === 'attention') where.push(`(o.status = 'mismatch' or (o.status = 'paid' and o.paid_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-30 minutes')))`);
   else if (status && /^[a-z]{3,12}$/.test(status)) add('o.status = ?', status);
   const cur = url.searchParams.get('currency');
   if (cur === 'INR' || cur === 'USD') add('o.currency = ?', cur);
@@ -89,8 +93,8 @@ function orderFilters(url){
 const ORDER_ROW = `select o.id, o.public_id, o.email, o.currency, o.subtotal, o.discount, o.tax, o.total, o.status, o.is_free, o.invoice_number, o.country,
   o.created_at, o.paid_at, o.delivered_at, o.refunded_at, o.razorpay_payment_id, o.refund_id, o.payment_method,
   o.signature_verified_at, o.api_verified_at, o.captured_at, o.refund_amount,   -- the order screen's Verified and Refunded rows
-  (select string_agg(i.title, ', ') from order_items i where i.order_id = o.id) as items,
-  (select string_agg(c.code, ', ') from coupon_redemptions r join coupons c on c.id = r.coupon_id where r.order_id = o.id and r.status <> 'released') as codes
+  (select group_concat(i.title, ', ') from order_items i where i.order_id = o.id) as items,
+  (select group_concat(c.code, ', ') from coupon_redemptions r join coupons c on c.id = r.coupon_id where r.order_id = o.id and r.status <> 'released') as codes
   from orders o`;
 
 export async function listOrders(ctx){
@@ -99,7 +103,7 @@ export async function listOrders(ctx){
   const offset = Math.max(0, Number(ctx.url.searchParams.get('offset')) || 0);
   const db = await getDb();
   const rows = await db.query(`${ORDER_ROW} ${where} order by o.created_at desc limit ${limit + 1} offset ${offset}`, args);
-  const total = (await db.one(`select count(*)::int as n from orders o ${where}`, args)).n;
+  const total = (await db.one(`select count(*) as n from orders o ${where}`, args)).n;
   return json({ orders: rows.slice(0, limit), total, hasMore: rows.length > limit });
 }
 
@@ -127,7 +131,7 @@ export async function ordersCsv(ctx){
 
 export async function getOrder(ctx){
   const db = await getDb();
-  const o = await db.maybeOne(`${ORDER_ROW} where o.id::text = $1 or o.public_id = $1`, [ctx.params.id]);
+  const o = await db.maybeOne(`${ORDER_ROW} where o.id = $1 or o.public_id = $1`, [ctx.params.id]);
   if (!o) throw new HttpError(404, 'Order not found.');
   const [items, events, downloads, links] = await Promise.all([
     db.query('select i.*, p.slug from order_items i left join products p on p.id = i.product_id where i.order_id = $1 order by i.id', [o.id]),
@@ -142,7 +146,7 @@ export async function getOrder(ctx){
 
 export async function resendOrder(ctx){
   const db = await getDb();
-  const o = await db.maybeOne('select * from orders where id::text = $1', [ctx.params.id]);
+  const o = await db.maybeOne('select * from orders where id = $1', [ctx.params.id]);
   if (!o) throw new HttpError(404, 'Order not found.');
   if (!['paid', 'delivered'].includes(o.status)) throw new HttpError(409, 'Only paid orders can get download links.');
   const items = await db.query('select i.product_id, i.title, p.link_ttl_hours from order_items i join products p on p.id = i.product_id where i.order_id = $1', [o.id]);
@@ -162,7 +166,7 @@ export async function resendOrder(ctx){
 
 export async function resendReceipt(ctx){
   const db = await getDb();
-  const o = await db.maybeOne('select * from orders where id::text = $1', [ctx.params.id]);
+  const o = await db.maybeOne('select * from orders where id = $1', [ctx.params.id]);
   if (!o || o.is_free || !o.invoice_number) throw new HttpError(404, 'This order has no receipt.');
   const items = await db.query('select i.*, i.title as product_title from order_items i where i.order_id = $1', [o.id]);
   const res = await sendReceipt(o, items);
@@ -180,7 +184,7 @@ export async function refund(ctx){
 
 export async function revokeLink(ctx){
   const db = await getDb();
-  await db.query('update download_tokens set revoked_at = coalesce(revoked_at, now()) where id::text = $1', [ctx.params.id]);
+  await db.query('update download_tokens set revoked_at = coalesce(revoked_at, now()) where id = $1', [ctx.params.id]);
   await audit(ctx, 'link_revoked', ctx.params.id);
   return json({ ok: true });
 }
@@ -188,7 +192,7 @@ export async function revokeLink(ctx){
 // Printable invoice (browser "Save as PDF").
 export async function invoice(ctx){
   const db = await getDb();
-  const o = await db.maybeOne('select * from orders where id::text = $1', [ctx.params.id]);
+  const o = await db.maybeOne('select * from orders where id = $1', [ctx.params.id]);
   if (!o || !o.invoice_number) throw new HttpError(404, 'This order has no invoice.');
   const items = await db.query('select * from order_items where order_id = $1', [o.id]);
   const store = await getSetting('store');
@@ -242,8 +246,8 @@ function couponInput(b){
 }
 export async function listCoupons(){
   const db = await getDb();
-  const rows = await db.query(`select c.*, (select count(*)::int from coupon_redemptions r where r.coupon_id = c.id and r.status = 'confirmed') as confirmed_uses,
-    (select json_agg(json_build_object('currency', x.currency, 'discount', x.s)) from (select currency, sum(amount)::bigint as s from coupon_redemptions r where r.coupon_id = c.id and r.status = 'confirmed' group by currency) x) as given
+  const rows = await db.query(`select c.*, (select count(*) from coupon_redemptions r where r.coupon_id = c.id and r.status = 'confirmed') as confirmed_uses,
+    (select json_group_array(json_object('currency', x.currency, 'discount', x.s)) from (select currency, sum(amount) as s from coupon_redemptions r where r.coupon_id = c.id and r.status = 'confirmed' group by currency) x) as given
     from coupons c order by c.created_at desc`);
   return json({ coupons: rows });
 }
@@ -252,7 +256,7 @@ export async function saveCoupon(ctx){
   const db = await getDb();
   const cols = Object.keys(v);
   try {
-    if (ctx.params.id) await db.query(`update coupons set ${cols.map((c, i) => `${c} = $${i + 2}`).join(', ')} where id::text = $1`, [ctx.params.id, ...cols.map(c => v[c])]);
+    if (ctx.params.id) await db.query(`update coupons set ${cols.map((c, i) => `${c} = $${i + 2}`).join(', ')} where id = $1`, [ctx.params.id, ...cols.map(c => v[c])]);
     else await db.query(`insert into coupons (${cols.join(',')}) values (${cols.map((_, i) => `$${i + 1}`).join(',')})`, cols.map(c => v[c]));
   } catch (err){ throw mapDbError(err) || err; }
   await audit(ctx, 'coupon_saved', v.code);
@@ -261,21 +265,21 @@ export async function saveCoupon(ctx){
 export async function pauseCoupon(ctx){
   const b = await readJson(ctx.request, 1024);
   const db = await getDb();
-  await db.query('update coupons set paused = $2 where id::text = $1', [ctx.params.id, !!b.paused]);
+  await db.query('update coupons set paused = $2 where id = $1', [ctx.params.id, !!b.paused]);
   await audit(ctx, b.paused ? 'coupon_paused' : 'coupon_resumed', ctx.params.id);
   return listCoupons();
 }
 export async function deleteCoupon(ctx){
   const db = await getDb();
-  const used = await db.maybeOne(`select 1 from coupon_redemptions where coupon_id::text = $1 and status <> 'released'`, [ctx.params.id]);
+  const used = await db.maybeOne(`select 1 from coupon_redemptions where coupon_id = $1 and status <> 'released'`, [ctx.params.id]);
   if (used) throw new HttpError(409, 'This code has been used, so it can only be paused (its history stays in reports).');
-  await db.query('delete from coupons where id::text = $1', [ctx.params.id]);
+  await db.query('delete from coupons where id = $1', [ctx.params.id]);
   return listCoupons();
 }
 export async function couponUsage(ctx){
   const db = await getDb();
   const rows = await db.query(`select r.status, r.amount, r.currency, r.email, r.created_at, o.public_id, o.id as order_id from coupon_redemptions r join orders o on o.id = r.order_id
-    where r.coupon_id::text = $1 order by r.created_at desc limit 500`, [ctx.params.id]);
+    where r.coupon_id = $1 order by r.created_at desc limit 500`, [ctx.params.id]);
   return json({ uses: rows });
 }
 
@@ -297,18 +301,18 @@ export async function reportData(url){
   const db = await getDb();
   const p = [start, end];
   const [byPeriod, byProduct, byCurrency, byCountry, coupons, refunds, dls] = await Promise.all([
-    db.query(`select to_char(date_trunc('${group}', paid_at at time zone '${TZ}'), 'YYYY-MM-DD') as period, currency, count(*)::int as orders, sum(total)::bigint as revenue
+    db.query(`select ${istPeriod('paid_at', group)} as period, currency, count(*) as orders, sum(total) as revenue
       from orders where status in ('paid','delivered') and not is_free and paid_at >= $1 and paid_at < $2 group by 1, 2 order by 1`, p),
-    db.query(`select i.title, o.currency, count(*)::int as sold, sum(i.total)::bigint as revenue from order_items i join orders o on o.id = i.order_id
+    db.query(`select i.title, o.currency, count(*) as sold, sum(i.total) as revenue from order_items i join orders o on o.id = i.order_id
       where o.status in ('paid','delivered') and o.paid_at >= $1 and o.paid_at < $2 group by 1, 2 order by revenue desc nulls last`, p),
-    db.query(`select currency, count(*)::int as orders, sum(total)::bigint as revenue, sum(discount)::bigint as discounts from orders
+    db.query(`select currency, count(*) as orders, sum(total) as revenue, sum(discount) as discounts from orders
       where status in ('paid','delivered') and not is_free and paid_at >= $1 and paid_at < $2 group by 1`, p),
-    db.query(`select coalesce(country, '—') as country, currency, count(*)::int as orders, sum(total)::bigint as revenue from orders
+    db.query(`select coalesce(country, '—') as country, currency, count(*) as orders, sum(total) as revenue from orders
       where status in ('paid','delivered') and paid_at >= $1 and paid_at < $2 group by 1, 2 order by orders desc limit 50`, p),
-    db.query(`select c.code, r.currency, count(*)::int as uses, sum(r.amount)::bigint as discount from coupon_redemptions r join coupons c on c.id = r.coupon_id join orders o on o.id = r.order_id
+    db.query(`select c.code, r.currency, count(*) as uses, sum(r.amount) as discount from coupon_redemptions r join coupons c on c.id = r.coupon_id join orders o on o.id = r.order_id
       where r.status = 'confirmed' and o.paid_at >= $1 and o.paid_at < $2 group by 1, 2 order by uses desc`, p),
-    db.query(`select currency, count(*)::int as refunds, sum(coalesce(refund_amount, total))::bigint as amount from orders where status = 'refunded' and refunded_at >= $1 and refunded_at < $2 group by 1`, p),
-    db.query(`select coalesce(pr.title, '—') as title, count(*)::int as downloads from download_events e left join products pr on pr.id = e.product_id
+    db.query(`select currency, count(*) as refunds, sum(coalesce(refund_amount, total)) as amount from orders where status = 'refunded' and refunded_at >= $1 and refunded_at < $2 group by 1`, p),
+    db.query(`select coalesce(pr.title, '—') as title, count(*) as downloads from download_events e left join products pr on pr.id = e.product_id
       where e.created_at >= $1 and e.created_at < $2 group by 1 order by downloads desc`, p)
   ]);
   return { from, to, group, byPeriod, byProduct, byCurrency, byCountry, coupons, refunds, downloads: dls };

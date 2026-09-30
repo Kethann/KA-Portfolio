@@ -83,7 +83,7 @@ test('login: generic errors, session works, CSRF and cross-site requests refused
 
 test('sessions: idle timeout, revoke, logout everywhere, password change ends other sessions', async () => {
   const first = { ...(await signIn(), S) };
-  await app.pg.query(`update admin_sessions set last_seen_at = now() - interval '3 hours' where revoked_at is null`);
+  await app.pg.query(`update admin_sessions set last_seen_at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-3 hours') where revoked_at is null`);
   assert.equal((await admin('GET', '/api/admin/products')).status, 401, 'idle session expired');
   await signIn(); const a = S;
   await signIn(); const b = S;

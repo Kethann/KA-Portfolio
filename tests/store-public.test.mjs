@@ -34,9 +34,9 @@ test('prices: manual per currency, integers only, sales only inside their window
 test('catalog lists published products only, with both currencies and category', async () => {
   const [cat] = (await app.pg.query(`insert into categories (kind, name, slug) values ('artifacts','Templates','templates') returning id`)).rows;
   await app.pg.query(`insert into products (kind, slug, title, status, sellable, price_inr, price_usd, category_id, tech_tags) values
-    ('artifacts','ui-kit','UI Kit','published',true,149900,2900,$1,'{React,Figma}'),
-    ('artifacts','secret-draft','Draft','draft',true,100,100,null,'{}'),
-    ('artzz','poster-1','Poster','published',false,null,null,null,'{}')`, [cat.id]);
+    ('artifacts','ui-kit','UI Kit','published',true,149900,2900,$1,'["React","Figma"]'),
+    ('artifacts','secret-draft','Draft','draft',true,100,100,null,'[]'),
+    ('artzz','poster-1','Poster','published',false,null,null,null,'[]')`, [cat.id]);
   const res = await app.call('GET', '/api/store/catalog');
   assert.equal(res.status, 200);
   const slugs = res.json.products.map(p => p.slug).sort();
@@ -57,7 +57,7 @@ test('tips: search, categories, paging, and published only', async () => {
   const [cat] = (await app.pg.query(`insert into categories (kind, name, slug) values ('tips','Color','color') returning id`)).rows;
   await app.pg.query(`insert into tips (slug, title, excerpt, body_md, status, published_at, category_id) values
     ('warm-palettes','Warm palettes for posters','Use bronze', '## Why\nWarm **bronze** tones.', 'published', now(), $1),
-    ('typography-scale','A type scale that works','Scale', 'Body', 'published', now() - interval '1 day', null),
+    ('typography-scale','A type scale that works','Scale', 'Body', 'published', strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day'), null),
     ('hidden','Hidden draft','x','x','draft', null, null)`, [cat.id]);
   const all = await app.call('GET', '/api/tips');
   assert.deepEqual(all.json.tips.map(t => t.slug), ['warm-palettes', 'typography-scale']);
@@ -86,5 +86,5 @@ test('markdown renders a safe subset and never lets HTML or scripts through', ()
   assert.match(html, /<a href="https:\/\/example.com" target="_blank" rel="noopener noreferrer nofollow">ok<\/a>/);
   assert.match(html, /<a href="\/store">site<\/a>/);
   assert.match(html, /<img src="https:\/\/cdn.example.com\/a.png" alt="y"/);
-  assert.equal(toPrefixQuery("a' | b:* & (c)"), 'a:* & b:* & c:*');
+  assert.equal(toPrefixQuery("a' | b:* & (c)"), '"a"* "b"* "c"*');
 });

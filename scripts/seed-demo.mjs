@@ -5,18 +5,18 @@ import { config } from 'dotenv';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setEnvSource, isProduction } from '../server/core/env.js';
-import { getDb, setDatabase, wrapPglite } from '../server/core/db.js';
+import { getDb, setDatabase } from '../server/core/db.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 config({ path: resolve(root, '.env') });
 process.env.KA_DATA_DIR ||= resolve(root, '.data');
 setEnvSource(process.env);
-if (isProduction() || process.env.DATABASE_URL){
-  console.error('Refusing to seed demo data into a configured/live database. Unset DATABASE_URL to seed the local one.');
+if (isProduction() || false){
+  console.error('Refusing to seed demo data into a live database.');
   process.exit(1);
 }
-const { openPglite } = await import('../server/dev/pglite.js');
-setDatabase(wrapPglite(await openPglite(resolve(process.env.KA_DATA_DIR || resolve(root, '.data'), 'pglite'))));
+const { openSqlite } = await import('../server/dev/sqlite.js');
+setDatabase(openSqlite(resolve(process.env.KA_DATA_DIR || resolve(root, '.data'), 'ka.sqlite')));
 const db = await getDb();
 
 async function category(kind, name, slug, sort){

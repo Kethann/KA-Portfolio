@@ -20,7 +20,7 @@ export async function issueToken(orderId, productId, channel, siteUrl){
   const p = await db.one('select link_ttl_hours, max_downloads from products where id = $1', [productId]);
   const token = randomToken(32);
   await db.query(`insert into download_tokens (order_id, product_id, token_hash, expires_at, max_downloads, channel)
-    values ($1, $2, $3, now() + make_interval(hours => $4), $5, $6)`, [orderId, productId, sha256hex(token), p.link_ttl_hours, p.max_downloads, channel]);
+    values ($1, $2, $3, strftime('%Y-%m-%dT%H:%M:%fZ','now','+' || $4 || ' hours'), $5, $6)`, [orderId, productId, sha256hex(token), p.link_ttl_hours, p.max_downloads, channel]);
   return `${siteUrl}/api/download/${token}`;
 }
 
@@ -158,19 +158,17 @@ export async function redeem({ token, ip, country, userAgent, siteUrl }){
   const db = await getDb();
   const file = await db.maybeOne('select storage_path, filename from product_files where product_id = $1 and is_current', [pre.t.product_id]);
   if (!file) return errorPage('missing', siteUrl);
-  const counted = await db.tx(async (tx) => {
-    const row = await tx.maybeOne(`update download_tokens set download_count = download_count + 1
-      where token_hash = $1 and revoked_at is null and expires_at > now() and download_count < max_downloads
-      returning id, order_id, product_id`, [sha256hex(token)]);
-    if (!row) return null;
-    const o = await tx.one('select status from orders where id = $1', [row.order_id]);
-    if (o_blocked(o.status)) throw Object.assign(new Error('blocked'), { blocked: true });
-    await tx.query('insert into download_events (token_id, order_id, product_id, ip, country, user_agent) values ($1,$2,$3,$4,$5,$6)',
-      [row.id, row.order_id, row.product_id, ip, country, String(userAgent || '').slice(0, 300)]);
-    return row;
-  }).catch((err) => { if (err.blocked) return 'blocked'; throw err; });
-  if (counted === 'blocked') return errorPage('revoked', siteUrl);
-  if (!counted) return errorPage('limit', siteUrl);
+  // one atomic statement: counted only while the link is live, under its limit and the order is still paid
+  const counted = await db.maybeOne(`update download_tokens set download_count = download_count + 1
+    where token_hash = $1 and revoked_at is null and expires_at > now() and download_count < max_downloads
+      and exists (select 1 from orders o where o.id = download_tokens.order_id and o.status in ('paid','delivered'))
+    returning id, order_id, product_id`, [sha256hex(token)]);
+  if (!counted){
+    const again = await lookup(token);   // why not: refunded/revoked, expired, or the limit was just reached
+    return errorPage(again.error === 'revoked' ? 'revoked' : again.error === 'expired' ? 'expired' : 'limit', siteUrl);
+  }
+  await db.query('insert into download_events (token_id, order_id, product_id, ip, country, user_agent) values ($1,$2,$3,$4,$5,$6)',
+    [counted.id, counted.order_id, counted.product_id, ip, country, String(userAgent || '').slice(0, 300)]).catch(() => {});   // the log never blocks a download
   const url = await getStorage().signedUrl('deliverables', file.storage_path, SIGNED_URL_SECONDS, file.filename);
   return new Response(null, { status: 303, headers: { Location: url, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
 }

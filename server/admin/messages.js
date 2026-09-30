@@ -1,6 +1,6 @@
 // Portal: inbox (contact form + assistant hand-offs), replies, labels, canned replies, blocklist.
 import { json, readJson, HttpError } from '../core/http.js';
-import { getDb } from '../core/db.js';
+import { getDb, ftsQuery } from '../core/db.js';
 import { sendEmail } from '../core/email.js';
 import { str, stringArray, uuid as vUuid } from '../core/validate.js';
 import { audit } from './auth.js';
@@ -15,18 +15,18 @@ export async function listMessages(ctx){
   if (status === 'inbox') where.push(`status in ('new','read')`);
   else if (STATUSES.includes(status)) add('status = ?', status);
   else where.push(`status <> 'spam'`);
-  if (u.get('label')) add('? = any(labels)', u.get('label').slice(0, 40));
+  if (u.get('label')) add('exists (select 1 from json_each(labels) where value = ?)', u.get('label').slice(0, 40));
   if (['contact', 'assistant', 'system'].includes(u.get('source'))) add('source = ?', u.get('source'));
-  const q = (u.get('q') || '').trim().slice(0, 100);
-  if (q) add(`search @@ plainto_tsquery('simple', ?)`, q);
+  const q = ftsQuery((u.get('q') || '').trim().slice(0, 100));
+  if (q) add(`rowid in (select rowid from messages_fts where messages_fts match ?)`, q);
   const limit = Math.min(200, Math.max(1, Number(u.get('limit')) || 50)), offset = Math.max(0, Number(u.get('offset')) || 0);
   const db = await getDb();
   const w = where.length ? `where ${where.join(' and ')}` : '';
-  const rows = await db.query(`select id, source, name, email, subject, left(body, 240) as preview, status, labels, created_at, replied_at, meta->>'country' as country
+  const rows = await db.query(`select id, source, name, email, subject, substr(body, 1, 240) as preview, status, labels, created_at, replied_at, meta->>'country' as country
     from messages ${w} order by created_at desc limit ${limit + 1} offset ${offset}`, args);
-  const counts = await db.one(`select count(*) filter (where status = 'new')::int as new, count(*) filter (where status in ('new','read'))::int as inbox,
-    count(*) filter (where status = 'spam')::int as spam, count(*) filter (where status = 'done')::int as done from messages`);
-  const labels = (await db.query(`select distinct unnest(labels) as l from messages order by 1 limit 100`)).map(r => r.l);
+  const counts = await db.one(`select count(*) filter (where status = 'new') as new, count(*) filter (where status in ('new','read')) as inbox,
+    count(*) filter (where status = 'spam') as spam, count(*) filter (where status = 'done') as done from messages`);
+  const labels = (await db.query(`select distinct j.value as l from messages, json_each(messages.labels) j order by 1 limit 100`)).map(r => r.l);
   return json({ messages: rows.slice(0, limit), hasMore: rows.length > limit, counts, labels });
 }
 
@@ -58,10 +58,10 @@ export async function bulkMessages(ctx){
   const ids = b.ids.map(x => vUuid(x, 'Message'));
   const db = await getDb();
   if (b.action === 'delete'){
-    await db.query('delete from messages where id = any($1::uuid[])', [ids]);
+    await db.query('delete from messages where id in (select value from json_each($1))', [ids]);
     await audit(ctx, 'messages_deleted', null, { count: ids.length });
   } else if (STATUSES.includes(b.action)){
-    await db.query('update messages set status = $2 where id = any($1::uuid[])', [ids, b.action]);
+    await db.query('update messages set status = $2 where id in (select value from json_each($1))', [ids, b.action]);
   } else throw new HttpError(400, 'Unknown action.');
   return json({ ok: true });
 }
@@ -92,13 +92,13 @@ export async function saveCanned(ctx){
   const b = await readJson(ctx.request, 32 * 1024);
   const title = str(b.title, { name: 'Title', max: 80, required: true }), body = str(b.body, { name: 'Text', max: 10000, required: true, trim: false });
   const db = await getDb();
-  if (ctx.params.id) await db.query('update canned_replies set title = $2, body = $3 where id::text = $1', [ctx.params.id, title, body]);
+  if (ctx.params.id) await db.query('update canned_replies set title = $2, body = $3 where id = $1', [ctx.params.id, title, body]);
   else await db.query('insert into canned_replies (title, body) values ($1, $2)', [title, body]);
   return listCanned();
 }
 export async function deleteCanned(ctx){
   const db = await getDb();
-  await db.query('delete from canned_replies where id::text = $1', [ctx.params.id]);
+  await db.query('delete from canned_replies where id = $1', [ctx.params.id]);
   return listCanned();
 }
 
@@ -123,7 +123,7 @@ export async function addBlock(ctx){
 }
 export async function removeBlock(ctx){
   const db = await getDb();
-  await db.query('delete from blocklist where id::text = $1', [ctx.params.id]);
+  await db.query('delete from blocklist where id = $1', [ctx.params.id]);
   return listBlocklist();
 }
 

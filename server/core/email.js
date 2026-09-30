@@ -1,8 +1,10 @@
-// Transactional email. Production: Brevo's HTTPS API (same free quota as Brevo SMTP; works from
-// serverless functions and from Cloudflare Workers later). Development/tests: messages are
-// written to .data/outbox as .json files. Every send is recorded in email_log (never the body).
+// Transactional email. Production: Gmail over SMTP with a Google App Password (GMAIL_USER +
+// GMAIL_APP_PASSWORD; Gmail's free limit is about 500 emails a day), or Brevo's HTTPS API (BREVO_API_KEY).
+// Development/tests: messages are written to .data/outbox as .json files. Every send is recorded in
+// email_log (never the body).
 import { env, localDataDir } from './env.js';
 import { getDb } from './db.js';
+import { buildMime, smtpSend } from './smtp.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { sep } from 'node:path';
 
@@ -15,9 +17,24 @@ export function setEmailTransport(t){ transport = t; }
 
 function getTransport(){
   if (transport) return transport;
-  if (env('BREVO_API_KEY')) transport = brevoTransport(env('BREVO_API_KEY'));
-  else transport = outboxTransport(at(localDataDir('Email (BREVO_API_KEY)'), 'outbox'));
+  if (env('GMAIL_USER') && env('GMAIL_APP_PASSWORD')) transport = gmailTransport(env('GMAIL_USER'), env('GMAIL_APP_PASSWORD'));
+  else if (env('BREVO_API_KEY')) transport = brevoTransport(env('BREVO_API_KEY'));
+  else transport = outboxTransport(at(localDataDir('Email (GMAIL_USER and GMAIL_APP_PASSWORD)'), 'outbox'));
   return transport;
+}
+
+// Gmail only sends as the signed-in account (or an alias set up in Gmail), so that address is the sender;
+// the display name still comes from MAIL_FROM_NAME / SITE_NAME.
+function gmailTransport(user, appPassword){
+  const pass = String(appPassword).replace(/\s+/g, '');   // Google shows it in groups of four
+  return {
+    kind: 'gmail',
+    async send(msg){
+      const from = { email: user, name: msg.from.name };
+      const message = buildMime({ from, to: msg.to, replyTo: msg.replyTo, subject: msg.subject, text: msg.text, html: msg.html, attachments: msg.attachments });
+      return smtpSend({ user, pass, message, envelopeTo: msg.to });
+    }
+  };
 }
 
 function brevoTransport(apiKey){

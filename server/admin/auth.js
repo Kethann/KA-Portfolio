@@ -43,7 +43,7 @@ async function findSession(ctx){
   if (!token || token.length > 100) return null;
   const db = await getDb();
   return db.maybeOne(`select s.*, u.email, u.role, u.name, u.must_change_password from admin_sessions s join admin_users u on u.id = s.user_id
-    where s.token_hash = $1 and s.revoked_at is null and s.expires_at > now() and s.last_seen_at > now() - make_interval(secs => $2) and u.disabled_at is null`, [sha256hex(token), IDLE_MS / 1000]);
+    where s.token_hash = $1 and s.revoked_at is null and s.expires_at > now() and s.last_seen_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-' || $2 || ' seconds') and u.disabled_at is null`, [sha256hex(token), IDLE_MS / 1000]);
 }
 
 export async function requireAdmin(ctx){
@@ -76,7 +76,7 @@ async function startSession(ctx, userId){
 // Public and always 200, so the portal can choose a screen without a 401 in the browser console.
 export async function setupStatus(ctx){
   const db = await getDb();
-  const n = (await db.one('select count(*)::int as n from admin_users')).n;
+  const n = (await db.one('select count(*) as n from admin_users')).n;
   const signedIn = n > 0 && !!(await findSession(ctx));
   return json({ needsSetup: n === 0, signedIn, setupConfigured: !!env('ADMIN_SETUP_TOKEN') || !isProduction() }, 200, { 'Cache-Control': 'no-store' });
 }
@@ -89,12 +89,10 @@ export async function setup(ctx){
   const email = vEmail(body.email);
   const password = passwordPolicy(body.password);
   const db = await getDb();
-  const user = await db.tx(async (tx) => {
-    await tx.query('lock table admin_users in exclusive mode');
-    const n = (await tx.one('select count(*)::int as n from admin_users')).n;
-    if (n > 0) throw new HttpError(409, 'The owner account already exists. Sign in instead.');
-    return tx.one(`insert into admin_users (email, password_hash, role) values ($1, $2, 'owner') returning id`, [email, await hashPassword(password)]);
-  });
+  // one atomic statement: the owner is created only while nobody exists yet (two racing setups can't both win)
+  const user = await db.maybeOne(`insert into admin_users (email, password_hash, role) select $1, $2, 'owner'
+    where not exists (select 1 from admin_users) returning id`, [email, await hashPassword(password)]);
+  if (!user) throw new HttpError(409, 'The owner account already exists. Sign in instead.');
   await audit(ctx, 'owner_created', email);
   const { cookie, csrf } = await startSession(ctx, user.id);
   return json({ ok: true, csrf, email }, 201, { 'Set-Cookie': cookie });
@@ -172,7 +170,7 @@ export async function listSessions(ctx){
 
 export async function revokeSession(ctx){
   const db = await getDb();
-  await db.query('update admin_sessions set revoked_at = now() where id::text = $1 and user_id = $2', [ctx.params.id, ctx.admin.userId]);
+  await db.query('update admin_sessions set revoked_at = now() where id = $1 and user_id = $2', [ctx.params.id, ctx.admin.userId]);
   await audit(ctx, 'session_revoked', ctx.params.id);
   return json({ ok: true });
 }

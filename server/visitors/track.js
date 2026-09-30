@@ -48,7 +48,7 @@ export async function visit(ctx){
         geo?.timezone || clip(body.z, 60) || null, clip(body.l, 20) || null, u.device_type, u.device_vendor, u.device_model, u.os, u.os_version, u.browser, u.browser_version,
         int(body.w, 20000), int(body.h, 20000), BOT.test(ua) || !ua, ua]);
   } else {
-    await db.query(`update visits set last_seen_at = now(), duration_ms = greatest(coalesce(duration_ms, 0), $2)
+    await db.query(`update visits set last_seen_at = now(), duration_ms = max(coalesce(duration_ms, 0), $2)
       where id = (select id from visits where session_id = $1 order by visited_at desc limit 1)`, [sid, int(body.d, 24 * 3600e3) || 0]);
   }
   return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
@@ -58,8 +58,8 @@ export async function visit(ctx){
 onDaily('visitRetention', async () => {
   const db = await getDb();
   const { retentionDays } = await getSetting('visitors');
-  const removed = retentionDays > 0 ? (await db.query(`delete from visits where visited_at < now() - make_interval(days => $1) returning 1`, [retentionDays])).length : 0;
-  await db.query(`delete from ip_geo_cache where looked_up_at < now() - interval '30 days'`);
+  const removed = retentionDays > 0 ? (await db.query(`delete from visits where visited_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-' || $1 || ' days') returning 1`, [retentionDays])).length : 0;
+  await db.query(`delete from ip_geo_cache where looked_up_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-30 days')`);
   return { removed };
 });
 

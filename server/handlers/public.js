@@ -8,9 +8,8 @@ import { str, email as vEmail } from '../core/validate.js';
 import { sendEmail } from '../core/email.js';
 import { isBlocked } from '../core/blocklist.js';
 import { demoPaymentsEnabled } from '../store/orders.js';
-import { readFileSync } from 'node:fs';
-// new URL(..., import.meta.url) lets Vercel's file tracer see and bundle the JSON (createRequire it can't).
-const seed = JSON.parse(readFileSync(new URL('../portfolio-seed.json', import.meta.url), 'utf8'));
+// bundled with the code (the Worker has no file system to read it from at runtime)
+import seed from '../portfolio-seed.json' with { type: 'json' };
 
 // Public, non-personal reads are never kept by a CDN and are rechecked by the browser every time, so a
 // publish from the portal shows up on the very next request. The router adds an ETag, so an unchanged
@@ -26,7 +25,7 @@ export async function liveVersion(){
 }
 export async function bumpLiveVersion(){
   const db = await getDb();
-  await db.query(`insert into settings (key, value) values ('live', '{}'::jsonb)
+  await db.query(`insert into settings (key, value) values ('live', '{}')
     on conflict (key) do update set revision = settings.revision + 1, updated_at = now()`);
 }
 

@@ -1,7 +1,7 @@
 // Portal: KA Assistant: usage and cost (estimates, clearly labelled), knowledge base, conversation
 // logs with ratings, a playground that runs the real pipeline, and the exact prompt preview.
 import { json, readJson, HttpError } from '../core/http.js';
-import { getDb } from '../core/db.js';
+import { getDb, ftsQuery } from '../core/db.js';
 import { getSetting } from '../core/settings.js';
 import { str, bool } from '../core/validate.js';
 import { onDaily } from '../jobs/hooks.js';
@@ -18,11 +18,11 @@ export async function overview(){
   await seedIfEmpty();
   const [settings, today, days, totals, ratings, kb] = await Promise.all([
     getSetting('assistant'), todayUsage(),
-    db.query(`select to_char(day, 'YYYY-MM-DD') as day, requests, tokens_in, tokens_out, cost_micros from assistant_usage where day > current_date - 31 order by day`),
-    db.one(`select count(*)::int as conversations, coalesce(sum((select count(*) from assistant_messages m where m.conversation_id = c.id and m.role = 'user')), 0)::int as questions
-      from assistant_conversations c where c.started_at > now() - interval '30 days' and c.audience <> 'playground'`),
-    db.one(`select count(*) filter (where rating = 1)::int as up, count(*) filter (where rating = -1)::int as down from assistant_messages`),
-    db.one(`select (select count(*) from kb_sources)::int as sources, (select count(*) from kb_chunks)::int as chunks`)
+    db.query(`select day, requests, tokens_in, tokens_out, cost_micros from assistant_usage where day > date('now', '-31 days') order by day`),
+    db.one(`select count(*) as conversations, coalesce(sum((select count(*) from assistant_messages m where m.conversation_id = c.id and m.role = 'user')), 0) as questions
+      from assistant_conversations c where c.started_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-30 days') and c.audience <> 'playground'`),
+    db.one(`select count(*) filter (where rating = 1) as up, count(*) filter (where rating = -1) as down from assistant_messages`),
+    db.one(`select (select count(*) from kb_sources) as sources, (select count(*) from kb_chunks) as chunks`)
   ]);
   const recent = await db.query(`select m.content, m.created_at, m.conversation_id from assistant_messages m join assistant_conversations c on c.id = m.conversation_id
     where m.role = 'user' and c.audience <> 'playground' order by m.id desc limit 12`);
@@ -35,7 +35,7 @@ export async function overview(){
 export async function listKb(){
   const db = await getDb();
   await seedIfEmpty();
-  return json({ sources: await db.query(`select s.id, s.kind, s.title, s.body, s.enabled, s.updated_at, (select count(*)::int from kb_chunks c where c.source_id = s.id) as chunks from kb_sources s order by s.created_at`) });
+  return json({ sources: await db.query(`select s.id, s.kind, s.title, s.body, s.enabled, s.updated_at, (select count(*) from kb_chunks c where c.source_id = s.id) as chunks from kb_sources s order by s.created_at`) });
 }
 export async function saveKb(ctx){
   const b = await readJson(ctx.request, 256 * 1024);
@@ -44,7 +44,7 @@ export async function saveKb(ctx){
   const db = await getDb();
   let id = ctx.params.id;
   if (id){
-    const r = await db.query('update kb_sources set kind = $2, title = $3, body = $4, enabled = $5, updated_at = now() where id::text = $1 returning id', [id, kind, title, body, bool(b.enabled, true)]);
+    const r = await db.query('update kb_sources set kind = $2, title = $3, body = $4, enabled = $5, updated_at = now() where id = $1 returning id', [id, kind, title, body, bool(b.enabled, true)]);
     if (!r.length) throw new HttpError(404, 'Source not found.');
   } else id = (await db.one('insert into kb_sources (kind, title, body, enabled) values ($1, $2, $3, $4) returning id', [kind, title, body, bool(b.enabled, true)])).id;
   await reindex(db, id, body);
@@ -53,7 +53,7 @@ export async function saveKb(ctx){
 }
 export async function deleteKb(ctx){
   const db = await getDb();
-  await db.query('delete from kb_sources where id::text = $1', [ctx.params.id]);
+  await db.query('delete from kb_sources where id = $1', [ctx.params.id]);
   await audit(ctx, 'kb_deleted', ctx.params.id);
   return listKb();
 }
@@ -64,33 +64,34 @@ export async function conversations(ctx){
   const q = (ctx.url.searchParams.get('q') || '').trim().slice(0, 100);
   const aud = ctx.url.searchParams.get('audience');
   const args = [], where = [];
-  if (q){ args.push(q); where.push(`exists (select 1 from assistant_messages m where m.conversation_id = c.id and m.search @@ plainto_tsquery('simple', $${args.length}))`); }
+  const fq = ftsQuery(q);
+  if (fq){ args.push(fq); where.push(`exists (select 1 from assistant_messages m where m.conversation_id = c.id and m.id in (select rowid from assistant_messages_fts where assistant_messages_fts match $${args.length}))`); }
   if (['visitor', 'buyer', 'playground'].includes(aud)){ args.push(aud); where.push(`c.audience = $${args.length}`); }
   const rows = await db.query(`select c.id, c.audience, c.country, c.started_at, c.last_at,
       (select content from assistant_messages m where m.conversation_id = c.id and m.role = 'user' order by m.id limit 1) as first_question,
-      (select count(*)::int from assistant_messages m where m.conversation_id = c.id and m.role = 'user') as questions,
-      (select coalesce(sum(cost_micros), 0)::bigint from assistant_messages m where m.conversation_id = c.id) as cost_micros,
-      (select coalesce(sum(rating), 0)::int from assistant_messages m where m.conversation_id = c.id) as rating
+      (select count(*) from assistant_messages m where m.conversation_id = c.id and m.role = 'user') as questions,
+      (select coalesce(sum(cost_micros), 0) from assistant_messages m where m.conversation_id = c.id) as cost_micros,
+      (select coalesce(sum(rating), 0) from assistant_messages m where m.conversation_id = c.id) as rating
     from assistant_conversations c ${where.length ? 'where ' + where.join(' and ') : ''} order by c.last_at desc limit 300`, args);
   return json({ conversations: rows });
 }
 export async function conversation(ctx){
   const db = await getDb();
-  const c = await db.maybeOne('select * from assistant_conversations where id::text = $1', [ctx.params.id]);
+  const c = await db.maybeOne('select * from assistant_conversations where id = $1', [ctx.params.id]);
   if (!c) throw new HttpError(404, 'Conversation not found.');
   const messages = await db.query('select id, role, content, sources, tokens_in, tokens_out, cost_micros, rating, created_at from assistant_messages where conversation_id = $1 order by id', [c.id]);
   return json({ conversation: c, messages });
 }
 export async function deleteConversation(ctx){
   const db = await getDb();
-  await db.query('delete from assistant_conversations where id::text = $1', [ctx.params.id]);
+  await db.query('delete from assistant_conversations where id = $1', [ctx.params.id]);
   return json({ ok: true });
 }
 export async function rate(ctx){
   const b = await readJson(ctx.request, 256);
   const rating = b.rating === 1 || b.rating === -1 ? b.rating : null;
   const db = await getDb();
-  await db.query(`update assistant_messages set rating = $2 where id::text = $1 and role = 'assistant'`, [ctx.params.id, rating]);
+  await db.query(`update assistant_messages set rating = $2 where id = $1 and role = 'assistant'`, [ctx.params.id, rating]);
   return json({ ok: true });
 }
 
@@ -104,7 +105,7 @@ export async function playground(ctx){
 
 onDaily('assistantLogRetention', async () => {
   const db = await getDb();
-  const rows = await db.query(`delete from assistant_conversations where last_at < now() - make_interval(days => $1) returning 1`, [LOG_DAYS]);
+  const rows = await db.query(`delete from assistant_conversations where last_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-' || $1 || ' days') returning 1`, [LOG_DAYS]);
   return { removed: rows.length };
 });
 

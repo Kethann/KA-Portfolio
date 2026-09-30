@@ -18,9 +18,9 @@ export async function listTeam(ctx){
   const people = await db.query(`select u.id, u.email, u.name, u.role, u.totp_enabled as "twoFactor", u.must_change_password as "mustChangePassword",
       u.disabled_at as "disabledAt", u.created_at as "createdAt", u.locked_until as "lockedUntil",
       (select max(s.last_seen_at) from admin_sessions s where s.user_id = u.id) as "lastSeenAt",
-      (select count(*)::int from admin_sessions s where s.user_id = u.id and s.revoked_at is null and s.expires_at > now()) as "activeSessions"
+      (select count(*) from admin_sessions s where s.user_id = u.id and s.revoked_at is null and s.expires_at > now()) as "activeSessions"
     from admin_users u order by (u.role = 'owner') desc, u.created_at`);
-  return json({ people: people.map(p => ({ ...p, you: p.id === ctx.admin.userId })) });
+  return json({ people: people.map(p => ({ ...p, twoFactor: !!p.twoFactor, mustChangePassword: !!p.mustChangePassword, you: p.id === ctx.admin.userId })) });
 }
 
 export async function addPerson(ctx){
@@ -39,14 +39,14 @@ export async function addPerson(ctx){
 }
 
 async function target(ctx, db){
-  const u = await db.maybeOne('select * from admin_users where id::text = $1', [ctx.params.id]);
+  const u = await db.maybeOne('select * from admin_users where id = $1', [ctx.params.id]);
   if (!u) throw new HttpError(404, 'That person isn’t on the team any more.');
   return u;
 }
 // the last active owner can't be demoted, switched off or deleted: someone must always be able to manage the team
 async function assertNotLastOwner(db, u, action){
   if (u.role !== 'owner') return;
-  const owners = (await db.one(`select count(*)::int as n from admin_users where role = 'owner' and disabled_at is null`)).n;
+  const owners = (await db.one(`select count(*) as n from admin_users where role = 'owner' and disabled_at is null`)).n;
   if (owners <= 1) throw new HttpError(409, `You can’t ${action} the only owner. Make someone else an owner first.`);
 }
 
@@ -75,10 +75,11 @@ export async function resetPersonPassword(ctx){
   const u = await target(ctx, db);
   if (u.id === ctx.admin.userId) throw new HttpError(409, 'Change your own password in Account & security.');
   const password = passwordPolicy(b.password);
-  await db.tx(async (tx) => {
-    await tx.query(`update admin_users set password_hash = $2, must_change_password = true, password_changed_at = now(), failed_attempts = 0, locked_until = null where id = $1`, [u.id, await hashPassword(password)]);
-    await tx.query('update admin_sessions set revoked_at = now() where user_id = $1 and revoked_at is null', [u.id]);
-  });
+  const hash = await hashPassword(password);
+  await db.batch([
+    [`update admin_users set password_hash = $2, must_change_password = true, password_changed_at = now(), failed_attempts = 0, locked_until = null where id = $1`, [u.id, hash]],
+    ['update admin_sessions set revoked_at = now() where user_id = $1 and revoked_at is null', [u.id]],
+  ]);
   await audit(ctx, 'team_password_reset', u.email);
   return listTeam(ctx);
 }
@@ -101,10 +102,10 @@ export async function setPersonAccess(ctx){
   if (u.id === ctx.admin.userId) throw new HttpError(409, 'You can’t switch off your own access.');
   const off = b.enabled === false;
   if (off) await assertNotLastOwner(db, u, 'switch off');
-  await db.tx(async (tx) => {
-    await tx.query('update admin_users set disabled_at = $2 where id = $1', [u.id, off ? new Date() : null]);
-    if (off) await tx.query('update admin_sessions set revoked_at = now() where user_id = $1 and revoked_at is null', [u.id]);
-  });
+  await db.batch([
+    ['update admin_users set disabled_at = $2 where id = $1', [u.id, off ? new Date() : null]],
+    off && ['update admin_sessions set revoked_at = now() where user_id = $1 and revoked_at is null', [u.id]],
+  ]);
   await audit(ctx, off ? 'team_access_off' : 'team_access_on', u.email);
   return listTeam(ctx);
 }

@@ -64,8 +64,11 @@ async function verifiedOrder(db, history){
   if (!id || !email) return { asked: !!id || /\border\b/i.test(text), order: null };
   const o = await db.maybeOne(`select id, public_id, status, created_at, paid_at, delivered_at, refunded_at, currency, total, is_free from orders where public_id = $1 and email = $2`, [id, email]);
   if (!o) return { asked: true, order: null, failed: true };
+  // each item with its newest active download link
   const items = await db.query(`select i.title, t.expires_at, t.max_downloads, t.download_count from order_items i
-    left join lateral (select * from download_tokens t where t.order_id = i.order_id and t.product_id = i.product_id and t.revoked_at is null order by created_at desc limit 1) t on true where i.order_id = $1`, [o.id]);
+    left join (select * from (select t.*, row_number() over (partition by t.product_id order by t.created_at desc) as rn
+        from download_tokens t where t.order_id = $1 and t.revoked_at is null) where rn = 1) t on t.product_id = i.product_id
+    where i.order_id = $1`, [o.id]);
   return { asked: true, order: { ...o, items } };
 }
 
@@ -179,7 +182,7 @@ ${blocks.join('\n')}
 // Continues the visitor's own conversation (never someone else's), or starts a new one.
 async function ensureConversation(db, { conversationId, visitorId, audience, ip, country }){
   const found = conversationId && /^[0-9a-f-]{36}$/i.test(conversationId)
-    ? await db.maybeOne('select id from assistant_conversations where id = $1 and ($2::text is null or visitor_id = $2)', [conversationId, visitorId]) : null;
+    ? await db.maybeOne('select id from assistant_conversations where id = $1 and ($2 is null or visitor_id = $2)', [conversationId, visitorId]) : null;
   if (found) return found.id;
   return (await db.one(`insert into assistant_conversations (visitor_id, audience, ip, country) values ($1, $2, $3, $4) returning id`, [visitorId, audience, ip, country])).id;
 }

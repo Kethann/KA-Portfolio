@@ -1,6 +1,6 @@
 // Public catalog + tips. Read-only; only published rows are ever selected.
 import { json, HttpError } from '../core/http.js';
-import { getDb } from '../core/db.js';
+import { getDb, ftsQuery } from '../core/db.js';
 import { priceFor, percentOff } from '../store/pricing.js';
 import { renderMarkdown } from '../core/markdown.js';
 import { PUBLIC_CACHE } from './public.js';
@@ -8,8 +8,8 @@ import { PUBLIC_CACHE } from './public.js';
 const PRODUCT_SELECT = `
   select p.*, c.slug as category_slug, c.name as category_name,
          l.key as license_key, l.name as license_name, l.summary as license_summary,
-         coalesce((select json_agg(json_build_object('url', m.url, 'alt', m.alt, 'width', m.width, 'height', m.height) order by m.sort, m.id)
-                   from product_media m where m.product_id = p.id), '[]'::json) as media
+         (select json_group_array(json_object('url', m.url, 'alt', m.alt, 'width', m.width, 'height', m.height))
+            from (select * from product_media m where m.product_id = p.id order by m.sort, m.id) m) as media
     from products p
     left join categories c on c.id = p.category_id
     left join licenses l on l.id = p.license_id`;
@@ -37,8 +37,8 @@ export async function catalog(ctx){
   const kind = ctx.url.searchParams.get('kind');
   if (kind && kind !== 'artzz' && kind !== 'artifacts') throw new HttpError(400, 'Unknown store section.');
   const db = await getDb();
-  const rows = await db.query(`${PRODUCT_SELECT} where p.status = 'published' and ($1::text is null or p.kind = $1) order by p.kind, p.sort, p.created_at desc limit 500`, [kind || null]);
-  const categories = await db.query(`select kind, slug, name from categories where kind in ('artzz','artifacts') and ($1::text is null or kind = $1) order by kind, sort, name`, [kind || null]);
+  const rows = await db.query(`${PRODUCT_SELECT} where p.status = 'published' and ($1 is null or p.kind = $1) order by p.kind, p.sort, p.created_at desc limit 500`, [kind || null]);
+  const categories = await db.query(`select kind, slug, name from categories where kind in ('artzz','artifacts') and ($1 is null or kind = $1) order by kind, sort, name`, [kind || null]);
   const now = new Date();
   return json({ products: rows.map(r => productDto(r, now)), categories }, 200, PUBLIC_CACHE);
 }
@@ -52,12 +52,9 @@ export async function product(ctx){
   return json({ product: productDto(row) }, 200, PUBLIC_CACHE);
 }
 
-// Search terms -> a safe prefix query: only letters/numbers survive, so user text can never
-// reach the tsquery parser as syntax.
-export function toPrefixQuery(q){
-  const words = String(q || '').toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
-  return words.slice(0, 8).map(w => `${w.slice(0, 40)}:*`).join(' & ');
-}
+// Search terms -> a safe FTS5 prefix query: only letters/numbers survive and each word is quoted, so
+// user text can never reach the search parser as syntax. Every word must match (as a prefix).
+export const toPrefixQuery = ftsQuery;
 
 const PAGE = 12;
 export async function tips(ctx){
@@ -69,10 +66,10 @@ export async function tips(ctx){
   const rows = await db.query(`
     select t.slug, t.title, t.excerpt, t.cover_url, t.tags, t.published_at, c.slug as category_slug, c.name as category_name
       from tips t left join categories c on c.id = t.category_id
+      ${q ? `join (select rowid as rid, rank from tips_fts where tips_fts match $1) f on f.rid = t.rowid` : ''}
      where t.status = 'published'
-       and ($1::text = '' or t.search @@ to_tsquery('simple', $1))
-       and ($2::text is null or c.slug = $2)
-     order by ${q ? `ts_rank(t.search, to_tsquery('simple', $1)) desc, ` : ''}t.published_at desc nulls last, t.created_at desc
+       and ($2 is null or c.slug = $2)
+     order by ${q ? `f.rank, ` : ''}t.published_at desc nulls last, t.created_at desc
      limit ${PAGE + 1} offset ${page * PAGE}`, [q, category]);
   const categories = await db.query(`select slug, name from categories where kind = 'tips' order by sort, name`);
   return json({

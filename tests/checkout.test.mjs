@@ -182,10 +182,10 @@ test('forged signatures are rejected and change nothing', async () => {
   const o = (await order(kit, { email: 'forge@example.com' })).json;
   const v = await app.call('POST', '/api/checkout/verify', { body: { orderId: o.orderId, clientSecret: o.clientSecret, razorpay_order_id: o.razorpay.orderId, razorpay_payment_id: 'pay_Tforged1', razorpay_signature: 'f'.repeat(64) }, ip: ip() });
   assert.equal(v.status, 400);
-  const before = await app.pg.query('select count(*)::int as n from webhook_events');
+  const before = await app.pg.query('select count(*) as n from webhook_events');
   const hook = await webhook('payment.captured', { id: 'pay_Tforged2', order_id: o.razorpay.orderId, amount: 49900, currency: 'INR', status: 'captured' }, { secret: 'attacker' });
   assert.equal(hook.status, 400);
-  assert.equal((await app.pg.query('select count(*)::int as n from webhook_events')).rows[0].n, before.rows[0].n);
+  assert.equal((await app.pg.query('select count(*) as n from webhook_events')).rows[0].n, before.rows[0].n);
   const db = await row(o.orderId);
   assert.equal(db.status, 'created'); assert.equal(db.captured_at, null); assert.equal(db.signature_verified_at, null);
   // the webhook route needs no origin but a browser can't forge its way through the signature
@@ -203,7 +203,7 @@ test('expired links and the download limit are enforced, atomically', async () =
   const o2 = (await order(kit, { email: 'expired@example.com' })).json;
   await pay(o2);
   const t2 = linkIn(mailsTo('expired@example.com')[0]).split('/').pop();
-  await app.pg.query(`update download_tokens set expires_at = now() - interval '1 minute'`);
+  await app.pg.query(`update download_tokens set expires_at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 minute')`);
   const exp = await app.call('GET', `/api/download/${t2}`, { ip: ip() });
   assert.equal(exp.status, 410); assert.match(exp.text, /Link expired/);
   assert.equal((await app.call('GET', '/api/download/not-a-token', { ip: ip() })).status, 404);
@@ -278,7 +278,7 @@ test('USD order is created, charged and delivered in USD only', async () => {
 test('expiry releases coupons; a real payment arriving late is still delivered', async () => {
   await coupon('LATE', { max_uses: 5 });
   const o = (await order(kit, { email: 'late@example.com', codes: ['LATE'] })).json;
-  await app.pg.query(`update orders set expires_at = now() - interval '1 minute' where public_id = $1`, [o.orderId]);
+  await app.pg.query(`update orders set expires_at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 minute') where public_id = $1`, [o.orderId]);
   const cron = await app.call('GET', '/api/cron/daily', { headers: { authorization: 'Bearer test-cron-secret' } });
   assert.equal(cron.status, 200);
   assert.equal((await row(o.orderId)).status, 'expired');

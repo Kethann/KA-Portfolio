@@ -1,7 +1,7 @@
 // Portal: system status (which services are configured — names only, never values), email log,
 // storage use, backups, audit log and visitor-data purge.
 import { json, readJson, HttpError } from '../core/http.js';
-import { getDb } from '../core/db.js';
+import { getDb, ftsQuery } from '../core/db.js';
 import { env, isProduction } from '../core/env.js';
 import { getSetting } from '../core/settings.js';
 import { getStorage, BUCKETS } from '../core/storage.js';
@@ -36,11 +36,11 @@ export async function status(){
     return { key: s.key, label: s.label, required: s.required, vars: vars.map(v => ({ name: v, set: !!env(v) })), ok: vars.every(v => !!env(v)) };
   });
   const email = await db.query(`select to_email, subject, template, status, error, created_at from email_log order by created_at desc limit 30`);
-  const emailFails = (await db.one(`select count(*)::int as n from email_log where status = 'failed' and created_at > now() - interval '7 days'`)).n;
-  const size = await db.maybeOne('select pg_database_size(current_database())::bigint as bytes').catch(() => null);
-  const migrations = await db.query('select name, applied_at from _migrations order by name').catch(() => []);
+  const emailFails = (await db.one(`select count(*) as n from email_log where status = 'failed' and created_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-7 days')`)).n;
+  const size = await db.maybeOne('select page_count * page_size as bytes from pragma_page_count(), pragma_page_size()').catch(() => null);
+  const migrations = await db.query('select name, applied_at from d1_migrations order by name').catch(() => []);
   return json({
-    production: isProduction(), host: env('VERCEL') ? 'vercel' : 'node',
+    production: isProduction(), host: env('KA_PLATFORM') || 'node',
     database: { ok: true, ms: dbMs, bytes: size ? Number(size.bytes) : null, limitBytes: 500 * 1024 * 1024, migrations },
     lastHeartbeat: system.lastHeartbeat, lastBackup: system.lastBackup,
     services, email, emailFailures7d: emailFails,
@@ -74,7 +74,7 @@ export async function backupNow(ctx){
 }
 export async function deleteBackup(ctx){
   const db = await getDb();
-  const b = await db.maybeOne('select id, storage_path from backups where id::text = $1', [ctx.params.id]);
+  const b = await db.maybeOne('select id, storage_path from backups where id = $1', [ctx.params.id]);
   if (!b) throw new HttpError(404, 'Backup not found.');
   if (b.storage_path) await getStorage().remove('backups', [b.storage_path]).catch(() => {});
   await db.query('delete from backups where id = $1', [b.id]);
@@ -83,7 +83,7 @@ export async function deleteBackup(ctx){
 }
 export async function backupLink(ctx){
   const db = await getDb();
-  const b = await db.maybeOne(`select storage_path from backups where id::text = $1 and status = 'ok'`, [ctx.params.id]);
+  const b = await db.maybeOne(`select storage_path from backups where id = $1 and status = 'ok'`, [ctx.params.id]);
   if (!b) throw new HttpError(404, 'Backup not found.');
   await audit(ctx, 'backup_downloaded', ctx.params.id);
   return json({ url: await getStorage().signedUrl('backups', b.storage_path, 60, b.storage_path.split('/').pop()) });
@@ -100,7 +100,7 @@ export async function purgeVisits(ctx){
   const b = await readJson(ctx.request, 1024);
   const days = int(b.olderThanDays, { name: 'Days', min: 0, max: 3650 });
   const db = await getDb();
-  const rows = await db.query(`delete from visits where visited_at < now() - make_interval(days => $1) returning 1`, [days]);
+  const rows = await db.query(`delete from visits where visited_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-' || $1 || ' days') returning 1`, [days]);
   await audit(ctx, 'visits_purged', null, { days, count: rows.length });
   return json({ ok: true, deleted: rows.length });
 }
@@ -109,10 +109,10 @@ export async function purgeVisits(ctx){
 export async function pulse(){
   const db = await getDb();
   const r = await db.one(`select
-    (select count(*)::int from messages where status = 'new') as new_messages,
-    (select count(distinct session_id)::int from visits where last_seen_at > now() - interval '5 minutes' and not is_bot) as live_visitors,
-    (select count(*)::int from orders where status in ('paid','delivered') and paid_at > now() - interval '24 hours') as orders_24h,
-    (select count(*)::int from orders where status = 'mismatch' or (status = 'paid' and paid_at < now() - interval '30 minutes')) as needs_attention`);
+    (select count(*) from messages where status = 'new') as new_messages,
+    (select count(distinct session_id) from visits where last_seen_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-5 minutes') and not is_bot) as live_visitors,
+    (select count(*) from orders where status in ('paid','delivered') and paid_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-24 hours')) as orders_24h,
+    (select count(*) from orders where status = 'mismatch' or (status = 'paid' and paid_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-30 minutes'))) as needs_attention`);
   return json({ newMessages: r.new_messages, liveVisitors: r.live_visitors, orders24h: r.orders_24h, needsAttention: r.needs_attention, serverTime: new Date().toISOString() });
 }
 
@@ -121,13 +121,15 @@ export async function search(ctx){
   const q = (ctx.url.searchParams.get('q') || '').trim().slice(0, 80);
   if (q.length < 2) return json({ results: [] });
   const like = `%${q.toLowerCase().replace(/[\\%_]/g, (m) => '\\' + m)}%`;
+  const fq = ftsQuery(q);
+  const ESC = `escape '\\'`;   // SQLite has no default LIKE escape; `like` above escapes % _ \ with a backslash
   const db = await getDb();
   const [orders, products, messages, tips, coupons] = await Promise.all([
-    db.query(`select id, public_id, email, status, total, currency from orders where lower(public_id) like $1 or lower(email) like $1 or lower(coalesce(razorpay_payment_id,'')) like $1 order by created_at desc limit 5`, [like]),
-    db.query(`select id, title, kind, status from products where lower(title) like $1 or lower(slug) like $1 order by updated_at desc limit 5`, [like]),
-    db.query(`select id, subject, name, email, status from messages where search @@ plainto_tsquery('simple', $1) or lower(email) like $2 order by created_at desc limit 5`, [q, like]),
-    db.query(`select id, title, status from tips where lower(title) like $1 order by updated_at desc limit 3`, [like]),
-    db.query(`select id, code, paused from coupons where lower(code) like $1 limit 3`, [like])
+    db.query(`select id, public_id, email, status, total, currency from orders where lower(public_id) like $1 ${ESC} or lower(email) like $1 ${ESC} or lower(coalesce(razorpay_payment_id,'')) like $1 ${ESC} order by created_at desc limit 5`, [like]),
+    db.query(`select id, title, kind, status from products where lower(title) like $1 ${ESC} or lower(slug) like $1 ${ESC} order by updated_at desc limit 5`, [like]),
+    db.query(`select id, subject, name, email, status from messages where ${fq ? 'rowid in (select rowid from messages_fts where messages_fts match $1) or ' : ''}lower(email) like $2 ${ESC} order by created_at desc limit 5`, [fq, like]),
+    db.query(`select id, title, status from tips where lower(title) like $1 ${ESC} order by updated_at desc limit 3`, [like]),
+    db.query(`select id, code, paused from coupons where lower(code) like $1 ${ESC} limit 3`, [like])
   ]);
   return json({ results: [
     ...orders.map(o => ({ app: 'orders', route: o.id, title: `${o.public_id} · ${o.email}`, meta: o.status, kind: 'Order' })),

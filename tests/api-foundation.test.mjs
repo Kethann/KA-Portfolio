@@ -50,10 +50,10 @@ test('contact escapes hostile content in the owner email', async () => {
 });
 
 test('contact honeypot pretends success but stores nothing', async () => {
-  const before = (await app.pg.query('select count(*)::int as n from messages')).rows[0].n;
+  const before = (await app.pg.query('select count(*) as n from messages')).rows[0].n;
   const res = await app.call('POST', '/api/contact', { body: contact({ website: 'http://spam' }), ip: '198.51.100.2' });
   assert.equal(res.status, 202);
-  assert.equal((await app.pg.query('select count(*)::int as n from messages')).rows[0].n, before);
+  assert.equal((await app.pg.query('select count(*) as n from messages')).rows[0].n, before);
 });
 
 test('blocked senders land in spam without emailing anyone', async () => {
@@ -86,7 +86,7 @@ test('notify-me stores one signup per email and never reveals whether it existed
   const first = await app.call('POST', '/api/notify', { body: { email: 'Fan@Example.com', topic: 'upscaler' }, ip: '198.51.100.30' });
   const again = await app.call('POST', '/api/notify', { body: { email: 'fan@example.com', topic: 'upscaler' }, ip: '198.51.100.31' });
   assert.equal(first.status, 201); assert.equal(again.status, 201);
-  assert.equal((await app.pg.query(`select count(*)::int as n from notify_signups where email = 'fan@example.com'`)).rows[0].n, 1);
+  assert.equal((await app.pg.query(`select count(*) as n from notify_signups where email = 'fan@example.com'`)).rows[0].n, 1);
   assert.equal(app.mail.sent.length, 1, 'one confirmation only');
   assert.equal((await app.call('POST', '/api/notify', { body: { email: 'a@b.co', topic: 'nope' }, ip: '198.51.100.32' })).status, 400);
 });

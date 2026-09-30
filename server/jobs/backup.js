@@ -9,17 +9,19 @@ export const KEEP = 8;
 const PAGE = 5000;
 // Secrets at rest stay out of backups: sessions are disposable, and the owner account is
 // recreated from the portal's setup flow if ever needed.
-const SKIP = new Set(['admin_sessions', 'rate_limits', '_migrations']);
+const SKIP = new Set(['admin_sessions', 'rate_limits', 'd1_migrations', '_cf_KV', 'invoice_counter_placeholder']);
 
 export async function runBackup(now = new Date()){
   const db = await getDb();
-  const tables = (await db.query(`select tablename from pg_tables where schemaname = 'public' order by tablename`)).map(r => r.tablename).filter(t => !SKIP.has(t));
+  // real tables only (not SQLite internals or the full-text search indexes, which rebuild from their tables)
+  const tables = (await db.query(`select name from sqlite_master where type = 'table' and name not like 'sqlite_%' and name not like '%_fts%' order by name`))
+    .map(r => r.name).filter(t => !SKIP.has(t));
   const out = { createdAt: now.toISOString(), tables: {} };
   const counts = {};
   for (const t of tables){
     const rows = [];
     for (let offset = 0; ; offset += PAGE){
-      // table names come from pg_tables, not from input; quoted as identifiers anyway
+      // table names come from sqlite_master, not from input; quoted as identifiers anyway
       const page = await db.query(`select * from "${t.replace(/"/g, '""')}" order by 1 limit ${PAGE} offset ${offset}`);
       for (const r of page) rows.push(t === 'admin_users' ? { ...r, password_hash: '[omitted]', totp_secret: r.totp_secret ? '[omitted]' : null } : r);
       if (page.length < PAGE) break;
@@ -38,10 +40,10 @@ export async function runBackup(now = new Date()){
     throw err;
   }
   // prune old ones
-  const old = await db.query(`select id, storage_path from backups where status = 'ok' order by created_at desc offset ${KEEP}`);
+  const old = await db.query(`select id, storage_path from backups where status = 'ok' order by created_at desc limit -1 offset ${KEEP}`);
   if (old.length){
     await storage.remove('backups', old.map(o => o.storage_path));
-    await db.query('delete from backups where id = any($1::uuid[])', [old.map(o => o.id)]);
+    await db.query('delete from backups where id in (select value from json_each($1))', [old.map(o => o.id)]);
   }
   return { path, bytes: bytes.length, counts };
 }

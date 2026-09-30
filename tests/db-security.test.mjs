@@ -1,64 +1,53 @@
-// Row-level security, privileges and money constraints, checked against real Postgres.
+// Money and state rules enforced by the database itself (the same SQLite engine D1 runs).
+// On Cloudflare only the Worker can reach D1 (no public keys, no client access), so there are no
+// row-level policies to test: what matters is that bad data can't be written even by a bug in the code.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createTestDatabase} from './helpers/pglite.mjs';
+import { createTestDatabase } from './helpers/pglite.mjs';
+import { rateLimitHit, nextInvoiceNumber } from '../server/core/atomic.js';
+import { setDatabase } from '../server/core/db.js';
 
-const pg = await createTestDatabase();
-const PUBLIC_TABLES = new Set(['products','product_media','categories','tips','licenses','legal_pages']);
+const db = createTestDatabase();
+setDatabase(db);
+const q = (sql, params) => db.query(sql, params);
 
-async function asRole(role, fn){
-  await pg.exec(`set role ${role}`);
-  try{ return await fn(); } finally { await pg.exec('reset role'); }
-}
-
-test('every table has row-level security enabled', async()=>{
-  const {rows} = await pg.query(`select c.relname, c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace
-    where n.nspname='public' and c.relkind='r' and c.relname <> '_migrations'`);
-  assert.ok(rows.length > 30);
-  for (const r of rows) assert.equal(r.relrowsecurity, true, r.relname + ' must have RLS on');
+test('every table is STRICT and foreign keys are enforced', async () => {
+  const tables = await q(`select name, sql from sqlite_master where type = 'table' and name not like 'sqlite_%' and name not like '%_fts%' and name <> 'd1_migrations'`);
+  assert.ok(tables.length > 30);
+  for (const t of tables) assert.match(t.sql, /\)\s*strict$/i, t.name + ' must be STRICT (no silent type changes)');
+  await assert.rejects(q(`insert into product_media (product_id, url) values ('no-such-product', '/x.webp')`), /FOREIGN KEY/);
 });
 
-test('the public cannot read or write any private table', async()=>{
-  const {rows} = await pg.query(`select tablename from pg_tables where schemaname='public' and tablename <> '_migrations'`);
-  for (const {tablename} of rows){
-    if (PUBLIC_TABLES.has(tablename)) continue;
-    for (const role of ['anon','authenticated']){
-      await assert.rejects(asRole(role, ()=>pg.query(`select * from ${tablename} limit 1`)), /permission denied/, `${role} read ${tablename}`);
-      await assert.rejects(asRole(role, ()=>pg.query(`delete from ${tablename}`)), /permission denied/, `${role} delete ${tablename}`);
-    }
-  }
-});
-
-test('the public sees published products only and can never write them', async()=>{
-  await pg.query(`insert into products (kind, slug, title, status) values ('artzz','draft-one','Draft','draft'),('artzz','live-one','Live','published')`);
-  const seen = await asRole('anon', ()=>pg.query('select slug from products order by slug'));
-  assert.deepEqual(seen.rows.map(r=>r.slug), ['live-one']);
-  await assert.rejects(asRole('anon', ()=>pg.query(`update products set title='x'`)), /permission denied/);
-  await assert.rejects(asRole('anon', ()=>pg.query(`insert into products (kind, slug, title) values ('artzz','hack','Hack')`)), /permission denied/);
-  await assert.rejects(asRole('anon', ()=>pg.query(`select rate_limit_hit('x', 60, 5)`)), /permission denied/);
-});
-
-test('money and state constraints hold at the database level', async()=>{
+test('money and state constraints hold at the database level', async () => {
   // a published, sellable, paid product needs both prices
-  await assert.rejects(pg.query(`insert into products (kind, slug, title, status, sellable, price_inr) values ('artifacts','p1','P','published',true,50000)`), /priced_when_selling/);
+  await assert.rejects(q(`insert into products (kind, slug, title, status, sellable, price_inr) values ('artifacts','p1','P','published',1,50000)`), /priced_when_selling|CHECK/);
   // order totals must add up exactly and money is integer
-  await assert.rejects(pg.query(`insert into orders (public_id,email,currency,subtotal,discount,total) values ('KA-1','a@b.co','INR',1000,100,950)`), /total_math/);
+  await assert.rejects(q(`insert into orders (public_id,email,currency,subtotal,discount,total) values ('KA-1','a@b.co','INR',1000,100,950)`), /CHECK/);
   // the app always sends values as parameters: a fractional amount is refused, never rounded
-  await assert.rejects(pg.query(`insert into orders (public_id,email,currency,subtotal,total) values ('KA-2','a@b.co','INR',$1,$1)`, ['10.5']), /integer/);
-  await assert.rejects(pg.query(`insert into orders (public_id,email,currency,subtotal,total) values ('KA-3','a@b.co','EUR',100,100)`), /currency/);
+  await assert.rejects(q(`insert into orders (public_id,email,currency,subtotal,total) values ('KA-2','a@b.co','INR',$1,$1)`, ['10.5']), /INTEGER/);
+  await assert.rejects(q(`insert into orders (public_id,email,currency,subtotal,total) values ('KA-3','a@b.co','EUR',100,100)`), /CHECK/);
   // paid needs two proofs: the verified webhook AND (checkout signature OR server-side API check)
-  await pg.query(`insert into orders (public_id,email,currency,subtotal,total) values ('KA-4','a@b.co','INR',100,100),('KA-5','a@b.co','INR',100,100)`);
-  await assert.rejects(pg.query(`update orders set status='paid', paid_at=now(), signature_verified_at=now() where public_id='KA-4'`), /paid_needs_two_proofs/, 'signature alone');
-  await assert.rejects(pg.query(`update orders set status='paid', paid_at=now(), captured_at=now() where public_id='KA-4'`), /paid_needs_two_proofs/, 'webhook alone');
-  await pg.query(`update orders set status='paid', paid_at=now(), signature_verified_at=now(), captured_at=now() where public_id='KA-4'`);
-  await pg.query(`update orders set status='paid', paid_at=now(), api_verified_at=now(), captured_at=now() where public_id='KA-5'`);
+  await q(`insert into orders (public_id,email,currency,subtotal,total) values ('KA-4','a@b.co','INR',100,100),('KA-5','a@b.co','INR',100,100)`);
+  await assert.rejects(q(`update orders set status='paid', paid_at=now(), signature_verified_at=now() where public_id='KA-4'`), /CHECK/, 'signature alone');
+  await assert.rejects(q(`update orders set status='paid', paid_at=now(), captured_at=now() where public_id='KA-4'`), /CHECK/, 'webhook alone');
+  await q(`update orders set status='paid', paid_at=now(), signature_verified_at=now(), captured_at=now() where public_id='KA-4'`);
+  await q(`update orders set status='paid', paid_at=now(), api_verified_at=now(), captured_at=now() where public_id='KA-5'`);
 });
 
-test('rate limits and invoice numbers are atomic', async()=>{
+test('rate limits and invoice numbers are atomic', async () => {
   const hits = [];
-  for (let i = 0; i < 5; i++) hits.push((await pg.query(`select rate_limit_hit('k', 60, 3) as ok`)).rows[0].ok);
-  assert.deepEqual(hits, [true,true,true,false,false]);
-  const a = (await pg.query('select next_invoice_number() as n')).rows[0].n;
-  const b = (await pg.query('select next_invoice_number() as n')).rows[0].n;
+  for (let i = 0; i < 5; i++) hits.push(await rateLimitHit('k', 60, 3));
+  assert.deepEqual(hits, [true, true, true, false, false]);
+  const a = await nextInvoiceNumber(), b = await nextInvoiceNumber();
   assert.equal(b, a + 1);
+});
+
+test('values come back as plain JavaScript: booleans, JSON and ISO times', async () => {
+  const [p] = await q(`insert into products (kind, slug, title, tags, sellable) values ('artzz','t1','T',$1,$2) returning *`, [['a', 'b'], true]);
+  assert.deepEqual(p.tags, ['a', 'b']); assert.equal(p.sellable, true); assert.equal(p.is_free, false);
+  assert.match(p.created_at, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
+  assert.match(p.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  // a batch is all-or-nothing
+  await assert.rejects(db.batch([[`update products set title = 'changed' where slug = 't1'`], [`insert into orders (public_id,email,currency,subtotal,total) values ('X','bad','INR',1,1)`]]));
+  assert.equal((await q(`select title from products where slug = 't1'`))[0].title, 'T', 'the first statement was rolled back');
 });

@@ -144,7 +144,7 @@ test('system: service status shows names only, backups run and link privately, a
   assert.match(link.json.url, /__storage/);
   assert.equal((await admin('GET', '/api/admin/system/storage')).status, 200);
   assert.equal((await admin('POST', '/api/admin/system/test-email', {})).status, 200);
-  await app.pg.query(`insert into visits (session_id, visitor_id, path, visited_at) values ('s1','v1','/', now() - interval '100 days'), ('s2','v2','/', now())`);
+  await app.pg.query(`insert into visits (session_id, visitor_id, path, visited_at) values ('s1','v1','/', strftime('%Y-%m-%dT%H:%M:%fZ','now','-100 days')), ('s2','v2','/', now())`);
   const purge = await admin('POST', '/api/admin/visits/purge', { olderThanDays: 90 });
   assert.equal(purge.json.deleted, 1);
   const audit = (await admin('GET', '/api/admin/audit')).json.entries.map(e => e.action);

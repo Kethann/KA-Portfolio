@@ -1,20 +1,22 @@
-// In-process test harness: real handler + real Postgres (PGlite) + in-memory email + temp storage.
+// In-process test harness: real handler + real SQLite (the engine D1 runs) + in-memory email + temp storage.
 // call(method, path, {body, headers, ip, country}) -> {status, headers, json, text}
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { setEnvSource } from '../../server/core/env.js';
-import { setDatabase, wrapPglite } from '../../server/core/db.js';
+import { setDatabase } from '../../server/core/db.js';
 import { setEmailTransport } from '../../server/core/email.js';
 import { setStorage, localStorage } from '../../server/core/storage.js';
-import { openPglite } from '../../server/dev/pglite.js';
+import { openSqlite } from '../../server/dev/sqlite.js';
 
 export async function createTestApp(envVars = {}){
   const dataDir = await mkdtemp(resolve(tmpdir(), 'ka-test-'));
   const vars = { KA_DATA_DIR: dataDir, OWNER_EMAIL: 'owner@example.com', MAIL_FROM: 'shop@example.com', DOWNLOAD_TOKEN_SECRET: 'test-download-secret', CRON_SECRET: 'test-cron-secret', ...envVars };
   setEnvSource(vars);
-  const pg = await openPglite();
-  setDatabase(wrapPglite(pg));
+  const sqlite = openSqlite();
+  setDatabase(sqlite);
+  // tests read and adjust rows directly: pg.query(sql, params) -> { rows }
+  const pg = { query: async (sql, params) => ({ rows: await sqlite.query(sql, params) }), exec: async (sql) => { sqlite.raw.exec(sql); }, close: () => sqlite.close() };
   const mail = { sent: [], async send(msg){ this.sent.push(msg); return { id: 'm' + this.sent.length }; } };
   setEmailTransport(mail);
   const storage = localStorage(dataDir);

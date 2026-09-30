@@ -12,18 +12,23 @@ export async function summary(ctx){
   const p = [start, end];
   const W = `visited_at >= $1 and visited_at < $2 and not is_bot`;
   const [totals, series, countries, cities, devices, browsers, oses, referrers, paths, hours, bots] = await Promise.all([
-    db.one(`select count(*)::int as views, count(distinct session_id)::int as sessions, count(distinct visitor_id)::int as visitors,
-      count(distinct visitor_id) filter (where is_new)::int as new_visitors, coalesce(avg(duration_ms) filter (where duration_ms > 0), 0)::int as avg_ms from visits where ${W}`, p),
-    db.query(`select to_char(date_trunc('day', visited_at at time zone '${TZ}'), 'YYYY-MM-DD') as day, count(distinct session_id)::int as sessions, count(*)::int as views from visits where ${W} group by 1 order by 1`, p),
-    db.query(`select coalesce(country, '—') as k, count(distinct session_id)::int as n from visits where ${W} group by 1 order by n desc limit 20`, p),
-    db.query(`select coalesce(city, '—') as k, coalesce(country, '') as country, count(distinct session_id)::int as n from visits where ${W} and city is not null group by 1, 2 order by n desc limit 15`, p),
-    db.query(`select coalesce(device_type, 'unknown') as k, count(distinct session_id)::int as n from visits where ${W} group by 1 order by n desc`, p),
-    db.query(`select coalesce(browser, 'unknown') as k, count(distinct session_id)::int as n from visits where ${W} group by 1 order by n desc limit 10`, p),
-    db.query(`select coalesce(os, 'unknown') as k, count(distinct session_id)::int as n from visits where ${W} group by 1 order by n desc limit 10`, p),
-    db.query(`select case when referrer = '' then 'Direct' else regexp_replace(referrer, '^https?://(www\\.)?([^/]+).*$', '\\2') end as k, count(distinct session_id)::int as n from visits where ${W} group by 1 order by n desc limit 12`, p),
-    db.query(`select path as k, count(*)::int as n from visits where ${W} group by 1 order by n desc limit 12`, p),
-    db.query(`select extract(hour from visited_at at time zone '${TZ}')::int as h, count(*)::int as n from visits where ${W} group by 1 order by 1`, p),
-    db.one(`select count(*)::int as n from visits where visited_at >= $1 and visited_at < $2 and is_bot`, p)
+    db.one(`select count(*) as views, count(distinct session_id) as sessions, count(distinct visitor_id) as visitors,
+      count(distinct visitor_id) filter (where is_new) as new_visitors, coalesce(avg(duration_ms) filter (where duration_ms > 0), 0) as avg_ms from visits where ${W}`, p),
+    db.query(`select strftime('%Y-%m-%d', visited_at, '+330 minutes') as day, count(distinct session_id) as sessions, count(*) as views from visits where ${W} group by 1 order by 1`, p),
+    db.query(`select coalesce(country, '—') as k, count(distinct session_id) as n from visits where ${W} group by 1 order by n desc limit 20`, p),
+    db.query(`select coalesce(city, '—') as k, coalesce(country, '') as country, count(distinct session_id) as n from visits where ${W} and city is not null group by 1, 2 order by n desc limit 15`, p),
+    db.query(`select coalesce(device_type, 'unknown') as k, count(distinct session_id) as n from visits where ${W} group by 1 order by n desc`, p),
+    db.query(`select coalesce(browser, 'unknown') as k, count(distinct session_id) as n from visits where ${W} group by 1 order by n desc limit 10`, p),
+    db.query(`select coalesce(os, 'unknown') as k, count(distinct session_id) as n from visits where ${W} group by 1 order by n desc limit 10`, p),
+    // referrer -> its site name: drop the scheme and a leading www., keep everything before the first /
+    db.query(`select k, count(distinct session_id) as n from (select session_id, case when referrer = '' then 'Direct' else (
+        select case when instr(h, '/') > 0 then substr(h, 1, instr(h, '/') - 1) else h end from (
+          select case when s like 'www.%' then substr(s, 5) else s end as h from (
+            select case when instr(referrer, '://') > 0 then substr(referrer, instr(referrer, '://') + 3) else referrer end as s))) end as k
+      from visits where ${W}) group by k order by n desc limit 12`, p),
+    db.query(`select path as k, count(*) as n from visits where ${W} group by 1 order by n desc limit 12`, p),
+    db.query(`select cast(strftime('%H', visited_at, '+330 minutes') as integer) as h, count(*) as n from visits where ${W} group by 1 order by 1`, p),
+    db.one(`select count(*) as n from visits where visited_at >= $1 and visited_at < $2 and is_bot`, p)
   ]);
   const returning = Math.max(0, totals.visitors - totals.new_visitors);
   return json({ from, to, totals: { ...totals, returning, bots: bots.n }, series, countries, cities, devices, browsers, oses, referrers, paths, hours });
@@ -31,8 +36,10 @@ export async function summary(ctx){
 
 export async function live(){
   const db = await getDb();
-  const rows = await db.query(`select distinct on (session_id) session_id, path, country, city, device_type, browser, os, referrer, visited_at, last_seen_at
-    from visits where last_seen_at > now() - interval '5 minutes' and not is_bot order by session_id, visited_at desc`);
+  // each live session's latest page view
+  const rows = await db.query(`select session_id, path, country, city, device_type, browser, os, referrer, visited_at, last_seen_at from (
+      select v.*, row_number() over (partition by session_id order by visited_at desc) as rn
+      from visits v where last_seen_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-5 minutes') and not is_bot) where rn = 1`);
   rows.sort((a, b) => new Date(b.last_seen_at) - new Date(a.last_seen_at));
   return json({ live: rows.slice(0, 100), count: rows.length });
 }

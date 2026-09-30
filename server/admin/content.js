@@ -11,9 +11,8 @@ import { loadSiteDocument, TOPICS } from '../handlers/public.js';
 import { validateSiteDocument } from './site-document.js';
 import { isOwnMediaUrl, slugify } from './catalog.js';
 import { audit } from './auth.js';
-import { readFileSync } from 'node:fs';
-// new URL(..., import.meta.url) lets Vercel's file tracer see and bundle the JSON (createRequire it can't).
-const seed = JSON.parse(readFileSync(new URL('../portfolio-seed.json', import.meta.url), 'utf8'));
+// bundled with the code (the Worker has no file system to read it from at runtime)
+import seed from '../portfolio-seed.json' with { type: 'json' };
 
 // ---- portfolio document --------------------------------------------------------------------------
 export async function getSite(){ return json(await loadSiteDocument()); }
@@ -55,17 +54,17 @@ export async function saveTip(ctx){
   let id = ctx.params.id;
   try {
     if (id){
-      const cur = await db.maybeOne('select updated_at from tips where id::text = $1', [id]);
+      const cur = await db.maybeOne('select updated_at from tips where id = $1', [id]);
       if (!cur) throw new HttpError(404, 'Tip not found.');
       if (b.updatedAt && new Date(b.updatedAt).getTime() !== new Date(cur.updated_at).getTime()) throw new HttpError(409, 'This tip was changed somewhere else. Reload it first.', { code: 'stale' });
       await db.query(`update tips set slug=$2, title=$3, excerpt=$4, body_md=$5, cover_url=$6, category_id=$7, tags=$8, status=$9, updated_at=now(),
-        published_at = case when $9 = 'published' and published_at is null then now() else published_at end where id::text = $1`, [id, ...v]);
+        published_at = case when $9 = 'published' and published_at is null then now() else published_at end where id = $1`, [id, ...v]);
     } else {
       id = (await db.one(`insert into tips (slug, title, excerpt, body_md, cover_url, category_id, tags, status, published_at)
         values ($1,$2,$3,$4,$5,$6,$7,$8, case when $8 = 'published' then now() end) returning id`, v)).id;
     }
   } catch (err){
-    if (/tips_slug_key|duplicate/i.test(String(err.message))) throw new HttpError(409, 'Another tip already uses that web address (slug).');
+    if (/UNIQUE constraint failed: tips.slug/.test(String(err.message))) throw new HttpError(409, 'Another tip already uses that web address (slug).');
     throw err;
   }
   await audit(ctx, 'tip_saved', id, { status: v[7] });
@@ -73,7 +72,7 @@ export async function saveTip(ctx){
 }
 export async function deleteTip(ctx){
   const db = await getDb();
-  const t = await db.maybeOne('delete from tips where id::text = $1 returning *', [ctx.params.id]);
+  const t = await db.maybeOne('delete from tips where id = $1 returning *', [ctx.params.id]);
   if (t) await audit(ctx, 'tip_deleted', t.slug);
   return json({ ok: true, deleted: t ? tipDto(t) : null });   // the portal keeps this for Undo
 }
@@ -214,7 +213,7 @@ export async function listNotify(){
 }
 export async function deleteSignup(ctx){
   const db = await getDb();
-  await db.query('delete from notify_signups where id::text = $1', [ctx.params.id]);
+  await db.query('delete from notify_signups where id = $1', [ctx.params.id]);
   return listNotify();
 }
 // Emails everyone not yet notified, once. Safe to press twice: notified_at is claimed per row first.
@@ -231,7 +230,7 @@ export async function launch(ctx){
     const res = await sendEmail({ to: r.email, template: 'launch', vars: { topic_name: TOPICS[topic], topic_title: TOPICS[topic].replace(/^the /, '').replace(/^./, c => c.toUpperCase()), link, message } });
     if (res.ok) sent++; else { failed++; await db.query('update notify_signups set notified_at = null where id = $1', [r.id]); }
   }
-  const left = (await db.one('select count(*)::int as n from notify_signups where topic = $1 and notified_at is null', [topic])).n;
+  const left = (await db.one('select count(*) as n from notify_signups where topic = $1 and notified_at is null', [topic])).n;
   await audit(ctx, 'launch_email', topic, { sent, failed });
   return json({ sent, failed, remaining: left });
 }

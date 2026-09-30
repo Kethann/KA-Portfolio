@@ -9,12 +9,17 @@
     "start": "node server/platform/node-dev.js",
     "dev": "npm start",
     "build": "node generator/scripts/verify_scripts.cjs && tsc --noEmit && vite build && node --test tests/gallery-build.test.mjs tests/delivery.test.mjs && node generator/scripts/verify_startup.cjs",
-    "build:vercel": "node generator/scripts/verify_scripts.cjs && tsc --noEmit && vite build",
     "frontend": "vite",
     "test": "node --test --test-concurrency=1 tests/ && node generator/scripts/verify_ui.cjs",
     "db:import-legacy": "node scripts/import-legacy.mjs",
     "db:migrate": "node scripts/db-migrate.mjs",
-    "db:seed-demo": "node scripts/seed-demo.mjs"
+    "db:seed-demo": "node scripts/seed-demo.mjs",
+    "build:cf": "node generator/scripts/verify_scripts.cjs && tsc --noEmit && vite build",
+    "cf:dev": "npm run build:cf && wrangler dev",
+    "cf:migrate": "wrangler d1 migrations apply ka-db --remote",
+    "cf:deploy": "npm run build:cf && wrangler d1 migrations apply ka-db --remote && wrangler deploy",
+    "cf:move-local-data": "node scripts/migrate-local-to-d1.mjs",
+    "cf:upload-files": "node scripts/upload-files-to-r2.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
@@ -32,15 +37,16 @@
     "@types/react-dom": "^18.3.5",
     "@types/three": "^0.185.4",
     "aws4fetch": "^1.0.20",
+    "better-sqlite3": "^11.10.0",
     "postcss": "8.5.28",
     "typescript": "^5.7.2",
     "vite": "^6.4.3",
-    "wrangler": "^4.143.0"
+    "wrangler": "^4.144.0"
   },
   "overrides": {
     "qs": "^6.16.0"
   },
   "engines": {
-    "node": ">=20.10 <23"
+    "node": ">=20.10"
   }
 }

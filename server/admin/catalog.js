@@ -19,10 +19,11 @@ export function mapDbError(err){
   if (/priced_when_selling/.test(m)) return new HttpError(400, 'A published item for sale needs both an INR and a USD price (or mark it free).');
   if (/sale_below_price/.test(m)) return new HttpError(400, 'The sale price must be lower than the normal price.');
   if (/sale_window|coupon_window/.test(m)) return new HttpError(400, 'The end date must be after the start date.');
-  if (/duplicate key.*slug|products_slug_key|tips_slug_key/.test(m)) return new HttpError(409, 'That web address (slug) is already used by another item.');
-  if (/coupons_code/.test(m)) return new HttpError(409, 'That code already exists.');
+  // SQLite/D1 wording: "UNIQUE constraint failed: products.slug", "CHECK constraint failed: <name or rule>"
+  if (/UNIQUE constraint failed: (products|tips)\.slug/.test(m)) return new HttpError(409, 'That web address (slug) is already used by another item.');
+  if (/UNIQUE constraint failed: coupons\.code/.test(m)) return new HttpError(409, 'That code already exists.');
   if (/coupon_value/.test(m)) return new HttpError(400, 'Set a percentage, or a fixed amount for at least one currency.');
-  if (/coupon_currencies/.test(m)) return new HttpError(400, 'Choose at least one currency.');
+  if (/json_array_length\(currencies\)/.test(m)) return new HttpError(400, 'Choose at least one currency.');
   return null;
 }
 async function guarded(fn){
@@ -63,9 +64,10 @@ export function isOwnMediaUrl(u){
 
 // ---- products ------------------------------------------------------------------------------------
 const LIST_SELECT = `select p.*, c.name as category_name, c.slug as category_slug, l.name as license_name, l.key as license_key, l.summary as license_summary,
-  coalesce((select json_agg(json_build_object('id', m.id, 'url', m.url, 'alt', m.alt, 'width', m.width, 'height', m.height) order by m.sort, m.id) from product_media m where m.product_id = p.id), '[]'::json) as media,
-  (select json_build_object('id', f.id, 'filename', f.filename, 'bytes', f.bytes, 'licenseVersion', f.license_version, 'createdAt', f.created_at) from product_files f where f.product_id = p.id and f.is_current) as file,
-  (select count(*)::int from order_items i join orders o on o.id = i.order_id where i.product_id = p.id and o.status in ('paid','delivered')) as sales
+  (select json_group_array(json_object('id', m.id, 'url', m.url, 'alt', m.alt, 'width', m.width, 'height', m.height))
+     from (select * from product_media m where m.product_id = p.id order by m.sort, m.id) m) as media,
+  (select json_object('id', f.id, 'filename', f.filename, 'bytes', f.bytes, 'licenseVersion', f.license_version, 'createdAt', f.created_at) from product_files f where f.product_id = p.id and f.is_current) as file,
+  (select count(*) from order_items i join orders o on o.id = i.order_id where i.product_id = p.id and o.status in ('paid','delivered')) as sales
   from products p left join categories c on c.id = p.category_id left join licenses l on l.id = p.license_id`;
 
 function adminDto(p){
@@ -86,20 +88,20 @@ export async function listProducts(ctx){
   const kind = ctx.url.searchParams.get('kind');
   if (kind && kind !== 'artzz' && kind !== 'artifacts') throw new HttpError(400, 'Unknown section.');
   const db = await getDb();
-  const rows = await db.query(`${LIST_SELECT} where ($1::text is null or p.kind = $1) and p.status <> 'archived' order by p.kind, p.sort, p.created_at desc`, [kind || null]);
+  const rows = await db.query(`${LIST_SELECT} where ($1 is null or p.kind = $1) and p.status <> 'archived' order by p.kind, p.sort, p.created_at desc`, [kind || null]);
   return json({ products: rows.map(adminDto) });
 }
 
 export async function getProduct(ctx){
   const db = await getDb();
-  const row = await db.maybeOne(`${LIST_SELECT} where p.id::text = $1`, [ctx.params.id]);
+  const row = await db.maybeOne(`${LIST_SELECT} where p.id = $1`, [ctx.params.id]);
   if (!row) throw new HttpError(404, 'Product not found.');
   return json({ product: adminDto(row) });
 }
 
 async function uniqueSlug(db, base, exceptId = null){
   let s = base, i = 2;
-  while (await db.maybeOne('select 1 from products where slug = $1 and ($2::uuid is null or id <> $2)', [s, exceptId])) s = `${base.slice(0, 54)}-${i++}`;
+  while (await db.maybeOne('select 1 from products where slug = $1 and ($2 is null or id <> $2)', [s, exceptId])) s = `${base.slice(0, 54)}-${i++}`;
   return s;
 }
 
@@ -181,14 +183,14 @@ export async function duplicateProduct(ctx){
   const p = await db.maybeOne('select * from products where id = $1', [id]);
   if (!p) throw new HttpError(404, 'Product not found.');
   const slug = await uniqueSlug(db, `${p.slug.slice(0, 50)}-copy`);
-  const copy = await db.tx(async (tx) => {
-    const row = await tx.one(`insert into products (kind, slug, title, summary, description, category_id, tags, tech_tags, version, status, sellable, is_free, price_inr, price_usd,
+  const copy = { id: crypto.randomUUID() };
+  await db.batch([
+    [`insert into products (id, kind, slug, title, summary, description, category_id, tags, tech_tags, version, status, sellable, is_free, price_inr, price_usd,
       sale_price_inr, sale_price_usd, sale_starts_at, sale_ends_at, license_id, demo_url, preview_url, max_downloads, link_ttl_hours, refund_after_download, sort)
-      select kind, $2, title || ' (copy)', summary, description, category_id, tags, tech_tags, version, 'draft', sellable, is_free, price_inr, price_usd,
-      sale_price_inr, sale_price_usd, sale_starts_at, sale_ends_at, license_id, demo_url, preview_url, max_downloads, link_ttl_hours, refund_after_download, sort from products where id = $1 returning id`, [id, slug]);
-    await tx.query('insert into product_media (product_id, url, alt, width, height, sort) select $2, url, alt, width, height, sort from product_media where product_id = $1', [id, row.id]);
-    return row;
-  });
+      select $3, kind, $2, title || ' (copy)', summary, description, category_id, tags, tech_tags, version, 'draft', sellable, is_free, price_inr, price_usd,
+      sale_price_inr, sale_price_usd, sale_starts_at, sale_ends_at, license_id, demo_url, preview_url, max_downloads, link_ttl_hours, refund_after_download, sort from products where id = $1`, [id, slug, copy.id]],
+    ['insert into product_media (product_id, url, alt, width, height, sort) select $2, url, alt, width, height, sort from product_media where product_id = $1', [id, copy.id]],
+  ]);
   await audit(ctx, 'product_duplicated', copy.id, { from: id });
   return getProduct({ ...ctx, params: { id: copy.id } });
 }
@@ -200,7 +202,7 @@ export async function deleteLicense(ctx){
   const db = await getDb();
   const l = await db.maybeOne('select key, name from licenses where id = $1', [id]);
   if (!l) throw new HttpError(404, 'License not found.');
-  const used = await db.maybeOne('select (select count(*) from products where license_id = $1)::int as products, (select count(*) from order_items where license_key = $2)::int as orders', [id, l.key]);
+  const used = await db.maybeOne('select (select count(*) from products where license_id = $1) as products, (select count(*) from order_items where license_key = $2) as orders', [id, l.key]);
   if (used.products) throw new HttpError(409, `“${l.name}” is used by ${used.products} product${used.products === 1 ? '' : 's'}. Choose another license for ${used.products === 1 ? 'it' : 'them'} first.`);
   if (used.orders) throw new HttpError(409, `“${l.name}” was sold with ${used.orders} order${used.orders === 1 ? '' : 's'}, so it has to stay (buyers keep the text they agreed to).`);
   await db.query('delete from licenses where id = $1', [id]);
@@ -234,7 +236,7 @@ export async function reorderProducts(ctx){
   if (!Array.isArray(body.ids) || body.ids.length > 1000) throw new HttpError(400, 'Send the new order as a list.');
   const ids = body.ids.map(i => vUuid(i, 'Product'));
   const db = await getDb();
-  await db.tx(async (tx) => { for (const [i, id] of ids.entries()) await tx.query('update products set sort = $2 where id = $1', [id, i]); });
+  await db.batch(ids.map((id, i) => ['update products set sort = $2 where id = $1', [id, i]]));
   return json({ ok: true });
 }
 
@@ -256,16 +258,16 @@ export async function updateMedia(ctx){
   const db = await getDb();
   if (Array.isArray(b.order)){
     const ids = b.order.map(x => vUuid(x, 'Image'));
-    await db.tx(async (tx) => { for (const [i, mid] of ids.entries()) await tx.query('update product_media set sort = $3 where id = $1 and product_id = $2', [mid, ctx.params.id, i]); });
+    await db.batch(ids.map((mid, i) => ['update product_media set sort = $3 where id = $1 and product_id = $2', [mid, ctx.params.id, i]]));
   }
   if (b.alt && typeof b.alt === 'object') for (const [mid, alt] of Object.entries(b.alt)) await db.query('update product_media set alt = $3 where id = $1 and product_id = $2', [vUuid(mid, 'Image'), ctx.params.id, str(alt, { max: 200 })]);
-  await db.query('update products set updated_at = now() where id::text = $1', [ctx.params.id]);
+  await db.query('update products set updated_at = now() where id = $1', [ctx.params.id]);
   return getProduct(ctx);
 }
 export async function deleteMedia(ctx){
   const db = await getDb();
-  await db.query('delete from product_media where id::text = $1 and product_id::text = $2', [ctx.params.mediaId, ctx.params.id]);
-  await db.query('update products set updated_at = now() where id::text = $1', [ctx.params.id]);
+  await db.query('delete from product_media where id = $1 and product_id = $2', [ctx.params.mediaId, ctx.params.id]);
+  await db.query('update products set updated_at = now() where id = $1', [ctx.params.id]);
   return getProduct(ctx);
 }
 
@@ -277,14 +279,13 @@ export async function setFile(ctx){
   const filename = str(b.filename, { name: 'File name', max: 160, required: true }).replace(/["\\\r\n]/g, '');
   const bytes = int(b.bytes, { min: 1, max: 50 * MB });
   const db = await getDb();
-  const old = await db.tx(async (tx) => {
-    const prev = await tx.query('update product_files set is_current = false where product_id = $1 and is_current returning storage_path', [id]);
-    await tx.query(`insert into product_files (product_id, storage_path, filename, bytes, sha256, license_version) values ($1,$2,$3,$4,$5,$6)`,
-      [id, path, filename, bytes, str(b.sha256, { max: 64 }), int(b.licenseVersion, { min: 1, max: 1e6, required: false })]);
-    await tx.query('update products set updated_at = now() where id = $1', [id]);
-    return prev;
-  });
-  void old;   // earlier versions stay in storage so links already sent keep working until they expire
+  // earlier versions stay in storage so links already sent keep working until they expire
+  await db.batch([
+    ['update product_files set is_current = 0 where product_id = $1 and is_current = 1', [id]],
+    [`insert into product_files (product_id, storage_path, filename, bytes, sha256, license_version) values ($1,$2,$3,$4,$5,$6)`,
+      [id, path, filename, bytes, str(b.sha256, { max: 64 }), int(b.licenseVersion, { min: 1, max: 1e6, required: false })]],
+    ['update products set updated_at = now() where id = $1', [id]],
+  ]);
   await audit(ctx, 'product_file_set', id, { filename, bytes });
   return getProduct({ ...ctx, params: { id } });
 }
@@ -292,7 +293,7 @@ export async function setFile(ctx){
 // A short-lived link so the portal can download the current deliverable (e.g. to repackage).
 export async function fileLink(ctx){
   const db = await getDb();
-  const f = await db.maybeOne('select storage_path, filename from product_files where product_id::text = $1 and is_current', [ctx.params.id]);
+  const f = await db.maybeOne('select storage_path, filename from product_files where product_id = $1 and is_current', [ctx.params.id]);
   if (!f) throw new HttpError(404, 'No file uploaded yet.');
   return json({ url: await getStorage().signedUrl('deliverables', f.storage_path, 120, f.filename) });
 }
@@ -300,7 +301,7 @@ export async function fileLink(ctx){
 // ---- categories + licenses ----------------------------------------------------------------------
 export async function listCategories(){
   const db = await getDb();
-  const rows = await db.query(`select c.*, (select count(*)::int from products p where p.category_id = c.id) + (select count(*)::int from tips t where t.category_id = c.id) as used from categories c order by kind, sort, name`);
+  const rows = await db.query(`select c.*, (select count(*) from products p where p.category_id = c.id) + (select count(*) from tips t where t.category_id = c.id) as used from categories c order by kind, sort, name`);
   return json({ categories: rows });
 }
 export async function saveCategory(ctx){
@@ -311,14 +312,14 @@ export async function saveCategory(ctx){
   if (!kind) throw new HttpError(400, 'Choose where the category is used.');
   const slug = slugify(b.slug || name);
   try {
-    if (ctx.params.id) await db.query('update categories set name = $2, slug = $3, sort = coalesce($4, sort) where id::text = $1', [ctx.params.id, name, slug, b.sort ?? null]);
+    if (ctx.params.id) await db.query('update categories set name = $2, slug = $3, sort = coalesce($4, sort) where id = $1', [ctx.params.id, name, slug, b.sort ?? null]);
     else await db.query('insert into categories (kind, name, slug, sort) values ($1, $2, $3, (select coalesce(max(sort), -1) + 1 from categories where kind = $1))', [kind, name, slug]);
   } catch (err){ if (/unique|duplicate/i.test(err.message)) throw new HttpError(409, 'A category with that name already exists.'); throw err; }
   return listCategories();
 }
 export async function deleteCategory(ctx){
   const db = await getDb();
-  await db.query('delete from categories where id::text = $1', [ctx.params.id]);   // items fall back to "no category"
+  await db.query('delete from categories where id = $1', [ctx.params.id]);   // items fall back to "no category"
   return listCategories();
 }
 export async function listLicenses(){
@@ -330,7 +331,7 @@ export async function saveLicense(ctx){
   const db = await getDb();
   const name = str(b.name, { name: 'Name', max: 60, required: true }), summary = str(b.summary, { name: 'Summary', max: 300 }), body = str(b.body, { name: 'License text', max: 40000, trim: false });
   if (ctx.params.id){
-    await db.query('update licenses set name = $2, summary = $3, body_md = $4, version = version + case when body_md is distinct from $4 then 1 else 0 end, updated_at = now() where id::text = $1', [ctx.params.id, name, summary, body]);
+    await db.query('update licenses set name = $2, summary = $3, body_md = $4, version = version + case when body_md is not $4 then 1 else 0 end, updated_at = now() where id = $1', [ctx.params.id, name, summary, body]);
   } else {
     const key = slugify(b.key || name);
     try { await db.query('insert into licenses (key, name, summary, body_md) values ($1, $2, $3, $4)', [key, name, summary, body]); }

@@ -46,7 +46,7 @@ export async function quotaReport(chain){
   const db = await getDb();
   const day = quotaDay();
   const today = await db.query('select model, requests, failures, quota_limit, exhausted_at from assistant_model_usage where day = $1', [day]);
-  const known = await db.query(`select distinct on (model) model, quota_limit from assistant_model_usage where quota_limit is not null order by model, day desc`);
+  const known = await db.query(`select model, quota_limit from assistant_model_usage u where quota_limit is not null and day = (select max(day) from assistant_model_usage v where v.model = u.model and v.quota_limit is not null)`);
   const models = chain.map(model => {
     const t = today.find(r => r.model === model);
     const limit = t?.quota_limit ?? known.find(r => r.model === model)?.quota_limit ?? null;

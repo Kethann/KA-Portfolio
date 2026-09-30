@@ -1,6 +1,6 @@
-// HOST ADAPTER: LOCAL DEVELOPMENT (`npm start`). Serves the site the same way Vercel does
-// (static files + /api/* through server/handler.js). Without DATABASE_URL it uses a local PGlite
-// database and local file storage under .data/, so no accounts are needed to work on the site.
+// HOST ADAPTER: LOCAL DEVELOPMENT (`npm start`). Serves the site the same way the Cloudflare Worker does
+// (static files + /api/* through server/handler.js), with a local SQLite database (the engine D1 runs)
+// and local file storage under .data/, so no accounts are needed to work on the site.
 import { config } from 'dotenv';
 import { createServer } from 'node:http';
 import { readFile, stat, mkdir, writeFile } from 'node:fs/promises';
@@ -9,7 +9,7 @@ import { resolve, extname, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Readable } from 'node:stream';
 import { setEnvSource, env } from '../core/env.js';
-import { setDatabase, wrapPglite } from '../core/db.js';
+import { setDatabase } from '../core/db.js';
 import { getStorage } from '../core/storage.js';
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
@@ -24,13 +24,10 @@ const SECURITY = { 'X-Content-Type-Options':'nosniff', 'Referrer-Policy':'strict
 
 export async function createDevServer({ port = Number(env('PORT', 9878)), host = env('HOST', '127.0.0.1'), dataDir = env('KA_DATA_DIR', resolve(root, '.data')) } = {}){
   process.env.KA_DATA_DIR = dataDir;
-  let pg = null;
-  if (!env('DATABASE_URL')){
-    const { openPglite } = await import('../dev/pglite.js');
-    await mkdir(dataDir, { recursive: true });
-    pg = await openPglite(resolve(dataDir, 'pglite'));
-    setDatabase(wrapPglite(pg));
-  }
+  const { openSqlite } = await import('../dev/sqlite.js');
+  await mkdir(dataDir, { recursive: true });
+  const pg = openSqlite(resolve(dataDir, 'ka.sqlite'));
+  setDatabase(pg);
   const { handle } = await import('../handler.js');
   const platform = {
     name: 'node-dev',
@@ -135,7 +132,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   createDevServer().then((server) => {
     const { port, address } = server.address();
     console.log(`Site:    http://${address}:${port}\nPortal:  http://${address}:${port}/portal/`);
-    if (!env('DATABASE_URL')) console.log('Data:    local PGlite database + storage in .data/ (set DATABASE_URL to use Supabase)');
+    console.log('Data:    local SQLite database (.data/ka.sqlite) + storage in .data/');
     const stop = () => server.shutdown().then(() => process.exit(0));
     process.once('SIGINT', stop); process.once('SIGTERM', stop);
   }).catch((err) => {

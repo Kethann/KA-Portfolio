@@ -86,7 +86,7 @@ test('portal: summary, live, log and CSV (admin only); retention job deletes old
   assert.equal(log.json.rows.length, 1);
   const csvRes = await app.call('GET', '/api/admin/visitors.csv', { headers, ip: '198.51.100.99' });
   assert.match(csvRes.text, /"ip",/); assert.match(csvRes.text, /198\.51\.100\.20/);
-  await app.pg.query(`update visits set visited_at = now() - interval '400 days' where ip = '8.8.4.4'`);
+  await app.pg.query(`update visits set visited_at = strftime('%Y-%m-%dT%H:%M:%fZ','now','-400 days') where ip = '8.8.4.4'`);
   const r = await jobHooks.daily.visitRetention();
   assert.equal(r.removed, 2);
 });

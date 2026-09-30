@@ -44,7 +44,7 @@ export async function locate(ip, platformGeo){
   if (platformGeo && platformGeo.country) return { ...platformGeo };
   if (!isPublicIp(ip)) return null;
   const db = await getDb();
-  const cached = await db.maybeOne(`select country, region, city, timezone, provider from ip_geo_cache where ip = $1 and looked_up_at > now() - make_interval(days => $2)`, [ip, CACHE_DAYS]);
+  const cached = await db.maybeOne(`select country, region, city, timezone, provider from ip_geo_cache where ip = $1 and looked_up_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-' || $2 || ' days')`, [ip, CACHE_DAYS]);
   if (cached) return cached;
   for (const [name, p] of Object.entries(PROVIDERS)){
     if (!p.enabled()) continue;

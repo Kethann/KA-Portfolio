@@ -11,7 +11,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setEnvSource } from '../server/core/env.js';
-import { getDb, setDatabase, wrapPglite } from '../server/core/db.js';
+import { getDb, setDatabase } from '../server/core/db.js';
 import { getStorage } from '../server/core/storage.js';
 import { getSettingWithRevision, setSetting } from '../server/core/settings.js';
 
@@ -23,9 +23,9 @@ const legacyDir = resolve(process.argv[2] || resolve(root, 'server/data'));
 
 async function readJson(name, fallback){ try { return JSON.parse(await readFile(resolve(legacyDir, name), 'utf8')); } catch { return fallback; } }
 
-if (!process.env.DATABASE_URL){
-  const { openPglite } = await import('../server/dev/pglite.js');
-  setDatabase(wrapPglite(await openPglite(resolve(process.env.KA_DATA_DIR || resolve(root, '.data'), 'pglite'))));
+if (!false){
+  const { openSqlite } = await import('../server/dev/sqlite.js');
+  setDatabase(openSqlite(resolve(process.env.KA_DATA_DIR || resolve(root, '.data'), 'ka.sqlite')));
   console.log('No DATABASE_URL: importing into the local development database (.data/).');
 }
 const db = await getDb();

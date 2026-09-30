@@ -1,12 +1,11 @@
 // What the assistant knows: the owner's own sources (text / FAQ / documents, split into chunks and
-// searched with Postgres full-text search) plus live site data (published products with prices,
+// searched with SQLite FTS5 full-text search) plus live site data (published products with prices,
 // tips, portfolio titles, legal pages). Only published/public information is ever included.
 import { getDb } from '../core/db.js';
 import { getSetting } from '../core/settings.js';
 import { formatMoney, priceFor } from '../store/pricing.js';
-import { readFileSync } from 'node:fs';
-// new URL(..., import.meta.url) lets Vercel's file tracer see and bundle the JSON (createRequire it can't).
-const legacy = JSON.parse(readFileSync(new URL('../knowledge.json', import.meta.url), 'utf8'));
+// bundled with the code (the Worker has no file system to read it from at runtime)
+import legacy from '../knowledge.json' with { type: 'json' };
 
 const CHUNK = 900;
 export function chunk(text){
@@ -19,17 +18,22 @@ export function chunk(text){
   if (cur) out.push(cur);
   return out;
 }
-export async function reindex(db, sourceId, body){
-  await db.query('delete from kb_chunks where source_id = $1', [sourceId]);
+// Replaces a source's chunks in one all-or-nothing batch (the search index follows through triggers).
+export function reindexStatements(sourceId, body){
   const parts = chunk(body);
-  for (const [i, c] of parts.entries()) await db.query('insert into kb_chunks (source_id, ord, content) values ($1, $2, $3)', [sourceId, i, c]);
-  return parts.length;
+  return [['delete from kb_chunks where source_id = $1', [sourceId]],
+    ...parts.map((c, i) => ['insert into kb_chunks (source_id, ord, content) values ($1, $2, $3)', [sourceId, i, c]])];
+}
+export async function reindex(db, sourceId, body){
+  const list = reindexStatements(sourceId, body);
+  await db.batch(list);
+  return list.length - 1;
 }
 
 // First run: turn the real (non-placeholder) facts from the old knowledge.json into a source.
 export async function seedIfEmpty(){
   const db = await getDb();
-  if ((await db.one('select count(*)::int as n from kb_sources')).n > 0) return;
+  if ((await db.one('select count(*) as n from kb_sources')).n > 0) return;
   const real = (v) => typeof v === 'string' && v.trim() && !/PLACEHOLDER/i.test(v);
   const lines = [];
   if (real(legacy.bio)) lines.push(legacy.bio);
@@ -51,14 +55,16 @@ export async function retrieve(question, { includeProducts = true } = {}){
   const q = String(question || '').slice(0, 500);
   let hits = [];
   if (q.trim()){
-    hits = await db.query(`select c.content, s.title, ts_rank(c.search, query) as rank
-      from kb_chunks c join kb_sources s on s.id = c.source_id, websearch_to_tsquery('simple', $1) query
-      where s.enabled and c.search @@ query order by rank desc limit 6`, [q]).catch(() => []);
+    // every word first (quoted, so the question can never be read as search syntax), then any longer word
+    const search = (match) => db.query(`select c.content, s.title, f.rank
+      from (select rowid as rid, rank from kb_chunks_fts where kb_chunks_fts match $1) f
+      join kb_chunks c on c.id = f.rid join kb_sources s on s.id = c.source_id
+      where s.enabled order by f.rank limit 6`, [match]).catch(() => []);
+    const all = [...new Set(q.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [])].slice(0, 12);
+    if (all.length) hits = await search(all.map(w => `"${w}"`).join(' '));
     if (!hits.length){
-      // fall back to OR-matching of the longer words (websearch_to_tsquery is AND-based)
-      const words = [...new Set(q.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) || [])].slice(0, 8);
-      if (words.length) hits = await db.query(`select c.content, s.title, ts_rank(c.search, to_tsquery('simple', $1)) as rank
-        from kb_chunks c join kb_sources s on s.id = c.source_id where s.enabled and c.search @@ to_tsquery('simple', $1) order by rank desc limit 6`, [words.join(' | ')]).catch(() => []);
+      const words = all.filter(w => w.length >= 4).slice(0, 8);
+      if (words.length) hits = await search(words.map(w => `"${w}"`).join(' OR '));
     }
   }
   // always include the start of general "text" sources (the about-me basics)

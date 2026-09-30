@@ -1,4 +1,4 @@
-// Scheduled jobs (vercel.json "crons"). Each is safe to run twice.
+// Scheduled jobs (Cloudflare Cron Triggers in wrangler.jsonc). Each is safe to run twice.
 //   daily  (01:00 UTC): keep-alive query, expire unpaid orders, daily report when enabled
 //   weekly (Mon 02:00 UTC): backup export, weekly report when enabled
 import { json } from '../core/http.js';
@@ -10,7 +10,7 @@ import { jobHooks } from '../jobs/hooks.js';
 export async function daily(){
   const db = await getDb();
   const results = {};
-  // A real read and write every day: Supabase pauses free projects after 7 days without activity.
+  // A small read and write every day (a heartbeat the portal shows under System status).
   await db.query('select 1');
   const system = await getSetting('system');
   await setSetting('system', { ...system, lastHeartbeat: new Date().toISOString() });

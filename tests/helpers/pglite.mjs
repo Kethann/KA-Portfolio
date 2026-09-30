@@ -1,5 +1,5 @@
-// Test database: a fresh in-memory PGlite with every migration applied (see server/dev/pglite.js).
-export { migrate } from '../../server/dev/pglite.js';
-import { openPglite } from '../../server/dev/pglite.js';
+// Test database: a fresh in-memory SQLite with every migration applied (see server/dev/sqlite.js).
+export { migrate } from '../../server/dev/sqlite.js';
+import { openSqlite } from '../../server/dev/sqlite.js';
 
-export function createTestDatabase(dataDir){ return openPglite(dataDir); }
+export function createTestDatabase(file){ return openSqlite(file); }
