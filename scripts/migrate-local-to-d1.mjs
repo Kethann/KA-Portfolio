@@ -75,6 +75,11 @@ try {
     }
     report[t] = n;
   }
+  // a database from before the team feature has no roles: the first account becomes the owner
+  if (!raw.prepare(`select 1 from admin_users where role = 'owner'`).get()){
+    const OWNER = `update admin_users set role = 'owner' where id = (select id from admin_users order by created_at limit 1)`;
+    raw.exec(OWNER); sql.push(OWNER + ';');
+  }
   const bad = raw.prepare('pragma foreign_key_check').all();
   if (bad.length) throw new Error(`Foreign key problems after copying: ${JSON.stringify(bad.slice(0, 5))}`);
   raw.exec('commit');

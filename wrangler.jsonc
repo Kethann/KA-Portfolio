@@ -2,41 +2,58 @@
 // Setup steps: docs/CLOUDFLARE.md. Secrets (keys, passwords) are NOT kept here: add them in the Cloudflare
 // dashboard (Worker > Settings > Variables and Secrets) or with `npx wrangler secret put NAME`.
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "kethan-artzz",
-  "main": "server/platform/cloudflare.js",
-  "compatibility_date": "2026-09-01",
-  "compatibility_flags": ["nodejs_compat"],
-
-  // The built site. Only these paths run the Worker; every other file is served straight from Cloudflare's edge.
-  "assets": {
-    "directory": "./dist",
-    "binding": "ASSETS",
-    "html_handling": "auto-trailing-slash",
-    "not_found_handling": "none",
-    "run_worker_first": ["/api/*", "/legal", "/legal/*", "/__storage/*", "/__storage-upload/*"]
-  },
-
-  // Database: create it once with `npx wrangler d1 create ka-db`, then paste the id it prints here.
-  "d1_databases": [
-    { "binding": "DB", "database_name": "ka-db", "database_id": "PASTE-YOUR-D1-DATABASE-ID-HERE", "migrations_dir": "migrations" }
-  ],
-
-  // Files (images, downloads, backups): create it once with `npx wrangler r2 bucket create ka-files`.
-  "r2_buckets": [
-    { "binding": "FILES", "bucket_name": "ka-files" }
-  ],
-
-  // Daily housekeeping (01:00 UTC) and the weekly backup (Mondays 02:00 UTC).
-  "triggers": { "crons": ["0 1 * * *", "0 2 * * 1"] },
-
-  // Public, non-secret settings. PUBLIC_SITE_URL: your site's address (e.g. https://kethan-artzz.<you>.workers.dev
-  // or your own domain) — used in email links.
-  "vars": {
-    "KA_ENV": "production",
-    "SITE_NAME": "Kethan Artzz",
-    "PUBLIC_SITE_URL": ""
-  },
-
-  "observability": { "enabled": true }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "kethan-artzz",
+	"main": "server/platform/cloudflare.js",
+	"compatibility_date": "2026-09-01",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	// The built site. Only these paths run the Worker; every other file is served straight from Cloudflare's edge.
+	"assets": {
+		"directory": "./dist",
+		"binding": "ASSETS",
+		"html_handling": "auto-trailing-slash",
+		"not_found_handling": "none",
+		"run_worker_first": [
+			"/api/*",
+			"/legal",
+			"/legal/*",
+			"/__storage/*",
+			"/__storage-upload/*"
+		]
+	},
+	// Database (created with `npx wrangler d1 create ka-db`).
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "ka-db",
+			"database_id": "b2a46d52-2b1d-42e0-bff4-b7b52ef7e8c4",
+			"migrations_dir": "migrations"
+		}
+	],
+	// Files (images, downloads, backups): create it once with `npx wrangler r2 bucket create ka-files`.
+	"r2_buckets": [
+		{
+			"binding": "FILES",
+			"bucket_name": "ka-files"
+		}
+	],
+	// Daily housekeeping (01:00 UTC) and the weekly backup (Mondays 02:00 UTC).
+	"triggers": {
+		"crons": [
+			"0 1 * * *",
+			"0 2 * * 1"
+		]
+	},
+	// Public, non-secret settings. PUBLIC_SITE_URL: your site's address (e.g. https://kethan-artzz.<you>.workers.dev
+	// or your own domain) — used in email links.
+	"vars": {
+		"KA_ENV": "production",
+		"SITE_NAME": "Kethan Artzz",
+		"PUBLIC_SITE_URL": ""
+	},
+	"observability": {
+		"enabled": true
+	}
 }
