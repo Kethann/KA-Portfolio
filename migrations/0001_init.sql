@@ -520,29 +520,20 @@ create table backups (
 -- ------------------------------------------------------------------ full-text search (FTS5)
 -- Replaces Postgres tsvector columns: each index mirrors its table through triggers.
 create virtual table tips_fts using fts5(title, excerpt, body_md, content='tips', content_rowid='rowid', tokenize='unicode61 remove_diacritics 2');
-create trigger tips_fts_ai after insert on tips begin insert into tips_fts (rowid, title, excerpt, body_md) values (new.rowid, new.title, new.excerpt, new.body_md); end;
-create trigger tips_fts_ad after delete on tips begin insert into tips_fts (tips_fts, rowid, title, excerpt, body_md) values ('delete', old.rowid, old.title, old.excerpt, old.body_md); end;
-create trigger tips_fts_au after update of title, excerpt, body_md on tips begin
-  insert into tips_fts (tips_fts, rowid, title, excerpt, body_md) values ('delete', old.rowid, old.title, old.excerpt, old.body_md);
-  insert into tips_fts (rowid, title, excerpt, body_md) values (new.rowid, new.title, new.excerpt, new.body_md);
-end;
+CREATE TRIGGER tips_fts_ai AFTER INSERT on tips BEGIN insert into tips_fts (rowid, title, excerpt, body_md) values (new.rowid, new.title, new.excerpt, new.body_md); END;
+CREATE TRIGGER tips_fts_ad AFTER DELETE on tips BEGIN insert into tips_fts (tips_fts, rowid, title, excerpt, body_md) values ('delete', old.rowid, old.title, old.excerpt, old.body_md); END;
+CREATE TRIGGER tips_fts_au AFTER UPDATE of title, excerpt, body_md on tips BEGIN insert into tips_fts (tips_fts, rowid, title, excerpt, body_md) values ('delete', old.rowid, old.title, old.excerpt, old.body_md); insert into tips_fts (rowid, title, excerpt, body_md) values (new.rowid, new.title, new.excerpt, new.body_md); END;
 
 create virtual table messages_fts using fts5(name, email, subject, body, content='messages', content_rowid='rowid', tokenize='unicode61 remove_diacritics 2');
-create trigger messages_fts_ai after insert on messages begin insert into messages_fts (rowid, name, email, subject, body) values (new.rowid, new.name, new.email, new.subject, new.body); end;
-create trigger messages_fts_ad after delete on messages begin insert into messages_fts (messages_fts, rowid, name, email, subject, body) values ('delete', old.rowid, old.name, old.email, old.subject, old.body); end;
-create trigger messages_fts_au after update of name, email, subject, body on messages begin
-  insert into messages_fts (messages_fts, rowid, name, email, subject, body) values ('delete', old.rowid, old.name, old.email, old.subject, old.body);
-  insert into messages_fts (rowid, name, email, subject, body) values (new.rowid, new.name, new.email, new.subject, new.body);
-end;
+CREATE TRIGGER messages_fts_ai AFTER INSERT on messages BEGIN insert into messages_fts (rowid, name, email, subject, body) values (new.rowid, new.name, new.email, new.subject, new.body); END;
+CREATE TRIGGER messages_fts_ad AFTER DELETE on messages BEGIN insert into messages_fts (messages_fts, rowid, name, email, subject, body) values ('delete', old.rowid, old.name, old.email, old.subject, old.body); END;
+CREATE TRIGGER messages_fts_au AFTER UPDATE of name, email, subject, body on messages BEGIN insert into messages_fts (messages_fts, rowid, name, email, subject, body) values ('delete', old.rowid, old.name, old.email, old.subject, old.body); insert into messages_fts (rowid, name, email, subject, body) values (new.rowid, new.name, new.email, new.subject, new.body); END;
 
 create virtual table kb_chunks_fts using fts5(content, content='kb_chunks', content_rowid='id', tokenize='unicode61 remove_diacritics 2');
-create trigger kb_chunks_fts_ai after insert on kb_chunks begin insert into kb_chunks_fts (rowid, content) values (new.id, new.content); end;
-create trigger kb_chunks_fts_ad after delete on kb_chunks begin insert into kb_chunks_fts (kb_chunks_fts, rowid, content) values ('delete', old.id, old.content); end;
-create trigger kb_chunks_fts_au after update of content on kb_chunks begin
-  insert into kb_chunks_fts (kb_chunks_fts, rowid, content) values ('delete', old.id, old.content);
-  insert into kb_chunks_fts (rowid, content) values (new.id, new.content);
-end;
+CREATE TRIGGER kb_chunks_fts_ai AFTER INSERT on kb_chunks BEGIN insert into kb_chunks_fts (rowid, content) values (new.id, new.content); END;
+CREATE TRIGGER kb_chunks_fts_ad AFTER DELETE on kb_chunks BEGIN insert into kb_chunks_fts (kb_chunks_fts, rowid, content) values ('delete', old.id, old.content); END;
+CREATE TRIGGER kb_chunks_fts_au AFTER UPDATE of content on kb_chunks BEGIN insert into kb_chunks_fts (kb_chunks_fts, rowid, content) values ('delete', old.id, old.content); insert into kb_chunks_fts (rowid, content) values (new.id, new.content); END;
 
 create virtual table assistant_messages_fts using fts5(content, content='assistant_messages', content_rowid='id', tokenize='unicode61 remove_diacritics 2');
-create trigger assistant_messages_fts_ai after insert on assistant_messages begin insert into assistant_messages_fts (rowid, content) values (new.id, new.content); end;
-create trigger assistant_messages_fts_ad after delete on assistant_messages begin insert into assistant_messages_fts (assistant_messages_fts, rowid, content) values ('delete', old.id, old.content); end;
+CREATE TRIGGER assistant_messages_fts_ai AFTER INSERT on assistant_messages BEGIN insert into assistant_messages_fts (rowid, content) values (new.id, new.content); END;
+CREATE TRIGGER assistant_messages_fts_ad AFTER DELETE on assistant_messages BEGIN insert into assistant_messages_fts (assistant_messages_fts, rowid, content) values ('delete', old.id, old.content); END;
