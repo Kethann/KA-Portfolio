@@ -22,6 +22,7 @@ export function productDto(p, now = new Date()){
   }
   return {
     id: p.id, slug: p.slug, kind: p.kind, title: p.title, summary: p.summary, description: p.description,
+    descriptionHtml: p.description ? renderMarkdown(p.description) : '',   // Markdown from the portal, rendered safely here
     category: p.category_slug ? { slug: p.category_slug, name: p.category_name } : null,
     tags: p.tags || [], techTags: p.tech_tags || [], version: p.version || '',
     sellable: !!p.sellable, free: !!p.is_free, prices,

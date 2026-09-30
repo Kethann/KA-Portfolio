@@ -19,6 +19,7 @@ export function useDebounced<T>(value: T, ms: number){
 // Keeps keyboard focus inside `ref` while active and returns it to the opener afterwards.
 // returnTo: the element that opened the dialog (clicks do not focus buttons in every browser,
 // e.g. Safari on macOS), so focus goes back to it on close instead of wherever focus happened to be.
+let openModals = 0;
 export function useFocusTrap(ref: React.RefObject<HTMLElement>, active: boolean, onEscape: () => void, returnTo?: HTMLElement | null){
   const escape = useRef(onEscape);
   escape.current = onEscape;
@@ -40,10 +41,13 @@ export function useFocusTrap(ref: React.RefObject<HTMLElement>, active: boolean,
       else if (!e.shiftKey && activeEl === list[list.length - 1]){ e.preventDefault(); list[0].focus(); }
     };
     root.addEventListener('keydown', onKey);
+    openModals++;
     document.documentElement.classList.add('ka-modal-open');
     return () => {
       root.removeEventListener('keydown', onKey);
-      document.documentElement.classList.remove('ka-modal-open');
+      // the page stays locked while any dialog is still open (the lightbox under a closing checkout)
+      openModals = Math.max(0, openModals - 1);
+      if (!openModals) document.documentElement.classList.remove('ka-modal-open');
       if (opener && opener.isConnected) opener.focus({ preventScroll: true });
     };
   }, [active, ref, returnTo]);

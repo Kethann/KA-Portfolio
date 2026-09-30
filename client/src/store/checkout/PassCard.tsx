@@ -97,23 +97,27 @@ export function PassCard({ product, currency, amount, free, email, orderId, phas
       <div className={`kco-card ${flipped ? 'is-flipped' : ''}`} role="button" tabIndex={0}
         aria-label={`${product.title} pass. ${flipped ? 'Showing license details' : 'Showing summary'}. Press Enter to flip.`} aria-pressed={flipped}
         onClick={onFlip} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); onFlip(); } }}>
+        {/* A ticket, not a payment card: the artwork fills it, a holographic foil follows the tilt,
+            and a perforated stub carries the buyer's email and the order. PAID stamps on success. */}
         <div className="kco-face kco-front" aria-hidden={flipped}>
+          {thumb ? <img className="kco-art" src={thumb.url} alt="" decoding="async" /> : <span className="kco-art kco-art-empty" />}
+          <span className="kco-scrim" aria-hidden="true" /><span className="kco-foil" aria-hidden="true" />
           <span className="kco-sheen" aria-hidden="true" /><span className="kco-noise" aria-hidden="true" />
           <div className="kco-card-top">
-            <span className="kco-brand"><img src="/images/favicon-64.png" alt="" width="22" height="22" />{kindLabel}</span>
-            <span className="kco-chip" aria-hidden="true" />
+            <span className="kco-brand"><img src="/images/favicon-64.png" alt="" width="20" height="20" />{kindLabel} PASS</span>
+            <span className="kco-tag">{free ? 'Free download' : 'Instant download'}</span>
           </div>
-          <div className="kco-card-mid">
-            {thumb ? <img className="kco-thumb" src={thumb.url} alt="" /> : <span className="kco-thumb kco-thumb-empty" />}
+          <div className="kco-main">
             <div className="kco-title"><strong>{product.title}</strong><small>{product.license ? `${product.license.name} license` : 'Digital download'}</small></div>
+            <div className="kco-amount"><CountingPrice amount={amount} currency={currency} reduced={reduced} free={free} /></div>
           </div>
-          <div className="kco-amount"><CountingPrice amount={amount} currency={currency} reduced={reduced} free={free} /></div>
-          <div className="kco-card-foot">
+          <div className="kco-stub">
             <span className="kco-email" aria-hidden="true">
               {shown ? Array.from(shown).map((ch, i) => <span key={i} className="kco-char">{ch}</span>) : <span className="kco-ghost">you@example.com</span>}
             </span>
-            <span className="kco-order">{method && phase === 'success' ? methodText(method) : orderId || '•••• ••••'}</span>
+            <span className="kco-order">{method && phase === 'success' ? methodText(method) : orderId || 'KA-••••••••'}</span>
           </div>
+          {phase === 'success' && <span className="kco-stamp" aria-hidden="true">{free ? 'YOURS' : 'PAID'}</span>}
         </div>
         <div className="kco-face kco-back" aria-hidden={!flipped}>
           <span className="kco-stripe" aria-hidden="true" />

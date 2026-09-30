@@ -3,7 +3,7 @@ export type Currency = 'INR' | 'USD';
 export interface Price { currency: Currency; amount: number; compareAt: number | null; onSale: boolean; saleEndsAt: string | null; free: boolean; available: boolean; percentOff: number }
 export interface Media { url: string; alt: string; width: number | null; height: number | null }
 export interface Product {
-  id: string; slug: string; kind: 'artzz' | 'artifacts'; title: string; summary: string; description: string;
+  id: string; slug: string; kind: 'artzz' | 'artifacts'; title: string; summary: string; description: string; descriptionHtml?: string;
   category: { slug: string; name: string } | null; tags: string[]; techTags: string[]; version: string;
   sellable: boolean; free: boolean; prices: Record<Currency, Price>;
   license: { key: string; name: string; summary: string } | null; demoUrl: string; previewUrl: string; media: Media[];
@@ -27,15 +27,23 @@ export const apiUrl = (path: string) => (window.kaApiUrl ? window.kaApiUrl(path)
 
 export class ApiError extends Error { constructor(message: string, public status: number, public code?: string){ super(message); } }
 
+// A dropped connection shows a sentence people understand, not the browser's "Failed to fetch".
+async function send(path: string, init: RequestInit): Promise<Response>{
+  try { return await fetch(apiUrl(path), init); }
+  catch (e){
+    if ((e as Error).name === 'AbortError') throw e;
+    throw new ApiError(typeof navigator !== 'undefined' && navigator.onLine === false ? 'You’re offline. Check your connection and try again.' : 'Couldn’t reach the store. Check your connection and try again.', 0, 'network');
+  }
+}
 export async function getJson<T>(path: string, signal?: AbortSignal): Promise<T>{
-  const res = await fetch(apiUrl(path), { headers: { Accept: 'application/json' }, signal });
+  const res = await send(path, { headers: { Accept: 'application/json' }, signal });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(body.error || 'Something went wrong. Please try again.', res.status, body.code);
   return body as T;
 }
 
 export async function postJson<T>(path: string, data: unknown, signal?: AbortSignal): Promise<T>{
-  const res = await fetch(apiUrl(path), { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(data), signal });
+  const res = await send(path, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(data), signal });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(body.error || 'Something went wrong. Please try again.', res.status, body.code);
   return body as T;

@@ -176,7 +176,7 @@ function ArtifactCard({ product, currency, onOpen, onBuy }: { product: Product; 
   const price = product.prices[currency];
   const demo = product.demoUrl || product.previewUrl;
   return <li className="kas-card">
-    <button type="button" className="kas-card-shot" onClick={(e) => onOpen(0, e.currentTarget)} aria-label={`View screenshots of ${product.title}`} disabled={!product.media.length}>
+    <button type="button" className="kas-card-shot" onClick={(e) => onOpen(0, e.currentTarget)} aria-label={product.media.length ? `View screenshots of ${product.title}` : `View details of ${product.title}`}>
       <Img media={product.media[0]} sizes="(max-width: 700px) 100vw, 420px" />
       {product.media.length > 1 && <span className="kas-shot-count" aria-hidden="true">{product.media.length}</span>}
     </button>
@@ -242,7 +242,8 @@ function Lightbox({ items, index, mediaIndex, opener, currency, onClose, onMove,
     <div className="kas-lb-caption">
       <div>
         <strong>{product.title}</strong>
-        {product.description ? <p>{product.description}</p> : product.summary ? <p>{product.summary}</p> : null}
+        {/* descriptions are Markdown, rendered to safe HTML by the server (the same renderer as Tips) */}
+        {product.descriptionHtml ? <div className="kas-lb-desc" dangerouslySetInnerHTML={{ __html: product.descriptionHtml }} /> : product.summary ? <p>{product.summary}</p> : null}
         {product.kind === 'artifacts' && media.length > 1 && <span className="kas-lb-count" aria-live="polite">{mediaIndex + 1} / {media.length}</span>}
       </div>
       {product.sellable && product.prices[currency].available && <div className="kas-lb-buy"><PriceTag price={product.prices[currency]} /><BuyButton product={product} currency={currency} onBuy={(p, c) => { onClose(); onBuy(p, c, opener); }} /></div>}

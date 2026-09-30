@@ -190,3 +190,86 @@
   .kco-pay{ transform:none; }
 }
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){ .kdp{ background:rgba(6,5,8,.97); } }
+
+/* ---- Pass card v2: artwork-first ticket (replaces the credit-card look) --------------------------- */
+.kco-front{ display:grid; grid-template-rows:auto 1fr auto; padding:0; gap:0; background:#120e13; }
+.kco-art{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scale(1.08) translate(calc((var(--gx, 50%) - 50%) * -0.06), calc((var(--gy, 50%) - 50%) * -0.06)); }
+.kco-art-empty{ display:block; background:radial-gradient(120% 80% at 18% 0%, #6a2622, transparent 62%), radial-gradient(90% 70% at 100% 100%, #3b1830, transparent 60%), linear-gradient(135deg, #2a1c22, #120e13); }
+.kco-scrim{ position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(180deg, rgba(10,8,11,.62) 0%, rgba(10,8,11,.08) 26%, rgba(10,8,11,.12) 48%, rgba(10,8,11,.86) 82%); }
+.kco-foil{ position:absolute; inset:0; pointer-events:none; mix-blend-mode:color-dodge; opacity:.32;
+  background:conic-gradient(from 200deg at var(--gx, 50%) var(--gy, 40%), #ff9a8b, #fecf7a, #a6f0c6, #8fb8ff, #d6a4ff, #ff9a8b);
+  -webkit-mask-image:radial-gradient(circle at var(--gx, 50%) var(--gy, 40%), #000 0, rgba(0,0,0,.35) 38%, transparent 70%); mask-image:radial-gradient(circle at var(--gx, 50%) var(--gy, 40%), #000 0, rgba(0,0,0,.35) 38%, transparent 70%); }
+.kco-front .kco-card-top{ z-index:2; padding:6% 6.5% 0; }
+.kco-brand{ color:#ffe3c9; text-shadow:0 1px 6px rgba(0,0,0,.5); }
+.kco-brand img{ width:20px; height:20px; }
+.kco-tag{ font:600 10px/1 var(--font-mono, 'JetBrains Mono'), monospace; letter-spacing:.14em; text-transform:uppercase; color:rgba(255,240,228,.85);
+  padding:5px 8px; border-radius:999px; background:rgba(10,8,11,.45); border:1px solid rgba(255,230,210,.22); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+.kco-main{ position:relative; z-index:2; align-self:end; display:flex; justify-content:space-between; align-items:flex-end; gap:12px; padding:0 6.5% 3.5%; min-width:0; }
+.kco-main .kco-title{ min-width:0; text-shadow:0 2px 10px rgba(0,0,0,.6); }
+.kco-main .kco-title strong{ font:600 clamp(17px, 4.6vw, 22px)/1.15 var(--font-heading, 'Fraunces'), serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
+.kco-main .kco-title small{ color:rgba(255,236,220,.78); }
+.kco-main .kco-amount{ flex:none; font-size:clamp(22px, 6.4vw, 30px); text-shadow:0 2px 12px rgba(0,0,0,.6); }
+.kco-stub{ position:relative; z-index:2; display:flex; justify-content:space-between; align-items:center; gap:10px; padding:3.4% 6.5% 4%;
+  font:12px/1.2 var(--font-mono, 'JetBrains Mono'), monospace; color:rgba(255,236,220,.82); min-width:0;
+  background:rgba(12,10,13,.72); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); border-top:1.5px dashed rgba(255,230,210,.34); }
+.kco-stamp{ position:absolute; z-index:3; right:7%; top:30%; padding:6px 12px; border:2.5px solid #86e8aa; border-radius:10px; color:#86e8aa;
+  font:800 clamp(16px, 4.4vw, 20px)/1 var(--font-mono, 'JetBrains Mono'), monospace; letter-spacing:.24em; background:rgba(8,28,16,.45);
+  transform:rotate(-12deg); text-shadow:0 0 12px rgba(134,232,170,.45); box-shadow:0 0 18px rgba(134,232,170,.25), inset 0 0 12px rgba(134,232,170,.15);
+  animation:kcoStamp .5s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes kcoStamp{ 0%{ opacity:0; transform:rotate(-12deg) scale(2.2); } 100%{ opacity:1; transform:rotate(-12deg) scale(1); } }
+.tone-ok .kco-front, .tone-bad .kco-front{ background:#120e13; }
+.tone-ok .kco-face{ border-color:rgba(134,232,170,.55); }
+.tone-bad .kco-face{ border-color:rgba(255,110,110,.55); }
+.tone-busy .kco-foil{ animation:kcoFoilSweep 1.8s linear infinite; opacity:.45; }
+@keyframes kcoFoilSweep{ 0%{ --gx:0%; } 100%{ --gx:100%; } }
+@property --gx{ syntax:'<percentage>'; inherits:true; initial-value:50%; }
+@media (prefers-reduced-motion: reduce){ .kco-stamp, .tone-busy .kco-foil{ animation:none; } .kco-art{ transform:none; } }
+
+/* ---- demo test wallet ---------------------------------------------------------------------------- */
+.kdp-wallet{ display:grid; gap:8px; }
+.kdp-wallet-head{ display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--kas-dim, rgba(239,236,232,.7)); }
+.kdp-wallet ul{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(132px, 1fr)); gap:8px; }
+.kdp-wcard{ width:100%; display:grid; gap:2px; text-align:left; padding:9px 10px; border-radius:12px; cursor:pointer; color:#fff;
+  border:1px solid rgba(255,255,255,.14); background:linear-gradient(140deg, #2d2735, #17141c); font:inherit; transition:transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+.kdp-wcard.brand-visa{ background:linear-gradient(140deg, #1f3a8a, #121f4d); } .kdp-wcard.brand-mastercard{ background:linear-gradient(140deg, #3b2a1f, #1c1512); }
+.kdp-wcard.brand-amex{ background:linear-gradient(140deg, #1d5a6b, #0f2f38); } .kdp-wcard.brand-rupay{ background:linear-gradient(140deg, #3a2466, #1b1233); }
+.kdp-wcard:hover{ transform:translateY(-1px); border-color:rgba(255,255,255,.3); }
+.kdp-wcard:focus-visible{ outline:2px solid #ff9438; outline-offset:2px; }
+.kdp-wcard.is-on{ border-color:#ff9438; box-shadow:0 0 0 1px #ff9438, 0 6px 18px rgba(255,148,56,.25); }
+.kdp-wname{ font-size:12px; font-weight:700; } .kdp-wnum{ font:11px/1.2 var(--font-mono, 'JetBrains Mono'), monospace; opacity:.75; }
+.kdp-wbal{ font:600 12px/1.2 var(--font-mono, 'JetBrains Mono'), monospace; color:#a8f0c2; } .kdp-wbal.is-short{ color:#ffb0a8; }
+
+/* The demo window can be taller than the screen (with the test wallet): flex centring would push its
+   top out of reach, so the children centre with auto margins instead and the whole window scrolls. */
+.kdp{ justify-content:flex-start; overscroll-behavior:contain; }
+.kdp > :first-child{ margin-top:auto; } .kdp > :last-child{ margin-bottom:auto; }
+.kdp-card-wrap{ width:min(100%, 290px); }
+@media (max-height:760px){ .kdp-card-wrap{ width:min(100%, 230px); } }
+/* foil: a gentle colour shift where the light hits, not coloured patches on the artwork */
+.kco-foil{ mix-blend-mode:soft-light; opacity:.28; }
+.tone-busy .kco-foil{ opacity:.34; }
+
+/* ---- Card lighting v2: no coloured haze. A soft contact shadow grounds the card, a thin rim light
+   catches the edge, and state shows only on that rim (a travelling highlight while working, a quiet
+   green when paid, red when it failed). ------------------------------------------------------------ */
+.kco-card-wrap::before, .kco-card-wrap.tone-busy::before, .kco-card-wrap.tone-ok::before, .kco-card-wrap.tone-bad::before{
+  inset:auto 12% -6% 12%; height:18%; border-radius:50%; box-shadow:none; opacity:1; animation:none !important; transition:none;
+  background:radial-gradient(closest-side, rgba(0,0,0,.62), rgba(0,0,0,0)); filter:blur(7px); }
+.kco-face, .tone-ok .kco-face, .tone-bad .kco-face{ border-color:transparent; box-shadow:0 1px 1px rgba(0,0,0,.35), 0 14px 34px -10px rgba(0,0,0,.6); }
+.kco-face::after{ content:""; position:absolute; inset:0; z-index:4; border-radius:inherit; padding:1.2px; pointer-events:none;
+  background:linear-gradient(150deg, rgba(255,255,255,.6), rgba(255,255,255,.1) 32%, rgba(255,255,255,0) 58%, rgba(255,255,255,.08) 78%, rgba(255,255,255,.32));
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+@property --kco-sweep{ syntax:'<angle>'; inherits:false; initial-value:0deg; }
+.tone-busy .kco-face::after{ padding:1.6px; background:conic-gradient(from var(--kco-sweep), rgba(255,255,255,.08) 0 62%, rgba(255,200,150,.95) 80%, rgba(255,255,255,.08) 96%);
+  animation:kcoSweep 1.6s linear infinite; }
+@keyframes kcoSweep{ to{ --kco-sweep:360deg; } }
+.tone-ok .kco-face::after{ padding:1.6px; background:linear-gradient(150deg, rgba(150,236,180,.95), rgba(150,236,180,.25) 45%, rgba(150,236,180,.7)); }
+.tone-bad .kco-face::after{ padding:1.6px; background:linear-gradient(150deg, rgba(255,140,140,.95), rgba(255,140,140,.25) 45%, rgba(255,140,140,.7)); }
+.kco-stamp{ box-shadow:none; text-shadow:none; }
+@media (prefers-reduced-motion: reduce){ .tone-busy .kco-face::after{ animation:none; background:linear-gradient(150deg, rgba(255,200,150,.9), rgba(255,200,150,.2) 50%, rgba(255,200,150,.6)); } }
+
+/* demo window: opaque form (the checkout text behind must not show through) and a CVV that fits phones */
+.kdp-form{ background:rgba(22,18,26,.97); }
+.kdp-row{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+.kdp-field input{ width:100%; min-width:0; box-sizing:border-box; }

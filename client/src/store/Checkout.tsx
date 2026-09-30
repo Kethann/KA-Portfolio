@@ -213,11 +213,11 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
     rzp.open();
   };
 
-  const onDemo = async (outcome: 'approve' | 'decline') => {
+  const onDemo = async (outcome: 'approve' | 'decline', reason?: string) => {
     const order = s.order; if (!order) return;
     if (outcome === 'decline'){
       await postJson('/api/checkout/demo-pay', { orderId: order.orderId, clientSecret: order.clientSecret, outcome }).catch(() => {});
-      dispatch({ type: 'PAY_FAILED', error: 'Your bank declined this payment (demo decline card). Nothing was charged.' }); return;
+      dispatch({ type: 'PAY_FAILED', error: `${reason || 'Your bank declined this payment (test card).'} Nothing was charged.` }); return;
     }
     dispatch({ type: 'PAID' });
     try {
@@ -312,7 +312,7 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
       </form>}
     </div>
     {demo && s.phase === 'paying' && s.order?.demo && quote &&
-      <DemoPay amountText={formatPrice(quote.total, quote.currency)} onResult={onDemo} onClose={() => { cancelOrder(s.order!); dispatch({ type: 'DISMISSED' }); }} />}
+      <DemoPay amount={quote.total} currency={quote.currency} onResult={onDemo} onClose={() => { cancelOrder(s.order!); dispatch({ type: 'DISMISSED' }); }} />}
   </div>;
 }
 
