@@ -265,3 +265,15 @@
 .stack .deck .l2,.stack:hover .deck .l2,.stack:focus-visible .deck .l2,.stack:hover .l2,.stack:focus-visible .l2{transform:translate3d(calc(-11px - var(--fan,0) * 13px),calc(-13px - var(--fan,0) * 4px),0) rotate(calc(-4.4deg - var(--fan,0) * 3.8deg))}
 @media (hover:hover){.stack:hover{--fan:.6}}
 @media (prefers-reduced-motion:reduce){.stack .deck,.stack .deck .layer{transition:none;will-change:auto}}
+
+/* Stack images: a soft shimmer until the picture arrives, then a short fade-in; a failed picture shows a
+   titled placeholder in the card's own style instead of an empty or broken frame. */
+.deck .layer,.deck .front{background:linear-gradient(110deg,#17151c 30%,#26212c 48%,#17151c 66%) 0 0/220% 100%;animation:stackShimmer 1.5s linear infinite}
+.deck .layer:has(img.is-in),.deck .front:has(img.is-in),.deck .layer:has(.img-fallback),.deck .front:has(.img-fallback){animation:none;background:#15141a}
+.deck img{opacity:0;transition:opacity .38s ease}
+.deck img.is-in{opacity:1}
+.deck .layer img.is-in{opacity:1}
+.img-fallback{position:absolute;inset:0;display:grid;place-items:end start;padding:14px;box-sizing:border-box;color:#d9d3cc;font:500 13px/1.3 var(--font-heading,"Fraunces"),ui-serif,Georgia,serif;
+  background:radial-gradient(120% 80% at 20% 0%,#3a1b20,transparent 60%),linear-gradient(160deg,#211b24,#121016)}
+@keyframes stackShimmer{to{background-position:-220% 0}}
+@media (prefers-reduced-motion:reduce){.deck .layer,.deck .front{animation:none}.deck img{transition:none}}

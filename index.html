@@ -56,6 +56,10 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
 <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <style>
+/* soft fade at the top, beneath the menu bar (layer 60) and above sections (layer 10): whatever
+   scrolls up there fades out instead of peeking around the bar */
+#top-fade{position:fixed;left:0;right:0;top:0;height:calc(92px + env(safe-area-inset-top,0px));z-index:30;pointer-events:none;
+  background:linear-gradient(180deg,rgba(7,5,10,.97) 0%,rgba(7,5,10,.9) 24%,rgba(7,5,10,.5) 60%,rgba(7,5,10,0) 100%)}
 #assistant-new[hidden]{display:none}#assistant-new{margin-right:6px}
 #fullscreen-item .fs-exit{display:none}#fullscreen-item.is-fullscreen .fs-enter{display:none}#fullscreen-item.is-fullscreen .fs-exit{display:inline}
 .fs-guide{max-width:min(380px,calc(100vw - 32px));padding:22px 22px 18px;border-radius:22px;color:#efece8;background:#17151d;border:1px solid rgba(255,255,255,.14);font:14px/1.6 Manrope,system-ui,sans-serif}
@@ -1343,6 +1347,7 @@ html.ka-modal-open{ overflow:hidden; }
 </nav>
 
 <div id="nebula-bg" aria-hidden="true"></div>
+<div id="top-fade" aria-hidden="true"></div>
 <div id="stage"></div>
 <script>
 (function(){

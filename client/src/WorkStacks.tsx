@@ -27,6 +27,22 @@ function sizedBest(p:Project,min:number){
   if(min>top&&p.full)return `/images/${p.slug}-full.webp`;
   return sized(p,min);
 }
+/** One stack image: shimmers until it arrives and then fades in (no empty card, no pop-in); a size that
+ *  fails falls back to the full export once, and if that fails too a quiet titled placeholder shows instead
+ *  of an empty or broken card. The first stack's cover loads at once (it is the first thing seen). */
+function StackImg({p,min,alt,eager}:{p:Project;min:number;alt:string;eager?:boolean}){
+  const first=sized(p,min);
+  const [src,setSrc]=useState(first);
+  const [state,setState]=useState<'loading'|'ok'|'failed'>('loading');
+  const ref=useRef<HTMLImageElement>(null);
+  useEffect(()=>{setSrc(first);setState('loading');},[first]);
+  // an image already in the browser cache can finish before React hears its load event
+  useLayoutEffect(()=>{const i=ref.current;if(i&&i.complete&&i.naturalWidth)setState('ok');},[src]);
+  if(state==='failed')return <span className="img-fallback" aria-hidden={alt?undefined:true}>{alt||p.title}</span>;
+  const onError=()=>{const full=p.src?'':`/images/${p.slug}-full.webp`;if(full&&src!==full)setSrc(full);else setState('failed');};
+  return <img ref={ref} src={src} alt={alt} className={state==='ok'?'is-in':''} loading={eager?'eager':'lazy'} decoding="async" draggable={false}
+    {...(eager?{fetchpriority:'high'}:{}) as object} onLoad={()=>setState('ok')} onError={onError}/>;
+}
 function useMedia(query:string){
   const [matches,setMatches]=useState(()=>typeof matchMedia==='function'&&matchMedia(query).matches);
   useEffect(()=>{
@@ -133,13 +149,13 @@ function StackGrid({id,stacks,reduced,onOpen}:{id:string;stacks:Stack[];reduced:
     return()=>{cancelAnimationFrame(first);cleanup();};
   },[entered,keys,coarse]);
   return <div className={'stack-grid'+(entered?' is-entered':' is-pending')} ref={rootRef}>
-    {stacks.map(s=>{
+    {stacks.map((s,si)=>{
       const count=s.items.length,others=s.items.filter(i=>i.slug!==s.cover.slug);
       return <button type="button" className="stack" key={s.name} onClick={e=>onOpen(s.name,e.currentTarget)} aria-label={`${s.name}, ${count} ${count===1?'image':'images'}. Open`}>
         <span className="deck">
-          {count>2&&<span className="layer l2" aria-hidden="true"><img src={sized(others[1]||s.cover,q(480,1080))} alt="" loading="lazy" decoding="async" draggable={false}/></span>}
-          {count>1&&<span className="layer l1" aria-hidden="true"><img src={sized(others[0]||s.cover,q(480,1080))} alt="" loading="lazy" decoding="async" draggable={false}/></span>}
-          <span className="front"><img src={sized(s.cover,q(768,1600))} alt={s.cover.title} loading="lazy" decoding="async" draggable={false}/></span>
+          {count>2&&<span className="layer l2" aria-hidden="true"><StackImg p={others[1]||s.cover} min={q(480,1080)} alt="" eager={si===0}/></span>}
+          {count>1&&<span className="layer l1" aria-hidden="true"><StackImg p={others[0]||s.cover} min={q(480,1080)} alt="" eager={si===0}/></span>}
+          <span className="front"><StackImg p={s.cover} min={q(768,1600)} alt={s.cover.title} eager={si===0}/></span>
         </span>
         <span className="meta"><strong>{s.name}</strong><small>{count} {count===1?'image':'images'}</small></span>
       </button>;
