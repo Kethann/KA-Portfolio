@@ -15,11 +15,24 @@ const mod=(v:number,n:number)=>((v%n)+n)%n;
 function sized(p:Project,min:number){
   if(p.src)return p.src;
   const widths=[...p.widths].sort((a,b)=>a-b),w=widths.find(x=>x>=min)||widths[widths.length-1];
-  return w?`/images/${p.slug}-${w}.webp`:`/images/${p.slug}-full.webp`;
+  return w?`/images/${p.slug}-${w}.${avif?'avif':'webp'}`:`/images/${p.slug}-full.webp`;
+}
+/** Every export exists as AVIF (roughly a third smaller than WebP at the same quality). A one-pixel probe
+ *  decides once; until it answers (a few ms, long before a stack is on screen) WebP is used. */
+let avif=false;
+if(typeof Image!=='undefined'){
+  const probe=new Image();
+  probe.onload=()=>{avif=probe.width>0;};
+  probe.src='data:image/avif;base64,AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUIAAADybWV0YQAAAAAAAAAoaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAGxpYmF2aWYAAAAADnBpdG0AAAAAAAEAAAAeaWxvYwAAAABEAAABAAEAAAABAAABGgAAAB0AAAAoaWluZgAAAAAAAQAAABppbmZlAgAAAAABAABhdjAxQ29sb3IAAAAAamlwcnAAAABLaXBjbwAAABRpc3BlAAAAAAAAAAIAAAACAAAAEHBpeGkAAAAAAwgICAAAAAxhdjFDgQ0MAAAAABNjb2xybmNseAACAAIAAYAAAAAXaXBtYQAAAAAAAAABAAEEAQKDBAAAACVtZGF0EgAKCBgANogQEAwgMg8f8D///8WfhwB8+ErK42A=';
 }
 const dpr=()=>typeof window==='undefined'?1:Math.min(3,Math.max(1,window.devicePixelRatio||1));
-/** Width to ask for: the CSS size scaled by the screen's pixel density, capped. */
-const q=(base:number,cap:number)=>Math.min(cap,Math.round(base*dpr()));
+/** Width to ask for in grids and the coverflow: the size it is actually drawn at (never wider than the
+ *  screen) times the pixel density, capped at 2x — past that a phone shows no extra detail but pays
+ *  twice the data. The full-screen viewer (hiMin) still uses the real density. */
+const q=(base:number,cap:number)=>{
+  const vw=typeof window==='undefined'?base:Math.max(320,window.innerWidth||base);
+  return Math.min(cap,Math.round(Math.min(base,vw)*Math.min(2,dpr())));
+};
 /** Like sized(), but reaches for the original when even the largest export is smaller than needed (5K / 4K TVs). */
 function sizedBest(p:Project,min:number){
   if(p.src)return p.src;
@@ -425,7 +438,9 @@ function ShareButton({project,stackName}:{project:Project;stackName:string}){
 function Viewer({p,stackName,index,n,atStart,atEnd,onPrev,onNext,onBack,reduced,origin,pinned,onPin}:{pinned:boolean;onPin?:()=>void;p:Project;stackName:string;index:number;n:number;atStart:boolean;atEnd:boolean;onPrev:()=>void;onNext:()=>void;onBack:()=>void;reduced:boolean;origin:DOMRect|null}){
   const rootRef=useRef<HTMLDivElement>(null),frameRef=useRef<HTMLDivElement>(null),infoRef=useRef<HTMLDivElement>(null),first=useRef(true);
   const [hi,setHi]=useState(false);
-  const hiMin=useMemo(()=>Math.min(3840,Math.max(q(1600,3840),Math.round(Math.min(window.innerWidth*.6,1000)*dpr()))),[]);
+  // Full quality for this screen: the widest the picture can be drawn, at the screen's real pixel density
+  // (a phone gets ~1600, a 1440p desktop 1600, a 4K/5K display 2400-3840 or the original).
+  const hiMin=useMemo(()=>Math.min(3840,Math.max(1080,Math.round(Math.min(window.innerWidth,1600)*dpr()))),[]);
   useEffect(()=>{setHi(false);},[p.slug]);
   useEffect(()=>{rootRef.current?.focus({preventScroll:true});},[]);
   // Fly the picture out of the carousel card into the viewer (transform only), then bring the text in.

@@ -42,7 +42,11 @@ export async function createDevServer({ port = Number(env('PORT', 9878)), host =
   async function sendFile(res, file, cache){
     const s = await stat(file).catch(() => null);
     if (!s || !s.isFile()) return false;
-    res.writeHead(200, { ...SECURITY, 'Content-Type': TYPES[extname(file).toLowerCase()] || 'application/octet-stream', 'Content-Length': s.size, 'Cache-Control': cache });
+    // ETag like the hosts send, so a no-cache file costs a tiny 304 on reload instead of a full download
+    const etag = `W/"${s.size.toString(36)}-${Math.floor(s.mtimeMs).toString(36)}"`;
+    const headers = { ...SECURITY, 'Content-Type': TYPES[extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': cache, ETag: etag };
+    if (cache !== 'no-store' && res.req?.headers['if-none-match'] === etag){ res.writeHead(304, headers); res.end(); return true; }
+    res.writeHead(200, { ...headers, 'Content-Length': s.size });
     createReadStream(file).pipe(res);
     return true;
   }
@@ -97,7 +101,7 @@ export async function createDevServer({ port = Number(env('PORT', 9878)), host =
         if (await sendFile(res, resolve(root, 'index.html'), 'no-cache')) return;
       }
       for (const [prefix, base, cache] of [['/dist/assets/', resolve(root, 'dist/assets'), 'no-cache'], ['/assets/', resolve(root, 'dist/assets'), 'no-cache'],
-        ['/images/', resolve(root, 'images'), 'public, max-age=3600'], ['/portal/', resolve(root, 'dist/portal'), 'no-store']]){
+        ['/images/', resolve(root, 'images'), 'public, max-age=86400, stale-while-revalidate=604800'], ['/portal/', resolve(root, 'dist/portal'), 'no-store']]){
         if (path.startsWith(prefix)){
           let rel = path.slice(prefix.length) || 'index.html';
           if (prefix === '/portal/' && !extname(rel)) rel = 'index.html';     // single-page app
