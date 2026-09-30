@@ -71,7 +71,8 @@ export async function demoPay(ctx){
   await rateLimit(`demo:${ctx.ip}`, 30, 10 * 60);
   const body = await readJson(ctx.request, 4 * 1024);
   const outcome = body.outcome === 'approve' ? 'approve' : 'decline';
-  return json(await orders.demoPay({ ...clientFields(body), outcome, siteUrl: siteUrl(ctx.request) }));
+  const card = body.card && typeof body.card === 'object' ? { network: String(body.card.network || '').slice(0, 20), last4: String(body.card.last4 || '').slice(0, 4) } : null;
+  return json(await orders.demoPay({ ...clientFields(body), outcome, card, siteUrl: siteUrl(ctx.request) }));
 }
 
 export async function cancel(ctx){

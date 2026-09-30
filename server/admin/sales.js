@@ -87,7 +87,8 @@ function orderFilters(url){
   return { where: where.length ? `where ${where.join(' and ')}` : '', args };
 }
 const ORDER_ROW = `select o.id, o.public_id, o.email, o.currency, o.subtotal, o.discount, o.tax, o.total, o.status, o.is_free, o.invoice_number, o.country,
-  o.created_at, o.paid_at, o.delivered_at, o.refunded_at, o.razorpay_payment_id, o.refund_id,
+  o.created_at, o.paid_at, o.delivered_at, o.refunded_at, o.razorpay_payment_id, o.refund_id, o.payment_method,
+  o.signature_verified_at, o.api_verified_at, o.captured_at, o.refund_amount,   -- the order screen's Verified and Refunded rows
   (select string_agg(i.title, ', ') from order_items i where i.order_id = o.id) as items,
   (select string_agg(c.code, ', ') from coupon_redemptions r join coupons c on c.id = r.coupon_id where r.order_id = o.id and r.status <> 'released') as codes
   from orders o`;
@@ -102,12 +103,20 @@ export async function listOrders(ctx){
   return json({ orders: rows.slice(0, limit), total, hasMore: rows.length > limit });
 }
 
+// "Visa •••• 4242", "UPI", "Net banking · HDFC", "Wallet · Paytm" (same wording as the portal)
+export function methodLabel(m){
+  if (!m || typeof m !== 'object') return '';
+  if (m.type === 'card') return `${m.network || 'Card'}${m.last4 ? ` •••• ${m.last4}` : ''}`;
+  const name = { upi: 'UPI', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI', paylater: 'Pay later' }[m.type] || String(m.type || '');
+  return m.detail ? `${name} · ${m.detail}` : name;
+}
 export async function ordersCsv(ctx){
   const { where, args } = orderFilters(ctx.url);
   const db = await getDb();
   const rows = await db.query(`${ORDER_ROW} ${where} order by o.created_at desc limit 20000`, args);
   const cols = [
     { label: 'Order', get: r => r.public_id }, { label: 'Created (UTC)', get: r => r.created_at }, { label: 'Status', get: r => r.status }, { label: 'Email', get: r => r.email },
+    { label: 'Paid with', get: r => methodLabel(r.payment_method) },
     { label: 'Items', get: r => r.items }, { label: 'Currency', get: r => r.currency }, { label: 'Subtotal', get: r => (r.subtotal / 100).toFixed(2) },
     { label: 'Discount', get: r => (r.discount / 100).toFixed(2) }, { label: 'Tax', get: r => (r.tax / 100).toFixed(2) }, { label: 'Total', get: r => (r.total / 100).toFixed(2) },
     { label: 'Codes', get: r => r.codes }, { label: 'Invoice', get: r => r.invoice_number ? `INV-${String(r.invoice_number).padStart(6, '0')}` : '' },

@@ -25,8 +25,9 @@ export function demoPaymentsEnabled(){
   return !isProduction() && env('KA_DEMO_PAYMENTS') === '1' && !razorpay.isConfigured();
 }
 
-// What the buyer paid with, for the success screen only (never stored): e.g. card network + last 4
-// digits, or 'upi' / 'netbanking' / 'wallet'. No VPA, name or full card data is ever returned.
+// What the buyer paid with: card network + last 4 digits, or 'upi' / 'netbanking' (bank) / 'wallet'.
+// Shown on the success screen and kept on the order for the owner's records. No UPI ID, name or full
+// card data is ever returned or stored.
 export function methodSummary(p){
   if (!p || typeof p !== 'object') return null;
   const m = String(p.method || '');
@@ -224,12 +225,13 @@ export async function verifyCheckout({ publicId, clientSecret, razorpayOrderId, 
   const result = await statusFor(publicId, clientSecret, siteUrl);
   let method = null;
   try { method = methodSummary(await razorpay.fetchPayment(paymentId)); } catch { /* display only */ }
+  if (method) await db.query('update orders set payment_method = coalesce(payment_method, $2) where id = $1', [order.id, method]);
   return { ...result, method };
 }
 
 // Demo payment (see demoPaymentsEnabled). 'approve' records both proofs as a real capture would;
 // 'decline' records a failed attempt. Delivery then runs through the normal, unchanged path.
-export async function demoPay({ publicId, clientSecret, outcome, siteUrl }){
+export async function demoPay({ publicId, clientSecret, outcome, card, siteUrl }){
   if (!demoPaymentsEnabled()) throw new HttpError(404, 'Not found.');
   const db = await getDb();
   const order = await orderByClient(db, publicId, clientSecret);
@@ -238,7 +240,8 @@ export async function demoPay({ publicId, clientSecret, outcome, siteUrl }){
     await db.tx(async (tx) => {
       const o = await tx.one('select * from orders where id = $1 for update', [order.id]);
       if (o.captured_at) return;
-      await tx.query(`update orders set signature_verified_at = now(), captured_at = now(), razorpay_payment_id = $2, updated_at = now() where id = $1`, [o.id, `demo_pay_${o.public_id}`]);
+      const method = methodSummary({ method: 'card', card: { network: card?.network || 'Demo card', last4: card?.last4 } });
+      await tx.query(`update orders set signature_verified_at = now(), captured_at = now(), razorpay_payment_id = $2, payment_method = $3, updated_at = now() where id = $1`, [o.id, `demo_pay_${o.public_id}`, method]);
       await event(tx, o.id, 'demo_payment', { outcome });
     });
     await tryFinalize(order.id, siteUrl);
@@ -278,7 +281,8 @@ export async function handleWebhook({ rawBody, signature, eventId, siteUrl }){
         const o = await tx.one('select * from orders where id = $1 for update', [order.id]);
         if (!o.captured_at) await event(tx, o.id, 'payment_captured', { via: type });
         if (o.razorpay_payment_id && o.razorpay_payment_id !== payment.id && o.captured_at) await event(tx, o.id, 'second_payment', { payment: payment.id });
-        await tx.query(`update orders set captured_at = coalesce(captured_at, now()), razorpay_payment_id = case when captured_at is null then $2 else razorpay_payment_id end, updated_at = now() where id = $1`, [o.id, payment.id]);
+        await tx.query(`update orders set captured_at = coalesce(captured_at, now()), razorpay_payment_id = case when captured_at is null then $2 else razorpay_payment_id end,
+          payment_method = coalesce(payment_method, $3), updated_at = now() where id = $1`, [o.id, payment.id, methodSummary(payment)]);
       });
       finalizeId = order.id; result = 'captured';
     }

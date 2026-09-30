@@ -11,7 +11,16 @@ import { Copy, DetailHeader, MoneyInput } from './common';
 import { ago, dateTime, money, todayIST } from '../format';
 
 type Order = { id: string; public_id: string; email: string; currency: 'INR' | 'USD'; subtotal: number; discount: number; tax: number; total: number; status: string; is_free: boolean;
-  invoice_number: number | null; country: string | null; created_at: string; paid_at: string | null; delivered_at: string | null; refunded_at: string | null; razorpay_payment_id: string | null; refund_id: string | null; items: string; codes: string | null };
+  invoice_number: number | null; country: string | null; created_at: string; paid_at: string | null; delivered_at: string | null; refunded_at: string | null; razorpay_payment_id: string | null; refund_id: string | null; items: string; codes: string | null;
+  payment_method: PayMethod | null };
+type PayMethod = { type: string; network?: string; last4?: string; detail?: string };
+// "Visa •••• 4242", "UPI", "Net banking · HDFC"
+function paidWith(m: PayMethod | null | undefined){
+  if (!m) return '';
+  if (m.type === 'card') return `${m.network || 'Card'}${m.last4 ? ` •••• ${m.last4}` : ''}`;
+  const name = ({ upi: 'UPI', netbanking: 'Net banking', wallet: 'Wallet', emi: 'EMI', paylater: 'Pay later' } as Record<string, string>)[m.type] || m.type;
+  return m.detail ? `${name} · ${m.detail}` : name;
+}
 const STATUSES = ['all', 'attention', 'delivered', 'paid', 'refunded', 'failed', 'created', 'expired', 'cancelled', 'mismatch'];
 const PAGE = 200;
 
@@ -42,6 +51,7 @@ function List({ go, active, initialStatus, onExport }: { go: (r: string) => void
     { key: 'buyer', label: 'Buyer', width: '1.6fr', render: o => <span className="truncate" title={o.email}>{o.email}</span>, sort: (a, b) => a.email.localeCompare(b.email), hideBelow: 480 },
     { key: 'items', label: 'Items', width: '1.5fr', render: o => <span className="truncate muted">{o.items}</span>, hideBelow: 820 },
     { key: 'total', label: 'Total', width: '110px', align: 'right', render: o => o.is_free ? <span className="muted">Free</span> : money(o.total, o.currency), sort: (a, b) => a.currency.localeCompare(b.currency) || a.total - b.total },
+    { key: 'paid', label: 'Paid with', width: '1fr', hideBelow: 980, render: o => <span className="truncate muted">{paidWith(o.payment_method) || (o.is_free ? 'Free' : '—')}</span> },
     { key: 'status', label: 'Status', width: '104px', render: o => <Badge tone={STATUS_TONE[o.status]}>{o.status}</Badge>, sort: (a, b) => a.status.localeCompare(b.status) },
     { key: 'date', label: 'Created', width: '118px', render: o => <span className="muted" title={dateTime(o.created_at)}>{ago(o.created_at)}</span>, sort: (a, b) => a.created_at.localeCompare(b.created_at), hideBelow: 620 }
   ], []);
@@ -123,6 +133,7 @@ function Detail({ id, go, open }: { id: string; go: (r: string) => void; open: A
             <dt>Buyer</dt><dd><span className="row" style={{ gap: 4 }}><span className="truncate">{o.email}</span><Copy text={o.email} label="Copy email" /></span></dd>
             <dt>Country</dt><dd>{o.country || '—'}</dd>
             <dt>Currency</dt><dd>{o.currency}</dd>
+            <dt>Paid with</dt><dd>{paidWith(o.payment_method) || (o.is_free ? 'Free order' : '—')}</dd>
             {o.razorpay_payment_id && <><dt>Payment</dt><dd><span className="row" style={{ gap: 4 }}><span className="mono truncate" style={{ fontSize: 12 }}>{o.razorpay_payment_id}</span><Copy text={o.razorpay_payment_id} label="Copy payment ID" /></span></dd></>}
             {o.invoice_number && <><dt>Invoice</dt><dd className="mono">INV-{String(o.invoice_number).padStart(6, '0')}</dd></>}
             <dt>Verified</dt><dd>{o.signature_verified_at ? 'Signature ✓ ' : ''}{o.api_verified_at ? 'API ✓ ' : ''}{o.captured_at ? 'Captured ✓' : o.is_free ? 'Free order' : '—'}</dd>

@@ -213,7 +213,7 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
     rzp.open();
   };
 
-  const onDemo = async (outcome: 'approve' | 'decline', reason?: string) => {
+  const onDemo = async (outcome: 'approve' | 'decline', reason?: string, card?: { network: string; last4: string }) => {
     const order = s.order; if (!order) return;
     if (outcome === 'decline'){
       await postJson('/api/checkout/demo-pay', { orderId: order.orderId, clientSecret: order.clientSecret, outcome }).catch(() => {});
@@ -221,8 +221,8 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
     }
     dispatch({ type: 'PAID' });
     try {
-      const st = await postJson<Status>('/api/checkout/demo-pay', { orderId: order.orderId, clientSecret: order.clientSecret, outcome });
-      dispatch({ type: 'CONFIRMED', success: successFrom(order, { ...st, method: { type: 'card', network: 'Demo card' } }) });
+      const st = await postJson<Status>('/api/checkout/demo-pay', { orderId: order.orderId, clientSecret: order.clientSecret, outcome, card });
+      dispatch({ type: 'CONFIRMED', success: successFrom(order, { ...st, method: { type: 'card', network: card?.network || 'Demo card', last4: card?.last4 } }) });
     } catch (err){ dispatch({ type: 'CONFIRM_FAILED', error: (err as Error).message }); }
   };
   const retry = () => { inFlight.current = false; setPhaseLayout(); dispatch({ type: 'RETRY' }); requestAnimationFrame(() => emailRef.current?.focus({ preventScroll: true })); };

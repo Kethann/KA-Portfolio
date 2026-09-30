@@ -29,7 +29,7 @@ function loadWallet(): Wallet {
 }
 function saveWallet(w: Wallet){ try { localStorage.setItem(WALLET_KEY, JSON.stringify(w)); } catch { /* private mode: balances reset on reload */ } }
 
-export function DemoPay({ amount, currency, onResult, onClose }: { amount: number; currency: Currency; onResult(outcome: 'approve' | 'decline', reason?: string): void; onClose(): void }){
+export function DemoPay({ amount, currency, onResult, onClose }: { amount: number; currency: Currency; onResult(outcome: 'approve' | 'decline', reason?: string, card?: { network: string; last4: string }): void; onClose(): void }){
   const [num, setNum] = useState(''), [exp, setExp] = useState(''), [cvv, setCvv] = useState(''), [name, setName] = useState('');
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [flipped, setFlipped] = useState(false);
@@ -68,7 +68,7 @@ export function DemoPay({ amount, currency, onResult, onClose }: { amount: numbe
         const w = { ...wallet, [picked.id]: { ...wallet[picked.id], [currency]: left - amount } };
         setWallet(w); saveWallet(w);
       }
-      onResult('approve');
+      onResult('approve', undefined, { network: BRAND_NAMES[brand], last4: digits.slice(-4) });
     }, 700);
   };
   const reset = () => { const w = freshWallet(); setWallet(w); saveWallet(w); };

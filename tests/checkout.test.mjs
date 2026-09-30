@@ -335,3 +335,15 @@ test('Razorpay outage: order fails cleanly, nothing charged, coupon released', a
   assert.equal(res.status, 502); assert.match(res.json.error, /Nothing was charged/);
   assert.equal((await app.pg.query(`select used_count from coupons where code='OUTAGE'`)).rows[0].used_count, 0);
 });
+
+test('the order keeps how it was paid (card network + last 4, or UPI), from checkout or webhook', async () => {
+  const a = (await order(kit, { email: 'paid-card@example.com' })).json;
+  const payA = `pay_M${++seq}cardabc`;
+  rz.payments.set(payA, { id: payA, order_id: a.razorpay.orderId, amount: a.razorpay.amount, currency: a.razorpay.currency, status: 'captured', method: 'card', card: { network: 'Visa', last4: '4242', name: 'Should Not Be Kept' } });
+  await app.call('POST', '/api/checkout/verify', { body: { orderId: a.orderId, clientSecret: a.clientSecret, razorpay_order_id: a.razorpay.orderId, razorpay_payment_id: payA, razorpay_signature: sign(a.razorpay.orderId, payA) }, ip: ip() });
+  assert.deepEqual((await row(a.orderId)).payment_method, { type: 'card', network: 'Visa', last4: '4242' });
+  const b = (await order(kit, { email: 'paid-upi@example.com' })).json;
+  await webhook('payment.captured', { id: `pay_U${++seq}upiabcd`, order_id: b.razorpay.orderId, amount: b.razorpay.amount, currency: b.razorpay.currency, status: 'captured', method: 'upi', vpa: 'someone@okbank' });
+  const pm = (await row(b.orderId)).payment_method;
+  assert.equal(pm.type, 'upi'); assert.ok(!JSON.stringify(pm).includes('someone@okbank'), 'the UPI ID is never stored');
+});
