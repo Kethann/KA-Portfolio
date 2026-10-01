@@ -147,6 +147,19 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
   const confirm = useConfirm();
   const s = useLoad<{ product: Product }>(`/products/${id}`);
   const cats = useLoad<{ categories: { id: string; kind: string; name: string }[] }>('/categories');
+  // "＋ New category…" in the Category menu: created for this product's section and selected at once
+  const [newCat, setNewCat] = useState<string | null>(null);
+  const addCategory = async () => {
+    const name = (newCat || '').trim(); if (!name || !p) return;
+    try {
+      const r = await post<{ categories: { id: string; kind: string; name: string }[] }>('/categories', { kind: p.kind, name });
+      cats.setData(r);
+      const made = r.categories.find(c => c.kind === p.kind && c.name.toLowerCase() === name.toLowerCase());
+      if (made) set('categoryId', made.id);
+      setNewCat(null);
+      toast.show(`Category “${name}” added`, { tone: 'success' });
+    } catch (err){ toast.error(err); }
+  };
   const lic = useLoad<{ licenses: { id: string; key: string; name: string; summary: string; body_md: string; version: number }[] }>('/licenses');
   // Server-owned parts (uploaded media/file, sales count) follow the server even while fields are being
   // edited; the version stamp (updatedAt) stays the one this edit started from.
@@ -234,8 +247,18 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
               <Field label="Short description" hint={`${p.summary.length}/400 · shown on the card`}><textarea rows={2} value={p.summary} onChange={e => set('summary', e.target.value)} maxLength={400} /></Field>
               <MarkdownField label="Full description" value={p.description} onChange={v => set('description', v)} rows={8} hint="Markdown: **bold**, lists, links." />
               <div className="form-grid">
-                <Field label="Category"><select value={p.categoryId || ''} onChange={e => set('categoryId', e.target.value || null)}>
-                  <option value="">No category</option>{cats.data?.categories.filter(c => c.kind === p.kind).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+                <Field label="Category" hint={newCat === null ? 'Shown as a filter in the store' : undefined}>
+                  {newCat === null
+                    ? <select value={p.categoryId || ''} onChange={e => e.target.value === '__new' ? setNewCat('') : set('categoryId', e.target.value || null)}>
+                        <option value="">No category</option>{cats.data?.categories.filter(c => c.kind === p.kind).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        <option value="__new">＋ New category…</option></select>
+                    : <span className="row" style={{ gap: 6 }}>
+                        <input autoFocus aria-label="New category name" value={newCat} maxLength={60} placeholder={p.kind === 'artzz' ? 'e.g. Poster arts' : 'e.g. Design kits'}
+                          onChange={e => setNewCat(e.target.value)} onKeyDown={e => { if (e.key === 'Enter'){ e.preventDefault(); void addCategory(); } if (e.key === 'Escape') setNewCat(null); }} style={{ flex: 1 }} />
+                        <AsyncButton className="btn sm" disabled={!newCat.trim()} onClick={addCategory}>Add</AsyncButton>
+                        <button type="button" className="btn sm ghost" onClick={() => setNewCat(null)}>Cancel</button>
+                      </span>}
+                </Field>
                 <Field label="Version"><input value={p.version} onChange={e => set('version', e.target.value)} maxLength={30} placeholder="1.0" /></Field>
               </div>
               <Field label="Tags"><TagInput label="Tags" value={p.tags} onChange={v => set('tags', v)} /></Field>
