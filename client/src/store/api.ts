@@ -18,7 +18,7 @@ declare global {
   interface Window {
     kaApiUrl?: (path: string) => string;
     kaPublicConfig?: () => Promise<PublicConfig>;
-    kaTurnstile?: (el: HTMLElement) => Promise<{ token(): string; reset(): void; remove(): void }>;
+    kaTurnstile?: (el: HTMLElement) => Promise<{ token(): string; reset(): void; remove(): void; live?: boolean }>;
     kaToast?: (text: string, state?: string) => void;
   }
 }

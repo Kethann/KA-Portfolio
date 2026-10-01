@@ -10,7 +10,7 @@ import { DemoPay } from './checkout/DemoPay';
 
 type Req = { mode: 'buy'; product: Product; currency: Currency; opener?: HTMLElement | null } | { mode: 'resend'; opener?: HTMLElement | null };
 interface Status { orderId: string; status: string; downloadUrl: string | null; method?: PaymentMethod | null }
-type Widget = { token(): string; reset(): void; remove(): void };
+type Widget = { token(): string; reset(): void; remove(): void; live?: boolean };
 
 declare global { interface Window { Razorpay?: new (options: Record<string, unknown>) => { open(): void; on(event: string, fn: (resp: { error?: { description?: string } }) => void): void } } }
 
@@ -29,15 +29,28 @@ function loadRazorpay(){
   return razorpayScript;
 }
 
+// The bot check (Turnstile). The form that holds it is removed while a payment runs or after it fails and
+// comes back for "Try again", so the check is attached to whichever box element is on screen right now (a
+// callback ref), not just once. token() waits a few seconds for the invisible check to finish instead of
+// sending an empty pass when Pay is pressed quickly.
 function useTurnstile(){
-  const box = useRef<HTMLDivElement>(null);
+  const el = useRef<HTMLDivElement | null>(null);
   const widget = useRef<Widget | null>(null);
-  useEffect(() => {
-    let alive = true;
-    if (box.current && window.kaTurnstile) window.kaTurnstile(box.current).then(w => { if (alive) widget.current = w; else w.remove(); }).catch(() => {});
-    return () => { alive = false; widget.current?.remove(); widget.current = null; };
+  const loading = useRef<Promise<void> | null>(null);
+  const box = useCallback((node: HTMLDivElement | null) => {
+    if (node === el.current) return;
+    widget.current?.remove(); widget.current = null; el.current = node;
+    if (!node || !window.kaTurnstile){ loading.current = null; return; }
+    loading.current = window.kaTurnstile(node).then(w => { if (el.current === node) widget.current = w; else w.remove(); }).catch(() => {});
   }, []);
-  return { box, token: () => widget.current?.token() || '', reset: () => widget.current?.reset() };
+  useEffect(() => () => { widget.current?.remove(); widget.current = null; el.current = null; }, []);
+  const token = async (waitMs = 8000) => {
+    if (loading.current) await loading.current;
+    const t0 = Date.now();
+    while (widget.current?.live && !widget.current.token() && Date.now() - t0 < waitMs) await new Promise(r => setTimeout(r, 250));
+    return widget.current?.token() || '';
+  };
+  return { box, token, reset: () => widget.current?.reset() };
 }
 
 function useOnline(){
@@ -102,7 +115,7 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
   useEffect(() => { publicConfig().then(c => setDemo(!!(c as { demoPayments?: boolean }).demoPayments)); }, []);
 
   const requestQuote = useCallback(async (list: string[], addr?: string) => {
-    const q = await postJson<Quote & { ok?: boolean; error?: string; code?: string }>('/api/checkout/quote', { productId: product.id, currency, codes: list, email: addr && EMAIL.test(addr) ? addr : undefined, turnstileToken: list.length ? ts.token() : undefined });
+    const q = await postJson<Quote & { ok?: boolean; error?: string; code?: string }>('/api/checkout/quote', { productId: product.id, currency, codes: list, email: addr && EMAIL.test(addr) ? addr : undefined, turnstileToken: list.length ? await ts.token() : undefined });
     if (list.length) ts.reset();
     if (q.ok === false) throw new ApiError(q.error || 'That code can’t be used.', 200, q.code);   // a rejected code is an answer, not a failure
     return q as Quote;
@@ -171,11 +184,14 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
     if (!online){ dispatch({ type: 'INVALID', error: 'You’re offline. Reconnect and try again.' }); inFlight.current = false; return; }
     setEmailError('');
     try { if (remember) localStorage.setItem(EMAIL_KEY, addr); else localStorage.removeItem(EMAIL_KEY); } catch {}
+    // The bot-check pass is collected now, while the form (and the check inside it) is still on screen: the
+    // next step swaps the form for the payment view, which removes the check.
+    const pass = await ts.token();
     setPhaseLayout(); setFlipped(false);
     dispatch({ type: 'VALID' });
     let order: OrderResult;
     try {
-      order = await postJson<OrderResult>('/api/checkout/order', { productId: product.id, currency, email: addr, codes, turnstileToken: ts.token() });
+      order = await postJson<OrderResult>('/api/checkout/order', { productId: product.id, currency, email: addr, codes, turnstileToken: pass });
     } catch (err){
       ts.reset();
       if (err instanceof ApiError && err.code === 'coupon_rejected') setCodeError((err as Error).message);
@@ -386,7 +402,7 @@ function Resend({ onClose }: { onClose(): void }){
     e.preventDefault();
     if (!EMAIL.test(email.trim())){ setError('Enter the email you used to buy.'); return; }
     setWorking(true); setError('');
-    try { const r = await postJson<{ message: string }>('/api/downloads/resend', { email: email.trim(), turnstileToken: ts.token() }); setDone(r.message); }
+    try { const r = await postJson<{ message: string }>('/api/downloads/resend', { email: email.trim(), turnstileToken: await ts.token() }); setDone(r.message); }
     catch (err){ setError((err as Error).message); ts.reset(); }
     finally { setWorking(false); }
   };

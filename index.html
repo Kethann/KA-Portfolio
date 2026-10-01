@@ -1751,6 +1751,7 @@ html.ka-modal-open{ overflow:hidden; }
           "error-callback": function(){ current = ""; }
         });
         return {
+          live: true,   // a real check (NOOP has no site key): callers may wait briefly for its pass
           token: function(){ return current || (ts.getResponse(id) || ""); },
           reset: function(){ current = ""; try{ ts.reset(id); }catch(e){} },
           remove: function(){ try{ ts.remove(id); }catch(e){} container.innerHTML = ""; }
