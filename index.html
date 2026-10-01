@@ -7850,35 +7850,37 @@ function renderAboutStats(stats){
     tile.append(num, label);
     return tile;
   }));
+  // Scroll-linked count: starts as soon as the tiles enter the screen, reaches the exact number when they are
+  // centred, never goes back down while they stay on screen, and starts over once they have left it completely.
   var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var nums = function(){ return box.querySelectorAll(".about-stat-num > span:first-child"); };
-  var frames = [];
-  var stop = function(){ frames.forEach(cancelAnimationFrame); frames = []; };
-  var run = function(){
-    stop();
-    nums().forEach(function(el, i){
-      var target = Number(el.dataset.target) || 0;
-      if (reduce || !target){ el.textContent = fmt(target); return; }
-      var start = null, dur = 1500 + i * 180;
-      var step = function(t){
-        if (start === null) start = t;
-        var k = Math.min(1, (t - start) / dur), eased = 1 - Math.pow(1 - k, 3);
-        el.textContent = fmt(target * eased);
-        if (k < 1) frames[i] = requestAnimationFrame(step);
-      };
-      frames[i] = requestAnimationFrame(step);
+  var state = window.__kaStats || (window.__kaStats = { box: null, best: 0, queued: false });
+  state.box = box; state.best = 0;
+  var paint = function(p){
+    var eased = 1 - Math.pow(1 - p, 3);
+    box.querySelectorAll(".about-stat-num > span:first-child").forEach(function(el){
+      el.textContent = fmt((Number(el.dataset.target) || 0) * eased);
     });
   };
-  var reset = function(){ stop(); nums().forEach(function(el){ el.textContent = "0"; }); };
-  if (window.__kaStatsObserver) window.__kaStatsObserver.disconnect();
-  if (reduce || !("IntersectionObserver" in window)){ run(); return; }
-  // counts when the tiles are clearly on screen (not just peeking under the hero at the bottom edge),
-  // and resets when they leave, so they count again the next time — like the headings that write themselves in
-  var io = new IntersectionObserver(function(entries){
-    entries.forEach(function(e){ if (e.isIntersecting) run(); else reset(); });
-  }, { threshold: 0.6, rootMargin: "0px 0px -20% 0px" });
-  window.__kaStatsObserver = io;
-  io.observe(box);
+  if (reduce){ paint(1); return; }
+  var update = function(){
+    state.queued = false;
+    var b = state.box; if (!b || b.hidden) return;
+    var r = b.getBoundingClientRect(), vh = window.innerHeight || 1;
+    if (!r.height || r.bottom <= 0 || r.top >= vh){ if (state.best !== 0){ state.best = 0; paint(0); } return; }   // fully off screen: start over
+    // 0 as the tiles enter from either edge, 1 when they are centred (scrolling down or back up alike)
+    var p = Math.min(1, Math.max(0, 1 - Math.abs((r.top + r.height / 2) - vh / 2) / (vh / 2 + r.height / 2)));
+    if (p > state.best){ state.best = p; paint(p); }
+  };
+  state.update = update;
+  if (!state.bound){
+    state.bound = true;
+    var queue = function(){ if (!state.queued){ state.queued = true; requestAnimationFrame(function(){ state.update && state.update(); }); } };
+    window.addEventListener("scroll", queue, { passive: true });
+    window.addEventListener("resize", queue);
+    document.addEventListener("click", function(){ setTimeout(queue, 50); setTimeout(queue, 600); }, true);   // section switches
+  }
+  paint(0);
+  requestAnimationFrame(update);
 }
 
 function applySiteAppearance(data){
