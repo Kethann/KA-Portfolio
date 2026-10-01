@@ -10,6 +10,10 @@ import { audit } from './auth.js';
 const IMAGE_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/avif': 'avif', 'image/gif': 'gif' };
 const FONT_TYPES = { 'font/woff2': 'woff2', 'font/woff': 'woff', 'font/ttf': 'ttf', 'font/otf': 'otf' };
 const MB = 1024 * 1024;
+// Size limits: none of our own for images and buyer files — R2's maximum object size (5 TiB) is the only one.
+// Up to SINGLE_UPLOAD a file goes up in one request; bigger files go up in PART_SIZE chunks (a Worker accepts
+// at most 100 MB per request on the free plan), so any size works.
+export const MAX_FILE = 5 * 1024 * 1024 * MB, SINGLE_UPLOAD = 90 * MB, PART_SIZE = 50 * MB;
 
 export function slugify(s){ return String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'item'; }
 
@@ -35,23 +39,25 @@ export async function signUpload(ctx){
   const body = await readJson(ctx.request, 4096);
   const kind = body.kind;
   const type = str(body.contentType, { max: 100 }).toLowerCase();
-  const bytes = int(body.bytes, { name: 'File size', min: 1, max: 50 * MB });
+  const bytes = int(body.bytes, { name: 'File size', min: 1, max: MAX_FILE });
   const name = str(body.filename, { name: 'File name', max: 160, required: true }).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+/, '').slice(-100) || 'file';
   let bucket, path;
   if (kind === 'image'){
     if (!IMAGE_TYPES[type]) throw new HttpError(400, 'Upload a PNG, JPG, WebP, AVIF or GIF image.');
-    if (bytes > 10 * MB) throw new HttpError(400, 'Images can be up to 10 MB.');
     bucket = 'media'; path = `images/${randomToken(9)}.${IMAGE_TYPES[type]}`;
   } else if (kind === 'font'){
     if (!FONT_TYPES[type]) throw new HttpError(400, 'Upload a WOFF2, WOFF, TTF or OTF font.');
-    if (bytes > 6 * MB) throw new HttpError(400, 'Fonts can be up to 6 MB.');
+    if (bytes > 50 * MB) throw new HttpError(400, 'Fonts can be up to 50 MB.');
     bucket = 'media'; path = `fonts/${randomToken(9)}.${FONT_TYPES[type]}`;
   } else if (kind === 'deliverable'){
     bucket = 'deliverables'; path = `files/${randomToken(12)}/${name}`;
   } else throw new HttpError(400, 'Unknown upload type.');
   const storage = getStorage();
-  const up = await storage.signedUploadUrl(bucket, path);
-  return json({ bucket, path, uploadUrl: up.url, method: up.method, contentType: type, publicUrl: bucket === 'media' ? storage.publicUrl(bucket, path) : null });
+  const chunked = bytes > SINGLE_UPLOAD;
+  // a big upload can take hours on a slow connection: its link stays valid for a day
+  const up = await storage.signedUploadUrl(bucket, path, chunked ? 24 * 3600 : 600);
+  return json({ bucket, path, uploadUrl: up.url, method: up.method, contentType: type, publicUrl: bucket === 'media' ? storage.publicUrl(bucket, path) : null,
+    chunked, partSize: PART_SIZE });
 }
 
 // URLs the site may show as images: our own public media bucket, or the site's /images folder.
@@ -277,7 +283,7 @@ export async function setFile(ctx){
   const path = str(b.path, { max: 300, required: true });
   if (!/^files\/[A-Za-z0-9_-]{16}\/[A-Za-z0-9._-]{1,100}$/.test(path)) throw new HttpError(400, 'Upload the file first.');
   const filename = str(b.filename, { name: 'File name', max: 160, required: true }).replace(/["\\\r\n]/g, '');
-  const bytes = int(b.bytes, { min: 1, max: 50 * MB });
+  const bytes = int(b.bytes, { min: 1, max: MAX_FILE });
   const db = await getDb();
   // earlier versions stay in storage so links already sent keep working until they expire
   await db.batch([

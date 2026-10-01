@@ -51,9 +51,9 @@ export function r2Storage(r2, secret){
       const exp = Math.floor(Date.now() / 1000) + expiresInSeconds;
       return `/__storage/${bucket}/${path}?exp=${exp}&sig=${sign(`${bucket}/${path}:${exp}`)}${download ? `&download=${encodeURIComponent(download)}` : ''}`;
     },
-    async signedUploadUrl(bucket, path){
+    async signedUploadUrl(bucket, path, seconds = 600){
       assertPath(bucket, path);
-      const exp = Math.floor(Date.now() / 1000) + 600;
+      const exp = Math.floor(Date.now() / 1000) + seconds;
       return { url: `/__storage-upload/${bucket}/${path}?exp=${exp}&sig=${sign(`upload:${bucket}/${path}:${exp}`)}`, method: 'PUT' };
     },
     verify(kind, bucket, path, exp, sig){
@@ -94,9 +94,9 @@ export function localStorage(dataDir){
       const sig = hmacHex(secret, `${bucket}/${path}:${exp}`);
       return `/__storage/${bucket}/${path}?exp=${exp}&sig=${sig}${download ? `&download=${encodeURIComponent(download)}` : ''}`;
     },
-    async signedUploadUrl(bucket, path){
+    async signedUploadUrl(bucket, path, seconds = 600){
       assertPath(bucket, path);
-      const exp = Math.floor(Date.now() / 1000) + 600;
+      const exp = Math.floor(Date.now() / 1000) + seconds;
       const sig = hmacHex(secret, `upload:${bucket}/${path}:${exp}`);
       return { url: `/__storage-upload/${bucket}/${path}?exp=${exp}&sig=${sig}`, method: 'PUT' };
     },

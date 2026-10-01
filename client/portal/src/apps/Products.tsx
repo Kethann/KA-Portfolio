@@ -1,5 +1,5 @@
 // Products (Artzz gallery pieces and Artifacts for sale): list, reorder, edit, publish, images, file.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import type { AppProps } from './registry';
 import { useDraft, useLoad, usePref, useUnsavedGuard } from '../hooks';
 import { api, del, get, post, put, patch } from '../api';
@@ -207,8 +207,14 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
   };
 
   // Deliverable: optionally repackaged so LICENSE.txt travels inside the download.
+  // LICENSE.txt is packed into the download in the browser (the whole file in memory, ZIP up to 4 GB), so only for
+  // files up to 1 GB; bigger files go up as they are (buyers still get LICENSE.txt attached to the delivery email).
+  const packed = useRef(false);
   const prepareFile = async (file: File) => {
+    packed.current = false;
     if (!packLicense || !license) return file;
+    if (file.size > 1024 * 1024 * 1024){ toast.show('Large file: uploaded as it is. LICENSE.txt is attached to the buyer’s email instead of packed inside.'); return file; }
+    packed.current = true;
     const text = new TextEncoder().encode(licenseText({ product: p.title, license: license.name, summary: license.summary, body: license.body_md, version: license.version }));
     const buf = new Uint8Array(await file.arrayBuffer());
     const isZip = /\.zip$/i.test(file.name) && buf[0] === 0x50 && buf[1] === 0x4b;
@@ -216,7 +222,7 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
     return new File([blob], isZip ? file.name : file.name.replace(/\.[^.]+$/, '') + '.zip', { type: 'application/zip' });
   };
   const fileUploaded = async (u: { path: string; file: File }) => {
-    const r = await put<{ product: Product }>(`/products/${id}/file`, { path: u.path, filename: u.file.name, bytes: u.file.size, licenseVersion: packLicense && license ? license.version : null });
+    const r = await put<{ product: Product }>(`/products/${id}/file`, { path: u.path, filename: u.file.name, bytes: u.file.size, licenseVersion: packed.current && license ? license.version : null });
     refresh(r);
     toast.show(packLicense && license ? 'File uploaded with LICENSE.txt inside' : 'File uploaded', { tone: 'success' });
   };
@@ -325,7 +331,7 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
                 ) : <p className="muted">No file yet. A for-sale item can’t be published without one.</p>}
                 <Switch checked={packLicense} onChange={setPackLicense} label={license ? `Put LICENSE.txt (${license.name}) inside the download` : 'Put LICENSE.txt inside the download (choose a license first)'} disabled={!license} />
                 <Uploader kind="deliverable" accept="*/*" label={p.file ? 'Replace the file' : 'Upload the file'} prepare={prepareFile} onUploaded={fileUploaded}>
-                  Up to 50 MB. Stored privately; buyers only get expiring links.
+                  Any size (big files upload in parts). Stored privately; buyers only get expiring links.
                 </Uploader>
                 <p className="field-hint">Replacing keeps earlier versions, so links already emailed keep working until they expire.</p>
               </section>

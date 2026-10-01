@@ -157,7 +157,12 @@ test('catalog: drafts stay private; publishing rules; stale edits refused; own m
   const up = await admin('POST', '/api/admin/uploads', { kind: 'image', contentType: 'image/webp', bytes: 1000, filename: 'wave.webp' });
   assert.equal(up.status, 200); assert.ok(up.json.publicUrl);
   assert.equal((await admin('POST', '/api/admin/uploads', { kind: 'image', contentType: 'image/svg+xml', bytes: 1000, filename: 'x.svg' })).status, 400, 'SVG (script-capable) refused');
-  assert.equal((await admin('POST', '/api/admin/uploads', { kind: 'image', contentType: 'image/png', bytes: 11 * 1024 * 1024, filename: 'big.png' })).status, 400);
+  // no size limit of our own: big images are fine, files over 90 MB go up in parts, only R2's 5 TiB maximum is refused
+  const mid = await admin('POST', '/api/admin/uploads', { kind: 'image', contentType: 'image/png', bytes: 40 * 1024 * 1024, filename: 'big.png' });
+  assert.equal(mid.status, 200); assert.equal(mid.json.chunked, false);
+  const huge = await admin('POST', '/api/admin/uploads', { kind: 'deliverable', contentType: 'application/zip', bytes: 3 * 1024 ** 3, filename: 'huge.zip' });
+  assert.equal(huge.status, 200); assert.equal(huge.json.chunked, true); assert.equal(huge.json.partSize, 50 * 1024 * 1024);
+  assert.equal((await admin('POST', '/api/admin/uploads', { kind: 'deliverable', contentType: 'application/zip', bytes: 6 * 1024 ** 4, filename: 'x.zip' })).status, 400);
   assert.equal((await admin('POST', `/api/admin/products/${p.id}/media`, { url: 'https://evil.example/x.png' })).status, 400);
   const withImg = await admin('POST', `/api/admin/products/${p.id}/media`, { url: up.json.publicUrl, alt: 'Waves' });
   p = withImg.json.product;

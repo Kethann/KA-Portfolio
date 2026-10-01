@@ -47,12 +47,38 @@ async function storageRequest(request, env, ctx, url){
   if (!BUCKETS[bucket] || !/^[A-Za-z0-9._/-]{1,300}$/.test(path) || path.includes('..')) return text(404, 'Not found');
 
   if (upload){
-    if (request.method !== 'PUT') return text(405, 'Method not allowed');
     if (!storage.verify('upload', bucket, path, url.searchParams.get('exp'), url.searchParams.get('sig'))) return text(403, 'This upload link has expired. Try again.');
+    const key = `${bucket}/${path}`;
+    const reply = (o) => new Response(JSON.stringify(o), { status: 200, headers: { ...SECURITY, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
     const size = Number(request.headers.get('content-length') || 0);
+    // Big files (any size up to R2's 5 TiB): POST ?mpu=start -> PUT ?uploadId&part=N (each <= 95 MB) -> POST ?uploadId&mpu=complete
+    const step = url.searchParams.get('mpu'), uploadId = url.searchParams.get('uploadId');
+    if (request.method === 'POST' && step === 'start'){
+      const m = await env.FILES.createMultipartUpload(key, { httpMetadata: { contentType: url.searchParams.get('type') || 'application/octet-stream' } });
+      return reply({ uploadId: m.uploadId });
+    }
+    if (uploadId){
+      const m = env.FILES.resumeMultipartUpload(key, uploadId);
+      if (request.method === 'PUT'){
+        const n = Number(url.searchParams.get('part'));
+        if (!Number.isInteger(n) || n < 1 || n > 10000) return text(400, 'Bad part number.');
+        if (!size || size > MAX_UPLOAD) return text(413, 'This part is too large.');
+        const part = await m.uploadPart(n, request.body);
+        return reply({ part: part.partNumber, etag: part.etag });
+      }
+      if (request.method === 'POST' && step === 'complete'){
+        const body = await request.json().catch(() => ({}));
+        const parts = (Array.isArray(body.parts) ? body.parts : []).map(x => ({ partNumber: Number(x.part), etag: String(x.etag) })).sort((x, y) => x.partNumber - y.partNumber);
+        if (!parts.length) return text(400, 'No parts.');
+        await m.complete(parts);
+        return reply({ ok: true });
+      }
+      if (request.method === 'DELETE'){ await m.abort().catch(() => {}); return reply({ ok: true }); }
+    }
+    if (request.method !== 'PUT') return text(405, 'Method not allowed');
     if (!size || size > MAX_UPLOAD) return text(413, 'This file is too large to upload in one go.');
-    await env.FILES.put(`${bucket}/${path}`, request.body, { httpMetadata: { contentType: request.headers.get('content-type') || 'application/octet-stream' } });
-    return new Response('{"ok":true}', { status: 200, headers: { ...SECURITY, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+    await env.FILES.put(key, request.body, { httpMetadata: { contentType: request.headers.get('content-type') || 'application/octet-stream' } });
+    return reply({ ok: true });
   }
 
   if (request.method !== 'GET' && request.method !== 'HEAD') return text(405, 'Method not allowed');

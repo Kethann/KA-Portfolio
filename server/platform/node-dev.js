@@ -3,8 +3,10 @@
 // and local file storage under .data/, so no accounts are needed to work on the site.
 import { config } from 'dotenv';
 import { createServer } from 'node:http';
-import { readFile, stat, mkdir, writeFile } from 'node:fs/promises';
-import { createReadStream } from 'node:fs';
+import { readFile, stat, mkdir, writeFile, rm } from 'node:fs/promises';
+import { randomBytes, createHash } from 'node:crypto';
+import { pipeline } from 'node:stream/promises';
+import { createReadStream, createWriteStream } from 'node:fs';
 import { resolve, extname, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Readable } from 'node:stream';
@@ -80,11 +82,45 @@ export async function createDevServer({ port = Number(env('PORT', 9878)), host =
         const bucket = rest.split('/')[0], objectPath = rest.slice(bucket.length + 1);
         if (storage.kind !== 'local'){ res.writeHead(404); return res.end(); }
         if (upload){
-          if (req.method !== 'PUT' || !storage.verify('upload', bucket, objectPath, url.searchParams.get('exp'), url.searchParams.get('sig'))){ res.writeHead(403); return res.end(); }
-          const chunks = []; let size = 0;
-          for await (const c of req){ size += c.length; if (size > 50 * 1024 * 1024){ res.writeHead(413); return res.end(); } chunks.push(c); }
-          await storage.put(bucket, objectPath, Buffer.concat(chunks));
-          res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end('{"ok":true}');
+          if (!storage.verify('upload', bucket, objectPath, url.searchParams.get('exp'), url.searchParams.get('sig'))){ res.writeHead(403); return res.end(); }
+          const reply = (o) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
+          const readBody = async (limit) => { const chunks = []; let size = 0; for await (const c of req){ size += c.length; if (size > limit) return null; chunks.push(c); } return Buffer.concat(chunks); };
+          const LIMIT = 95 * 1024 * 1024;   // same per-request limit as a Cloudflare Worker
+          // chunked uploads, same protocol as the Worker (R2 multipart): parts kept in .data/storage/.uploads/<id>/
+          const step = url.searchParams.get('mpu'), uploadId = url.searchParams.get('uploadId');
+          const partsDir = (id) => inside(resolve(storage.root, '.uploads'), id);
+          if (req.method === 'POST' && step === 'start'){
+            const id = randomBytes(12).toString('hex');
+            await mkdir(partsDir(id), { recursive: true });
+            await writeFile(resolve(partsDir(id), 'target.json'), JSON.stringify({ bucket, objectPath }));
+            return reply({ uploadId: id });
+          }
+          if (uploadId){
+            if (!/^[a-f0-9]{24}$/.test(uploadId)){ res.writeHead(400); return res.end(); }
+            const dir = partsDir(uploadId);
+            if (req.method === 'PUT'){
+              const n = Number(url.searchParams.get('part'));
+              if (!Number.isInteger(n) || n < 1 || n > 10000){ res.writeHead(400); return res.end(); }
+              const body = await readBody(LIMIT); if (!body){ res.writeHead(413); return res.end(); }
+              await writeFile(resolve(dir, String(n)), body);
+              return reply({ part: n, etag: createHash('md5').update(body).digest('hex') });
+            }
+            if (req.method === 'POST' && step === 'complete'){
+              const { parts = [] } = JSON.parse((await readBody(1024 * 1024)).toString() || '{}');
+              const file = inside(resolve(storage.root, bucket), objectPath);
+              await mkdir(dirname(file), { recursive: true });
+              const out = createWriteStream(file);
+              for (const x of [...parts].sort((p, q) => p.part - q.part)) await pipeline(createReadStream(resolve(dir, String(Number(x.part)))), out, { end: false });
+              await new Promise((ok, fail) => out.end((e) => e ? fail(e) : ok()));
+              await rm(dir, { recursive: true, force: true });
+              return reply({ ok: true });
+            }
+            if (req.method === 'DELETE'){ await rm(dir, { recursive: true, force: true }); return reply({ ok: true }); }
+          }
+          if (req.method !== 'PUT'){ res.writeHead(405); return res.end(); }
+          const body = await readBody(LIMIT); if (!body){ res.writeHead(413); return res.end(); }
+          await storage.put(bucket, objectPath, body);
+          return reply({ ok: true });
         }
         const isPublic = bucket === 'media';
         if (!isPublic && !storage.verify('get', bucket, objectPath, url.searchParams.get('exp'), url.searchParams.get('sig'))){ res.writeHead(403); return res.end(); }
