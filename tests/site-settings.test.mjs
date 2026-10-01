@@ -34,3 +34,23 @@ test('passCard: defaults for older sites, values kept in range, fonts and logo c
   assert.throws(() => validateSiteDocument({ ...base, passCard: { logoUrl: 'https://evil.example/logo.png' } }, seed, seed), /pass logo/);
   assert.equal(validateSiteDocument({ ...base, passCard: { logoUrl: '/images/icon-192.png' } }, seed, seed).passCard.logoUrl, '/images/icon-192.png');
 });
+
+test('About numbers: defaults for older sites, up to 6, whole numbers, short suffix, can be hidden', () => {
+  const base = structuredClone(seed); delete base.stats;
+  const d = validateSiteDocument({ ...base }, seed, seed).stats;
+  assert.equal(d.enabled, true); assert.ok(d.items.length >= 3); assert.equal(d.items[0].label, 'Projects');
+  const s = validateSiteDocument({ ...base, stats: { enabled: false, items: [
+    { label: 'Projects', value: '42.6', suffix: '+++++' }, { label: '', value: 5 }, { label: 'Years', value: -3 },
+    ...Array.from({ length: 8 }, (_, i) => ({ label: 'X' + i, value: i })) ] } }, seed, seed).stats;
+  assert.equal(s.enabled, false);
+  assert.deepEqual(s.items[0], { label: 'Projects', value: 43, suffix: '++++' });
+  assert.equal(s.items.some(x => !x.label), false, 'empty labels dropped');
+  assert.equal(s.items.find(x => x.label === 'Years').value, 0, 'never negative');
+  assert.ok(s.items.length <= 6);
+});
+
+test('the full portfolio (18 artworks in 3 folders) is the starting data, so any of it can be re-added in the portal', () => {
+  assert.deepEqual(seed.folders, ['Film Posters', 'Key Art', 'Social']);
+  assert.equal(seed.images.length, 18);
+  for (const f of seed.folders) assert.ok(seed.images.some(i => i.cat === f), f + ' has images');
+});

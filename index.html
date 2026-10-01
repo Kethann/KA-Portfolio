@@ -760,6 +760,22 @@ footer.site-footer{
   .footer-link:hover{ transform:none; }
 }
 
+/* ============================================================ ABOUT NUMBERS (count up) == */
+.about-stats{ display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:clamp(10px, 1.6vw, 18px);
+  width:min(100%, 960px); margin:clamp(28px, 5vw, 56px) auto 0; }
+.about-stats[hidden]{ display:none; }
+.about-stat{ position:relative; padding:clamp(16px, 2.4vw, 24px) clamp(14px, 2vw, 22px); border-radius:20px; text-align:center;
+  background:var(--glass-bg); border:var(--glass-border); box-shadow:var(--glass-highlight), var(--glass-shadow);
+  backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur); overflow:hidden; }
+.about-stat::after{ content:""; position:absolute; left:18%; right:18%; bottom:0; height:2px; border-radius:2px;
+  background:linear-gradient(90deg, transparent, rgba(255,148,56,.75), transparent); opacity:.7; }
+.about-stat-num{ display:block; font-family:var(--font-heading), ui-serif, Georgia, serif; font-weight:var(--heading-weight, 500);
+  font-size:clamp(30px, 4.4vw, 48px); line-height:1; letter-spacing:-0.02em; color:var(--ink); font-variant-numeric:tabular-nums; }
+.about-stat-num .sfx{ color:var(--amber); margin-left:2px; }
+.about-stat-label{ display:block; margin-top:10px; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10.5px;
+  letter-spacing:0.14em; text-transform:uppercase; color:var(--ink-dim); }
+@media (max-width:520px){ .about-stats{ grid-template-columns:repeat(2, 1fr); } }
+
 /* ============================================================ IMAGE UPSCALER: coming-soon dialog only == */
 #upscaler-modal{ position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; padding:24px; }
 #upscaler-modal[hidden]{ display:none; }
@@ -1549,6 +1565,9 @@ html.ka-modal-open{ overflow:hidden; }
       <p class="about-caption">IMAGINE &middot; CREATE &middot; EVOLVE</p>
       <p class="about-bio-text" id="about-bio-text">I'm a graphic designer based in India, specializing in movie poster and publicity campaign design. My work has shaped the visual identity for major theatrical releases — from Salaar and Devara to WAR 2, Kuravaali, and campaigns spanning both Indian and Hollywood cinema. Since 2019, I've been crafting key art that doesn't just advertise a film — it captures its emotional core in a single frame. Every poster is a puzzle: balancing star power, mood, typography, and story into something that stops people mid-scroll. Available for freelance and full-time collaborations — always looking for the next story worth telling visually.</p>
     </div>
+
+    <!-- About numbers (Projects, Delivered, ...): filled from the portal (Content > Site text), count up when seen -->
+    <div class="about-stats" id="about-stats" role="list" aria-label="In numbers" hidden></div>
 
     <div class="about-block" id="about-skills-block">
       <div class="gallery-head">
@@ -7813,7 +7832,57 @@ function applyFavicon(url){
   if (url){ if (!link.dataset.kaDefault) link.dataset.kaDefault = link.getAttribute("href") || ""; link.href = url; }
   else if (link.dataset.kaDefault !== undefined){ link.href = link.dataset.kaDefault; }
 }
+// About numbers: one tile per item; each counts from 0 when it scrolls into view (instantly with reduced motion).
+function renderAboutStats(stats){
+  var box = document.getElementById("about-stats");
+  if (!box) return;
+  var items = stats && stats.enabled !== false && Array.isArray(stats.items) ? stats.items.filter(function(x){ return x && x.label; }) : [];
+  box.hidden = !items.length;
+  var fmt = function(n){ try { return Math.round(n).toLocaleString("en-IN"); } catch(e){ return String(Math.round(n)); } };
+  box.replaceChildren.apply(box, items.map(function(x){
+    var tile = document.createElement("div"); tile.className = "about-stat"; tile.setAttribute("role", "listitem");
+    var num = document.createElement("span"); num.className = "about-stat-num";
+    var val = document.createElement("span"); val.textContent = "0"; val.dataset.target = String(Math.max(0, Number(x.value) || 0));
+    num.appendChild(val);
+    if (x.suffix){ var sfx = document.createElement("span"); sfx.className = "sfx"; sfx.textContent = x.suffix; num.appendChild(sfx); }
+    var label = document.createElement("span"); label.className = "about-stat-label"; label.textContent = x.label;
+    tile.setAttribute("aria-label", fmt(val.dataset.target) + (x.suffix || "") + " " + x.label);
+    tile.append(num, label);
+    return tile;
+  }));
+  var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var nums = function(){ return box.querySelectorAll(".about-stat-num > span:first-child"); };
+  var frames = [];
+  var stop = function(){ frames.forEach(cancelAnimationFrame); frames = []; };
+  var run = function(){
+    stop();
+    nums().forEach(function(el, i){
+      var target = Number(el.dataset.target) || 0;
+      if (reduce || !target){ el.textContent = fmt(target); return; }
+      var start = null, dur = 1500 + i * 180;
+      var step = function(t){
+        if (start === null) start = t;
+        var k = Math.min(1, (t - start) / dur), eased = 1 - Math.pow(1 - k, 3);
+        el.textContent = fmt(target * eased);
+        if (k < 1) frames[i] = requestAnimationFrame(step);
+      };
+      frames[i] = requestAnimationFrame(step);
+    });
+  };
+  var reset = function(){ stop(); nums().forEach(function(el){ el.textContent = "0"; }); };
+  if (window.__kaStatsObserver) window.__kaStatsObserver.disconnect();
+  if (reduce || !("IntersectionObserver" in window)){ run(); return; }
+  // counts when the tiles are clearly on screen (not just peeking under the hero at the bottom edge),
+  // and resets when they leave, so they count again the next time — like the headings that write themselves in
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if (e.isIntersecting) run(); else reset(); });
+  }, { threshold: 0.6, rootMargin: "0px 0px -20% 0px" });
+  window.__kaStatsObserver = io;
+  io.observe(box);
+}
+
 function applySiteAppearance(data){
+  try { renderAboutStats(data && data.stats); } catch(e){}
   var root = document.documentElement.style;
   if (data.details){
     if (data.details.customFonts) applyCustomFonts(data.details.customFonts);

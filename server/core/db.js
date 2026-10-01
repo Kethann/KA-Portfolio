@@ -7,6 +7,8 @@
 // Values are converted at this edge so handlers see plain JS: booleans, Date/ISO strings, parsed JSON.
 //   now()  in SQL means the current UTC time as ISO text (the same format every timestamp column stores).
 let current = null;
+let lastD1Size = null;   // D1 reports the database size with every query result (meta.size_after)
+export const dbSizeBytes = () => lastD1Size;
 
 export const NOW = `strftime('%Y-%m-%dT%H:%M:%fZ','now')`;
 
@@ -46,8 +48,8 @@ export function d1Driver(d1){
   };
   return {
     kind: 'd1',
-    async query(text, params){ const r = await prep(text, params).all(); return (r.results || []).map(fromRow); },
-    async batch(list){ if (!list.length) return []; const rs = await d1.batch(list.map(([t, p]) => prep(t, p))); return rs.map(r => (r.results || []).map(fromRow)); },
+    async query(text, params){ const r = await prep(text, params).all(); if (r.meta?.size_after) lastD1Size = r.meta.size_after; return (r.results || []).map(fromRow); },
+    async batch(list){ if (!list.length) return []; const rs = await d1.batch(list.map(([t, p]) => prep(t, p))); const sz = rs.at(-1)?.meta?.size_after; if (sz) lastD1Size = sz; return rs.map(r => (r.results || []).map(fromRow)); },
   };
 }
 

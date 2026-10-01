@@ -1,7 +1,7 @@
 // Portal: system status (which services are configured — names only, never values), email log,
 // storage use, backups, audit log and visitor-data purge.
 import { json, readJson, HttpError } from '../core/http.js';
-import { getDb, ftsQuery } from '../core/db.js';
+import { getDb, ftsQuery, dbSizeBytes } from '../core/db.js';
 import { env, isProduction } from '../core/env.js';
 import { getSetting } from '../core/settings.js';
 import { getStorage, BUCKETS } from '../core/storage.js';
@@ -39,7 +39,7 @@ export async function status(){
   });
   const email = await db.query(`select to_email, subject, template, status, error, created_at from email_log order by created_at desc limit 30`);
   const emailFails = (await db.one(`select count(*) as n from email_log where status = 'failed' and created_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-7 days')`)).n;
-  const size = await db.maybeOne('select page_count * page_size as bytes from pragma_page_count(), pragma_page_size()').catch(() => null);
+  const size = dbSizeBytes() !== null ? { bytes: dbSizeBytes() } : await db.maybeOne('select page_count * page_size as bytes from pragma_page_count(), pragma_page_size()').catch(() => null);
   const migrations = await db.query('select name, applied_at from d1_migrations order by name').catch(() => []);
   return json({
     production: isProduction(), host: env('KA_PLATFORM') || 'node',
@@ -56,12 +56,12 @@ export async function storageUsage(){
   for (const b of Object.keys(BUCKETS)){
     try { buckets[b] = await storage.usage(b); } catch { buckets[b] = { bytes: null, count: null, error: 'Couldn’t read this bucket.' }; }
   }
-  return json({ buckets, limitBytes: 1024 * 1024 * 1024 });
+  return json({ buckets, limitBytes: 10 * 1024 * 1024 * 1024 });   // R2 free plan: 10 GB
 }
 
 export async function testEmail(ctx){
   const res = await sendEmail({ to: ctx.admin.email, template: 'alert', vars: { title: 'Test email', body: 'Email sending works. This test was sent from the portal’s System window.' } });
-  if (!res.ok) throw new HttpError(502, 'Sending failed. Check BREVO_API_KEY, MAIL_FROM and that the sender domain is verified in Brevo.');
+  if (!res.ok) throw new HttpError(502, 'Sending failed. Check GMAIL_USER and GMAIL_APP_PASSWORD (Settings > System status shows whether they are set).');
   return json({ ok: true, to: ctx.admin.email });
 }
 

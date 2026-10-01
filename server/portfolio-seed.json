@@ -13,14 +13,15 @@
     "contactButton": "Send message"
   },
   "folders": [
-    "Selected work",
-    "Experiments"
+    "Film Posters",
+    "Key Art",
+    "Social"
   ],
   "images": [
     {
       "slug": "tiger-blue",
       "title": "All Hail the Tiger",
-      "cat": "Selected work",
+      "cat": "Film Posters",
       "widths": [
         480,
         768,
@@ -31,7 +32,7 @@
       ],
       "full": 5413,
       "id": "tiger-blue",
-      "description": "A sample project entry for this visual study. Explore its composition, typography, and visual direction. Edit this description in the studio to tell the story behind the work.",
+      "description": "",
       "technologies": [
         "Art direction",
         "Typography",
@@ -42,7 +43,7 @@
     {
       "slug": "devara-11-days",
       "title": "DEVARA — 11 Days to Go",
-      "cat": "Selected work",
+      "cat": "Film Posters",
       "widths": [
         480,
         768,
@@ -52,7 +53,7 @@
       ],
       "full": 3200,
       "id": "devara-11-days",
-      "description": "A sample project entry for this visual study. Explore its composition, typography, and visual direction. Edit this description in the studio to tell the story behind the work.",
+      "description": "",
       "technologies": [
         "Art direction",
         "Typography",
@@ -63,7 +64,7 @@
     {
       "slug": "devara-14-days",
       "title": "DEVARA — 14 Days to Go",
-      "cat": "Selected work",
+      "cat": "Film Posters",
       "widths": [
         480,
         768,
@@ -73,7 +74,7 @@
       ],
       "full": 2700,
       "id": "devara-14-days",
-      "description": "A sample project entry for this visual study. Explore its composition, typography, and visual direction. Edit this description in the studio to tell the story behind the work.",
+      "description": "",
       "technologies": [
         "Art direction",
         "Typography",
@@ -84,7 +85,7 @@
     {
       "slug": "vara-23-days",
       "title": "VARA — 23 Days to Go",
-      "cat": "Selected work",
+      "cat": "Film Posters",
       "widths": [
         480,
         768,
@@ -94,7 +95,7 @@
       ],
       "full": 2400,
       "id": "vara-23-days",
-      "description": "A sample project entry for this visual study. Explore its composition, typography, and visual direction. Edit this description in the studio to tell the story behind the work.",
+      "description": "",
       "technologies": [
         "Art direction",
         "Typography",
@@ -105,7 +106,7 @@
     {
       "slug": "wa-00-40-18",
       "title": "United Tollywood",
-      "cat": "Selected work",
+      "cat": "Key Art",
       "widths": [
         480,
         768,
@@ -115,12 +116,217 @@
       ],
       "full": 3120,
       "id": "wa-00-40-18",
-      "description": "A sample project entry for this visual study. Explore its composition, typography, and visual direction. Edit this description in the studio to tell the story behind the work.",
+      "description": "",
       "technologies": [
         "Art direction",
         "Typography",
         "Compositing"
       ],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "wa-00-51-35",
+      "id": "wa-00-51-35",
+      "title": "Character Study I",
+      "cat": "Key Art",
+      "widths": [
+        480,
+        768,
+        1080
+      ],
+      "full": 1080,
+      "description": "",
+      "technologies": [],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "wa-00-51-35-1",
+      "id": "wa-00-51-35-1",
+      "title": "Character Study II",
+      "cat": "Key Art",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400
+      ],
+      "full": 2707,
+      "description": "",
+      "technologies": [],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "wa-00-51-36",
+      "id": "wa-00-51-36",
+      "title": "Character Study III",
+      "cat": "Key Art",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400
+      ],
+      "full": 2700,
+      "description": "",
+      "technologies": [],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "wa-00-51-36-2",
+      "id": "wa-00-51-36-2",
+      "title": "Character Study IV",
+      "cat": "Key Art",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400
+      ],
+      "full": 2400,
+      "description": "",
+      "technologies": [],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "wa-00-51-37",
+      "id": "wa-00-51-37",
+      "title": "Character Study V",
+      "cat": "Key Art",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400
+      ],
+      "full": 3200,
+      "description": "",
+      "technologies": [],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "wa-00-51-37-1",
+      "id": "wa-00-51-37-1",
+      "title": "Character Study VI",
+      "cat": "Key Art",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600
+      ],
+      "full": 1600,
+      "description": "",
+      "technologies": [],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "wa-01-03-45",
+      "id": "wa-01-03-45",
+      "title": "Social Promo I",
+      "cat": "Social",
+      "widths": [
+        480,
+        768,
+        1080,
+        1600,
+        2400,
+        3840
+      ],
+      "full": 4160,
+      "description": "",
+      "technologies": [],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "wa-01-03-46",
+      "id": "wa-01-03-46",
+      "title": "Social Promo II",
+      "cat": "Social",
+      "widths": [
+        480,
+        768
+      ],
+      "full": 1033,
+      "description": "",
+      "technologies": [],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "wa-01-03-46-1",
+      "id": "wa-01-03-46-1",
+      "title": "Social Promo III",
+      "cat": "Social",
+      "widths": [
+        480,
+        768,
+        1080
+      ],
+      "full": 1599,
+      "description": "",
+      "technologies": [],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "wa-01-03-47",
+      "id": "wa-01-03-47",
+      "title": "Social Promo IV",
+      "cat": "Social",
+      "widths": [
+        480,
+        768,
+        1080
+      ],
+      "full": 1080,
+      "description": "",
+      "technologies": [],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "wa-01-14-05",
+      "id": "wa-01-14-05",
+      "title": "Social Promo V",
+      "cat": "Social",
+      "widths": [
+        480,
+        768
+      ],
+      "full": 1066,
+      "description": "",
+      "technologies": [],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "wa-01-14-06",
+      "id": "wa-01-14-06",
+      "title": "Social Promo VI",
+      "cat": "Social",
+      "widths": [
+        480,
+        768,
+        1080
+      ],
+      "full": 1200,
+      "description": "",
+      "technologies": [],
+      "link": "https://www.behance.net/KethanArtzz"
+    },
+    {
+      "slug": "wa-01-22-13",
+      "id": "wa-01-22-13",
+      "title": "Social Promo VII",
+      "cat": "Social",
+      "widths": [
+        480,
+        768,
+        1080
+      ],
+      "full": 1599,
+      "description": "",
+      "technologies": [],
       "link": "https://www.behance.net/KethanArtzz"
     }
   ]

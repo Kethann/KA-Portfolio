@@ -19,6 +19,7 @@ import { registerSystem } from './admin/system.js';
 import { registerVisitors } from './admin/visitors.js';
 import { registerVisits } from './visitors/track.js';
 import { registerAssistantAdmin } from './admin/assistant.js';
+import { registerUsage } from './admin/usage.js';
 
 export const router = createRouter();
 const { route } = router;
@@ -39,6 +40,7 @@ registerSystem(route);
 registerVisitors(route);
 registerVisits(route);
 registerAssistantAdmin(route);
+registerUsage(route);
 
 // ---- public site
 route('GET', '/api/public-config', pub.publicConfig);

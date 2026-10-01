@@ -1,6 +1,7 @@
 // KA Portal entry: decides between setup, sign-in and the desktop, and re-shows sign-in over the
 // desktop (keeping open windows and unsaved edits) if the session ends.
 import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
+import { UsageAlert } from './shell/UsageAlert';
 import { createRoot } from 'react-dom/client';
 import './tokens.css';
 import './portal.css';
@@ -79,6 +80,7 @@ function DesktopInner({ session, onSignedOut, areaRef }: { session: Session; onS
       </main>
       <Dock pulse={pulse} compact={compact} />
       {overlays}
+      <UsageAlert />
     </div>
   );
 }

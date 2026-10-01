@@ -9,7 +9,7 @@ import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
 import { TagInput, Uploader, useSaveKey } from './common';
 import { discardSite, keepMineOverTheirs, loadSite, saveSite, thumb, updateSite, useSite } from './siteDoc';
-import type { SiteImage } from './siteDoc';
+import type { SiteImage, StatItem } from './siteDoc';
 import { ago, dateTime } from '../format';
 
 type Tab = 'portfolio' | 'text' | 'upscaler' | 'emails';
@@ -71,7 +71,35 @@ function SiteText(){
           </Field>
         ))}
       </div>
+      <AboutStats />
     </div>
+  );
+}
+
+// About > the numbers that count up (Projects, Delivered, ...): up to 6.
+function AboutStats(){
+  const { doc } = useSite();
+  const st = doc!.stats;
+  const setItems = (items: StatItem[]) => updateSite(d => ({ ...d, stats: { ...d.stats, items } }));
+  const change = (i: number, patch: Partial<StatItem>) => setItems(st.items.map((x, j) => j === i ? { ...x, ...patch } : x));
+  const move = (i: number, by: number) => { const a = [...st.items]; const [x] = a.splice(i, 1); a.splice(Math.max(0, Math.min(a.length, i + by)), 0, x); setItems(a); };
+  return (
+    <section className="card stack" aria-labelledby="about-stats-h" style={{ marginTop: 'var(--sp-5)' }}>
+      <div className="row between"><h3 id="about-stats-h">About numbers</h3>
+        <Switch checked={st.enabled} onChange={v => updateSite(d => ({ ...d, stats: { ...d.stats, enabled: v } }))} label="Show on the About page" /></div>
+      <p className="field-hint" style={{ margin: 0 }}>They count up when a visitor scrolls to them. Up to 6.</p>
+      {st.items.map((x, i) => (
+        <div className="row" key={i} style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <Field label={i === 0 ? 'Label' : ''}><input aria-label={`Label ${i + 1}`} value={x.label} maxLength={40} placeholder="Projects" onChange={e => change(i, { label: e.target.value })} /></Field>
+          <Field label={i === 0 ? 'Number' : ''}><input aria-label={`Number ${i + 1}`} type="number" min={0} max={1000000000} value={x.value} onChange={e => change(i, { value: Math.max(0, Math.round(Number(e.target.value) || 0)) })} style={{ width: 120 }} /></Field>
+          <Field label={i === 0 ? 'After it' : ''}><input aria-label={`Suffix ${i + 1}`} value={x.suffix} maxLength={4} placeholder="+" onChange={e => change(i, { suffix: e.target.value })} style={{ width: 70 }} /></Field>
+          <button type="button" className="icon-btn sm" title="Move up" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
+          <button type="button" className="icon-btn sm" title="Move down" disabled={i === st.items.length - 1} onClick={() => move(i, 1)}>↓</button>
+          <button type="button" className="icon-btn sm" title="Remove" onClick={() => setItems(st.items.filter((_, j) => j !== i))}><Icon name="trash" size={14} /></button>
+        </div>
+      ))}
+      <div><button type="button" className="btn sm" disabled={st.items.length >= 6} onClick={() => setItems([...st.items, { label: '', value: 0, suffix: '+' }])}><Icon name="plus" /> Add a number</button></div>
+    </section>
   );
 }
 

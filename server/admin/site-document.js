@@ -17,6 +17,8 @@ export const DETAIL_FIELDS = { creatorName: 80, tagline: 160, portfolioTitle: 10
 
 const text = (v, max) => typeof v === 'string' ? v.trim().slice(0, max) : '';
 const bad = (msg) => new HttpError(400, msg);
+// About numbers shown until the owner sets their own (Content > Site text)
+export const STATS_DEFAULT = { enabled: true, items: [{ label: 'Projects', value: 150, suffix: '+' }, { label: 'Delivered', value: 120, suffix: '+' }, { label: 'Happy clients', value: 60, suffix: '+' }, { label: 'Years', value: 6, suffix: '+' }] };
 const isImageUrl = (u) => isOwnMediaUrl(u) && /\.(png|jpe?g|webp|avif)$/i.test(u);
 const isFontUrl = (u) => isOwnMediaUrl(u) && /\/fonts\/[A-Za-z0-9_-]+\.(woff2|woff|ttf|otf)$/i.test(u);
 function httpUrl(u){ try { return ['https:', 'http:'].includes(new URL(u).protocol); } catch { return false; } }
@@ -170,5 +172,11 @@ export function validateSiteDocument(input, current, seed){
     foil: pc.foil !== false,
     dim: num(pc.dim, 0, 90, 55),
   };
-  return { typeV2: true, details, folders, images, notice, visibility, stacks, layoutOverrides, branding, elementStyles, socialLinks, passCard };
+  // About > numbers (count up on the page): up to 6, each a label, a whole number and an optional suffix like "+".
+  const st = input.stats && typeof input.stats === 'object' ? input.stats : null;
+  const stats = st ? {
+    enabled: st.enabled !== false,
+    items: (Array.isArray(st.items) ? st.items : []).slice(0, 6).map(x => ({ label: text(x && x.label, 40), value: num(x && x.value, 0, 1e9, 0), suffix: text(x && x.suffix, 4) })).filter(x => x.label),
+  } : structuredClone(STATS_DEFAULT);
+  return { typeV2: true, details, folders, images, notice, visibility, stacks, layoutOverrides, branding, elementStyles, socialLinks, passCard, stats };
 }

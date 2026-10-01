@@ -10,6 +10,7 @@ import { isBlocked } from '../core/blocklist.js';
 import { demoPaymentsEnabled } from '../store/orders.js';
 // bundled with the code (the Worker has no file system to read it from at runtime)
 import seed from '../portfolio-seed.json' with { type: 'json' };
+import { STATS_DEFAULT } from '../admin/site-document.js';
 
 // Public, non-personal reads are never kept by a CDN and are rechecked by the browser every time, so a
 // publish from the portal shows up on the very next request. The router adds an ETag, so an unchanged
@@ -50,7 +51,7 @@ export async function publicConfig(ctx){
 // JSON file; seeded from server/portfolio-seed.json the first time.
 export async function loadSiteDocument(){
   const { value, revision } = await getSettingWithRevision('site');
-  if (value) return { ...value, revision };
+  if (value) return { ...value, stats: value.stats || STATS_DEFAULT, revision };   // sites saved before About numbers existed
   const initial = { ...seed };
   delete initial.revision;
   const rev = await setSetting('site', initial, 0);
