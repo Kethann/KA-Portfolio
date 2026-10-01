@@ -1,150 +1,134 @@
-# Putting the site on Cloudflare (free plan)
+# Going live — complete setup (from zero)
 
-Everything runs on Cloudflare:
+How the live site is built:
 
-| Part | Cloudflare service | What it holds |
+| Part | Service | Name in this project |
 |---|---|---|
-| Website, portal, API | **Workers** (one Worker: `kethan-artzz`) | the site files + all `/api` code |
-| Database | **D1** (`ka-db`) | products, orders, settings, messages, team… |
-| Files | **R2** (`ka-files`) | uploaded images, files buyers download, backups |
-| Emails | your **Gmail** (App Password) | receipts, download links, notifications |
-| Daily/weekly jobs | **Cron Triggers** | order expiry, reports, weekly backup |
+| Public address | Cloudflare **Pages** | project `kethan` → `https://kethan.pages.dev` |
+| API, portal logic, file links | Cloudflare **Worker** | `kethan-artzz` (Pages hands it `/api`, `/legal`, `/__storage`) |
+| Database | Cloudflare **D1** | `ka-db` |
+| Files (images, downloads, backups) | Cloudflare **R2** | bucket `ka-files` |
+| Bot protection on forms | Cloudflare **Turnstile** | widget "Kethan Artzz site" |
+| Email | **Gmail** with an App Password | your Gmail |
+| Payments | **Razorpay** | test keys first, live keys later |
+| Scheduled jobs | Cloudflare **Cron Triggers** | set in `wrangler.jsonc` (nothing to do) |
 
-Do the steps in order. Each command is typed in a terminal (PowerShell) **inside the project folder**:
-
+Every command below is typed in **PowerShell inside the project folder**:
 ```
 cd C:\Users\volet\Downloads\Portfolio-main\KA-Crystal-Reconstruction
 ```
+A command that asks for a value (`npx wrangler secret put NAME`) shows `Enter a secret value:` — type or paste the value
+there and press Enter (pasted secrets stay invisible; that's normal). **Never** put secret values in files or chats.
 
 ---
 
-## 0. One-time on your PC
+## 1. Accounts you need (all free to start)
+1. **Cloudflare** — https://dash.cloudflare.com/sign-up
+2. **Google account** with Gmail — the address the store sends emails from
+3. **Razorpay** — https://dashboard.razorpay.com/signup (test mode works before business verification)
+4. **GitHub** — only if you want the code backed up / auto-deploys
 
-1. **Install Node.js 22 LTS or newer** from https://nodejs.org (the "LTS" button). Cloudflare's tool needs it.
-   Close and reopen the terminal afterwards, then check: `node -v` shows `v22…` or higher.
-2. Install the project's tools: `npm install`
-3. Sign in to Cloudflare from the terminal: `npx wrangler login` → a browser tab opens → **Allow**.
+## 2. Your PC (one time)
+1. Install **Node.js 22**: PowerShell → `winget install OpenJS.NodeJS.22` → close and reopen VS Code → `node -v` shows `v22…`.
+2. Allow npm to run in PowerShell: `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` → `Y`.
+3. Install the project tools: `npm install`
+4. Sign in to Cloudflare: `npx wrangler login` → browser opens → **Allow**.
 
-## 1. Create the database and the file bucket
+## 3. Database (D1)
+1. `npx wrangler d1 create ka-db`
+2. If it asks "add it on your behalf?" answer **No**. Copy the `database_id` it prints.
+3. Open `wrangler.jsonc` → in `d1_databases` put that id in `"database_id"`. Save.
+4. Create the tables: `npx wrangler d1 migrations apply ka-db --remote`
+
+## 4. File storage (R2)
+1. Cloudflare dashboard → **R2 Object Storage** → **Enable** (asks for a card; free up to 10 GB).
+2. `npx wrangler r2 bucket create ka-files`
+
+## 5. Bot protection (Turnstile) — needed for the contact form, checkout, notify-me and download pages
+1. Cloudflare dashboard → **Turnstile** → **Add widget**.
+2. Name: `Kethan Artzz site`. Hostnames: add `kethan.pages.dev` (and your own domain later). Mode: **Managed** → **Create**.
+3. It shows a **Site Key** and a **Secret Key** — used in step 7.
+
+## 6. Gmail App Password
+1. https://myaccount.google.com/security → turn on **2-Step Verification** (phone + code).
+2. https://myaccount.google.com/apppasswords → App name `Kethan Artzz site` → **Create** → copy the 16 letters.
+
+## 7. Secrets (values never go in the code)
+Run each line; paste the value when asked.
+
+| Name | Where the value comes from | Needed for |
+|---|---|---|
+| `DOWNLOAD_TOKEN_SECRET` | make up 40+ random letters/numbers | signed download & file links (**required**) |
+| `ADMIN_ENCRYPTION_KEY` | make up another 40+ random letters/numbers (never change it later) | portal two-factor codes (**required**) |
+| `GEMINI_API_KEY` | https://aistudio.google.com/apikey → Create API key | chat assistant |
+| `GMAIL_USER` | your Gmail address, e.g. `kethanartzz@gmail.com` | sending email |
+| `GMAIL_APP_PASSWORD` | the 16 letters from step 6 | sending email |
+| `OWNER_EMAIL` | where order/message alerts should go | alerts |
+| `TURNSTILE_SITE_KEY` | step 5, Site Key | forms |
+| `TURNSTILE_SECRET_KEY` | step 5, Secret Key | forms |
+| `RAZORPAY_KEY_ID` | step 11 (`rzp_test_…` first) | payments |
+| `RAZORPAY_KEY_SECRET` | step 11 | payments |
+| `RAZORPAY_WEBHOOK_SECRET` | make up a long phrase; same text goes into Razorpay in step 11 | payments |
+| `ADMIN_SETUP_TOKEN` | make up a code — *only* if the database has no portal account yet (step 9) | first sign-up |
 
 ```
-npx wrangler d1 create ka-db
-```
-It prints a block with `"database_id": "…"`. Open **wrangler.jsonc** and paste that id where it says
-`PASTE-YOUR-D1-DATABASE-ID-HERE`. Save.
-
-```
-npx wrangler r2 bucket create ka-files
-```
-(If Cloudflare asks you to enable R2 first: dashboard → **R2 Object Storage** → **Enable**. The free tier
-needs a card on file but stays free up to 10 GB.)
-
-## 2. Secrets (keys and passwords)
-
-Run each line; it asks for the value and stores it encrypted on Cloudflare (never in the code).
-If it asks "create a new Worker?", answer **yes**.
-
-| Name | What to paste |
-|---|---|
-| `GEMINI_API_KEY` | your key from https://aistudio.google.com/apikey |
-| `DOWNLOAD_TOKEN_SECRET` | any long random text (e.g. mash 40+ letters/numbers) — signs download links |
-| `ADMIN_ENCRYPTION_KEY` | another long random text — protects two-factor codes |
-| `OWNER_EMAIL` | the email that should receive order/message alerts |
-| `GMAIL_USER` | your Gmail address, e.g. `kethanartzz@gmail.com` |
-| `GMAIL_APP_PASSWORD` | the 16-letter App Password (see below) |
-| `RAZORPAY_KEY_ID` | Razorpay key id (start with **test** keys: `rzp_test_…`) |
-| `RAZORPAY_KEY_SECRET` | Razorpay key secret |
-| `RAZORPAY_WEBHOOK_SECRET` | the secret you type when creating the webhook (step 6) |
-| `ADMIN_SETUP_TOKEN` | *only if you start with an empty database* (skip step 4): a code to create the first owner |
-
-```
-npx wrangler secret put GEMINI_API_KEY
 npx wrangler secret put DOWNLOAD_TOKEN_SECRET
 npx wrangler secret put ADMIN_ENCRYPTION_KEY
-npx wrangler secret put OWNER_EMAIL
+npx wrangler secret put GEMINI_API_KEY
 npx wrangler secret put GMAIL_USER
 npx wrangler secret put GMAIL_APP_PASSWORD
-npx wrangler secret put RAZORPAY_KEY_ID
-npx wrangler secret put RAZORPAY_KEY_SECRET
-npx wrangler secret put RAZORPAY_WEBHOOK_SECRET
+npx wrangler secret put OWNER_EMAIL
+npx wrangler secret put TURNSTILE_SITE_KEY
+npx wrangler secret put TURNSTILE_SECRET_KEY
 ```
+(The first time, wrangler may ask to create the Worker — answer **yes**.)
+Non-secret settings live in `wrangler.jsonc` → `"vars"`: `KA_ENV` (`production`), `SITE_NAME`, `PUBLIC_SITE_URL`
+(`https://kethan.pages.dev`, or your domain later). Optional extras: `AI_MODEL`, `MAIL_SIGNATURE`, `IPSTACK_ACCESS_KEY`.
 
-**Gmail App Password:** Google Account → **Security** → turn on **2-Step Verification** (required) →
-search "App passwords" → name it `Kethan Artzz site` → **Create** → copy the 16 letters.
-Gmail allows about 500 emails a day, plenty for a store.
-
-## 3. Build and deploy
-
+## 8. Publish
 ```
 npm run cf:deploy
 ```
-This builds the site, creates the database tables on D1, and uploads the Worker. At the end it prints your
-address, like `https://kethan-artzz.<your-name>.workers.dev`. Open **wrangler.jsonc**, put that address in
-`"PUBLIC_SITE_URL": "…"` (used in email links), save, and run `npm run cf:deploy` once more.
+Builds the site, applies database changes, deploys the Worker and publishes `kethan.pages.dev`.
+If the Pages project `kethan` doesn't exist yet, the first run creates it.
+**Then:** Cloudflare dashboard → **Workers & Pages** → **kethan** → **Settings → Builds** → if a GitHub repository is
+connected, **Disconnect** it (otherwise a push would publish a wrong build over the site).
 
-## 4. Move your local data (products, settings, orders, team, images)
+## 9. Your portal account
+- **Data already moved from your PC** (done for you): sign in at `https://kethan.pages.dev/portal/` with your email and
+  the temporary password in `.data/live-owner-temp-password.txt`; the portal makes you choose your own.
+- **Empty database:** set `ADMIN_SETUP_TOKEN` (step 7), open the portal, choose **Set up** and enter that code, your email
+  and a password. Then remove the token: `npx wrangler secret delete ADMIN_SETUP_TOKEN`.
 
-1. **Stop your local server** (the terminal running `npm start`: press `Ctrl + C`).
-2. Copy the old local database into the new format and prepare the upload files:
-   ```
-   npm run cf:move-local-data
-   ```
-3. Load it into Cloudflare's database:
-   ```
-   npx wrangler d1 execute ka-db --remote --file .data/d1-import.sql
-   ```
-4. Upload your images and download files to R2 (keeps the same paths, so every link works):
-   ```
-   npm run cf:upload-files
-   ```
+## 10. Content you must fill in (portal)
+1. **Legal** app → fill every blank (your name/business name, address, contact email, city for disputes) in Terms,
+   Privacy, Refunds and Delivery → **Publish** each. Until then the pages say "being updated" (Razorpay will reject it).
+2. **Settings → Store**: seller name/address/tax id for receipts, tax on/off.
+3. **Products**: replace the demo items and their demo download files with your real ones (upload the real file on each
+   product; demo files are tiny `.txt` placeholders).
+4. **KA Assistant → Knowledge**: add how delivery works, your commission terms, etc.
 
-Your portal sign-in (email + password) comes along, so you log in on the live site exactly as you do locally.
+## 11. Payments (Razorpay)
+1. Razorpay dashboard → toggle **Test Mode** → **Account & Settings → API Keys → Generate Test Key**.
+2. `npx wrangler secret put RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` / `RAZORPAY_WEBHOOK_SECRET` (step 7 table).
+3. **Account & Settings → Webhooks → Add New Webhook**
+   - URL: `https://kethan.pages.dev/api/webhooks/razorpay`
+   - Secret: the same phrase as `RAZORPAY_WEBHOOK_SECRET`
+   - Events: `payment.captured`, `payment.failed`, `order.paid`, `refund.processed`, `refund.failed`
+4. Test: buy on the site with card `4111 1111 1111 1111` (any future date, any CVV) or UPI `success@razorpay`.
+5. Real money: complete Razorpay's activation (KYC + website review — website `https://kethan.pages.dev`, needs step 10.1
+   done), then repeat 1–3 in **Live Mode** with the live keys.
 
-## 5. Check it
-
-- Site: your `workers.dev` address → the crystal logo, portfolio, store, chat assistant.
-- Portal: add `/portal/` to the address → sign in → every app opens.
-- Portal → **Settings → System status** shows the database, storage and email as connected.
-
-## 6. Payments (Razorpay)
-
-Test mode first — no real money moves, the whole flow runs for real:
-
-1. Razorpay dashboard → switch to **Test Mode** → **Settings → API Keys** → generate → put them in the two
-   `RAZORPAY_KEY_*` secrets (step 2).
-2. **Settings → Webhooks → Add**: URL `https://<your address>/api/webhooks/razorpay`, secret = the same text
-   as `RAZORPAY_WEBHOOK_SECRET`, events: `payment.captured`, `payment.failed`, `order.paid`, `refund.processed`,
-   `refund.failed`.
-3. Buy something on the live site with Razorpay's test card `4111 1111 1111 1111` (any future date, any CVV)
-   or test UPI `success@razorpay`.
-
-When everything looks right, switch Razorpay to **Live Mode**, replace the three secrets with the live values,
-and add the webhook again in Live Mode.
-
-> The local demo wallet (the Visa/Mastercard test cards with balances) only works on your PC. On the live
-> site it is always off, so no one can ever "pay" with fake cards.
-
-## 7. Optional: your own domain
-
-Cloudflare dashboard → **Workers & Pages** → `kethan-artzz` → **Settings → Domains & Routes → Add → Custom
-domain**. Then update `PUBLIC_SITE_URL` and the Razorpay webhook URL to the new address.
+## 12. Optional: your own domain
+Buy one (Cloudflare → **Domain Registration**, or any registrar and move the nameservers to Cloudflare) → **Workers &
+Pages** → **kethan** → **Custom domains** → **Set up a domain**. Then: add the domain to the Turnstile widget (step 5),
+change `PUBLIC_SITE_URL` in `wrangler.jsonc`, run `npm run cf:deploy`, and update the Razorpay webhook URL.
 
 ## Every later update
-
-```
-npm run cf:deploy
-```
-(Or connect the GitHub repo in the dashboard: `kethan-artzz` → **Settings → Builds** → build command
-`npm run build:cf`, deploy command `npx wrangler d1 migrations apply ka-db --remote && npx wrangler deploy` —
-then every push to `main` deploys by itself.)
+`npm run cf:deploy`
 
 ## Good to know
-
-- **Free-plan limits:** 100,000 Worker requests a day (the site's pages, images and scripts are served as
-  static files and don't count), D1 5 GB, R2 10 GB, 1 million R2 writes a month.
-- **Uploads:** one file can be up to 95 MB (Cloudflare's request limit on the free plan).
-- **CPU:** the free plan gives each request 10 ms of CPU. Sign-in (password checking is deliberately slow for
-  safety) may exceed it; if the portal sign-in ever shows an error page, tell me — the fix is a small setting
-  change or the Workers Paid plan ($5/month).
-- The old Cloudflare **Pages** project (`*.pages.dev`) can be deleted: dashboard → Workers & Pages → the Pages
-  project → Settings → Delete.
+- Free plan: 100,000 Worker requests/day (pages, images and scripts are static and don't count), D1 5 GB, R2 10 GB.
+- One upload can be up to 95 MB.
+- Weekly backup (Mondays) goes to R2; download copies from the portal → Settings → Backups.
+- Local development: `npm start` (local SQLite in `.data/ka.sqlite`, files in `.data/storage`, emails in `.data/outbox`).
