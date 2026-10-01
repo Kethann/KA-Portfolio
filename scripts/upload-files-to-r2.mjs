@@ -1,19 +1,22 @@
 // Copies your local uploads (.data/storage: images, download files, backups) into the R2 bucket, keeping the
 // same paths, so every image link and download in the moved database keeps working on Cloudflare.
-// Needs: you are signed in (`npx wrangler login`) and the bucket exists. Run after scripts/migrate-local-to-d1.mjs.
+// Needs: you are signed in (`npx wrangler login`) and the bucket exists.
 // Usage: npm run cf:upload-files            (bucket name from wrangler.jsonc, default ka-files)
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dataDir = resolve(process.env.KA_DATA_DIR || resolve(root, '.data'));
-const listFile = resolve(dataDir, 'r2-files.txt');
-if (!existsSync(listFile)){ console.error('Run `node scripts/migrate-local-to-d1.mjs` first (it writes .data/r2-files.txt).'); process.exit(1); }
+// every file under .data/storage (bucket/path), the same paths the database's links use
+const storageRoot = resolve(dataDir, 'storage');
+if (!existsSync(storageRoot)){ console.error('No local files found (.data/storage).'); process.exit(1); }
+const list = [];
+(function walk(dir, prefix){ for (const e of readdirSync(dir, { withFileTypes: true })){ if (e.isDirectory()) walk(resolve(dir, e.name), prefix + e.name + '/'); else list.push(prefix + e.name); } })(storageRoot, '');
 const cfg = readFileSync(resolve(root, 'wrangler.jsonc'), 'utf8');
 const bucket = (/"bucket_name"\s*:\s*"([^"]+)"/.exec(cfg) || [])[1] || 'ka-files';
-const files = readFileSync(listFile, 'utf8').split('\n').map(s => s.trim()).filter(Boolean);
+const files = list;
 const TYPES = { webp: 'image/webp', avif: 'image/avif', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml',
   woff2: 'font/woff2', woff: 'font/woff', ttf: 'font/ttf', otf: 'font/otf', zip: 'application/zip', pdf: 'application/pdf', gz: 'application/gzip', json: 'application/json' };
 let ok = 0, failed = 0;

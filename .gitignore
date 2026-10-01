@@ -26,3 +26,5 @@ tests/.delivery-*
 # build output (Vercel builds from source on every deploy)
 dist/
 pages/out/
+.dev.vars
+.wrangler/

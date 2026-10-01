@@ -87,16 +87,12 @@ export async function sendReceipt(order, items){
 }
 
 // ---- download confirmation page (server-rendered, no scripts except Turnstile) ----------------
-function storageOrigin(){
-  const u = env('SUPABASE_URL');
-  try { return u ? new URL(u).origin : ''; } catch { return ''; }
-}
 function page(status, title, bodyHtml, { turnstile = false } = {}){
   const siteKey = env('TURNSTILE_SITE_KEY');
   const withTs = turnstile && siteKey;
   const csp = [
     "default-src 'none'", "style-src 'unsafe-inline'", "img-src 'self' data:", "base-uri 'none'", "frame-ancestors 'none'",
-    `form-action 'self' ${storageOrigin()}`.trim(),
+    "form-action 'self'",   // files are served from this same site (R2 through the Worker)
     withTs ? "script-src https://challenges.cloudflare.com" : "script-src 'none'",
     withTs ? "frame-src https://challenges.cloudflare.com" : "frame-src 'none'",
     withTs ? "connect-src https://challenges.cloudflare.com" : "connect-src 'none'"

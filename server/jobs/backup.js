@@ -13,8 +13,8 @@ const SKIP = new Set(['admin_sessions', 'rate_limits', 'd1_migrations', '_cf_KV'
 
 export async function runBackup(now = new Date()){
   const db = await getDb();
-  // real tables only (not SQLite internals or the full-text search indexes, which rebuild from their tables)
-  const tables = (await db.query(`select name from sqlite_master where type = 'table' and name not like 'sqlite_%' and name not like '%_fts%' order by name`))
+  // real tables only (not SQLite/D1 internals like _cf_METADATA, nor the search indexes, which rebuild from their tables)
+  const tables = (await db.query(`select name from sqlite_master where type = 'table' and name not like 'sqlite!_%' escape '!' and name not like '!_cf!_%' escape '!' and name not like '%!_fts%' escape '!' order by name`))
     .map(r => r.name).filter(t => !SKIP.has(t));
   const out = { createdAt: now.toISOString(), tables: {} };
   const counts = {};

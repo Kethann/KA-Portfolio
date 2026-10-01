@@ -10,19 +10,21 @@ import { runBackup, KEEP } from '../jobs/backup.js';
 import { int } from '../core/validate.js';
 import { audit } from './auth.js';
 
-// Which features work, from which variables are set. Values are never returned.
+// Which features work, from which variables are set (or, for D1/R2/cron, which bindings the host provides).
+// Values are never returned.
+const onCloudflare = () => env('KA_PLATFORM') === 'cloudflare';
 const SERVICES = [
-  { key: 'database', label: 'Database (Supabase Postgres)', vars: ['DATABASE_URL'], required: true },
-  { key: 'storage', label: 'File storage (Supabase Storage)', vars: ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'], required: true },
-  { key: 'email', label: 'Email (Brevo)', vars: ['BREVO_API_KEY', 'MAIL_FROM'], required: true },
+  { key: 'database', label: 'Database (Cloudflare D1)', vars: [], required: true, ok: () => true },   // status() itself just queried it
+  { key: 'storage', label: 'File storage (Cloudflare R2)', vars: [], required: true, ok: () => { try { return ['r2', 'local'].includes(getStorage().kind); } catch { return false; } } },
+  { key: 'email', label: 'Email (Gmail)', vars: () => env('BREVO_API_KEY') && !env('GMAIL_USER') ? ['BREVO_API_KEY', 'MAIL_FROM'] : ['GMAIL_USER', 'GMAIL_APP_PASSWORD'], required: true },
   { key: 'payments', label: 'Payments (Razorpay)', vars: ['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET'], required: true },
   { key: 'turnstile', label: 'Bot protection (Turnstile)', vars: ['TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY'], required: true },
-  { key: 'cron', label: 'Scheduled jobs', vars: ['CRON_SECRET'], required: true },
+  { key: 'cron', label: 'Scheduled jobs (Cloudflare Cron Triggers)', vars: [], required: true, ok: () => onCloudflare() || !!env('CRON_SECRET') },
   { key: 'downloads', label: 'Download links', vars: ['DOWNLOAD_TOKEN_SECRET'], required: true },
   { key: 'admin', label: 'Portal security', vars: ['ADMIN_ENCRYPTION_KEY'], required: true },
   { key: 'site', label: 'Site address', vars: ['PUBLIC_SITE_URL'], required: true },
   { key: 'assistant', label: 'KA Assistant (AI provider)', vars: () => [env('AI_PROVIDER') === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'GEMINI_API_KEY'], required: false },
-  { key: 'geo', label: 'Visitor location (fallback lookup; Vercel headers work without it)', vars: ['IPSTACK_ACCESS_KEY'], required: false }
+  { key: 'geo', label: 'Visitor location (optional extra lookup; Cloudflare provides the country without it)', vars: ['IPSTACK_ACCESS_KEY'], required: false, ok: () => onCloudflare() || !!env('IPSTACK_ACCESS_KEY') }
 ];
 
 export async function status(){
@@ -33,7 +35,7 @@ export async function status(){
   const system = await getSetting('system');
   const services = SERVICES.map(s => {
     const vars = typeof s.vars === 'function' ? s.vars() : s.vars;
-    return { key: s.key, label: s.label, required: s.required, vars: vars.map(v => ({ name: v, set: !!env(v) })), ok: vars.every(v => !!env(v)) };
+    return { key: s.key, label: s.label, required: s.required, vars: vars.map(v => ({ name: v, set: !!env(v) })), ok: s.ok ? s.ok() : vars.every(v => !!env(v)) };
   });
   const email = await db.query(`select to_email, subject, template, status, error, created_at from email_log order by created_at desc limit 30`);
   const emailFails = (await db.one(`select count(*) as n from email_log where status = 'failed' and created_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-7 days')`)).n;

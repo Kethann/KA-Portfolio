@@ -13,9 +13,10 @@
 import type { Currency } from '../api';
 
 export interface Quote { currency: Currency; subtotal: number; discount: number; tax: number; taxIncluded: number; taxLabel: string; total: number; free: boolean; onSale: boolean; compareAt: number | null; codes: { code: string; amount: number }[]; needsEmail: boolean }
-export interface OrderResult { orderId: string; clientSecret: string; free: boolean; demo?: boolean; downloadUrl?: string | null; razorpay?: { keyId: string; orderId: string; amount: number; currency: Currency; name: string; description: string; email: string } }
+export interface OrderResult { orderId: string; clientSecret: string; free: boolean; demo?: boolean; downloadUrl?: string | null; emailed?: boolean; razorpay?: { keyId: string; orderId: string; amount: number; currency: Currency; name: string; description: string; email: string } }
 export interface PaymentMethod { type: string; network?: string; last4?: string; detail?: string }
-export interface Success { orderId: string; downloadUrl: string | null; method: PaymentMethod | null; total: number; currency: Currency; free: boolean }
+// emailed: the delivery email was accepted by the mail service (false = it's retried; the on-screen link works now)
+export interface Success { orderId: string; downloadUrl: string | null; method: PaymentMethod | null; total: number; currency: Currency; free: boolean; emailed: boolean }
 
 export type Phase = 'loading' | 'idle' | 'validating' | 'creating' | 'paying' | 'confirming' | 'success' | 'failed' | 'cancelled';
 export interface State { phase: Phase; quote: Quote | null; notice: string; order: OrderResult | null; success: Success | null; failure: string; attemptFailed: string }

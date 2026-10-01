@@ -167,7 +167,8 @@ export async function createOrder({ productId, currency, codes, email, ip, count
   if (free){
     await deliver(order.id, siteUrl);
     const link = await issueScreenLink(order.id, siteUrl);
-    return { orderId: order.public_id, clientSecret, free: true, downloadUrl: link };
+    const after = await db.maybeOne('select status from orders where id = $1', [order.id]);
+    return { orderId: order.public_id, clientSecret, free: true, downloadUrl: link, emailed: after?.status === 'delivered' };
   }
   if (demoPaymentsEnabled()){
     const demoId = `demo_${order.public_id}`;

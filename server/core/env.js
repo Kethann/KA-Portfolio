@@ -16,7 +16,7 @@ export function requireEnv(name){
 
 // true on the live site; preview deployments and local development are not production.
 export function isProduction(){
-  return env('KA_ENV') === 'production' || env('VERCEL_ENV') === 'production';   // the Worker sets KA_ENV=production (wrangler.jsonc)
+  return env('KA_ENV') === 'production';   // the Worker sets KA_ENV=production (wrangler.jsonc)
 }
 
 // Local file-backed drivers (dev server and tests only). Serverless hosts have a read-only
@@ -24,7 +24,7 @@ export function isProduction(){
 // files. KA_DATA_DIR has no default on purpose: a literal path here would also make Vercel's file
 // tracer bundle the local .data folder (test emails, uploads) into the function.
 export function localDataDir(provider){
-  if (env('VERCEL') || env('KA_PLATFORM') === 'cloudflare' || isProduction()) throw new Error(`${provider} is not configured on this deployment. Add it in the Cloudflare dashboard (Worker > Settings) and redeploy.`);
+  if (env('KA_PLATFORM') === 'cloudflare' || isProduction()) throw new Error(`${provider} is not configured on this deployment. Add it in the Cloudflare dashboard (Worker > Settings) and redeploy.`);
   const dir = env('KA_DATA_DIR');
   if (!dir) throw new Error('KA_DATA_DIR is not set. Start the app with npm start, which sets it.');
   return dir;

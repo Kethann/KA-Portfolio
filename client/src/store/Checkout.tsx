@@ -159,7 +159,7 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
   };
   const validateEmail = () => { const ok = EMAIL.test(email.trim()); setEmailError(ok || !email ? '' : 'Enter a valid email address.'); return ok; };
 
-  const successFrom = (order: OrderResult, st: Status): Success => ({ orderId: order.orderId, downloadUrl: st.downloadUrl, method: st.method || null, total: quote?.total || 0, currency: quote?.currency || currency, free: false });
+  const successFrom = (order: OrderResult, st: Status): Success => ({ orderId: order.orderId, downloadUrl: st.downloadUrl, method: st.method || null, total: quote?.total || 0, currency: quote?.currency || currency, free: false, emailed: st.status === 'delivered' });
 
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -183,7 +183,7 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
       return;
     }
     ts.reset();
-    if (order.free){ dispatch({ type: 'ORDER_FREE', success: { orderId: order.orderId, downloadUrl: order.downloadUrl || null, method: null, total: 0, currency, free: true } }); return; }
+    if (order.free){ dispatch({ type: 'ORDER_FREE', success: { orderId: order.orderId, downloadUrl: order.downloadUrl || null, method: null, total: 0, currency, free: true, emailed: order.emailed !== false } }); return; }
     dispatch({ type: 'ORDER_CREATED', order });
     if (order.demo) return;                                   // DemoPay renders instead of Razorpay
     try { await loadRazorpay(); } catch {
@@ -256,7 +256,9 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
             <span className="kco-check" aria-hidden="true"><svg viewBox="0 0 24 24" width="34" height="34"><path d="M5 12.5l4.2 4.2L19 7" /></svg></span>
             <h3 ref={statusRef} tabIndex={-1}>{s.success.free ? 'It’s yours!' : 'Payment successful'}</h3>
             <p>{s.success.free ? 'Free download' : formatPrice(s.success.total, s.success.currency)} · Order <strong>{s.success.orderId}</strong></p>
-            <p className="kco-note">A download link{s.success.free ? '' : ' and your receipt'} were sent to <strong>{email.trim()}</strong>.</p>
+            <p className="kco-note">{s.success.emailed
+              ? <>A download link{s.success.free ? '' : ' and your receipt'} {s.success.free ? 'was' : 'were'} sent to <strong>{email.trim()}</strong>.</>
+              : <>Your download link{s.success.free ? '' : ' and receipt'} will be emailed to <strong>{email.trim()}</strong> shortly. Use “Download now” to get it right away.</>}</p>
             <div className="kas-co-actions">
               {s.success.downloadUrl && <a className="kas-buy" href={s.success.downloadUrl}>Download now</a>}
               <button type="button" className={s.success.downloadUrl ? 'kas-btn is-ghost' : 'kas-buy'} onClick={onClose}>Continue browsing</button>

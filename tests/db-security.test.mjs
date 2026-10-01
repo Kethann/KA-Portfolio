@@ -3,11 +3,11 @@
 // row-level policies to test: what matters is that bad data can't be written even by a bug in the code.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTestDatabase } from './helpers/pglite.mjs';
+import { openSqlite } from '../server/dev/sqlite.js';
 import { rateLimitHit, nextInvoiceNumber } from '../server/core/atomic.js';
 import { setDatabase } from '../server/core/db.js';
 
-const db = createTestDatabase();
+const db = openSqlite();
 setDatabase(db);
 const q = (sql, params) => db.query(sql, params);
 

@@ -18,7 +18,7 @@ export default defineConfig({
     rollupOptions:{
       // The crystal homepage imports mount() at runtime, outside Vite's HTML graph.
       preserveEntrySignatures:'strict',
-      input:{main:local('./client/index.html'),portal:local('./client/portal/index.html'),gallery:local('./client/src/gallery-entry.tsx'),poster:local('./client/src/poster-background.ts'),panda:local('./client/src/panda.ts'),studio:local('./client/src/studio/studio-entry.ts'),store:local('./client/src/store/store-entry.tsx')},
+      input:{portal:local('./client/portal/index.html'),gallery:local('./client/src/gallery-entry.tsx'),poster:local('./client/src/poster-background.ts'),panda:local('./client/src/panda.ts'),studio:local('./client/src/studio/studio-entry.ts'),store:local('./client/src/store/store-entry.tsx')},
       output:{entryFileNames:chunk=>['gallery','poster','panda','studio','store'].includes(chunk.name)?'assets/'+chunk.name+'.js':'assets/[name]-[hash].js'}
     }
   },
