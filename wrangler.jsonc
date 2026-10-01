@@ -51,7 +51,7 @@
 	"vars": {
 		"KA_ENV": "production",
 		"SITE_NAME": "Kethan Artzz",
-		"PUBLIC_SITE_URL": "https://kethan-artzz.kethanartzz.workers.dev"
+		"PUBLIC_SITE_URL": "https://kethan.pages.dev"
 	},
 	"observability": {
 		"enabled": true

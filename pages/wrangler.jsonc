@@ -1,0 +1,8 @@
+// Cloudflare Pages project "kethan" (kethan.pages.dev): the public address of the site.
+// Deploy with `npm run cf:deploy` (it builds once and updates both the Worker and this Pages project).
+{
+  "name": "kethan",
+  "pages_build_output_dir": "./out",
+  "compatibility_date": "2026-09-01",
+  "services": [{ "binding": "SITE", "service": "kethan-artzz" }]
+}

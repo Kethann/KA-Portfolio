@@ -17,9 +17,10 @@
     "build:cf": "node generator/scripts/verify_scripts.cjs && tsc --noEmit && vite build",
     "cf:dev": "npm run build:cf && wrangler dev",
     "cf:migrate": "wrangler d1 migrations apply ka-db --remote",
-    "cf:deploy": "npm run build:cf && wrangler d1 migrations apply ka-db --remote && wrangler deploy",
+    "cf:deploy": "npm run build:cf && wrangler d1 migrations apply ka-db --remote && wrangler deploy && node scripts/deploy-pages.mjs",
     "cf:move-local-data": "node scripts/migrate-local-to-d1.mjs",
-    "cf:upload-files": "node scripts/upload-files-to-r2.mjs"
+    "cf:upload-files": "node scripts/upload-files-to-r2.mjs",
+    "cf:deploy-pages": "node scripts/deploy-pages.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
