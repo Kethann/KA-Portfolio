@@ -5,13 +5,16 @@ import { getDb } from './db.js';
 export const DEFAULTS = {
   store: {
     enabled: true,
+    international: true,              // buyers outside India can pay in USD (international cards must also be on in Razorpay)
     allowCouponStacking: false,       // one coupon per order unless turned on
     taxEnabled: false,                // GST/tax: confirm treatment with your accountant first
     taxLabel: 'GST',
     taxRateBp: 0,                     // basis points (1800 = 18%), applied to the discounted amount
     taxInclusive: true,               // true: prices already include tax (tax shown as a part of the total)
     sellerName: '', sellerAddress: '', sellerTaxId: '',
-    orderExpiryMinutes: 45
+    orderExpiryMinutes: 45,
+    showRatings: true,                // star ratings + reviews on the store (only buyers can rate)
+    showDownloads: true               // "N downloads" on the store
   },
   upscaler: {
     comingSoon: true,

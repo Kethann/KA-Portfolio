@@ -37,7 +37,7 @@ export async function summary(ctx){
 export async function live(){
   const db = await getDb();
   // each live session's latest page view
-  const rows = await db.query(`select session_id, path, country, city, device_type, browser, os, referrer, visited_at, last_seen_at from (
+  const rows = await db.query(`select session_id, path, country, city, device_type, device_vendor, device_model, browser, os, referrer, visited_at, last_seen_at from (
       select v.*, row_number() over (partition by session_id order by visited_at desc) as rn
       from visits v where last_seen_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-5 minutes') and not is_bot) where rn = 1`);
   rows.sort((a, b) => new Date(b.last_seen_at) - new Date(a.last_seen_at));
@@ -62,14 +62,15 @@ export async function log(ctx){
   const offset = Math.max(0, Number(ctx.url.searchParams.get('offset')) || 0);
   const db = await getDb();
   const rows = await db.query(`select id, visited_at, last_seen_at, session_id, visitor_id, is_new, path, referrer, duration_ms, ip, country, region, city, timezone, language,
-    device_type, device_vendor, device_model, os, os_version, browser, browser_version, screen_w, screen_h, is_bot, user_agent from visits ${w} order by visited_at desc limit ${limit + 1} offset ${offset}`, args);
+    device_type, device_vendor, device_model, os, os_version, browser, browser_version, screen_w, screen_h, is_bot, user_agent, postal, latitude, longitude, isp, continent, location_accuracy, location_source,
+    (select provider from ip_geo_cache c where c.ip = visits.ip) as geo_provider from visits ${w} order by visited_at desc limit ${limit + 1} offset ${offset}`, args);
   return json({ rows: rows.slice(0, limit), hasMore: rows.length > limit });
 }
 export async function logCsv(ctx){
   const { w, args } = logFilter(ctx.url);
   const db = await getDb();
   const rows = await db.query(`select * from visits ${w} order by visited_at desc limit 50000`, args);
-  const cols = ['visited_at', 'session_id', 'visitor_id', 'is_new', 'path', 'referrer', 'duration_ms', 'ip', 'country', 'region', 'city', 'timezone', 'language', 'device_type', 'device_vendor', 'device_model', 'os', 'os_version', 'browser', 'browser_version', 'screen_w', 'screen_h', 'is_bot', 'user_agent']
+  const cols = ['visited_at', 'session_id', 'visitor_id', 'is_new', 'path', 'referrer', 'duration_ms', 'ip', 'country', 'region', 'city', 'timezone', 'language', 'device_type', 'device_vendor', 'device_model', 'os', 'os_version', 'browser', 'browser_version', 'screen_w', 'screen_h', 'is_bot', 'user_agent', 'postal', 'latitude', 'longitude', 'isp', 'continent', 'location_accuracy', 'location_source']
     .map(k => ({ label: k, get: (r) => r[k] }));
   return new Response(csv(rows, cols), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="visitors-${new Date().toISOString().slice(0, 10)}.csv"`, 'Cache-Control': 'no-store' } });
 }

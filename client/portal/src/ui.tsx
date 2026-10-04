@@ -318,14 +318,14 @@ export function Chart({ labels, series, height = 160, format = (v: number) => St
   const y = (v: number) => H - pad - (v / max) * (H - pad * 2 - 14);
   const summary = series.map(s => `${s.name}: total ${format(s.values.reduce((a, b) => a + b, 0))}, peak ${format(Math.max(0, ...s.values))}`).join('; ');
   return (
-    <figure className="chart" aria-label={summary}>
+    <figure className={'chart is-' + kind} aria-label={summary}>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={summary}
         onPointerMove={e => { const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect(); const i = Math.round(((e.clientX - r.left) / r.width) * (labels.length - 1)); setHover(Math.max(0, Math.min(labels.length - 1, i))); }}
         onPointerLeave={() => setHover(null)}>
         {[0.25, 0.5, 0.75].map(f => <line key={f} x1={0} x2={W} y1={H - pad - f * (H - pad * 2 - 14)} y2={H - pad - f * (H - pad * 2 - 14)} className="chart-grid" />)}
         {series.map((s, si) => kind === 'bar' ? s.values.map((v, i) => {
           const bw = Math.min(28, Math.max(2, (W - pad * 2) / labels.length / series.length - 2));   // a few data points stay normal bars, not one giant block
-          return <rect key={si + '-' + i} x={x(i) - (bw * series.length) / 2 + si * bw} y={y(v)} width={bw - 1} height={H - pad - y(v)} rx={2} style={{ fill: s.color || 'var(--accent)' }} opacity={hover === null || hover === i ? 1 : .55} />;
+          return <rect key={si + '-' + i} x={x(i) - (bw * series.length) / 2 + si * bw} y={y(v)} width={bw - 1} height={H - pad - y(v)} rx={2} className="chart-bar" style={{ fill: s.color || 'var(--accent)', ['--i' as string]: Math.min(i, 40) } as CSSProperties} opacity={hover === null || hover === i ? 1 : .55} />;
         }) : (
           <g key={si}>
             <path d={`M${x(0)},${H - pad} ` + s.values.map((v, i) => `L${x(i)},${y(v)}`).join(' ') + ` L${x(s.values.length - 1)},${H - pad} Z`} style={{ fill: s.color || 'var(--accent)' }} opacity={0.14} />

@@ -59,14 +59,5 @@ route('GET', '/api/cron/weekly', cron.weekly, { access: 'cron' });
 export function register(fn){ fn(route); }
 
 export async function handle(request, platform){
-  // an older host rewrote /api/:path* to /api/index?__path=:path*; still accepted, the original URL is restored.
-  const url = new URL(request.url);
-  const forwarded = url.searchParams.get('__path');
-  if (forwarded !== null && url.pathname.replace(/\/+$/, '') === '/api/index'){
-    url.searchParams.delete('__path');
-    url.pathname = '/api/' + forwarded.replace(/^\/+/, '');
-    const hasBody = request.method !== 'GET' && request.method !== 'HEAD' && request.body;
-    request = new Request(url, { method: request.method, headers: request.headers, body: hasBody ? request.body : undefined, ...(hasBody ? { duplex: 'half' } : {}) });
-  }
   return router.dispatch(request, platform);
 }

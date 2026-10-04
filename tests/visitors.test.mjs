@@ -32,6 +32,17 @@ test('views are stored with IP, platform location and parsed device; pings add t
   assert.equal(geoCalls.length, 0, 'platform location means no third-party lookup');
 });
 
+test('precise location is opt-in, rounded, and accepted only for the matching visitor session', async () => {
+  const id = ids();
+  await beacon({ t: 'view', ...id, p: '/' }, { ip: '198.51.100.30', country: 'IN' });
+  const saved = await beacon({ t: 'location', ...id, lat: 12.9716, lon: 77.5946, accuracy: 18 }, { ip: '198.51.100.30' });
+  assert.equal(saved.status, 204);
+  const row = (await app.pg.query('select latitude, longitude, location_accuracy, location_source from visits where session_id = $1', [id.s])).rows[0];
+  assert.deepEqual(row, { latitude: 12.972, longitude: 77.595, location_accuracy: 100, location_source: 'browser-consent' });
+  const rejected = await beacon({ t: 'location', ...id, v: 'someoneelse12345678', lat: 12, lon: 77, accuracy: 10 }, { ip: '198.51.100.30' });
+  assert.equal(rejected.status, 204);
+});
+
 test('bots are flagged; bad input refused; old bare beacons are ignored quietly', async () => {
   const id = ids();
   await beacon({ t: 'view', ...id, p: '/' }, { ua: 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)' });

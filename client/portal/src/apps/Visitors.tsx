@@ -84,7 +84,7 @@ function Live({ active }: { active: boolean }){
         <ul className="list live-list" aria-live="polite">{s.data.live.map(v => (
           <li key={v.session_id}><span className="live-flag" aria-hidden="true">{flag(v.country)}</span>
             <span className="grow truncate"><b>{v.city || (v.country ? regionName(v.country) : 'Unknown place')}</b> <span className="faint">· {v.path.replace('/?page=', '') || 'home'}</span></span>
-            <Badge>{v.device_type || 'device'}</Badge><span className="faint p-hide-sm" style={{ fontSize: 12 }}>{v.browser}{v.referrer ? ` · from ${v.referrer.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}` : ''}</span>
+            <Badge>{[v.device_vendor, v.device_model].filter(Boolean).join(' ') || v.device_type || 'device'}</Badge><span className="faint p-hide-sm" style={{ fontSize: 12 }}>{[v.browser, v.os].filter(Boolean).join(' · ')}{v.referrer ? ` · from ${v.referrer.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}` : ''}</span>
             <span className="faint" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{ago(v.last_seen_at)}</span></li>
         ))}</ul>
       )}
@@ -102,10 +102,10 @@ function Log(){
   const toast = useToast();
   const cols: Column<any>[] = [
     { key: 'when', label: 'When', width: '120px', render: r => <span title={dateTime(r.visited_at)}>{ago(r.visited_at)}</span> },
-    { key: 'where', label: 'Where', width: '1.3fr', render: r => <span className="truncate">{flag(r.country)} {r.city || r.country || 'Unknown'}</span> },
+    { key: 'where', label: 'Where', width: '1.3fr', render: r => <span className="truncate" title={[r.city, r.region, r.postal, r.isp].filter(Boolean).join(' · ')}>{flag(r.country)} {r.city ? `${r.city}${r.region ? ', ' + r.region : ''}` : r.country || 'Unknown'}</span> },
     { key: 'ip', label: 'IP', width: '1fr', render: r => <span className="mono truncate">{r.ip}</span> },
     { key: 'page', label: 'Page', width: '1fr', hideBelow: 720, render: r => <span className="truncate">{r.path}</span> },
-    { key: 'dev', label: 'Device', width: '1.2fr', hideBelow: 880, render: r => <span className="truncate">{r.device_type} · {r.browser} · {r.os}</span> },
+    { key: 'dev', label: 'Device', width: '1.2fr', hideBelow: 880, render: r => <span className="truncate" title={[r.device_vendor, r.device_model, r.device_type, r.browser, r.os].filter(Boolean).join(' · ')}>{[r.device_vendor, r.device_model].filter(Boolean).join(' ') || r.device_type || 'Unknown'} · {r.browser || 'browser'} · {r.os || 'system'}</span> },
     { key: 'time', label: 'Time', width: '70px', align: 'right', hideBelow: 560, render: r => dur(r.duration_ms) },
     { key: 'bot', label: '', width: '44px', render: r => r.is_bot ? <Badge tone="warning">bot</Badge> : r.is_new ? <Badge tone="accent">new</Badge> : null }
   ];
@@ -127,11 +127,19 @@ function Log(){
         <Modal title="Visit details" onClose={() => setOpen(null)}>
           <dl className="kv">
             {[['Time', dateTime(open.visited_at)], ['Last seen', dateTime(open.last_seen_at)], ['Time on page', dur(open.duration_ms)], ['Page', open.path], ['Came from', open.referrer || 'Direct'],
-              ['IP', open.ip], ['Location', [open.city, open.region, open.country].filter(Boolean).join(', ') || 'Unknown'], ['Time zone', open.timezone || '—'], ['Language', open.language || '—'],
+              ['IP', open.ip], ['Location', [open.city, open.region, open.postal, open.country].filter(Boolean).join(', ') || 'Unknown'], ['Location source', open.geo_provider || 'platform / IP estimate'],
+              ['Network', open.isp || '—'], ['Time zone', open.timezone || '—'], ['Language', open.language || '—'],
               ['Device', [open.device_type, open.device_vendor, open.device_model].filter(Boolean).join(' · ')], ['System', `${open.os || '—'} ${open.os_version || ''}`], ['Browser', `${open.browser || '—'} ${open.browser_version || ''}`],
               ['Screen', open.screen_w ? `${open.screen_w} × ${open.screen_h}` : '—'], ['Visitor', `${open.visitor_id}${open.is_new ? ' (first visit)' : ''}`], ['Bot', open.is_bot ? 'yes' : 'no']].map(([k, v]) => <Fragment key={k}><dt>{k}</dt><dd className={k === 'IP' || k === 'Visitor' ? 'mono' : ''}>{v}</dd></Fragment>)}
           </dl>
-          <details><summary className="faint">Raw user agent</summary><code className="mono" style={{ fontSize: 12, wordBreak: 'break-all' }}>{open.user_agent}</code></details>
+          {open.latitude != null && open.longitude != null && <section className="card stack" aria-label="Location map">
+            <div className="row between"><b>{open.location_source === 'browser-consent' ? 'Visitor-shared location' : 'Approximate IP area'}</b>
+              {open.location_accuracy && <Badge tone={open.location_source === 'browser-consent' ? 'success' : 'neutral'}>{open.location_accuracy >= 1000 ? `about ${(open.location_accuracy / 1000).toFixed(1)} km accuracy` : `about ${open.location_accuracy} m accuracy`}</Badge>}</div>
+            <iframe title="Map showing approximate visitor location" loading="lazy" referrerPolicy="no-referrer" style={{ width: '100%', height: 260, border: 0, borderRadius: 12 }}
+              src={`https://www.openstreetmap.org/export/embed.html?marker=${open.latitude}%2C${open.longitude}&layer=mapnik`} />
+            <p className="field-hint" style={{ margin: 0 }}><a href={`https://www.openstreetmap.org/?mlat=${open.latitude}&mlon=${open.longitude}#map=15/${open.latitude}/${open.longitude}`} target="_blank" rel="noopener noreferrer">Open map ?</a>
+              {open.location_source === 'browser-consent' ? ' � shared by the visitor after a location permission prompt; coordinates are rounded.' : ' � estimated from the visitor�s internet connection; it may be inaccurate and cannot identify a street address.'}</p>
+          </section>}          <details><summary className="faint">Raw user agent</summary><code className="mono" style={{ fontSize: 12, wordBreak: 'break-all' }}>{open.user_agent}</code></details>
         </Modal>
       )}
     </div>

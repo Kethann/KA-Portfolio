@@ -8,11 +8,14 @@ export interface Product {
   sellable: boolean; free: boolean; prices: Record<Currency, Price>;
   license: { key: string; name: string; summary: string } | null; demoUrl: string; previewUrl: string; media: Media[];
   delivery: { linkHours: number; maxDownloads: number };
+  downloads?: number | null;                       // null when the owner hides the counts
+  rating?: { avg: number; count: number } | null;  // only buyers can rate
 }
+export interface Review { rating: number; review: string; name: string; at: string }
 export interface Category { kind: string; slug: string; name: string }
 export interface TipSummary { slug: string; title: string; excerpt: string; coverUrl: string; tags: string[]; publishedAt: string | null; category: { slug: string; name: string } | null }
 export interface Tip extends TipSummary { html: string }
-export interface PublicConfig { turnstileSiteKey?: string; razorpayKeyId?: string; country?: string | null; suggestedCurrency?: Currency; store?: { enabled: boolean } }
+export interface PublicConfig { turnstileSiteKey?: string; razorpayKeyId?: string; country?: string | null; suggestedCurrency?: Currency; store?: { enabled: boolean; international?: boolean } }
 
 declare global {
   interface Window {

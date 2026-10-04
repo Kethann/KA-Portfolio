@@ -1,8 +1,7 @@
-// Approximate visitor location, from pluggable providers tried in order:
-//   1. the host platform (Vercel's free x-vercel-ip-* headers): no third party involved
-//   2. our cache (ip_geo_cache, 30 days)
-//   3. ipstack, if IPSTACK_ACCESS_KEY is set (free plan: 100 lookups/month; counted in geo_quota)
-//   4. ipwho.is, unless GEO_FALLBACK=none (self-capped; check its terms before commercial use)
+// Approximate visitor location, from the explicitly selected IP geo provider, or the host platform.
+// IP locations are estimates (normally city/ISP level), never an address or street location.
+// Provider selection: GEO_PROVIDER=ipstack|ipwhois|cloudflare|auto. Default auto uses Cloudflare,
+// then configured external providers. IPSTACK_ACCESS_KEY is only used with HTTPS unless HTTP is opted into.
 // Private/local addresses are never looked up. A lookup never takes longer than 1.5 s.
 import { getDb } from '../core/db.js';
 import { env } from '../core/env.js';
@@ -23,13 +22,16 @@ const PROVIDERS = {
     // The free plan is HTTP-only, so the key and the visitor's IP would travel unencrypted: it is used
     // only with a paid HTTPS plan (IPSTACK_HTTPS=1) or when you explicitly accept that (IPSTACK_ALLOW_HTTP=1).
     enabled: () => !!env('IPSTACK_ACCESS_KEY') && (env('IPSTACK_HTTPS') === '1' || env('IPSTACK_ALLOW_HTTP') === '1'), monthly: 100,
-    url: (ip) => `${env('IPSTACK_HTTPS') === '1' ? 'https' : 'http'}://api.ipstack.com/${encodeURIComponent(ip)}?access_key=${encodeURIComponent(env('IPSTACK_ACCESS_KEY'))}&fields=country_code,region_name,city,time_zone.id`,
-    parse: (j) => j && j.country_code ? { country: j.country_code, region: j.region_name || null, city: j.city || null, timezone: j.time_zone?.id || null } : null
+    url: (ip) => `${env('IPSTACK_HTTPS') === '1' ? 'https' : 'http'}://api.ipstack.com/${encodeURIComponent(ip)}?access_key=${encodeURIComponent(env('IPSTACK_ACCESS_KEY'))}&fields=country_code,region_name,city,time_zone.id,zip,latitude,longitude,connection.isp`,
+    parse: (j) => j && j.country_code ? { country: j.country_code, region: j.region_name || null, city: j.city || null, timezone: j.time_zone?.id || null,
+      postal: j.zip || null, latitude: Number.isFinite(Number(j.latitude)) ? Number(j.latitude) : null, longitude: Number.isFinite(Number(j.longitude)) ? Number(j.longitude) : null, isp: j.connection?.isp || null } : null
   },
   ipwhois: {
     enabled: () => (env('GEO_FALLBACK') || 'ipwhois') === 'ipwhois', monthly: 9000,
-    url: (ip) => `https://ipwho.is/${encodeURIComponent(ip)}?fields=success,country_code,region,city,timezone.id`,
-    parse: (j) => j && j.success && j.country_code ? { country: j.country_code, region: j.region || null, city: j.city || null, timezone: j.timezone?.id || null } : null
+    url: (ip) => `https://ipwho.is/${encodeURIComponent(ip)}?fields=success,country_code,region,city,timezone.id,postal,latitude,longitude,connection.isp,continent`,
+    parse: (j) => j && j.success && j.country_code ? { country: j.country_code, region: j.region || null, city: j.city || null, timezone: j.timezone?.id || null,
+      postal: j.postal || null, latitude: Number.isFinite(Number(j.latitude)) ? Number(j.latitude) : null, longitude: Number.isFinite(Number(j.longitude)) ? Number(j.longitude) : null,
+      isp: j.connection?.isp || null, continent: j.continent_code || null } : null
   }
 };
 
@@ -41,13 +43,19 @@ async function takeQuota(db, provider, monthly){
 }
 
 export async function locate(ip, platformGeo){
-  if (platformGeo && platformGeo.country) return { ...platformGeo };
+  const selected = (env('GEO_PROVIDER') || 'auto').toLowerCase();
+  if (!['auto', 'ipstack', 'ipwhois', 'cloudflare'].includes(selected)) return null;
+  if (selected === 'cloudflare') return platformGeo?.country ? { ...platformGeo } : null;
+  if (selected === 'auto' && platformGeo?.country) return { ...platformGeo };
   if (!isPublicIp(ip)) return null;
   const db = await getDb();
-  const cached = await db.maybeOne(`select country, region, city, timezone, provider from ip_geo_cache where ip = $1 and looked_up_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-' || $2 || ' days')`, [ip, CACHE_DAYS]);
-  if (cached) return cached;
-  for (const [name, p] of Object.entries(PROVIDERS)){
-    if (!p.enabled()) continue;
+  const providers = selected === 'auto' ? [['ipstack', PROVIDERS.ipstack], ['ipwhois', PROVIDERS.ipwhois]] : [[selected, PROVIDERS[selected]]];
+  const cached = await db.maybeOne(`select c.country, c.region, c.city, c.timezone, c.provider, v.postal, v.latitude, v.longitude, v.isp, v.continent
+    from ip_geo_cache c left join visits v on v.ip = c.ip and v.country = c.country and v.city is c.city where c.ip = $1 and c.looked_up_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-' || $2 || ' days')
+    order by v.visited_at desc limit 1`, [ip, CACHE_DAYS]);
+  if (cached && (selected === 'auto' || cached.provider === selected)) return cached;
+  for (const [name, p] of providers){
+    if (!p?.enabled()) continue;
     if (!(await takeQuota(db, name, p.monthly))) continue;
     try {
       const res = await fetchImpl(p.url(ip), { signal: AbortSignal.timeout(1500), headers: { Accept: 'application/json' } });

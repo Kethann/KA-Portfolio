@@ -8,6 +8,7 @@ import { AsyncButton, Chart, Empty, ErrorState, Segmented, SkeletonRows, useToas
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
 import { money, num, todayIST } from '../format';
+import { CurrencyMark, MASK, Money, useMoneyHidden } from '../money';
 
 type Preset = '7' | '30' | '90' | '365' | 'custom';
 export default function Reports({ open }: AppProps){
@@ -17,12 +18,15 @@ export default function Reports({ open }: AppProps){
   const from = preset === 'custom' ? cFrom : todayIST(-(Number(preset) - 1)), to = preset === 'custom' ? cTo : todayIST();
   const s = useLoad<any>(`/reports?from=${from}&to=${to}&group=${group}`);
   const toast = useToast();
+  const [hidden, setHidden] = useMoneyHidden();
+  const m = (v: number | string, c: string) => hidden ? MASK : money(Number(v), c);
   const d = s.data;
   const periods: string[] = useMemo(() => [...new Set<string>((d?.byPeriod || []).map((r: any) => r.period))].sort(), [d]);
   const curs: string[] = useMemo(() => [...new Set<string>((d?.byCurrency || []).map((r: any) => r.currency))], [d]);
   return (
     <div className="app report-app">
       <WinTools>
+        <button type="button" className="icon-btn" aria-pressed={hidden} aria-label={hidden ? 'Show amounts' : 'Hide amounts'} title={hidden ? 'Show amounts' : 'Hide amounts (for screen sharing)'} onClick={() => setHidden(!hidden)}><Icon name={hidden ? 'eyeOff' : 'eye'} /></button>
         <AsyncButton className="btn sm" onClick={async () => { await downloadFile(`/reports.csv?from=${from}&to=${to}&group=${group}`, `report-${from}-to-${to}.csv`); toast.show('CSV downloaded', { tone: 'success' }); }}><Icon name="downloads" /> CSV</AsyncButton>
         <button type="button" className="btn sm" onClick={() => {
           // the print-only layout stays until the dialog closes (print() doesn't block in every browser)
@@ -42,22 +46,22 @@ export default function Reports({ open }: AppProps){
         {s.error && !d ? <ErrorState message={s.error} retry={s.reload} /> : !d ? <SkeletonRows rows={10} /> : <>
           <div className="kpis">
             {curs.length ? d.byCurrency.map((c: any) => (
-              <div key={c.currency} className="kpi"><div className="kpi-label">Revenue · {c.currency}</div><div className="kpi-value">{money(Number(c.revenue), c.currency)}</div>
-                <div className="kpi-sub">{num(c.orders)} orders · {money(Number(c.discounts), c.currency)} in discounts</div></div>
+              <div key={c.currency} className="kpi kpi-rev"><div className="kpi-label"><CurrencyMark currency={c.currency} size={22} />Revenue · {c.currency}</div><div className="kpi-value"><Money minor={Number(c.revenue)} currency={c.currency} hidden={hidden} /></div>
+                <div className="kpi-sub">{num(c.orders)} orders · {m(c.discounts, c.currency)} in discounts</div></div>
             )) : <div className="kpi"><div className="kpi-label">Revenue</div><div className="kpi-value">—</div><div className="kpi-sub">No paid orders in this range</div></div>}
             <div className="kpi"><div className="kpi-label">Refunds</div><div className="kpi-value">{d.refunds.reduce((a: number, r: any) => a + r.refunds, 0)}</div>
-              <div className="kpi-sub">{d.refunds.map((r: any) => money(Number(r.amount), r.currency)).join(' · ') || 'none'}</div></div>
+              <div className="kpi-sub">{d.refunds.map((r: any) => m(r.amount, r.currency)).join(' · ') || 'none'}</div></div>
             <div className="kpi"><div className="kpi-label">Downloads</div><div className="kpi-value">{num(d.downloads.reduce((a: number, r: any) => a + r.downloads, 0))}</div><div className="kpi-sub">across {d.downloads.length} files</div></div>
           </div>
           {curs.map(c => (
-            <section key={c} className="card" aria-label={`Revenue in ${c}`}><h3>Revenue per {group} · {c}</h3>
-              <Chart kind="bar" labels={periods} series={[{ name: c, values: periods.map(p => Number(d.byPeriod.find((r: any) => r.period === p && r.currency === c)?.revenue || 0)) }]} format={v => money(v, c)} height={170} />
+            <section key={c} className="card" aria-label={`Revenue in ${c}`}><h3 className="row" style={{ gap: 8 }}><CurrencyMark currency={c} size={20} />Revenue per {group} · {c}</h3>
+              <Chart key={`${c}-${from}-${to}-${group}`} kind="bar" labels={periods} series={[{ name: c, values: periods.map(p => Number(d.byPeriod.find((r: any) => r.period === p && r.currency === c)?.revenue || 0)) }]} format={v => m(v, c)} height={170} />
             </section>
           ))}
           <div className="grid-auto" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))' }}>
-            <Table title="By product" empty="No sales" rows={d.byProduct} cols={[['Item', (r: any) => r.title], ['Sold', (r: any) => num(r.sold), true], ['Revenue', (r: any) => money(Number(r.revenue), r.currency), true]]} />
-            <Table title="By country" empty="No sales" rows={d.byCountry} cols={[['Country', (r: any) => r.country], ['Orders', (r: any) => num(r.orders), true], ['Revenue', (r: any) => money(Number(r.revenue), r.currency), true]]} />
-            <Table title="Coupons" empty="No codes used" rows={d.coupons} cols={[['Code', (r: any) => <span className="mono">{r.code}</span>], ['Uses', (r: any) => num(r.uses), true], ['Discount', (r: any) => money(Number(r.discount), r.currency), true]]} />
+            <Table title="By product" empty="No sales" rows={d.byProduct} cols={[['Item', (r: any) => r.title], ['Sold', (r: any) => num(r.sold), true], ['Revenue', (r: any) => m(r.revenue, r.currency), true]]} />
+            <Table title="By country" empty="No sales" rows={d.byCountry} cols={[['Country', (r: any) => r.country], ['Orders', (r: any) => num(r.orders), true], ['Revenue', (r: any) => m(r.revenue, r.currency), true]]} />
+            <Table title="Coupons" empty="No codes used" rows={d.coupons} cols={[['Code', (r: any) => <span className="mono">{r.code}</span>], ['Uses', (r: any) => num(r.uses), true], ['Discount', (r: any) => m(r.discount, r.currency), true]]} />
             <Table title="Downloads" empty="No downloads" rows={d.downloads} cols={[['File', (r: any) => r.title], ['Downloads', (r: any) => num(r.downloads), true]]} />
           </div>
           <p className="field-hint no-print">Scheduled email reports are set in <button type="button" className="btn ghost sm" onClick={() => open('settings', 'reports')}>Settings → Reports</button></p>

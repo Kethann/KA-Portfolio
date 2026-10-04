@@ -209,6 +209,29 @@ test('catalog: a for-sale item needs prices and a file; sold items archive inste
   assert.equal((await admin('DELETE', `/api/admin/products/${draft.id}`)).json.archived, false);
 });
 
+test('Artifacts category order is portal-controlled and published revisions can be restored', async () => {
+  const cats = await admin('POST', '/api/admin/categories', { kind: 'artifacts', name: 'Healthcare apps' });
+  const healthcare = cats.json.categories.find(c => c.name === 'Healthcare apps');
+  const finance = (await admin('POST', '/api/admin/categories', { kind: 'artifacts', name: 'Finance' })).json.categories.find(c => c.name === 'Finance');
+  const ordered = await admin('POST', '/api/admin/categories/reorder', { kind: 'artifacts', ids: [finance.id, healthcare.id] });
+  assert.deepEqual(ordered.json.categories.filter(c => c.kind === 'artifacts').map(c => c.id), [finance.id, healthcare.id]);
+
+  let p = (await admin('POST', '/api/admin/products', { kind: 'artifacts', title: 'Care dashboard' })).json.product;
+  p.categoryId = healthcare.id;
+  p = (await admin('PUT', `/api/admin/products/${p.id}`, { ...p, status: 'published', sellable: false, updatedAt: p.updatedAt })).json.product;
+  const first = (await admin('GET', `/api/admin/products/${p.id}/history`)).json.revisions[0];
+  p.title = 'Finance dashboard'; p.categoryId = finance.id;
+  p = (await admin('PUT', `/api/admin/products/${p.id}`, { ...p, status: 'draft', updatedAt: p.updatedAt })).json.product;
+  p = (await admin('PUT', `/api/admin/products/${p.id}`, { ...p, status: 'published', updatedAt: p.updatedAt })).json.product;
+  const history = (await admin('GET', `/api/admin/products/${p.id}/history`)).json.revisions;
+  assert.equal(history.length, 2);
+  const restored = await admin('POST', `/api/admin/products/${p.id}/history/${first.id}/restore`, {});
+  assert.equal(restored.status, 200, JSON.stringify(restored.json));
+  assert.equal(restored.json.product.title, 'Care dashboard');
+  assert.equal(restored.json.product.categoryId, healthcare.id);
+  assert.equal((await admin('GET', `/api/admin/products/${p.id}/history`)).json.revisions.length, 3, 'rollback is also recorded');
+});
+
 async function buy(productId, email, currency = 'INR'){
   const o = (await app.call('POST', '/api/checkout/order', { body: { productId, currency, email }, ip: ip() })).json;
   return (await app.call('POST', '/api/checkout/demo-pay', { body: { orderId: o.orderId, clientSecret: o.clientSecret, outcome: 'approve' }, ip: ip() })).json;

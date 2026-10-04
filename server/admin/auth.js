@@ -13,6 +13,7 @@ import { env, isProduction } from '../core/env.js';
 import { rateLimit } from '../core/guard.js';
 import { email as vEmail, str } from '../core/validate.js';
 import { hashPassword, verifyPassword, randomToken, sha256hex, safeEqual, newTotpSecret, verifyTotp, encrypt, decrypt } from '../core/crypto.js';
+import UAParser from 'ua-parser-js';
 
 const COOKIE = 'ka_admin';
 const ABSOLUTE_MS = 12 * 3600e3, IDLE_MS = 2 * 3600e3;
@@ -165,7 +166,13 @@ export async function listSessions(ctx){
   const db = await getDb();
   const rows = await db.query(`select id, created_at, last_seen_at, expires_at, ip, user_agent from admin_sessions
     where user_id = $1 and revoked_at is null and expires_at > now() order by last_seen_at desc limit 50`, [ctx.admin.userId]);
-  return json({ sessions: rows.map(r => ({ ...r, current: r.id === ctx.admin.sessionId })) });
+  return json({ sessions: rows.map(r => {
+    const parsed = new UAParser(r.user_agent || '').getResult();
+    return { ...r, current: r.id === ctx.admin.sessionId,
+      device: [parsed.device.vendor, parsed.device.model, parsed.device.type].filter(Boolean).join(' ') || (parsed.os.name ? `${parsed.os.name} device` : 'Unknown device'),
+      browser: [parsed.browser.name, parsed.browser.version?.split('.').slice(0, 2).join('.')].filter(Boolean).join(' '),
+      system: [parsed.os.name, parsed.os.version].filter(Boolean).join(' ') };
+  }) });
 }
 
 export async function revokeSession(ctx){

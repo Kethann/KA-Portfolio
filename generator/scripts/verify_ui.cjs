@@ -36,7 +36,7 @@ const items=['contact','about','store'].map((name,i)=>{const e=new Element('butt
 const sections=Object.fromEntries(['contact','about','portfolio','store','gallery'].map(name=>{const s=new Element();s.name=name;s.hidden=!(name==='about'||name==='portfolio');s.heading=new Element('h2');return [name,s];}));
 const visible=()=>Object.values(sections).filter(s=>!s.hidden).map(s=>s.name).sort().join(',');
 window.playAboutIntro=()=>{c.intros=(c.intros||0)+1;};
-const c=vm.createContext({console,window,document:{createElement:t=>new Element(t),getElementById:()=>new Element()},nav,navItemsContainer:nav,navPill:pill,navItems:items,sections,
+const c=vm.createContext({console,window,document:{documentElement:new Element('html'),createElement:t=>new Element(t),getElementById:id=>id==='assistant-panel'?panel:new Element()},nav,navItemsContainer:nav,navPill:pill,navItems:items,sections,
   PAGE_SECTIONS:{about:['about','portfolio'],contact:['contact'],gallery:['gallery'],store:['store'],tips:['tips']},
   activeSection:'about',reducedMotion:false,pillX:106,pillW:100,pillRAF:0,NAV_MS:300,sectionTimer:null,sectionSwitching:false,pendingScroll:null,galleryTeardown:()=>{},galleryCoverflowEl:new Element(),
   performance:{now:()=>time},requestAnimationFrame:fn=>{rafs.set(++id,fn);return id;},cancelAnimationFrame:i=>rafs.delete(i),
@@ -103,12 +103,12 @@ const chatFuncs=functionsIn(chatScript);
 const messagesEl=new Element(),panel=new Element(),launcher=new Element(),input=new Element(),sendBtn=new Element();
 let reads=0;const chatEvents=[];
 const packets=['data: {"text":"Hello"}\n\n','data: [DONE]\n\n'];
-const chat=vm.createContext({console,window,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},navigator:{language:'en'},TextDecoder,history:[],opened:false,streaming:false,followChat:true,closeTimer:null,reducedMotion:false,
+const chat=vm.createContext({console,window:{matchMedia:()=>({matches:false})},CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},navigator:{language:'en'},TextDecoder,history:[],opened:false,streaming:false,followChat:true,closeTimer:null,reducedMotion:false,
   kaApiUrl:path=>path, // mirrors the real KA_API_BASE=''-by-default helper at the top of index.html (see the "API BASE CONFIG" script block)
   messagesEl,panel,launcher,input,sendBtn,chipsEl:new Element(),QUICK_REPLIES:[],pickGreeting:()=>"Welcome",
   // returning visitor with no saved conversation: greeted by name, nothing restored, nothing persisted
   getVisitorName:()=>"Tester",loadStoredChatHistory:()=>[],saveChatHistory(){},addQuickReplies(){},
-  document:{createElement:t=>new Element(t),dispatchEvent:event=>chatEvents.push(event)},requestAnimationFrame:c.requestAnimationFrame,setTimeout:c.setTimeout,clearTimeout:c.clearTimeout,
+  document:{body:new Element('body'),createElement:t=>new Element(t),dispatchEvent:event=>chatEvents.push(event)},syncKeyboard(){},requestAnimationFrame:c.requestAnimationFrame,setTimeout:c.setTimeout,clearTimeout:c.clearTimeout,
   fetch:()=>Promise.resolve({ok:true,headers:{get:name=>name.toLowerCase()==='content-type'?'text/event-stream':null},body:{getReader:()=>({read:()=>Promise.resolve(reads<packets.length?{done:false,value:new TextEncoder().encode(packets[reads++])}:{done:true})})}})});
 for(const name of ['addMessage','addTypingIndicator','removeChips','openPanel','closePanel','sendMessage']) vm.runInContext(chatFuncs.get(name),chat);
 (async()=>{

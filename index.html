@@ -1474,45 +1474,97 @@ html.ka-modal-open{ overflow:hidden; }
 .about-block{ margin-top:72px; }
 .about-block .gallery-head{ margin-bottom:28px; }
 
-/* ---- skills constellation ---- */
-.skills-constellation{
-  position:relative; height:clamp(260px,32vw,360px); width:100%;
+/* ---- skills: resume board (left) + floating logo field (right) ---- */
+#about-skills-block[hidden], .skills-filter[hidden], #skills-intro[hidden]{ display:none; }
+.skills-meta{ margin:-14px 0 22px; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-dim); }
+.skills-layout{ display:grid; grid-template-columns:minmax(0, 1.75fr) minmax(0, 1fr); gap:clamp(24px, 4vw, 56px); align-items:start; }
+.skills-filter{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 18px; }
+.skills-chip{ display:inline-flex; align-items:center; gap:8px; min-height:38px; padding:0 14px 0 12px; border-radius:999px; cursor:pointer;
+  font:500 13px/1 'Manrope', sans-serif; color:var(--ink-dim); background:transparent; border:1px solid rgba(255,255,255,.12);
+  transition:color .2s ease, border-color .2s ease, background .2s ease, transform .2s var(--ease-snappy); }
+.skills-chip svg{ width:15px; height:15px; flex:none; opacity:.85; }
+.skills-chip .n{ min-width:20px; height:18px; padding:0 6px; border-radius:999px; display:inline-grid; place-items:center; font:600 10.5px/1 'JetBrains Mono', monospace; background:rgba(255,255,255,.07); }
+.skills-chip:hover{ color:var(--ink); border-color:rgba(255,255,255,.24); }
+.skills-chip[aria-checked="true"]{ color:#ffe3cc; border-color:rgba(255,170,120,.6); background:rgba(255,148,56,.12); }
+.skills-chip[aria-checked="true"] .n{ background:rgba(255,148,56,.25); }
+.skills-chip:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+
+.skills-board{ columns:2 260px; column-gap:16px; }
+.skills-board.is-solo{ columns:1; }
+.skill-card{ break-inside:avoid; margin:0 0 16px; padding:18px 18px 14px; border-radius:20px; position:relative; overflow:hidden;
+  background:var(--glass-bg); border:var(--glass-border); box-shadow:var(--glass-highlight), var(--glass-shadow);
+  backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur); }
+.skill-card::before{ content:""; position:absolute; left:0; right:0; top:0; height:2px; background:linear-gradient(90deg, transparent, rgba(255,148,56,.7), transparent); opacity:.55; }
+.skill-card-head{ display:flex; align-items:center; gap:10px; margin:0 0 12px; }
+.skill-card-ico{ width:32px; height:32px; flex:none; border-radius:10px; display:grid; place-items:center; color:#ffd9b8;
+  background:linear-gradient(150deg, rgba(255,148,56,.22), rgba(255,148,56,.05)); border:1px solid rgba(255,170,120,.28); }
+.skill-card-ico svg{ width:17px; height:17px; }
+.skill-card h3{ margin:0; flex:1; min-width:0; font-family:var(--font-heading), ui-serif, Georgia, serif; font-weight:var(--heading-weight, 500); font-size:20px; letter-spacing:-.01em; line-height:1.15; }
+.skill-card-count{ font:600 11px/1 'JetBrains Mono', monospace; color:var(--ink-dim); letter-spacing:.08em; }
+.skill-list{ list-style:none; margin:0; padding:0; display:grid; gap:2px; }
+.skills-board.is-solo .skill-list{ grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); column-gap:12px; }
+.skill-item{ display:grid; grid-template-columns:40px minmax(0, 1fr) auto; align-items:center; gap:12px; padding:7px 8px; margin:0 -8px; border-radius:12px;
+  cursor:default; outline:none; transition:background .2s ease; }
+.skill-item:hover, .skill-item:focus-visible, .skill-item.is-active{ background:rgba(255,255,255,.05); }
+.skill-item:focus-visible{ box-shadow:inset 0 0 0 2px rgba(255,148,56,.6); }
+.skill-logo{ --c:#3a3340; --ink:#fff; width:40px; height:40px; border-radius:11px; display:grid; place-items:center; flex:none;
+  font:700 13px/1 'JetBrains Mono', ui-monospace, monospace; letter-spacing:-.03em; color:var(--ink);
+  background:radial-gradient(120% 90% at 30% 15%, rgba(255,255,255,.32), transparent 55%), var(--c);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), inset 0 -2px 6px rgba(0,0,0,.18), 0 6px 18px -6px var(--c);
+  transition:transform .3s var(--ease-snappy); }
+.skill-item:hover .skill-logo, .skill-item:focus-visible .skill-logo, .skill-item.is-active .skill-logo{ transform:translateY(-1px) rotate(-6deg) scale(1.06); }
+.skill-text{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.skill-name{ font-size:14.5px; font-weight:600; color:var(--ink); line-height:1.25; }
+.skill-note{ font-size:12.5px; line-height:1.4; color:var(--ink-dim); }
+.skill-meter{ display:inline-flex; gap:3px; }
+.skill-meter i{ width:6px; height:14px; border-radius:2px; background:rgba(255,255,255,.12); }
+.skill-meter i.on{ background:linear-gradient(180deg, #ffd0a6, #ff9438); box-shadow:0 0 8px rgba(255,148,56,.35); }
+
+/* entrance: cards rise in one after another the first time the block is seen */
+.skills-board .skill-card{ opacity:0; transform:translateY(16px); }
+.skills-board.is-in .skill-card{ opacity:1; transform:none; transition:opacity .6s var(--ease-standard), transform .6s var(--ease-standard); transition-delay:calc(var(--d, 0) * 70ms); }
+
+/* the floating logo field: tiles come forward out of a deep blur, sharpen, then blur past the viewer */
+.skills-field{ position:sticky; top:96px; height:min(600px, 76vh); border-radius:28px; overflow:hidden; isolation:isolate; contain:layout paint;
+  -webkit-mask-image:radial-gradient(closest-side, #000 62%, transparent); mask-image:radial-gradient(closest-side, #000 62%, transparent); }
+.skills-field::before{ content:""; position:absolute; inset:8%; border-radius:50%; z-index:-1;
+  background:radial-gradient(circle at 50% 50%, rgba(255,148,56,.16), rgba(255,68,68,.05) 45%, transparent 70%); }
+.skill-float{ position:absolute; left:0; top:0; pointer-events:none; will-change:transform, filter, opacity; transition:opacity .4s ease; }
+.skill-float .skill-logo{ width:var(--s, 64px); height:var(--s, 64px); border-radius:calc(var(--s, 64px) * .27); font-size:calc(var(--s, 64px) * .32); }
+.skill-float .skill-logo{ transition:opacity .45s ease, filter .45s ease; }
+.skills-field.is-spot .skill-float .skill-logo{ opacity:.22; filter:blur(3px); }
+.skill-spot{ position:absolute; left:50%; top:50%; display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; pointer-events:none;
+  opacity:0; filter:blur(14px); transform:translate(-50%, -50%) scale(.82); transition:opacity .45s ease, filter .55s var(--ease-standard), transform .55s var(--ease-snappy); }
+.skills-field.is-spot .skill-spot{ opacity:1; filter:blur(0); transform:translate(-50%, -50%) scale(1); }
+.skill-spot .skill-logo{ width:112px; height:112px; border-radius:30px; font-size:36px; box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 24px 60px -12px var(--c), 0 0 0 1px rgba(255,255,255,.08); }
+.skill-spot-name{ font-family:var(--font-heading), ui-serif, Georgia, serif; font-size:24px; color:var(--ink); }
+.skill-spot-level{ font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:#ffc795; }
+.skills-field.is-static .skill-float{ will-change:auto; }
+
+/* grid items default to min-width:auto, which would let a long row (the chips on phones) widen the whole column */
+.skills-main{ min-width:0; }
+@media (max-width:900px){
+  .skills-layout{ grid-template-columns:minmax(0, 1fr); gap:8px; }
+  .skills-field{ position:relative; top:auto; height:210px; order:-1; margin:-8px -8px 4px; border-radius:20px; }
+  .skill-spot .skill-logo{ width:76px; height:76px; border-radius:21px; font-size:24px; }
+  .skill-spot-name{ font-size:18px; }
 }
-.skills-lines{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
-.skill-shimmer-line{
-  stroke:url(#about-skill-line); stroke-width:.35; opacity:.5; vector-effect:non-scaling-stroke;
-  stroke-dasharray:4 3; animation:skillShimmer 6s linear infinite;
-}
-@keyframes skillShimmer{ to{ stroke-dashoffset:-70; } }
-.skill-node{
-  position:absolute; transform:translate(-50%,-50%); width:58px; height:58px; border-radius:50%;
-  background:var(--glass-bg); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
-  border:var(--glass-border); box-shadow:var(--glass-highlight), var(--glass-shadow);
-  color:var(--ink); font-family:'JetBrains Mono', ui-monospace, monospace; font-size:14px; font-weight:600;
-  cursor:pointer; display:flex; align-items:center; justify-content:center;
-  transition:transform .25s var(--ease-snappy), box-shadow .25s ease;
-  animation:skillDrift 5s ease-in-out infinite;
-}
-.skill-node .skill-node-label{ pointer-events:none; }
-.sn-1{ animation-delay:0s; } .sn-2{ animation-delay:.6s; } .sn-3{ animation-delay:1.2s; } .sn-4{ animation-delay:1.8s; }
-@keyframes skillDrift{ 0%,100%{ transform:translate(-50%,-50%) translateY(0); } 50%{ transform:translate(-50%,-50%) translateY(-7px); } }
-.skill-node:hover, .skill-node:focus-visible, .skill-node.sn-active{
-  transform:translate(-50%,-50%) scale(1.14);
-  box-shadow:var(--glass-highlight), 0 0 24px 4px rgba(255,148,56,0.35), var(--glass-shadow);
-  outline:none;
-}
-.skill-tooltip{
-  position:absolute; bottom:calc(100% + 12px); left:50%; transform:translateX(-50%) translateY(6px);
-  width:max-content; max-width:220px; padding:10px 14px; border-radius:14px;
-  font-family:'Manrope',sans-serif; font-size:12px; line-height:1.4; font-weight:400; color:var(--ink);
-  text-align:left; opacity:0; pointer-events:none; transition:opacity .2s ease, transform .2s ease;
-}
-.skill-node:hover .skill-tooltip, .skill-node:focus-visible .skill-tooltip, .skill-node.sn-active .skill-tooltip{
-  opacity:1; transform:translateX(-50%) translateY(0);
+@media (max-width:600px){
+  .skills-board{ columns:1; }
+  .skill-card{ padding:16px 14px 12px; }
+  .skills-field{ height:180px; }
+  /* one sideways-scrolling row of chips instead of four wrapped rows */
+  .skills-filter{ flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none; margin:0 -20px 16px; padding:2px 20px;
+    -webkit-mask-image:linear-gradient(90deg, transparent, #000 20px, #000 calc(100% - 20px), transparent); mask-image:linear-gradient(90deg, transparent, #000 20px, #000 calc(100% - 20px), transparent); }
+  .skills-filter::-webkit-scrollbar{ display:none; }
+  .skills-chip{ flex:none; }
 }
 @media (prefers-reduced-motion: reduce){
-  .skill-node{ animation:none; }
-  .skill-shimmer-line{ animation:none; }
+  .skills-board .skill-card{ opacity:1; transform:none; }
+  .skill-logo, .skill-spot{ transition:none; }
+}
+@media (prefers-reduced-transparency: reduce){
+  .skill-card{ background:var(--glass-bg-heavy, rgba(20,16,22,.94)); backdrop-filter:none; -webkit-backdrop-filter:none; }
 }
 
 /* ---- featured work strip ---- */
@@ -1540,8 +1592,6 @@ html.ka-modal-open{ overflow:hidden; }
 @media(max-width:600px){
   .about-headline{ font-size:var(--step-2); }
   .about-bio-text{ margin-bottom:48px; }
-  .skills-constellation{ height:300px; }
-  .skill-node{ width:50px; height:50px; font-size:12px; }
 }
 </style>
 
@@ -1569,42 +1619,20 @@ html.ka-modal-open{ overflow:hidden; }
     <!-- About numbers (Projects, Delivered, ...): filled from the portal (Content > Site text), count up when seen -->
     <div class="about-stats" id="about-stats" role="list" aria-label="In numbers" hidden></div>
 
+    <!-- Skills: filled by renderSkills() from the site document (portal: Content > Site text > Skills).
+         The defaults below in DEFAULT_SKILLS are the first paint, before /api/portfolio answers. -->
     <div class="about-block" id="about-skills-block">
       <div class="gallery-head">
-        <h2>Skills</h2>
-        <p>Tools that shape every frame</p>
+        <h2 id="skills-title">Skills</h2>
+        <p id="skills-intro">The tools, languages and crafts behind every frame and every build</p>
       </div>
-      <div class="skills-constellation" id="skills-constellation">
-        <svg class="skills-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          <defs>
-            <linearGradient id="about-skill-line" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#b8d8ef" stop-opacity=".55"/>
-              <stop offset="60%" stop-color="#ffe8cd" stop-opacity=".95"/>
-              <stop offset="100%" stop-color="#e8aa82" stop-opacity=".7"/>
-            </linearGradient>
-          </defs>
-          <line class="skill-shimmer-line" x1="18" y1="28" x2="52" y2="16"/>
-          <line class="skill-shimmer-line" x1="52" y1="16" x2="82" y2="34"/>
-          <line class="skill-shimmer-line" x1="18" y1="28" x2="40" y2="62"/>
-          <line class="skill-shimmer-line" x1="82" y1="34" x2="62" y2="70"/>
-          <line class="skill-shimmer-line" x1="40" y1="62" x2="62" y2="70"/>
-        </svg>
-        <button type="button" class="skill-node sn-1" style="left:18%;top:28%;" aria-label="Photoshop">
-          <span class="skill-node-label">Ps</span>
-          <span class="skill-tooltip glass-panel">Photoshop — compositing and retouching every key art layer</span>
-        </button>
-        <button type="button" class="skill-node sn-2" style="left:52%;top:16%;" aria-label="Illustrator">
-          <span class="skill-node-label">Ai</span>
-          <span class="skill-tooltip glass-panel">Illustrator — vector typography and title treatments</span>
-        </button>
-        <button type="button" class="skill-node sn-3" style="left:82%;top:34%;" aria-label="Figma">
-          <span class="skill-node-label">Fg</span>
-          <span class="skill-tooltip glass-panel">Figma — campaign layouts and social deliverable systems</span>
-        </button>
-        <button type="button" class="skill-node sn-4" style="left:40%;top:62%;" aria-label="Lightroom">
-          <span class="skill-node-label">Lr</span>
-          <span class="skill-tooltip glass-panel">Lightroom — color grading and mood across a full campaign</span>
-        </button>
+      <p class="skills-meta" id="skills-meta"></p>
+      <div class="skills-layout">
+        <div class="skills-main">
+          <div class="skills-filter" id="skills-filter" role="radiogroup" aria-label="Skill categories"></div>
+          <div class="skills-board" id="skills-board"></div>
+        </div>
+        <div class="skills-field" id="skills-field" aria-hidden="true"></div>
       </div>
     </div>
 
@@ -6739,6 +6767,10 @@ function switchSection(name, focusTarget){
   var all = Object.values(sections).filter(Boolean);
   var showing = all.filter(function(section){ return !section.hidden; });
   all.forEach(function(section){ section.classList.remove("fading-in", "fading-out"); });
+  // which way the page moves: forward (slides in from the right) or back, by position in the nav
+  var navOrder = navItems.map(function(el){ return el.getAttribute("data-section"); });
+  var fromAt = navOrder.indexOf(activeSection), toAt = navOrder.indexOf(page);
+  document.documentElement.setAttribute("data-nav-dir", fromAt < 0 || toAt < 0 ? "none" : toAt > fromAt ? "next" : "prev");
   activeSection = page;
   if (window.kaTrackView) window.kaTrackView("/?page=" + page);
   navItems.forEach(function(el){
@@ -6780,7 +6812,8 @@ function switchSection(name, focusTarget){
     if (go.focus) focusSectionHeading(go.el);
     sectionTimer = setTimeout(function(){
       incoming.forEach(function(section){ section.classList.remove("fading-in"); });
-    }, reducedMotion ? 150 : 350);
+      document.documentElement.removeAttribute("data-nav-dir");
+    }, reducedMotion ? 150 : 430);
   }, outMs);
 }
 
@@ -7080,19 +7113,260 @@ window.addEventListener("ka-sequence-complete", function(){
     requestAnimationFrame(updateParallax);
   }, { passive: true });
 
-  // [Part C] skill nodes -- hover already works via CSS (:hover/:focus-visible); this adds
-  // tap-to-toggle for touch devices (no :hover) and closes any open tooltip on an outside tap.
-  var skillNodes = Array.prototype.slice.call(document.querySelectorAll(".skill-node"));
-  skillNodes.forEach(function(node){
-    node.addEventListener("click", function(e){
-      var wasActive = node.classList.contains("sn-active");
-      skillNodes.forEach(function(n){ n.classList.remove("sn-active"); });
-      if (!wasActive) node.classList.add("sn-active");
+  // [Part C] Skills -- a resume-style board (one card per category, filterable) and, beside it, a field of
+  // logo tiles that drift forward out of a gaussian blur, sharpen, and blur away past the viewer, one after
+  // another for as long as the field is on screen. Hovering, focusing or tapping a skill brings its logo
+  // forward in the field. Data: the site document's `skills` (portal: Content > Site text > Skills).
+  var DEFAULT_SKILLS = {"enabled":true,"title":"Skills","intro":"The tools, languages and crafts behind every frame and every build","categories":[{"name":"Design","icon":"design","items":[{"name":"Photoshop","code":"Ps","color":"#31A8FF","level":5,"note":"Compositing and retouching every key-art layer"},{"name":"Illustrator","code":"Ai","color":"#FF9A00","level":4,"note":"Vector typography and title treatments"},{"name":"Figma","code":"Fg","color":"#A259FF","level":4,"note":"Campaign layouts and social deliverable systems"},{"name":"InDesign","code":"Id","color":"#FF3366","level":3,"note":"Press kits and print-ready layouts"},{"name":"After Effects","code":"Ae","color":"#9999FF","level":3,"note":"Motion posters and animated titles"}]},{"name":"Arts","icon":"arts","items":[{"name":"Movie posters","code":"Mp","color":"#FF9438","level":5,"note":"Theatrical key art from first look to release"},{"name":"Typography","code":"Ty","color":"#E8AA82","level":5,"note":"Custom title logos and lettering"},{"name":"Photo manipulation","code":"Pm","color":"#FF6B4A","level":5,"note":"Blending stars, sets and effects into one frame"},{"name":"Digital painting","code":"Dp","color":"#C9864F","level":4,"note":"Painted skies, light and texture passes"},{"name":"Campaign design","code":"Cd","color":"#FFD9B8","level":4,"note":"Consistent looks across every format"}]},{"name":"Languages","icon":"languages","items":[{"name":"JavaScript","code":"JS","color":"#F7DF1E","level":4,"note":""},{"name":"TypeScript","code":"TS","color":"#3178C6","level":4,"note":""},{"name":"Python","code":"Py","color":"#3776AB","level":3,"note":""},{"name":"HTML","code":"HT","color":"#E34F26","level":4,"note":""},{"name":"CSS","code":"CSS","color":"#1572B6","level":4,"note":""},{"name":"SQL","code":"SQL","color":"#CC8A3B","level":3,"note":""}]},{"name":"Frontend","icon":"frontend","items":[{"name":"React","code":"Re","color":"#61DAFB","level":4,"note":"Components, hooks and state"},{"name":"Three.js","code":"3D","color":"#FFFFFF","level":4,"note":"WebGL scenes and shaders"},{"name":"GSAP","code":"Gs","color":"#88CE02","level":4,"note":"Timeline animation"},{"name":"Vite","code":"Vi","color":"#646CFF","level":4,"note":"Builds and dev tooling"},{"name":"Tailwind CSS","code":"Tw","color":"#38BDF8","level":3,"note":"Utility-first styling"}]},{"name":"Backend","icon":"backend","items":[{"name":"Node.js","code":"No","color":"#5FA04E","level":4,"note":"APIs, jobs and servers"},{"name":"Cloudflare Workers","code":"Cf","color":"#F38020","level":3,"note":"Edge functions and R2 storage"},{"name":"Vercel","code":"Vc","color":"#EDEBE8","level":3,"note":"Serverless deploys"}]},{"name":"Database","icon":"database","items":[{"name":"PostgreSQL","code":"Pg","color":"#4169E1","level":3,"note":""},{"name":"SQLite","code":"Sq","color":"#0F80CC","level":3,"note":""},{"name":"Cloudflare D1","code":"D1","color":"#F38020","level":3,"note":""},{"name":"Supabase","code":"Sb","color":"#3ECF8E","level":3,"note":""},{"name":"Firebase","code":"Fb","color":"#FFCA28","level":3,"note":""}]},{"name":"APIs","icon":"apis","items":[{"name":"REST APIs","code":"API","color":"#8B8BFF","level":4,"note":"Designing and consuming JSON APIs"},{"name":"Razorpay","code":"Rp","color":"#3395FF","level":4,"note":"Payments, webhooks and refunds"},{"name":"AI APIs","code":"AI","color":"#D97757","level":4,"note":"Gemini and Claude assistants"},{"name":"Webhooks","code":"Wh","color":"#C73A63","level":3,"note":"Signed event delivery"},{"name":"Email (SMTP)","code":"@","color":"#9AA3AF","level":3,"note":"Receipts, alerts and auto-replies"}]}]};
+  var SKILL_ICON_PATHS = {
+    design: "M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18zM2 2l7.6 7.6M11 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
+    arts: "M12 21a9 9 0 1 1 9-9c0 2.3-1.8 3.2-3.6 3.2h-1.8a1.8 1.8 0 0 0-1.4 3c.6.7.4 2.8-2.2 2.8zM7.5 11.5h.01M10 7.5h.01M15 7.5h.01M17.5 11.5h.01",
+    languages: "M16 18l6-6-6-6M8 6l-6 6 6 6M14 4l-4 16",
+    frontend: "M3 4h18v16H3zM3 9h18M6.5 6.5h.01M9.5 6.5h.01",
+    backend: "M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01M12 7h4M12 17h4",
+    database: "M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
+    apis: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1",
+    motion: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM10 8.5l5.5 3.5-5.5 3.5z",
+    tools: "M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z",
+    star: "M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"
+  };
+  var SKILL_LEVELS = ["", "Learning", "Familiar", "Proficient", "Advanced", "Expert"];
+  var skillsBlock = document.getElementById("about-skills-block");
+  var skillsBoard = document.getElementById("skills-board");
+  var skillsFilter = document.getElementById("skills-filter");
+  var skillsField = document.getElementById("skills-field");
+  var skillsData = null, skillsFilterIdx = -1, skillsSeq = 0;
+
+  function skillColor(c){ return /^#[0-9a-fA-F]{6}$/.test(c || "") ? c : "#3A3340"; }
+  function skillCode(x){
+    if (x.code) return x.code;
+    var w = String(x.name || "").split(/[\s.\-\/]+/).filter(Boolean);
+    return (w.map(function(s){ return s[0]; }).join("").slice(0, 2) || "?").toUpperCase();
+  }
+  // dark or light letters, whichever reads better on the tile colour (WCAG relative luminance)
+  function skillInk(hex){
+    var n = parseInt(hex.slice(1), 16);
+    function lin(c){ c /= 255; return c <= .04045 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4); }
+    var L = .2126 * lin(n >> 16) + .7152 * lin((n >> 8) & 255) + .0722 * lin(n & 255);
+    return L > .4 ? "#14110f" : "#ffffff";
+  }
+  function skillLogo(x){
+    var s = document.createElement("span"), c = skillColor(x.color);
+    s.className = "skill-logo"; s.setAttribute("aria-hidden", "true");
+    s.style.setProperty("--c", c); s.style.setProperty("--ink", skillInk(c));
+    s.textContent = skillCode(x);
+    return s;
+  }
+  function skillIcon(name){
+    var ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg"), p = document.createElementNS(ns, "path");
+    svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("fill", "none"); svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "1.8"); svg.setAttribute("stroke-linecap", "round"); svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true"); svg.setAttribute("focusable", "false");
+    p.setAttribute("d", SKILL_ICON_PATHS[name] || SKILL_ICON_PATHS.star); svg.appendChild(p);
+    return svg;
+  }
+  function el(tag, cls, text){ var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+  function skillCats(){ return (skillsData && skillsData.categories || []).filter(function(c){ return c && c.name && c.items && c.items.length; }); }
+
+  function renderSkillFilter(){
+    var cats = skillCats();
+    skillsFilter.replaceChildren();
+    if (cats.length < 2){ skillsFilter.hidden = true; return; }
+    skillsFilter.hidden = false;
+    var total = cats.reduce(function(n, c){ return n + c.items.length; }, 0);
+    [{ name: "All", icon: "star", count: total, i: -1 }].concat(cats.map(function(c, i){ return { name: c.name, icon: c.icon, count: c.items.length, i: i }; }))
+      .forEach(function(o){
+        var b = el("button", "skills-chip");
+        b.type = "button"; b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(o.i === skillsFilterIdx));
+        b.tabIndex = o.i === skillsFilterIdx ? 0 : -1;
+        if (o.i >= 0) b.appendChild(skillIcon(o.icon));
+        b.appendChild(document.createTextNode(o.name));
+        var n = el("span", "n", String(o.count)); n.setAttribute("aria-hidden", "true"); b.appendChild(n);
+        b.setAttribute("aria-label", o.name + ", " + o.count + " skill" + (o.count === 1 ? "" : "s"));
+        b.addEventListener("click", function(){ setSkillFilter(o.i, true); });
+        skillsFilter.appendChild(b);
+      });
+  }
+  // radio group keys: arrows move and select, Home/End jump
+  skillsFilter.addEventListener("keydown", function(e){
+    var keys = ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp", "Home", "End"];
+    if (keys.indexOf(e.key) < 0) return;
+    var chips = Array.prototype.slice.call(skillsFilter.querySelectorAll(".skills-chip")), at = chips.indexOf(document.activeElement);
+    if (at < 0) return;
+    e.preventDefault();
+    var next = e.key === "Home" ? 0 : e.key === "End" ? chips.length - 1 : (at + (e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1) + chips.length) % chips.length;
+    setSkillFilter(next - 1, false);
+    var again = skillsFilter.querySelectorAll(".skills-chip")[next]; if (again) again.focus();
+  });
+  function setSkillFilter(i, keepFocus){
+    if (i === skillsFilterIdx) return;
+    skillsFilterIdx = i;
+    var focused = keepFocus && document.activeElement && document.activeElement.closest && document.activeElement.closest(".skills-chip");
+    renderSkillFilter(); renderSkillBoard(false);
+    if (focused){ var c = skillsFilter.querySelector('[aria-checked="true"]'); if (c) c.focus(); }
+    restartSkillField();
+  }
+
+  function renderSkillBoard(animate){
+    var cats = skillCats();
+    skillsBoard.replaceChildren();
+    skillsBoard.classList.toggle("is-solo", skillsFilterIdx >= 0);
+    cats.forEach(function(c, ci){
+      if (skillsFilterIdx >= 0 && ci !== skillsFilterIdx) return;
+      var card = el("article", "skill-card"); card.style.setProperty("--d", String(ci));
+      card.setAttribute("aria-label", c.name);
+      var head = el("header", "skill-card-head"), ico = el("span", "skill-card-ico");
+      ico.appendChild(skillIcon(c.icon)); head.appendChild(ico);
+      head.appendChild(el("h3", "", c.name));
+      var cnt = el("span", "skill-card-count", String(c.items.length).padStart(2, "0")); cnt.setAttribute("aria-hidden", "true"); head.appendChild(cnt);
+      card.appendChild(head);
+      var ul = el("ul", "skill-list");
+      c.items.forEach(function(x){
+        var li = el("li", "skill-item"); li.tabIndex = 0;
+        var level = Math.max(0, Math.min(5, Number(x.level) || 0));
+        li.setAttribute("aria-label", x.name + (level ? ", " + SKILL_LEVELS[level] : "") + (x.note ? ". " + x.note : ""));
+        li.appendChild(skillLogo(x));
+        var t = el("span", "skill-text"); t.setAttribute("aria-hidden", "true");
+        t.appendChild(el("span", "skill-name", x.name)); if (x.note) t.appendChild(el("span", "skill-note", x.note));
+        li.appendChild(t);
+        if (level){
+          var m = el("span", "skill-meter"); m.setAttribute("aria-hidden", "true"); m.title = SKILL_LEVELS[level];
+          for (var k = 1; k <= 5; k++) m.appendChild(el("i", k <= level ? "on" : ""));
+          li.appendChild(m);
+        }
+        li._skill = x;
+        ul.appendChild(li);
+      });
+      card.appendChild(ul);
+      skillsBoard.appendChild(card);
     });
+    if (animate === false || reducedMotion) skillsBoard.classList.add("is-in");
+  }
+
+  // ---- the logo field
+  var fieldLive = [], fieldTimers = [], fieldOn = false, fieldVisible = false, spot = null, spotFor = null;
+  function fieldPool(){
+    var cats = skillCats();
+    var list = skillsFilterIdx >= 0 && cats[skillsFilterIdx] ? cats[skillsFilterIdx].items : cats.reduce(function(a, c){ return a.concat(c.items); }, []);
+    return list.filter(function(x){ return x && x.name; });
+  }
+  function fieldSlots(){ return window.innerWidth <= 600 ? 4 : window.innerWidth <= 900 ? 6 : 11; }
+  function spawnFloat(slot, slots){
+    if (!fieldOn) return;
+    var pool = fieldPool(); if (!pool.length) return;
+    var x = pool[skillsSeq++ % pool.length];
+    var W = skillsField.clientWidth, H = skillsField.clientHeight; if (!W || !H) return;
+    var f = el("div", "skill-float"), logo = skillLogo(x), small = window.innerWidth <= 900;
+    var size = Math.round((small ? 40 : 54) + Math.random() * (small ? 22 : 34));
+    f.style.setProperty("--s", size + "px"); f.appendChild(logo);
+    // lanes spread the tiles across the field so they rarely stack on top of each other
+    var lane = (slot + .5) / slots, x0 = W * (.14 + .72 * lane) + (Math.random() - .5) * W * .08;
+    var y0 = H * (.22 + Math.random() * .56), dx = (Math.random() - .5) * W * .16, dy = -(H * (.06 + Math.random() * .12));
+    var blur = small ? 9 : 14;
+    function at(px, py, s){ return "translate(" + px.toFixed(1) + "px," + py.toFixed(1) + "px) translate(-50%,-50%) scale(" + s + ")"; }
+    var frames = [
+      { transform: at(x0, y0, .28), filter: "blur(" + blur + "px)", opacity: 0 },
+      { offset: .32, transform: at(x0 + dx * .3, y0 + dy * .3, .92), filter: "blur(0px)", opacity: 1 },
+      { offset: .68, transform: at(x0 + dx * .68, y0 + dy * .68, 1.04), filter: "blur(0px)", opacity: 1 },
+      { transform: at(x0 + dx, y0 + dy, 1.5), filter: "blur(" + Math.round(blur * .8) + "px)", opacity: 0 }
+    ];
+    skillsField.appendChild(f);
+    var a = f.animate(frames, { duration: 6800 + Math.random() * 3400, easing: "cubic-bezier(.3,.55,.3,1)", fill: "both" });
+    fieldLive.push(f);
+    a.onfinish = function(){ f.remove(); fieldLive.splice(fieldLive.indexOf(f), 1); spawnFloat(slot, slots); };
+  }
+  function staticField(){
+    // reduced motion: a still arrangement with depth (the farther tiles stay softly blurred)
+    var pool = fieldPool().slice(0, 9), W = skillsField.clientWidth, H = skillsField.clientHeight;
+    pool.forEach(function(x, i){
+      var f = el("div", "skill-float"), a = (i / pool.length) * Math.PI * 2, r = i % 2 ? .3 : .19, near = i % 3 === 0;
+      f.style.setProperty("--s", (near ? 64 : 46) + "px"); f.appendChild(skillLogo(x));
+      f.style.transform = "translate(" + (W / 2 + Math.cos(a) * W * r).toFixed(1) + "px," + (H / 2 + Math.sin(a) * H * r).toFixed(1) + "px) translate(-50%,-50%)";
+      f.style.filter = near ? "none" : "blur(2.5px)"; f.style.opacity = near ? "1" : ".7";
+      skillsField.appendChild(f); fieldLive.push(f);
+    });
+    skillsField.classList.add("is-static");
+  }
+  function startSkillField(){
+    if (fieldOn || !fieldVisible || document.hidden || !skillsField.clientWidth) return;
+    fieldOn = true;
+    if (reducedMotion || !skillsField.animate){ staticField(); return; }
+    // one lane per skill when a category has only a few, so the same tiles never stack on each other
+    var slots = Math.min(fieldSlots(), Math.max(3, fieldPool().length)), every = 8400 / slots;
+    for (var i = 0; i < slots; i++) (function(i){ fieldTimers.push(setTimeout(function(){ spawnFloat(i, slots); }, i * every)); })(i);
+  }
+  function stopSkillField(){
+    fieldOn = false;
+    fieldTimers.forEach(clearTimeout); fieldTimers = [];
+    fieldLive.forEach(function(f){ if (f.getAnimations) f.getAnimations().forEach(function(a){ a.onfinish = null; a.cancel(); }); f.remove(); });
+    fieldLive = [];
+    skillsField.classList.remove("is-static");
+  }
+  function restartSkillField(){ stopSkillField(); startSkillField(); }
+  if ("IntersectionObserver" in window){
+    new IntersectionObserver(function(entries){
+      fieldVisible = entries[entries.length - 1].isIntersecting;
+      if (fieldVisible) startSkillField(); else stopSkillField();
+    }, { rootMargin: "60px" }).observe(skillsField);
+  } else { fieldVisible = true; }
+  document.addEventListener("visibilitychange", function(){ if (document.hidden) stopSkillField(); else startSkillField(); });
+  var fieldResize = 0;
+  window.addEventListener("resize", function(){ clearTimeout(fieldResize); fieldResize = setTimeout(function(){ if (fieldOn) restartSkillField(); }, 250); });
+
+  // ---- spotlight: the hovered / focused / tapped skill comes forward in the field
+  function showSpot(li){
+    var x = li && li._skill; if (!x) return;
+    if (spotFor === li){ return; }
+    spotFor = li;
+    skillsBoard.querySelectorAll(".skill-item.is-active").forEach(function(n){ if (n !== li) n.classList.remove("is-active"); });
+    li.classList.add("is-active");
+    if (!spot){ spot = el("div", "skill-spot"); skillsField.appendChild(spot); }
+    else if (spot.parentNode !== skillsField) skillsField.appendChild(spot);
+    spot.replaceChildren(skillLogo(x), el("span", "skill-spot-name", x.name));
+    var level = Math.max(0, Math.min(5, Number(x.level) || 0));
+    if (level) spot.appendChild(el("span", "skill-spot-level", SKILL_LEVELS[level]));
+    var c = spot.querySelector(".skill-logo"); if (c) c.style.setProperty("--c", skillColor(x.color));
+    skillsField.classList.add("is-spot");
+  }
+  function hideSpot(){
+    if (spotFor) spotFor.classList.remove("is-active");
+    spotFor = null; skillsField.classList.remove("is-spot");
+  }
+  skillsBoard.addEventListener("pointerover", function(e){ if (e.pointerType === "mouse"){ var li = e.target.closest(".skill-item"); if (li) showSpot(li); } });
+  skillsBoard.addEventListener("pointerleave", function(e){ if (e.pointerType === "mouse") hideSpot(); });
+  skillsBoard.addEventListener("focusin", function(e){ var li = e.target.closest(".skill-item"); if (li) showSpot(li); });
+  skillsBoard.addEventListener("focusout", function(e){ if (!skillsBoard.contains(e.relatedTarget)) hideSpot(); });
+  var lastPointer = "mouse";
+  skillsBoard.addEventListener("pointerdown", function(e){ lastPointer = e.pointerType || "mouse"; });
+  skillsBoard.addEventListener("click", function(e){
+    var li = e.target.closest(".skill-item"); if (!li) return;
+    if (spotFor === li && lastPointer !== "mouse") hideSpot(); else showSpot(li);   // a second tap puts it back
   });
-  document.addEventListener("click", function(e){
-    if (!e.target.closest(".skill-node")) skillNodes.forEach(function(n){ n.classList.remove("sn-active"); });
-  });
+  document.addEventListener("click", function(e){ if (spotFor && !e.target.closest("#skills-board")) hideSpot(); });
+
+  function renderSkills(data){
+    var d = data && typeof data === "object" ? data : DEFAULT_SKILLS;
+    skillsData = d;
+    skillsBlock.hidden = d.enabled === false || !skillCats().length;
+    if (skillsBlock.hidden){ stopSkillField(); return; }
+    document.getElementById("skills-title").textContent = d.title || "Skills";
+    var intro = document.getElementById("skills-intro"); intro.textContent = d.intro || ""; intro.hidden = !d.intro;
+    var cats = skillCats(), total = cats.reduce(function(n, c){ return n + c.items.length; }, 0);
+    document.getElementById("skills-meta").textContent = total + " skills \u00b7 " + cats.length + " categor" + (cats.length === 1 ? "y" : "ies");
+    if (skillsFilterIdx >= cats.length) skillsFilterIdx = -1;
+    hideSpot();
+    renderSkillFilter(); renderSkillBoard(skillsBoard.classList.contains("is-in") ? false : undefined);
+    restartSkillField();
+  }
+  window.kaRenderSkills = renderSkills;
+  renderSkills(window.__kaLastPortfolioData && window.__kaLastPortfolioData.skills);
+  // cards rise in the first time the board scrolls into view
+  if (!reducedMotion && "IntersectionObserver" in window){
+    var boardIo = new IntersectionObserver(function(entries){
+      if (entries.some(function(en){ return en.isIntersecting; })){ skillsBoard.classList.add("is-in"); boardIo.disconnect(); }
+    }, { threshold: .08 });
+    boardIo.observe(skillsBoard);
+  } else skillsBoard.classList.add("is-in");
 
   // [Part D] featured work strip -- built from the same real POSTERS data Gallery/Portfolio use,
   // clicking a thumbnail opens the exact same lightbox (openLightbox), so preview behavior is
@@ -7886,6 +8160,7 @@ function renderAboutStats(stats){
 
 function applySiteAppearance(data){
   try { renderAboutStats(data && data.stats); } catch(e){}
+  try { if (window.kaRenderSkills) window.kaRenderSkills(data && data.skills); } catch(e){}
   var root = document.documentElement.style;
   if (data.details){
     if (data.details.customFonts) applyCustomFonts(data.details.customFonts);
@@ -8191,6 +8466,25 @@ if (!/[?&]preview=1(&|$)/.test(location.search) && window.parent === window){
       isNew = false;
     };
     window.kaTrackView(location.pathname + location.search);
+    // A visible opt-in; the browser permission prompt only follows this visitor action.
+    var consented = false; try { consented = localStorage.getItem("ka_location_consent") === "1"; } catch(e){}
+    if (navigator.geolocation && !/[?&]preview=1(&|$)/.test(location.search)){
+      var share = document.createElement('button');
+      share.type = 'button'; share.className = 'location-share';
+      share.textContent = 'Share location for a more accurate visit map';
+      share.setAttribute('aria-label', 'Optionally share your location once for a more accurate visit map');
+      share.addEventListener('click', function(){
+        try { localStorage.setItem('ka_location_consent', '1'); } catch(e){}
+        share.disabled = true; share.textContent = 'Waiting for browser permission…';
+        navigator.geolocation.getCurrentPosition(function(pos){
+          post({ t: 'location', lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy });
+          share.textContent = 'Location shared for this visit';
+        }, function(){ share.disabled = false; share.textContent = 'Share location for a more accurate visit map'; }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+      });
+      if (consented){ share.textContent = 'Share location for a more accurate visit map'; }
+      document.body.appendChild(share);
+    }
+    // Precise location is only collected after a visitor clicks and the browser grants permission.
     setInterval(function(){ if (document.visibilityState === "visible") post({ t: "ping", d: elapsed() }); }, 30000);
     document.addEventListener("visibilitychange", function(){
       if (document.visibilityState === "hidden"){ visibleMs += Date.now() - shownAt; post({ t: "leave", d: visibleMs }, true); }
@@ -8203,7 +8497,8 @@ if (!/[?&]preview=1(&|$)/.test(location.search) && window.parent === window){
 </script>
 
 <style>
-/* ============================================================ AI ASSISTANT WIDGET ========== */
+.location-share{position:fixed;right:18px;bottom:96px;z-index:60;max-width:min(320px,calc(100vw - 36px));padding:11px 15px;border:1px solid rgba(255,190,130,.42);border-radius:999px;background:rgba(24,22,25,.88);backdrop-filter:blur(14px);color:#f0e9df;font:500 12px 'DM Sans',sans-serif;box-shadow:0 8px 28px #0006;cursor:pointer}.location-share:hover,.location-share:focus-visible{border-color:#ffbb7a;background:rgba(40,34,33,.96)}.location-share:disabled{opacity:.72;cursor:wait}/* ============================================================ AI ASSISTANT WIDGET ========== */
+
 .assistant-launcher{
   position:fixed; bottom:28px; right:28px; z-index:70;
   width:56px; height:56px; border-radius:50%; border:1px solid rgba(255,154,110,0.3);
@@ -10016,5 +10311,169 @@ html{ font-size:calc(100% * var(--text-scale, 1) * var(--screen-scale, 1)); }
   window.addEventListener('blur',reset);window.addEventListener('pagehide',reset);
   window.addEventListener('scroll',reset,{passive:true});
   [motion,clarity,contrast,forced].forEach(function(m){m.addEventListener('change',reset);});
+})();
+</script>
+<style>
+/* ============================================================ SWIPE BETWEEN PAGES (touch) == */
+/* sideways swipes from the sides of the screen switch pages here, so the browser must not also treat them as Back/Forward */
+html, body{ overscroll-behavior-x:none; }
+.edge-swipe-hint{ position:fixed; top:50%; z-index:120; display:flex; align-items:center; gap:10px; padding:8px 16px 8px 8px;
+  border-radius:999px; background:var(--glass-bg-heavy, rgba(20,16,22,.82)); border:var(--glass-border, 1px solid rgba(255,255,255,.16));
+  box-shadow:var(--glass-highlight, none), 0 10px 30px rgba(0,0,0,.45); backdrop-filter:blur(14px) saturate(140%); -webkit-backdrop-filter:blur(14px) saturate(140%);
+  color:var(--ink, #edebe8); font:600 11px/1 'JetBrains Mono', ui-monospace, monospace; letter-spacing:.14em; text-transform:uppercase;
+  pointer-events:none; opacity:0; transform:translate3d(0,-50%,0); will-change:transform,opacity; transition:opacity .2s ease, border-color .2s ease; }
+.edge-swipe-hint.is-next{ right:14px; flex-direction:row-reverse; padding:8px 8px 8px 16px; } .edge-swipe-hint.is-prev{ left:14px; }
+.edge-swipe-hint .ring{ position:relative; width:30px; height:30px; flex:none; display:grid; place-items:center; }
+.edge-swipe-hint .ring svg{ position:absolute; inset:0; width:30px; height:30px; transform:rotate(-90deg); }
+.edge-swipe-hint .ring circle{ fill:none; stroke-width:2.4; }
+.edge-swipe-hint .ring .track{ stroke:rgba(255,255,255,.14); }
+.edge-swipe-hint .ring .fill{ stroke:var(--amber, #ff9438); stroke-linecap:round; stroke-dasharray:1; stroke-dashoffset:1; }
+.edge-swipe-hint .arr{ position:relative; color:var(--amber, #ff9438); font-size:15px; letter-spacing:0; }
+.edge-swipe-hint.is-ready{ border-color:rgba(255,148,56,.65); }
+.edge-swipe-hint.is-end{ color:var(--ink-dim, #a8a39e); }
+.edge-swipe-hint.is-end .arr{ color:var(--ink-dim, #a8a39e); }
+/* the page follows the finger a little while swiping, and springs back if the swipe is let go */
+.site-section > .is-swiping{ transition:none !important; will-change:transform, opacity; }
+.site-section > .is-swipe-return{ transition:transform .32s cubic-bezier(.22,.8,.24,1), opacity .32s ease !important; }
+/* page changes move sideways in the direction of travel: forward slides in from the right, back from the left.
+   --swipe-x carries a finger drag into the outgoing animation, so a swipe hands over without a jump. */
+@media (prefers-reduced-motion: no-preference){
+  html[data-nav-dir="next"] .site-section.fading-out{ animation:sectionOutLeft .28s cubic-bezier(.4,0,.6,1) forwards; }
+  html[data-nav-dir="next"] .site-section.fading-in{ animation:sectionInRight .42s cubic-bezier(.22,.8,.24,1) forwards; }
+  html[data-nav-dir="prev"] .site-section.fading-out{ animation:sectionOutRight .28s cubic-bezier(.4,0,.6,1) forwards; }
+  html[data-nav-dir="prev"] .site-section.fading-in{ animation:sectionInLeft .42s cubic-bezier(.22,.8,.24,1) forwards; }
+}
+@keyframes sectionOutLeft{ from{ opacity:var(--swipe-o, 1); transform:translate3d(var(--swipe-x, 0px),0,0); } to{ opacity:0; transform:translate3d(calc(var(--swipe-x, 0px) - 9vw),0,0); } }
+@keyframes sectionOutRight{ from{ opacity:var(--swipe-o, 1); transform:translate3d(var(--swipe-x, 0px),0,0); } to{ opacity:0; transform:translate3d(calc(var(--swipe-x, 0px) + 9vw),0,0); } }
+@keyframes sectionInRight{ from{ opacity:0; transform:translate3d(9vw,0,0); } to{ opacity:1; transform:none; } }
+@keyframes sectionInLeft{ from{ opacity:0; transform:translate3d(-9vw,0,0); } to{ opacity:1; transform:none; } }
+</style>
+<script>
+// ==================================================================== SWIPE BETWEEN PAGES ==
+// Phones and tablets: a sideways swipe that STARTS on the left or right side of the screen moves to the previous /
+// next page in the nav (Contact, About, Store, Tips). The page follows the finger; letting go past the threshold, or
+// a quick flick, changes page with a sideways slide, otherwise it springs back. At the first / last page it only
+// stretches. Swipes that start in the middle are left alone (artwork, stacks and galleries keep their own swipes),
+// as are swipes on text fields, sideways-scrolling rows, and anything while a dialog, the store's viewer or
+// checkout, or the chat is open. Listeners are on window in the capture phase, so no widget can swallow them.
+(function(){
+  var root = document.documentElement, hint = null, s = null;
+  var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function pages(){ return Array.prototype.slice.call(document.querySelectorAll("#nav-items .nav-item")); }
+  function visibleSections(){ return Array.prototype.slice.call(document.querySelectorAll(".site-section:not([hidden])")); }
+  // what moves with the finger: each section's own content, never its fixed-position layers (glows, overlays),
+  // which a transform on the section would otherwise pull out of place
+  function moversOf(list){
+    var out = [];
+    list.forEach(function(sec){ Array.prototype.forEach.call(sec.children, function(c){ if (getComputedStyle(c).position !== "fixed") out.push(c); }); });
+    return out;
+  }
+  function busy(){
+    if (root.classList.contains("ka-modal-open")) return true;
+    var chat = document.getElementById("assistant-launcher");
+    if (chat && chat.getAttribute("aria-expanded") === "true") return true;
+    // any dialog that is actually showing (some stay in the page, invisible, while closed)
+    var open = document.querySelectorAll('[aria-modal="true"]:not([hidden]), [role="dialog"]:not([hidden]), dialog[open], #upscaler-modal.open');
+    for (var i = 0; i < open.length; i++){
+      var el = open[i], cs = getComputedStyle(el);
+      if (el.getClientRects().length && cs.visibility !== "hidden" && cs.display !== "none" && Number(cs.opacity) > 0.05) return true;
+    }
+    return false;
+  }
+  // true when the touch starts on something that needs its own sideways movement
+  function ownsSwipe(t, dir){
+    for (var n = t; n && n !== document.body && n.nodeType === 1; n = n.parentElement){
+      if (n.matches("input, textarea, select, [contenteditable=''], [contenteditable='true'], #site-nav, [data-no-page-swipe]")) return true;
+      if (n.scrollWidth > n.clientWidth + 2){
+        var ox = getComputedStyle(n).overflowX;
+        if (ox === "auto" || ox === "scroll"){
+          // it can still scroll the way the finger is going: let it scroll
+          if (dir > 0 ? n.scrollLeft + n.clientWidth < n.scrollWidth - 1 : n.scrollLeft > 1) return true;
+        }
+      }
+    }
+    return false;
+  }
+  function zone(){ return Math.max(28, Math.min(120, window.innerWidth * 0.2)); }
+  function need(){ return Math.max(70, Math.min(150, window.innerWidth * 0.24)); }
+  function showHint(dir, label, p, end){
+    if (!hint){
+      hint = document.createElement("div"); hint.setAttribute("aria-hidden", "true");
+      hint.innerHTML = '<span class="ring"><svg viewBox="0 0 30 30"><circle class="track" cx="15" cy="15" r="12"/><circle class="fill" cx="15" cy="15" r="12" pathLength="1"/></svg><span class="arr"></span></span><span class="lbl"></span>';
+      document.body.appendChild(hint);
+    }
+    hint.className = "edge-swipe-hint " + (dir > 0 ? "is-next" : "is-prev") + (p >= 1 && !end ? " is-ready" : "") + (end ? " is-end" : "");
+    hint.querySelector(".arr").textContent = end ? "\u2022" : dir > 0 ? "\u203a" : "\u2039";
+    hint.querySelector(".lbl").textContent = end ? (dir > 0 ? "Last page" : "First page") : label;
+    hint.querySelector(".fill").style.strokeDashoffset = String(1 - Math.min(1, p));
+    var q = Math.min(1, p);
+    hint.style.opacity = String(0.3 + q * 0.7);
+    hint.style.transform = "translate3d(" + ((dir > 0 ? 1 : -1) * (1 - q) * 28) + "px,-50%,0) scale(" + (0.92 + q * 0.08) + ")";
+  }
+  function hideHint(){ if (hint) hint.style.opacity = "0"; }
+  function follow(dx, p){
+    // the page leans toward the finger, with resistance (and a lot more at the first / last page)
+    var x = s.target ? dx * 0.32 : dx * 0.1, o = s.target ? 1 - Math.min(1, p) * 0.35 : 1;
+    s.x = x; s.o = o;
+    if (reduce) return;
+    s.movers.forEach(function(m){ m.classList.add("is-swiping"); m.style.transform = "translate3d(" + x.toFixed(1) + "px,0,0)"; m.style.opacity = o.toFixed(3); });
+  }
+  function release(commit){
+    var gesture = s; s = null; hideHint();
+    if (!gesture || !gesture.decided) return;
+    gesture.movers.forEach(function(m){ m.classList.remove("is-swiping"); });
+    if (commit){
+      // hand the drag offset to the outgoing animation (on the section), then switch exactly as a tap on the nav would
+      gesture.movers.forEach(function(m){ m.style.transform = ""; m.style.opacity = ""; });
+      if (!reduce) gesture.sections.forEach(function(sec){ sec.style.setProperty("--swipe-x", gesture.x.toFixed(1) + "px"); sec.style.setProperty("--swipe-o", gesture.o.toFixed(3)); });
+      root.setAttribute("data-nav-dir", gesture.dir > 0 ? "next" : "prev");
+      setTimeout(function(){ gesture.target.click(); }, 0);
+      setTimeout(function(){ gesture.sections.forEach(function(sec){ sec.style.removeProperty("--swipe-x"); sec.style.removeProperty("--swipe-o"); }); }, 700);
+      return;
+    }
+    gesture.movers.forEach(function(m){
+      m.classList.add("is-swipe-return"); m.style.transform = ""; m.style.opacity = "";
+      setTimeout(function(){ m.classList.remove("is-swipe-return"); }, 360);
+    });
+  }
+  window.addEventListener("touchstart", function(e){
+    if (s) release(false);
+    if (e.touches.length !== 1 || busy()) return;
+    var t = e.touches[0], w = window.innerWidth, z = zone(), dir = 0;
+    if (t.clientX <= z) dir = -1; else if (t.clientX >= w - z) dir = 1;
+    // the finger moves away from its edge (leftwards from the right side), so a row under it would scroll toward dir
+    if (!dir || ownsSwipe(e.target, dir)) return;
+    var list = pages(), cur = list.findIndex(function(b){ return b.getAttribute("aria-current") === "page"; });
+    if (cur < 0) return;
+    var target = list[cur + dir] || null;
+    s = { x0: t.clientX, y0: t.clientY, t0: performance.now(), dir: dir, target: target, x: 0, o: 1, decided: false, buzzed: false,
+      label: target ? (target.getAttribute("aria-label") || target.textContent.trim()) : "", sections: [], movers: [], lastX: t.clientX, lastT: performance.now(), v: 0 };
+  }, { passive: true, capture: true });
+  window.addEventListener("touchmove", function(e){
+    if (!s) return;
+    if (e.touches.length !== 1){ release(false); return; }
+    var t = e.touches[0], dx = t.clientX - s.x0, dy = t.clientY - s.y0, now = performance.now();
+    if (!s.decided){
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      // a sideways move pointing into the screen; anything else is a scroll and is left alone
+      if (Math.abs(dy) > Math.abs(dx) * 0.8 || (s.dir > 0 ? dx > 0 : dx < 0)){ s = null; return; }
+      s.decided = true; s.sections = visibleSections(); s.movers = reduce ? [] : moversOf(s.sections);
+    }
+    s.v = (t.clientX - s.lastX) / Math.max(8, now - s.lastT); s.lastX = t.clientX; s.lastT = now;
+    var into = s.dir > 0 ? -dx : dx, p = Math.max(0, into) / need();
+    // a tiny tick when letting go would change page (only after the visitor has tapped the page: browsers refuse it before)
+    if (s.target && p >= 1 && !s.buzzed){ s.buzzed = true; if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) try { navigator.vibrate(8); } catch(err){} }
+    if (p < 1) s.buzzed = false;
+    follow(s.dir > 0 ? -Math.max(0, into) : Math.max(0, into), p);
+    showHint(s.dir, s.label, p, !s.target);
+  }, { passive: true, capture: true });
+  window.addEventListener("touchend", function(){
+    if (!s) return;
+    if (!s.decided){ s = null; return; }
+    var into = Math.abs(s.x) / (s.target ? 0.32 : 0.1), flick = (s.dir > 0 ? -s.v : s.v) > 0.45 && into > 40;
+    release(!!s.target && (into >= need() || flick));
+  }, { passive: true, capture: true });
+  window.addEventListener("touchcancel", function(){ release(false); }, { passive: true, capture: true });
+  document.addEventListener("visibilitychange", function(){ if (document.hidden) release(false); });
 })();
 </script>

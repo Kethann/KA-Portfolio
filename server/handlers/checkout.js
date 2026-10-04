@@ -5,7 +5,7 @@ import { rateLimit, verifyTurnstile } from '../core/guard.js';
 import { email as vEmail, currency as vCurrency, str } from '../core/validate.js';
 import { getDb } from '../core/db.js';
 import * as orders from '../store/orders.js';
-import { downloadPage, redeem, resendLinks } from '../store/delivery.js';
+import { downloadPage, redeem, resendLinks, rate } from '../store/delivery.js';
 import { onDaily } from '../jobs/hooks.js';
 
 function productIdFrom(body){
@@ -95,7 +95,14 @@ export async function razorpayWebhook(ctx){
 
 export async function downloadGet(ctx){
   await rateLimit(`dl-view:${ctx.ip}`, 60, 10 * 60);
-  return downloadPage(ctx.params.token, siteUrl(ctx.request));
+  return downloadPage(ctx.params.token, siteUrl(ctx.request), { rated: ctx.url.searchParams.get('rated') === '1' });
+}
+
+// "Rate it" on the download page (a plain form post; the link itself proves the purchase)
+export async function ratePost(ctx){
+  await rateLimit(`rate:${ctx.ip}`, 20, 60 * 60);
+  const form = new URLSearchParams((await readBody(ctx.request, 8 * 1024)).toString('utf8'));
+  return rate({ token: ctx.params.token, form, siteUrl: siteUrl(ctx.request) });
 }
 
 export async function downloadPost(ctx){
@@ -136,5 +143,6 @@ export function registerCheckout(route){
   route('POST', '/api/webhooks/razorpay', razorpayWebhook, { access: 'webhook' });
   route('GET', '/api/download/:token', downloadGet);
   route('POST', '/api/download/:token', downloadPost);
+  route('POST', '/api/download/:token/rate', ratePost);
   route('POST', '/api/downloads/resend', resend);
 }

@@ -139,6 +139,7 @@ export async function updateProduct(ctx){
   if (!current) throw new HttpError(404, 'Product not found.');
   if (b.updatedAt && new Date(b.updatedAt).getTime() !== new Date(current.updated_at).getTime()) throw new HttpError(409, 'This item was changed somewhere else. Reload it to see the latest version.', { code: 'stale' });
   const status = ['draft', 'published', 'archived'].includes(b.status) ? b.status : current.status;
+  const publishedNow = status === 'published' && current.status !== 'published';
   const v = {
     title: str(b.title, { name: 'Title', max: 160, required: true }),
     slug: await uniqueSlug(db, vSlug(b.slug || slugify(b.title)), id),
@@ -179,7 +180,55 @@ export async function updateProduct(ctx){
   const cols = Object.keys(v);
   await guarded(() => db.query(`update products set ${cols.map((c, i) => `${c} = $${i + 2}`).join(', ')}, updated_at = now(),
     published_at = case when $${cols.length + 2} = 'published' and published_at is null then now() else published_at end where id = $1`, [id, ...cols.map(c => v[c]), status]));
+  if (publishedNow) await saveProductRevision(db, id, 'publish', ctx.admin?.email);
   await audit(ctx, 'product_saved', id, { status });
+  return getProduct({ ...ctx, params: { id } });
+}
+
+async function productSnapshot(db, id){
+  const p = await db.maybeOne('select * from products where id = $1', [id]);
+  if (!p) throw new HttpError(404, 'Product not found.');
+  const media = await db.query('select url, alt, width, height, sort from product_media where product_id = $1 order by sort, id', [id]);
+  return { product: p, media };
+}
+async function saveProductRevision(db, id, action, actor){
+  const snapshot = await productSnapshot(db, id);
+  if (snapshot.product.status !== 'published') return;
+  await db.query('insert into product_revisions (product_id, action, snapshot, actor) values ($1,$2,$3,$4)', [id, action, snapshot, actor || null]);
+}
+export async function productHistory(ctx){
+  const id = vUuid(ctx.params.id, 'Product');
+  const db = await getDb();
+  if (!(await db.maybeOne('select 1 from products where id = $1', [id]))) throw new HttpError(404, 'Product not found.');
+  const revisions = await db.query('select id, action, created_at, actor from product_revisions where product_id = $1 order by created_at desc, id desc limit 100', [id]);
+  return json({ revisions });
+}
+export async function restoreProductRevision(ctx){
+  const id = vUuid(ctx.params.id, 'Product'), revisionId = Number(ctx.params.revisionId);
+  if (!Number.isSafeInteger(revisionId) || revisionId < 1) throw new HttpError(400, 'Choose a valid publish revision.');
+  const db = await getDb();
+  const row = await db.maybeOne('select snapshot from product_revisions where id = $1 and product_id = $2', [revisionId, id]);
+  if (!row) throw new HttpError(404, 'Publish revision not found.');
+  const { product, media } = row.snapshot;
+  if (!product || product.id !== id || !Array.isArray(media)) throw new HttpError(400, 'This revision cannot be restored.');
+  const current = await db.maybeOne('select * from products where id = $1', [id]);
+  if (!current) throw new HttpError(404, 'Product not found.');
+  if (product.kind !== current.kind) throw new HttpError(400, 'The product section cannot be changed by restoring a revision.');
+  if (product.status === 'published' && current.kind === 'artzz' && media.length === 0) throw new HttpError(400, 'This revision has no image and cannot be published.');
+  if (product.status === 'published' && product.sellable && !product.is_free &&
+    (product.price_inr < 100 || product.price_usd < 100 || product.price_inr == null || product.price_usd == null)) throw new HttpError(400, 'This revision does not have valid prices.');
+  if (product.status === 'published' && product.sellable && !(await db.maybeOne('select 1 from product_files where product_id = $1 and is_current', [id])))
+    throw new HttpError(400, 'The current download file is missing, so this revision cannot be published.');
+  const cols = ['title','slug','summary','description','category_id','tags','tech_tags','version','status','sellable','is_free','price_inr','price_usd','sale_price_inr','sale_price_usd','sale_starts_at','sale_ends_at','license_id','demo_url','preview_url','max_downloads','link_ttl_hours','refund_after_download','sort'];
+  const args = [id, ...cols.map(k => product[k])];
+  const assignments = cols.map((k, i) => `${k} = $${i + 2}`).join(', ');
+  await guarded(async () => {
+    await db.query(`update products set ${assignments}, updated_at = now(), published_at = case when $10 = 'published' then coalesce(published_at, now()) else published_at end where id = $1`, args);
+    await db.query('delete from product_media where product_id = $1', [id]);
+    for (const m of media) await db.query('insert into product_media (product_id,url,alt,width,height,sort) values ($1,$2,$3,$4,$5,$6)', [id,m.url,m.alt,m.width,m.height,m.sort]);
+  });
+  await saveProductRevision(db, id, 'restore', ctx.admin?.email);
+  await audit(ctx, 'product_revision_restored', id, { revisionId });
   return getProduct({ ...ctx, params: { id } });
 }
 
@@ -323,6 +372,16 @@ export async function saveCategory(ctx){
   } catch (err){ if (/unique|duplicate/i.test(err.message)) throw new HttpError(409, 'A category with that name already exists.'); throw err; }
   return listCategories();
 }
+export async function reorderCategories(ctx){
+  const b = await readJson(ctx.request, 32 * 1024);
+  if (!['artifacts','artzz','tips'].includes(b.kind) || !Array.isArray(b.ids) || b.ids.length > 500) throw new HttpError(400, 'Send a valid category order.');
+  const ids = b.ids.map(id => vUuid(id, 'Category'));
+  const db = await getDb();
+  const existing = await db.query('select id from categories where kind = $1 order by sort, name', [b.kind]);
+  if (existing.length !== ids.length || new Set(ids).size !== ids.length || existing.some(r => !ids.includes(r.id))) throw new HttpError(400, 'Refresh the categories and try again.');
+  await db.batch(ids.map((id, i) => ['update categories set sort = $2 where id = $1 and kind = $3', [id, i, b.kind]]));
+  return listCategories();
+}
 export async function deleteCategory(ctx){
   const db = await getDb();
   await db.query('delete from categories where id = $1', [ctx.params.id]);   // items fall back to "no category"
@@ -347,14 +406,49 @@ export async function saveLicense(ctx){
   return listLicenses();
 }
 
+// ---- ratings (buyers rate from their download page; the owner can hide or delete any of them)
+export async function productRatings(ctx){
+  const id = vUuid(ctx.params.id, 'Product');
+  const db = await getDb();
+  const ratings = await db.query(`select r.id, r.rating, r.review, r.name, r.status, r.created_at, r.updated_at, o.public_id as order_ref
+    from product_ratings r join orders o on o.id = r.order_id where r.product_id = $1 order by r.created_at desc limit 500`, [id]);
+  const sum = await db.one(`select (select round(avg(rating), 2) from product_ratings where product_id = $1 and status = 'visible') as avg,
+      (select count(*) from product_ratings where product_id = $1 and status = 'visible') as count,
+      (select count(*) from order_items i join orders o on o.id = i.order_id where i.product_id = $1 and o.status in ('paid','delivered')) as downloads`, [id]);
+  return json({ ratings, avg: sum.avg === null ? null : Number(sum.avg), count: Number(sum.count), downloads: Number(sum.downloads) });
+}
+export async function updateRating(ctx){
+  const id = vUuid(ctx.params.id, 'Rating');
+  const b = await readJson(ctx.request, 1024);
+  if (!['visible', 'hidden'].includes(b.status)) throw new HttpError(400, 'Choose visible or hidden.');
+  const db = await getDb();
+  const r = await db.maybeOne('update product_ratings set status = $2, updated_at = now() where id = $1 returning product_id', [id, b.status]);
+  if (!r) throw new HttpError(404, 'Rating not found.');
+  await audit(ctx, b.status === 'hidden' ? 'rating_hidden' : 'rating_shown', id);
+  return productRatings({ ...ctx, params: { id: r.product_id } });
+}
+export async function deleteRating(ctx){
+  const id = vUuid(ctx.params.id, 'Rating');
+  const db = await getDb();
+  const r = await db.maybeOne('delete from product_ratings where id = $1 returning product_id', [id]);
+  if (!r) throw new HttpError(404, 'Rating not found.');
+  await audit(ctx, 'rating_deleted', id);
+  return productRatings({ ...ctx, params: { id: r.product_id } });
+}
+
 export function registerCatalog(route){
   const a = { access: 'admin' };
+  route('GET', '/api/admin/products/:id/ratings', productRatings, a);
+  route('PATCH', '/api/admin/ratings/:id', updateRating, a);
+  route('DELETE', '/api/admin/ratings/:id', deleteRating, a);
   route('POST', '/api/admin/uploads', signUpload, a);
   route('GET', '/api/admin/products', listProducts, a);
   route('POST', '/api/admin/products', createProduct, a);
   route('POST', '/api/admin/products/reorder', reorderProducts, a);
   route('GET', '/api/admin/products/:id', getProduct, a);
   route('PUT', '/api/admin/products/:id', updateProduct, a);
+  route('GET', '/api/admin/products/:id/history', productHistory, a);
+  route('POST', '/api/admin/products/:id/history/:revisionId/restore', restoreProductRevision, a);
   route('DELETE', '/api/admin/products/:id', deleteProduct, a);
   route('POST', '/api/admin/products/:id/duplicate', duplicateProduct, a);
   route('POST', '/api/admin/products/:id/restore', restoreProduct, a);
@@ -364,6 +458,7 @@ export function registerCatalog(route){
   route('PUT', '/api/admin/products/:id/file', setFile, a);
   route('GET', '/api/admin/products/:id/file', fileLink, a);
   route('GET', '/api/admin/categories', listCategories, a);
+  route('POST', '/api/admin/categories/reorder', reorderCategories, a);
   route('POST', '/api/admin/categories', saveCategory, a);
   route('PUT', '/api/admin/categories/:id', saveCategory, a);
   route('DELETE', '/api/admin/categories/:id', deleteCategory, a);

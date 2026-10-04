@@ -181,6 +181,7 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
     try {
       const r = await put<{ product: Product }>(`/products/${id}`, { ...draft, status: status || draft.status, updatedAt: draft.updatedAt || saved!.updatedAt });
       s.setData(r); setDraft(r.product);
+      if (status === 'published' && saved!.status !== 'published') history.reload();
       toast.show(status === 'published' ? 'Published: it’s live on the store' : status === 'draft' ? 'Unpublished: back to draft' : 'Saved', { tone: 'success' });
     } catch (e: any){
       if (e.code === 'stale'){
@@ -192,6 +193,7 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
     } finally { setSaving(false); }
   };
   useSaveKey(active, () => void save());
+  const history = useLoad<{ revisions: { id: number; action: 'publish' | 'restore'; created_at: string; actor: string | null }[] }>(`/products/${id}/history`);
 
   if (s.error && !s.data) return <ErrorState message={s.error} retry={s.reload} />;
   if (!draft || !saved) return <div className="pad"><SkeletonRows rows={10} /></div>;
@@ -349,6 +351,18 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
               </div>
             </div>
             <Readiness p={p} />
+            <section className="card stack" aria-label="Publish history">
+              <div className="row between"><b>Publish history</b><button type="button" className="btn sm ghost" onClick={() => history.reload()}>Refresh</button></div>
+              {history.error && !history.data ? <p className="field-error">{history.error}</p> : !history.data ? <p className="faint">Loading revisions…</p> : !history.data.revisions.length ? <p className="faint">Published versions appear here after the first publish.</p> : <ul className="list">{history.data.revisions.map(rev => <li key={rev.id}>
+                <span className="grow"><b>{rev.action === 'restore' ? 'Restored publish' : 'Published'}</b><span className="faint" style={{ display: 'block', fontSize: 12 }}>{ago(rev.created_at)}{rev.actor ? ` · ${rev.actor}` : ''}</span></span>
+                <AsyncButton className="btn sm ghost" disabled={saving || rev.id === history.data?.revisions[0]?.id} onClick={async () => {
+                  if (!(await confirm({ title: 'Restore this published version?', body: 'This replaces the current product with the selected published version. You can restore other versions from this history.', confirm: 'Restore version' }))) return;
+                  const r = await post<{ product: Product }>(`/products/${id}/history/${rev.id}/restore`);
+                  s.setData(r); setDraft(r.product); history.reload(); toast.show('Published version restored', { tone: 'success' });
+                }}>Restore</AsyncButton>
+              </li>)}</ul>}
+            </section>
+            <RatingsCard id={id} />
             <dl className="kv card">
               <dt>Status</dt><dd><Badge tone={STATUS_TONE[saved.status]}>{saved.status}</Badge></dd>
               <dt>Sold</dt><dd className="num">{p.sales}</dd>
@@ -429,3 +443,33 @@ const strip = (p: Product) => ({ ...p, media: undefined, file: undefined, update
 // datetime-local works in the viewer's zone; the portal assumes India time is the owner's zone.
 function toLocal(v: string | null){ if (!v) return ''; const d = new Date(v); const ist = new Date(d.getTime() + 330 * 60e3); return ist.toISOString().slice(0, 16); }
 function fromLocal(v: string){ if (!v) return null; return new Date(v + ':00+05:30').toISOString(); }
+
+// Ratings and downloads for one item: buyers rate it from their download page; hide or delete any rating here.
+type RatingRow = { id: string; rating: number; review: string; name: string; status: 'visible' | 'hidden'; created_at: string; order_ref: string };
+function RatingsCard({ id }: { id: string }){
+  const r = useLoad<{ ratings: RatingRow[]; avg: number | null; count: number; downloads: number }>(`/products/${id}/ratings`);
+  const confirm = useConfirm();
+  const toast = useToast();
+  if (!r.data) return null;
+  const d = r.data;
+  const stars = (n: number) => '★★★★★'.slice(0, Math.round(n)) + '☆☆☆☆☆'.slice(0, 5 - Math.round(n));
+  return (
+    <section className="card stack" aria-labelledby={`rt-${id}`}>
+      <div className="row between"><div className="eyebrow" id={`rt-${id}`}>Ratings & downloads</div><span className="faint num">{d.downloads} download{d.downloads === 1 ? '' : 's'}</span></div>
+      {d.count ? <div className="row" style={{ gap: 8, alignItems: 'baseline' }}><b style={{ fontSize: 20, color: 'var(--accent)' }}>{stars(d.avg || 0)}</b><span className="num">{(d.avg || 0).toFixed(1)}</span><span className="faint">· {d.count} rating{d.count === 1 ? '' : 's'}</span></div>
+        : <p className="field-hint" style={{ margin: 0 }}>No ratings yet. Buyers can rate from their download page.</p>}
+      {d.ratings.length > 0 && <ul className="list" style={{ display: 'grid', gap: 10, margin: 0, padding: 0, listStyle: 'none', maxHeight: 320, overflow: 'auto' }}>
+        {d.ratings.map(x => (
+          <li key={x.id} style={{ display: 'grid', gap: 4, opacity: x.status === 'hidden' ? 0.55 : 1 }}>
+            <div className="row between"><span><b style={{ color: 'var(--accent)' }}>{stars(x.rating)}</b> <span className="faint">{x.name || 'Verified buyer'} · {x.order_ref}{x.status === 'hidden' ? ' · hidden' : ''}</span></span>
+              <span className="row" style={{ gap: 4 }}>
+                <AsyncButton className="btn sm ghost" onClick={async () => r.setData(await patch(`/ratings/${x.id}`, { status: x.status === 'hidden' ? 'visible' : 'hidden' }))}>{x.status === 'hidden' ? 'Show' : 'Hide'}</AsyncButton>
+                <AsyncButton className="icon-btn sm" title="Delete" onClick={async () => { if (await confirm({ title: 'Delete this rating?', confirm: 'Delete', danger: true })){ r.setData(await del(`/ratings/${x.id}`)); toast.show('Rating deleted', { tone: 'success' }); } }}><Icon name="trash" size={14} /></AsyncButton>
+              </span></div>
+            {x.review && <p style={{ margin: 0, fontSize: 13 }}>{x.review}</p>}
+          </li>
+        ))}
+      </ul>}
+    </section>
+  );
+}

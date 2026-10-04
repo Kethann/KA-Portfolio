@@ -9,7 +9,6 @@ import { hmacHex, safeEqual } from './crypto.js';
 import { mkdir, writeFile, readFile, rm, stat, readdir } from 'node:fs/promises';
 import { dirname, sep } from 'node:path';
 
-// Plain string joins, not path.resolve(): see the note in email.js about Vercel's file tracer.
 const at = (...parts) => parts.join(sep);
 
 export const BUCKETS = { media: { public: true }, deliverables: { public: false }, backups: { public: false } };

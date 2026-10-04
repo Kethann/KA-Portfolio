@@ -29,7 +29,10 @@ export const platform = {
   geo(request){
     const cf = request.cf;
     if (!cf || !cf.country || cf.country === 'T1') return null;   // T1 = Tor
-    return { country: cf.country, region: cf.region || null, city: cf.city || null, timezone: cf.timezone || null, provider: 'cloudflare' };
+    // everything Cloudflare's network knows about the connection (IP-based: city-level, no permission popup)
+    const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+    return { country: cf.country, region: cf.region || null, city: cf.city || null, timezone: cf.timezone || null, provider: 'cloudflare',
+      postal: cf.postalCode || null, latitude: num(cf.latitude), longitude: num(cf.longitude), isp: cf.asOrganization || null, continent: cf.continent || null };
   }
 };
 

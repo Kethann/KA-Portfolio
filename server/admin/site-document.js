@@ -19,6 +19,46 @@ const text = (v, max) => typeof v === 'string' ? v.trim().slice(0, max) : '';
 const bad = (msg) => new HttpError(400, msg);
 // About numbers shown until the owner sets their own (Content > Site text)
 export const STATS_DEFAULT = { enabled: true, items: [{ label: 'Projects', value: 150, suffix: '+' }, { label: 'Delivered', value: 120, suffix: '+' }, { label: 'Happy clients', value: 60, suffix: '+' }, { label: 'Years', value: 6, suffix: '+' }] };
+// About > Skills: a resume-style board, one card per category. Each skill shows a logo tile (a short code on
+// its colour), a 0-5 level (0 hides the meter) and a one-line note. The homepage keeps an identical copy
+// (DEFAULT_SKILLS in index.html) for its first paint, before /api/portfolio answers.
+export const SKILL_ICONS = ['design', 'arts', 'languages', 'frontend', 'backend', 'database', 'apis', 'motion', 'tools', 'star'];
+const sk = (name, code, color, level, note) => ({ name, code, color, level, note });
+export const SKILLS_DEFAULT = {
+  enabled: true, title: 'Skills', intro: 'The tools, languages and crafts behind every frame and every build',
+  categories: [
+    { name: 'Design', icon: 'design', items: [
+      sk('Photoshop', 'Ps', '#31A8FF', 5, 'Compositing and retouching every key-art layer'),
+      sk('Illustrator', 'Ai', '#FF9A00', 4, 'Vector typography and title treatments'),
+      sk('Figma', 'Fg', '#A259FF', 4, 'Campaign layouts and social deliverable systems'),
+      sk('InDesign', 'Id', '#FF3366', 3, 'Press kits and print-ready layouts'),
+      sk('After Effects', 'Ae', '#9999FF', 3, 'Motion posters and animated titles') ] },
+    { name: 'Arts', icon: 'arts', items: [
+      sk('Movie posters', 'Mp', '#FF9438', 5, 'Theatrical key art from first look to release'),
+      sk('Typography', 'Ty', '#E8AA82', 5, 'Custom title logos and lettering'),
+      sk('Photo manipulation', 'Pm', '#FF6B4A', 5, 'Blending stars, sets and effects into one frame'),
+      sk('Digital painting', 'Dp', '#C9864F', 4, 'Painted skies, light and texture passes'),
+      sk('Campaign design', 'Cd', '#FFD9B8', 4, 'Consistent looks across every format') ] },
+    { name: 'Languages', icon: 'languages', items: [
+      sk('JavaScript', 'JS', '#F7DF1E', 4, ''), sk('TypeScript', 'TS', '#3178C6', 4, ''), sk('Python', 'Py', '#3776AB', 3, ''),
+      sk('HTML', 'HT', '#E34F26', 4, ''), sk('CSS', 'CSS', '#1572B6', 4, ''), sk('SQL', 'SQL', '#CC8A3B', 3, '') ] },
+    { name: 'Frontend', icon: 'frontend', items: [
+      sk('React', 'Re', '#61DAFB', 4, 'Components, hooks and state'), sk('Three.js', '3D', '#FFFFFF', 4, 'WebGL scenes and shaders'),
+      sk('GSAP', 'Gs', '#88CE02', 4, 'Timeline animation'), sk('Vite', 'Vi', '#646CFF', 4, 'Builds and dev tooling'),
+      sk('Tailwind CSS', 'Tw', '#38BDF8', 3, 'Utility-first styling') ] },
+    { name: 'Backend', icon: 'backend', items: [
+      sk('Node.js', 'No', '#5FA04E', 4, 'APIs, jobs and servers'), sk('Cloudflare Workers', 'Cf', '#F38020', 3, 'Edge functions and R2 storage'),
+      sk('Vercel', 'Vc', '#EDEBE8', 3, 'Serverless deploys') ] },
+    { name: 'Database', icon: 'database', items: [
+      sk('PostgreSQL', 'Pg', '#4169E1', 3, ''), sk('SQLite', 'Sq', '#0F80CC', 3, ''), sk('Cloudflare D1', 'D1', '#F38020', 3, ''),
+      sk('Supabase', 'Sb', '#3ECF8E', 3, ''), sk('Firebase', 'Fb', '#FFCA28', 3, '') ] },
+    { name: 'APIs', icon: 'apis', items: [
+      sk('REST APIs', 'API', '#8B8BFF', 4, 'Designing and consuming JSON APIs'), sk('Razorpay', 'Rp', '#3395FF', 4, 'Payments, webhooks and refunds'),
+      sk('AI APIs', 'AI', '#D97757', 4, 'Gemini and Claude assistants'), sk('Webhooks', 'Wh', '#C73A63', 3, 'Signed event delivery'),
+      sk('Email (SMTP)', '@', '#9AA3AF', 3, 'Receipts, alerts and auto-replies') ] }
+  ]
+};
+const SKILL_LIMITS = { categories: 10, items: 24 };
 const isImageUrl = (u) => isOwnMediaUrl(u) && /\.(png|jpe?g|webp|avif)$/i.test(u);
 const isFontUrl = (u) => isOwnMediaUrl(u) && /\/fonts\/[A-Za-z0-9_-]+\.(woff2|woff|ttf|otf)$/i.test(u);
 function httpUrl(u){ try { return ['https:', 'http:'].includes(new URL(u).protocol); } catch { return false; } }
@@ -178,5 +218,33 @@ export function validateSiteDocument(input, current, seed){
     enabled: st.enabled !== false,
     items: (Array.isArray(st.items) ? st.items : []).slice(0, 6).map(x => ({ label: text(x && x.label, 40), value: num(x && x.value, 0, 1e9, 0), suffix: text(x && x.suffix, 4) })).filter(x => x.label),
   } : structuredClone(STATS_DEFAULT);
-  return { typeV2: true, details, folders, images, notice, visibility, stacks, layoutOverrides, branding, elementStyles, socialLinks, passCard, stats };
+  const skills = validateSkills(input.skills);
+  return { typeV2: true, details, folders, images, notice, visibility, stacks, layoutOverrides, branding, elementStyles, socialLinks, passCard, stats, skills };
+}
+
+// About > Skills. Missing (a document saved before skills existed) means the defaults; anything sent is
+// bounded and cleaned, and too many categories or skills are refused rather than silently cut.
+export function validateSkills(input){
+  if (!input || typeof input !== 'object') return structuredClone(SKILLS_DEFAULT);
+  const cats = Array.isArray(input.categories) ? input.categories : [];
+  if (cats.length > SKILL_LIMITS.categories) throw bad(`Use up to ${SKILL_LIMITS.categories} skill categories.`);
+  const categories = [];
+  for (const c of cats){
+    if (!c || typeof c !== 'object') throw bad('Invalid skill category.');
+    const name = text(c.name, 40);
+    if (!name) throw bad('Each skill category needs a name.');
+    const raw = Array.isArray(c.items) ? c.items : [];
+    if (raw.length > SKILL_LIMITS.items) throw bad(`Use up to ${SKILL_LIMITS.items} skills in ${name}.`);
+    const items = [];
+    for (const x of raw){
+      if (!x || typeof x !== 'object') throw bad('Invalid skill.');
+      const itemName = text(x.name, 40);
+      if (!itemName) continue;                                   // an empty row is an unfinished edit, not an error
+      const color = text(x.color, 20), level = Number(x.level);
+      items.push({ name: itemName, code: text(x.code, 3), color: /^#[0-9a-fA-F]{6}$/.test(color) ? color.toUpperCase() : '',
+        level: Number.isFinite(level) ? Math.min(5, Math.max(0, Math.round(level))) : 0, note: text(x.note, 140) });
+    }
+    categories.push({ name, icon: SKILL_ICONS.includes(c.icon) ? c.icon : 'star', items });
+  }
+  return { enabled: input.enabled !== false, title: text(input.title, 60) || SKILLS_DEFAULT.title, intro: text(input.intro, 200), categories };
 }

@@ -104,7 +104,14 @@ function page(status, title, bodyHtml, { turnstile = false } = {}){
 .card{width:min(460px,100%);padding:28px;border-radius:22px;background:rgba(30,26,32,.9);border:1px solid rgba(255,255,255,.14);box-shadow:0 30px 80px rgba(0,0,0,.5)}
 h1{margin:0 0 6px;font:500 26px/1.15 Georgia,serif;letter-spacing:-.01em}p{margin:0 0 14px;color:rgba(237,235,232,.72)}small{color:rgba(237,235,232,.5)}
 button,a.btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 26px;border-radius:999px;border:1px solid rgba(255,170,120,.55);background:linear-gradient(145deg,rgba(255,180,120,.35),rgba(200,120,70,.25));color:#fffaf5;font:600 13px/1 ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;text-decoration:none}
-button:focus-visible,a:focus-visible{outline:3px solid #ff9438;outline-offset:3px}.ts{margin:0 0 16px}.brand{font:600 11px/1 ui-monospace,monospace;letter-spacing:.14em;color:#c9864f;margin-bottom:18px;display:block}
+button:focus-visible,a:focus-visible{outline:3px solid #ff9438;outline-offset:3px}
+.rate{margin-top:26px;padding-top:20px;border-top:1px solid rgba(255,255,255,.12)}.rate h2{margin:0 0 10px;font:500 19px/1.2 Georgia,serif}
+.rate form{display:grid;gap:10px}.rate .ok{color:#9fe0b0}.rate small{color:rgba(237,235,232,.5)}
+.stars{display:inline-flex;flex-direction:row-reverse;justify-content:flex-end;gap:4px}.stars input{position:absolute;opacity:0;width:1px;height:1px}
+.stars label{font-size:32px;line-height:1;color:rgba(255,255,255,.22);cursor:pointer;transition:color .15s}
+.stars input:checked~label,.stars label:hover,.stars label:hover~label{color:#ffb35c}.stars input:focus-visible+label{outline:2px solid #ff9438;border-radius:4px}
+.rate textarea,.rate input[name=name]{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(0,0,0,.25);color:#edebe8;font:inherit}
+button.ghost{background:transparent;border-color:rgba(255,255,255,.25);justify-self:start}.ts{margin:0 0 16px}.brand{font:600 11px/1 ui-monospace,monospace;letter-spacing:.14em;color:#c9864f;margin-bottom:18px;display:block}
 </style>${withTs ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>' : ''}</head>
 <body><main class="card"><span class="brand">${escapeHtml(env('SITE_NAME', 'KETHAN ARTZZ').toUpperCase())}</span>${bodyHtml.replace('{{TURNSTILE}}', withTs ? `<div class="ts cf-turnstile" data-sitekey="${escapeHtml(siteKey)}" data-theme="dark"></div>` : '')}</main></body></html>`;
   return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': csp,
@@ -133,18 +140,53 @@ const MESSAGES = {
   limit: ['Download limit reached', 'This link has been used the maximum number of times. You can get a fresh one by email.'],
   missing: ['File not ready', 'The file for this product isn’t available right now. Please reply to your order email and we’ll sort it out.']
 };
-function errorPage(kind, siteUrl){
+function errorPage(kind, siteUrl, extra = ''){
   const [t, m] = MESSAGES[kind];
-  return page(kind === 'invalid' ? 404 : 410, t, `<h1>${t}</h1><p>${m}</p>${kind === 'expired' || kind === 'limit' ? RESEND_HINT(siteUrl) : ''}`);
+  return page(kind === 'invalid' ? 404 : 410, t, `<h1>${t}</h1><p>${m}</p>${kind === 'expired' || kind === 'limit' ? RESEND_HINT(siteUrl) : ''}${extra}`);
 }
 
-export async function downloadPage(token, siteUrl){
+// ---- ratings: anyone holding a working (or used-up / expired) download link of a paid order can rate that item
+async function ratingFor(t){
+  const db = await getDb();
+  return db.maybeOne('select rating, review, name from product_ratings where order_id = $1 and product_id = $2', [t.order_id, t.product_id]);
+}
+function ratingForm(token, current, thanks){
+  const r = current?.rating || 0;
+  const stars = [5, 4, 3, 2, 1].map(n => `<input type="radio" id="s${n}" name="rating" value="${n}"${r === n ? ' checked' : ''} required><label for="s${n}" title="${n} star${n > 1 ? 's' : ''}">★</label>`).join('');
+  return `<section class="rate">${thanks ? '<p class="ok">Thanks for rating! You can change it any time from this page.</p>' : ''}
+<h2>${current ? 'Your rating' : 'Rate it'}</h2>
+<form method="post" action="/api/download/${escapeHtml(token)}/rate">
+<div class="stars" role="radiogroup" aria-label="Your rating, 1 to 5 stars">${stars}</div>
+<textarea name="review" maxlength="600" rows="3" placeholder="A few words for other buyers (optional)">${escapeHtml(current?.review || '')}</textarea>
+<input name="name" maxlength="40" placeholder="Name to show (optional)" value="${escapeHtml(current?.name || '')}" autocomplete="nickname">
+<button type="submit" class="ghost">${current ? 'Update rating' : 'Send rating'}</button>
+<small>Only people who bought or downloaded this can rate it. Your email is never shown.</small>
+</form></section>`;
+}
+export async function rate({ token, form, siteUrl }){
   const { t, error } = await lookup(token);
-  if (error) return errorPage(error, siteUrl);
+  if (!t || error === 'revoked' || error === 'invalid') return errorPage(error || 'invalid', siteUrl);
+  const rating = Number(form.get('rating'));
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return new Response(null, { status: 303, headers: { Location: `/api/download/${token}`, 'Cache-Control': 'no-store' } });
+  const review = String(form.get('review') || '').replace(/\s+/g, ' ').trim().slice(0, 600);
+  const name = String(form.get('name') || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
+  const db = await getDb();
+  await db.query(`insert into product_ratings (product_id, order_id, rating, review, name) values ($1, $2, $3, $4, $5)
+    on conflict (order_id, product_id) do update set rating = excluded.rating, review = excluded.review, name = excluded.name, updated_at = now()`,
+    [t.product_id, t.order_id, rating, review, name]);
+  return new Response(null, { status: 303, headers: { Location: `/api/download/${token}?rated=1`, 'Cache-Control': 'no-store' } });
+}
+
+export async function downloadPage(token, siteUrl, { rated = false } = {}){
+  const { t, error } = await lookup(token);
+  // a used-up or expired link can still rate what was bought
+  const canRate = t && (error === undefined || error === 'expired' || error === 'limit');
+  const rateHtml = canRate ? ratingForm(token, await ratingFor(t), rated) : '';
+  if (error) return errorPage(error, siteUrl, rateHtml);
   const left = t.max_downloads - t.download_count;
   return page(200, `Download ${t.product_title}`, `<h1>${escapeHtml(t.product_title)}</h1>
 <p>Order ${escapeHtml(t.public_id)} · ${left} download${left === 1 ? '' : 's'} left · link valid until ${escapeHtml(fmtDate(t.expires_at))}</p>
-<form method="post">{{TURNSTILE}}<button type="submit">Download</button></form>`, { turnstile: true });
+<form method="post">{{TURNSTILE}}<button type="submit">Download</button></form>${rateHtml}`, { turnstile: true });
 }
 
 // Counts one download (atomic: never above the limit) and redirects to a short-lived signed URL.

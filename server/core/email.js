@@ -8,8 +8,6 @@ import { buildMime, smtpSend } from './smtp.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { sep } from 'node:path';
 
-// Local paths are joined as plain strings: path.resolve() with a runtime folder makes Vercel's file
-// tracer bundle every .json it can find into the function.
 const at = (...parts) => parts.join(sep);
 
 let transport = null;

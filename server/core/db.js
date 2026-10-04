@@ -16,7 +16,7 @@ export const NOW = `strftime('%Y-%m-%dT%H:%M:%fZ','now')`;
 const BOOL = new Set(['published', 'sellable', 'is_free', 'refund_after_download', 'is_current', 'first_order_only', 'stackable', 'paused',
   'is_new', 'is_bot', 'enabled', 'cutoff_notified', 'totp_enabled', 'must_change_password']);
 const JSON_COLS = new Set(['value', 'tags', 'tech_tags', 'currencies', 'product_ids', 'data', 'payload', 'labels', 'meta', 'sources', 'tables', 'payment_method',
-  'media', 'given', 'file']);   // + lists and objects built in queries (json_group_array / json_object)
+  'media', 'given', 'file', 'snapshot']);   // + lists and objects built in queries (json_group_array / json_object)
 
 export function toSql(text){
   return text.replace(/\$(\d+)/g, '?$1').replace(/\bnow\(\)/gi, NOW);

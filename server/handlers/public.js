@@ -10,7 +10,7 @@ import { isBlocked } from '../core/blocklist.js';
 import { demoPaymentsEnabled } from '../store/orders.js';
 // bundled with the code (the Worker has no file system to read it from at runtime)
 import seed from '../portfolio-seed.json' with { type: 'json' };
-import { STATS_DEFAULT } from '../admin/site-document.js';
+import { STATS_DEFAULT, SKILLS_DEFAULT } from '../admin/site-document.js';
 
 // Public, non-personal reads are never kept by a CDN and are rechecked by the browser every time, so a
 // publish from the portal shows up on the very next request. The router adds an ETag, so an unchanged
@@ -40,7 +40,7 @@ export async function publicConfig(ctx){
     razorpayKeyId: env('RAZORPAY_KEY_ID') || '',
     country,
     suggestedCurrency: currencyFor(country),
-    store: { enabled: store.enabled !== false },
+    store: { enabled: store.enabled !== false, international: store.international !== false },
     demoPayments: demoPaymentsEnabled(),
     upscaler: { comingSoon: upscaler.comingSoon, title: upscaler.title, badge: upscaler.badge, text: upscaler.text, notifyEnabled: upscaler.notifyEnabled },
     assistant: { enabled: !!assistant.enabled, greeting: assistant.greeting, suggestions: assistant.suggestions }
@@ -51,12 +51,12 @@ export async function publicConfig(ctx){
 // JSON file; seeded from server/portfolio-seed.json the first time.
 export async function loadSiteDocument(){
   const { value, revision } = await getSettingWithRevision('site');
-  if (value) return { ...value, stats: value.stats || STATS_DEFAULT, revision };   // sites saved before About numbers existed
+  if (value) return { ...value, stats: value.stats || STATS_DEFAULT, skills: value.skills || SKILLS_DEFAULT, revision };   // sites saved before About numbers / Skills existed
   const initial = { ...seed };
   delete initial.revision;
   const rev = await setSetting('site', initial, 0);
   if (rev === null) return loadSiteDocument();     // another request seeded it first
-  return { ...initial, revision: rev };
+  return { ...initial, skills: initial.skills || SKILLS_DEFAULT, revision: rev };
 }
 
 export async function portfolio(){

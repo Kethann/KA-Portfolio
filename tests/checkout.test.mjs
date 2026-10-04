@@ -6,6 +6,7 @@ import { createTestApp } from './helpers/app.mjs';
 import { setRazorpayFetch } from '../server/store/razorpay.js';
 import { evaluateCoupons } from '../server/store/coupons.js';
 import { computeTax } from '../server/store/orders.js';
+import { getSetting, setSetting } from '../server/core/settings.js';
 
 const KEY_SECRET = 'test_key_secret', HOOK_SECRET = 'test_webhook_secret';
 const app = await createTestApp({ RAZORPAY_KEY_ID: 'rzp_test_abc', RAZORPAY_KEY_SECRET: KEY_SECRET, RAZORPAY_WEBHOOK_SECRET: HOOK_SECRET, PUBLIC_SITE_URL: 'http://shop.test' });
@@ -273,6 +274,26 @@ test('USD order is created, charged and delivered in USD only', async () => {
   const db = await row(o.orderId);
   assert.deepEqual([db.status, db.currency, db.total], ['delivered', 'USD', 1999]);
   assert.match(mailsTo('usd@example.com')[1].text, /\$19\.99/);
+});
+
+test('international payments switched off: USD quotes and orders are refused, INR still works, free stays free', async () => {
+  const store = await getSetting('store');
+  await setSetting('store', { ...store, international: false });
+  try {
+    const cfg = await app.call('GET', '/api/public-config');
+    assert.equal(cfg.json.store.international, false, 'the storefront is told to show INR only');
+    const q = await app.call('POST', '/api/checkout/quote', { body: { productId: kitUsd, currency: 'USD' }, ip: ip() });
+    assert.equal(q.status, 400); assert.match(q.json.error, /International payments are paused/);
+    const o = await order(kitUsd, { currency: 'USD', email: 'intl-off@example.com' });
+    assert.equal(o.status, 400, 'no USD order is created');
+    assert.equal(Number((await app.pg.query(`select count(*) as n from orders where email = 'intl-off@example.com'`)).rows[0].n), 0);
+    const inr = (await order(kitUsd, { currency: 'INR', email: 'intl-off@example.com' })).json;
+    assert.deepEqual([inr.razorpay.amount, inr.razorpay.currency], [99900, 'INR']);
+    const freebie = await product('free-worldwide', { is_free: true, price_inr: null, price_usd: null });
+    assert.equal((await order(freebie, { currency: 'USD', email: 'free-intl@example.com' })).json.free, true, 'free downloads are not payments');
+  } finally { await setSetting('store', store); }
+  const cfg = await app.call('GET', '/api/public-config');
+  assert.equal(cfg.json.store.international, true, 'on by default');
 });
 
 test('expiry releases coupons; a real payment arriving late is still delivered', async () => {

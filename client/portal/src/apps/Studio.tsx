@@ -147,7 +147,7 @@ function Social({ doc }: { doc: SiteDoc }){
   const set = (next: SiteDoc['socialLinks']) => updateSite(x => ({ ...x, socialLinks: next }));
   return (
     <div className="stack">
-      <p className="muted">Shown in the footer and contact section, in this order.</p>
+      <p className="muted">Shown in the footer and contact section, in this order. On desktop, names appear when you focus or hover over an icon; on touch screens they stay visible.</p>
       {links.map((l, i) => (
         <div key={i} className="social-row">
           <select aria-label="Icon" value={l.icon} onChange={e => set(links.map((x, j) => j === i ? { ...x, icon: e.target.value } : x))}>{ICONS.map(ic => <option key={ic}>{ic}</option>)}</select>

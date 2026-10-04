@@ -3,16 +3,16 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "KA portfolio + store: static site, portable Web API handlers (Vercel today), Supabase Postgres/Storage.",
+  "description": "KA portfolio + store: Cloudflare Workers, D1 (SQLite), R2 storage, Cloudflare Pages.",
   "scripts": {
     "prestart": "npm run build",
     "start": "node server/platform/node-dev.js",
     "dev": "npm start",
-    "build": "node generator/scripts/verify_scripts.cjs && tsc --noEmit && vite build && node --test tests/gallery-build.test.mjs tests/delivery.test.mjs && node generator/scripts/verify_startup.cjs",
+    "build": "node generator/scripts/verify_scripts.cjs && tsc --noEmit && vite build --configLoader runner && node --test tests/gallery-build.test.mjs tests/delivery.test.mjs && node generator/scripts/verify_startup.cjs",
     "test": "node --test --test-concurrency=1 \"tests/*.test.mjs\" && node generator/scripts/verify_ui.cjs",
     "db:import-legacy": "node scripts/import-legacy.mjs",
     "db:seed-demo": "node scripts/seed-demo.mjs",
-    "build:cf": "node generator/scripts/verify_scripts.cjs && tsc --noEmit && vite build",
+    "build:cf": "node generator/scripts/verify_scripts.cjs && tsc --noEmit && vite build --configLoader runner",
     "cf:dev": "npm run build:cf && wrangler dev",
     "cf:migrate": "wrangler d1 migrations apply ka-db --remote",
     "cf:deploy": "npm run build:cf && wrangler d1 migrations apply ka-db --remote && wrangler deploy && node scripts/deploy-pages.mjs",
@@ -42,6 +42,6 @@
     "qs": "^6.16.0"
   },
   "engines": {
-    "node": ">=20.10"
+    "node": ">=22.0.0"
   }
 }

@@ -94,6 +94,9 @@ export async function quote(db, { productId, slug, currency, codes, email, now =
   const product = await loadSellableProduct(db, { productId, slug });
   const price = priceFor(product, currency, now);
   if (!price.available) throw new HttpError(400, `This item can’t be bought in ${currency}.`);
+  const store = storeSettings || await getSetting('store');
+  // International (USD) sales can be paused by the owner; free downloads never involve a payment.
+  if (currency === 'USD' && store.international === false && !price.free) throw new HttpError(400, 'International payments are paused right now. Switch to ₹ INR to buy this item.', { code: 'international_off' });
   const list = normalizeCodes(codes);
   let coupons = [];
   if (list.length){
@@ -103,7 +106,6 @@ export async function quote(db, { productId, slug, currency, codes, email, now =
     if (missing) throw new HttpError(400, `${missing} isn’t a valid code.`, { code: 'coupon_rejected' });
     coupons = list.map(code => coupons.find(c => c.code === code));
   }
-  const store = storeSettings || await getSetting('store');
   const evalResult = evaluateCoupons(coupons, {
     product, currency, subtotal: price.amount, email, now,
     usage: await couponUsage(db, coupons.map(c => c.id), email),

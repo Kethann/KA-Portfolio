@@ -9,7 +9,8 @@ import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
 import { TagInput, Uploader, useSaveKey } from './common';
 import { discardSite, keepMineOverTheirs, loadSite, saveSite, thumb, updateSite, useSite } from './siteDoc';
-import type { SiteImage, StatItem } from './siteDoc';
+import { SKILL_ICONS } from './siteDoc';
+import type { SiteImage, StatItem, SkillCategory, SkillItem } from './siteDoc';
 import { ago, dateTime } from '../format';
 
 type Tab = 'portfolio' | 'text' | 'upscaler' | 'emails';
@@ -72,6 +73,7 @@ function SiteText(){
         ))}
       </div>
       <AboutStats />
+      <AboutSkills />
     </div>
   );
 }
@@ -99,6 +101,77 @@ function AboutStats(){
         </div>
       ))}
       <div><button type="button" className="btn sm" disabled={st.items.length >= 6} onClick={() => setItems([...st.items, { label: '', value: 0, suffix: '+' }])}><Icon name="plus" /> Add a number</button></div>
+    </section>
+  );
+}
+
+// About > Skills: categories of skills, each with a logo tile (short code on a colour), a 0-5 level and a note.
+const SKILL_LEVELS = ['No meter', 'Learning', 'Familiar', 'Proficient', 'Advanced', 'Expert'];
+const ICON_LABEL: Record<string, string> = { design: 'Design', arts: 'Arts', languages: 'Code', frontend: 'Frontend', backend: 'Backend', database: 'Database', apis: 'APIs', motion: 'Motion', tools: 'Tools', star: 'Star' };
+const skillCode = (x: SkillItem) => x.code || x.name.split(/[\s.\-/]+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+// dark or light text, whichever reads better on the tile colour
+function inkOn(hex: string){
+  const m = /^#([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return '#fff';
+  const n = parseInt(m[1], 16), lin = (c: number) => { c /= 255; return c <= .04045 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4); };
+  const L = .2126 * lin(n >> 16) + .7152 * lin((n >> 8) & 255) + .0722 * lin(n & 255);
+  return L > .4 ? '#14110f' : '#fff';
+}
+function moveIn<T>(list: T[], i: number, by: number){ const a = [...list]; const [x] = a.splice(i, 1); a.splice(Math.max(0, Math.min(a.length, i + by)), 0, x); return a; }
+function AboutSkills(){
+  const { doc } = useSite();
+  const sk = doc!.skills;
+  const [openCat, setOpenCat] = useState(0);
+  const setSk = (patch: Partial<typeof sk>) => updateSite(d => ({ ...d, skills: { ...d.skills, ...patch } }));
+  const setCats = (categories: SkillCategory[]) => setSk({ categories });
+  const setCat = (i: number, patch: Partial<SkillCategory>) => setCats(sk.categories.map((c, j) => j === i ? { ...c, ...patch } : c));
+  const setItem = (ci: number, ii: number, patch: Partial<SkillItem>) => setCat(ci, { items: sk.categories[ci].items.map((x, j) => j === ii ? { ...x, ...patch } : x) });
+  const total = sk.categories.reduce((n, c) => n + c.items.length, 0);
+  return (
+    <section className="card stack" aria-labelledby="about-skills-h" style={{ marginTop: 'var(--sp-5)' }}>
+      <div className="row between"><h3 id="about-skills-h">Skills</h3>
+        <Switch checked={sk.enabled} onChange={v => setSk({ enabled: v })} label="Show on the About page" /></div>
+      <p className="field-hint" style={{ margin: 0 }}>A resume-style board with one card per category. The logo tiles also float through the space beside it. {sk.categories.length} categories, {total} skills (up to 10 categories, 24 skills each).</p>
+      <div className="form-grid">
+        <Field label="Heading" hint={`${sk.title.length}/60`}><input maxLength={60} value={sk.title} onChange={e => setSk({ title: e.target.value })} placeholder="Skills" /></Field>
+        <Field label="Intro" hint={`${sk.intro.length}/200`}><input maxLength={200} value={sk.intro} onChange={e => setSk({ intro: e.target.value })} placeholder="The tools, languages and crafts behind every frame" /></Field>
+      </div>
+      {sk.categories.map((c, ci) => (
+        <div className={'skill-cat' + (openCat === ci ? ' is-open' : '')} key={ci}>
+          <div className="row skill-cat-head">
+            <button type="button" className="icon-btn sm" aria-expanded={openCat === ci} aria-label={`${openCat === ci ? 'Collapse' : 'Expand'} ${c.name || 'category'}`} onClick={() => setOpenCat(openCat === ci ? -1 : ci)}>
+              <Icon name={openCat === ci ? 'chevronDown' : 'chevronRight'} size={14} /></button>
+            <input aria-label={`Category ${ci + 1} name`} value={c.name} maxLength={40} placeholder="Category name" onChange={e => setCat(ci, { name: e.target.value })} style={{ flex: 1, minWidth: 120 }} />
+            <select aria-label={`Category ${ci + 1} icon`} value={c.icon} onChange={e => setCat(ci, { icon: e.target.value })} style={{ width: 'auto' }}>
+              {SKILL_ICONS.map(k => <option key={k} value={k}>{ICON_LABEL[k]} icon</option>)}
+            </select>
+            <span className="faint num" style={{ fontSize: 12 }}>{c.items.length}</span>
+            <button type="button" className="icon-btn sm" title="Move up" aria-label="Move category up" disabled={ci === 0} onClick={() => { setCats(moveIn(sk.categories, ci, -1)); setOpenCat(ci - 1); }}>↑</button>
+            <button type="button" className="icon-btn sm" title="Move down" aria-label="Move category down" disabled={ci === sk.categories.length - 1} onClick={() => { setCats(moveIn(sk.categories, ci, 1)); setOpenCat(ci + 1); }}>↓</button>
+            <button type="button" className="icon-btn sm" title="Remove category" aria-label={`Remove ${c.name || 'category'}`} onClick={() => { setCats(sk.categories.filter((_, j) => j !== ci)); setOpenCat(-1); }}><Icon name="trash" size={14} /></button>
+          </div>
+          {openCat === ci && <div className="stack" style={{ gap: 8 }}>
+            {c.items.map((x, ii) => (
+              <div className="skill-row" key={ii}>
+                <span className="skill-tile" style={{ background: x.color || '#3A3340', color: inkOn(x.color || '#3A3340') }} aria-hidden="true">{skillCode(x)}</span>
+                <input aria-label="Skill name" value={x.name} maxLength={40} placeholder="Skill" onChange={e => setItem(ci, ii, { name: e.target.value })} className="sr-name" />
+                <input aria-label="Logo letters" value={x.code} maxLength={3} placeholder={skillCode({ ...x, code: '' })} onChange={e => setItem(ci, ii, { code: e.target.value })} className="sr-code mono" title="1 to 3 letters on the logo tile (blank uses the initials)" />
+                <input aria-label="Logo colour" type="color" value={/^#[0-9a-f]{6}$/i.test(x.color) ? x.color : '#3A3340'} onChange={e => setItem(ci, ii, { color: e.target.value.toUpperCase() })} className="sr-color" title="Logo tile colour" />
+                <select aria-label="Level" value={x.level} onChange={e => setItem(ci, ii, { level: Number(e.target.value) })} className="sr-level">
+                  {SKILL_LEVELS.map((l, n) => <option key={n} value={n}>{n ? `${n} · ${l}` : l}</option>)}
+                </select>
+                <input aria-label="Note" value={x.note} maxLength={140} placeholder="One line about how you use it (optional)" onChange={e => setItem(ci, ii, { note: e.target.value })} className="sr-note" />
+                <span className="row sr-actions" style={{ gap: 2 }}>
+                  <button type="button" className="icon-btn sm" title="Move up" aria-label="Move skill up" disabled={ii === 0} onClick={() => setCat(ci, { items: moveIn(c.items, ii, -1) })}>↑</button>
+                  <button type="button" className="icon-btn sm" title="Move down" aria-label="Move skill down" disabled={ii === c.items.length - 1} onClick={() => setCat(ci, { items: moveIn(c.items, ii, 1) })}>↓</button>
+                  <button type="button" className="icon-btn sm" title="Remove" aria-label={`Remove ${x.name || 'skill'}`} onClick={() => setCat(ci, { items: c.items.filter((_, j) => j !== ii) })}><Icon name="trash" size={14} /></button>
+                </span>
+              </div>
+            ))}
+            <div><button type="button" className="btn sm" disabled={c.items.length >= 24} onClick={() => setCat(ci, { items: [...c.items, { name: '', code: '', color: '#FF9438', level: 3, note: '' }] })}><Icon name="plus" /> Add a skill</button></div>
+          </div>}
+        </div>
+      ))}
+      <div><button type="button" className="btn sm" disabled={sk.categories.length >= 10} onClick={() => { setCats([...sk.categories, { name: '', icon: 'star', items: [] }]); setOpenCat(sk.categories.length); }}><Icon name="plus" /> Add a category</button></div>
     </section>
   );
 }

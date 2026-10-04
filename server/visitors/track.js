@@ -33,20 +33,36 @@ export async function visit(ctx){
   let body;
   try { body = JSON.parse((await ctx.request.text()).slice(0, 4096)); } catch { throw new HttpError(400, 'Bad request.'); }
   const t = body.t, sid = body.s, vid = body.v;
-  if (!['view', 'ping', 'leave'].includes(t) || !ID.test(sid || '') || !ID.test(vid || '')) throw new HttpError(400, 'Bad request.');
+  if (!['view', 'ping', 'leave', 'location'].includes(t) || !ID.test(sid || '') || !ID.test(vid || '')) throw new HttpError(400, 'Bad request.');
   await rateLimit(`visit:${ctx.ip}`, 300, 10 * 60);
   const db = await getDb();
+  if (t === 'location'){
+    const lat = Number(body.lat), lon = Number(body.lon), accuracy = Number(body.accuracy);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lon) || lon < -180 || lon > 180 ||
+      !Number.isFinite(accuracy) || accuracy < 1 || accuracy > 100000) throw new HttpError(400, 'Bad location data.');
+    // Store only a single consented fix, rounded to roughly 100 m, with no precise coordinates or accuracy.
+    // Replace the current visit's IP estimate only when the reported fix is at least as reliable.
+    const latest = await db.maybeOne('select id from visits where session_id = $1 and visitor_id = $2 order by visited_at desc limit 1', [sid, vid]);
+    if (latest){
+      const roundedLat = Math.round(lat * 1000) / 1000, roundedLon = Math.round(lon * 1000) / 1000;
+      if (accuracy <= 1000) await db.query(`update visits set latitude = $2, longitude = $3, location_accuracy = $4, location_source = 'browser-consent'
+        where id = $1 and (location_source is null or location_source <> 'browser-consent')`, [latest.id, roundedLat, roundedLon, Math.max(100, Math.round(accuracy / 100) * 100)]);
+    }
+    return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
+  }
   if (t === 'view'){
     const ua = clip(ctx.request.headers.get('user-agent') || '', 400);
     const path = clip(body.p, 300).startsWith('/') ? clip(body.p, 300) : '/';
     const geo = await locate(ctx.ip, ctx.geo).catch(() => null);
     const u = parseUA(ua);
     await db.query(`insert into visits (session_id, visitor_id, is_new, path, referrer, ip, country, region, city, timezone, language,
-        device_type, device_vendor, device_model, os, os_version, browser, browser_version, screen_w, screen_h, is_bot, user_agent)
-      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
+        device_type, device_vendor, device_model, os, os_version, browser, browser_version, screen_w, screen_h, is_bot, user_agent,
+        postal, latitude, longitude, isp, continent)
+      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)`,
       [sid, vid, body.n === true, path, cleanReferrer(clip(body.r, 500), new URL(ctx.request.url).origin), ctx.ip, geo?.country || null, geo?.region || null, geo?.city || null,
         geo?.timezone || clip(body.z, 60) || null, clip(body.l, 20) || null, u.device_type, u.device_vendor, u.device_model, u.os, u.os_version, u.browser, u.browser_version,
-        int(body.w, 20000), int(body.h, 20000), BOT.test(ua) || !ua, ua]);
+        int(body.w, 20000), int(body.h, 20000), BOT.test(ua) || !ua, ua,
+        clip(geo?.postal, 20) || null, geo?.latitude ?? null, geo?.longitude ?? null, clip(geo?.isp, 120) || null, clip(geo?.continent, 4) || null]);
   } else {
     await db.query(`update visits set last_seen_at = now(), duration_ms = max(coalesce(duration_ms, 0), $2)
       where id = (select id from visits where session_id = $1 order by visited_at desc limit 1)`, [sid, int(body.d, 24 * 3600e3) || 0]);
@@ -60,6 +76,7 @@ onDaily('visitRetention', async () => {
   const { retentionDays } = await getSetting('visitors');
   const removed = retentionDays > 0 ? (await db.query(`delete from visits where visited_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-' || $1 || ' days') returning 1`, [retentionDays])).length : 0;
   await db.query(`delete from ip_geo_cache where looked_up_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-30 days')`);
+  await db.query(`update visits set latitude = null, longitude = null, location_accuracy = null, location_source = null where location_source = 'browser-consent' and visited_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-7 days')`);
   return { removed };
 });
 

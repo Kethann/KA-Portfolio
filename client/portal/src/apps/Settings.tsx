@@ -108,7 +108,7 @@ function Security(){
 
     <Section title="Signed-in devices" desc="Sessions end after 2 hours without activity, and always after 12 hours.">
       {!sess.data ? <SkeletonRows rows={3} /> : <ul className="list">{sess.data.sessions.map(x => (
-        <li key={x.id}><Icon name={/Mobile|Android|iPhone/i.test(x.user_agent || '') ? 'messages' : 'grid'} /><span className="grow truncate">{uaLabel(x.user_agent)} <span className="faint mono">· {x.ip || '—'}</span></span>
+        <li key={x.id}><Icon name={/mobile|tablet/i.test(x.device || '') ? 'messages' : 'grid'} /><span className="grow truncate"><b>{x.device || uaLabel(x.user_agent)}</b> <span className="faint">{[x.system, x.browser].filter(Boolean).join(' · ')}</span><span className="faint mono"> · {x.ip || '—'}</span></span>
           {x.current ? <Badge tone="accent">this device</Badge> : <span className="faint" style={{ fontSize: 12 }}>active {ago(x.last_seen_at)}</span>}
           {!x.current && <AsyncButton className="btn sm ghost" onClick={async () => { await del(`/sessions/${x.id}`); sess.reload(); toast.show('Signed out that device', { tone: 'success' }); }}>Sign out</AsyncButton>}</li>
       ))}</ul>}
@@ -140,6 +140,11 @@ function StoreSettings(){
     <Section title="Store">
       <Switch checked={v.enabled} onChange={x => set('enabled', x)} label="Store open (turn off to pause all new checkouts)" />
       <Switch checked={v.allowCouponStacking} onChange={x => set('allowCouponStacking', x)} label="Allow more than one discount code per order" />
+      <Switch checked={v.showRatings !== false} onChange={x => set('showRatings', x)} label="Show star ratings and reviews in the store (only buyers can rate)" />
+      <Switch checked={v.showDownloads !== false} onChange={x => set('showDownloads', x)} label="Show how many times each item was downloaded" />
+      <Switch checked={v.international !== false} onChange={x => set('international', x)} label="Accept international payments (buyers outside India pay in USD with an international card)" />
+      {v.international !== false && <p className="field-hint" style={{ margin: 0 }}>Razorpay only charges foreign cards once <b>International payments</b> is activated on your Razorpay account (Dashboard → Account &amp; Settings). Give every paid item a USD price too.</p>}
+      {v.international === false && <p className="field-hint" style={{ margin: 0 }}>Everyone sees and pays prices in ₹ INR. Free downloads still work worldwide.</p>}
       <Field label={`Unpaid orders expire after ${v.orderExpiryMinutes} minutes`}><input type="range" min={10} max={120} step={5} value={v.orderExpiryMinutes} onChange={e => set('orderExpiryMinutes', Number(e.target.value))} /></Field>
     </Section>
     <Section title="Tax (GST)" desc="Check with your accountant before charging tax. Rates apply to the price after discounts.">
@@ -239,11 +244,18 @@ function Categories(){
       </div>
       {(['artifacts', 'artzz', 'tips'] as const).map(kind => {
         const list = s.data!.categories.filter(c => c.kind === kind);
+        const reorder = async (i: number, dir: -1 | 1) => {
+          const to = i + dir; if (to < 0 || to >= list.length) return;
+          const ids = list.map(x => x.id); [ids[i], ids[to]] = [ids[to], ids[i]];
+          try { s.setData(await post('/categories/reorder', { kind, ids })); } catch (err) { toast.error(err); }
+        };
         return <div key={kind}><div className="eyebrow" style={{ margin: '8px 0 4px' }}>{kind}</div>
           {!list.length ? <p className="faint">None yet.</p> : <ul className="list">{list.map(c => (
             <li key={c.id}>{edit?.id === c.id
               ? <input autoFocus aria-label="Rename category" value={edit.name} onChange={e => setEdit({ ...edit, name: e.target.value })} onKeyDown={async e => { if (e.key === 'Enter'){ try { s.setData(await put(`/categories/${c.id}`, { name: edit.name, kind: c.kind })); setEdit(null); } catch (err){ toast.error(err); } } if (e.key === 'Escape') setEdit(null); }} style={{ flex: 1 }} />
               : <span className="grow">{c.name} <span className="faint">· {c.used} item{c.used === 1 ? '' : 's'}</span></span>}
+              <button type="button" className="icon-btn sm" aria-label={`Move ${c.name} up`} disabled={list.indexOf(c) === 0} onClick={() => void reorder(list.indexOf(c), -1)}>↑</button>
+              <button type="button" className="icon-btn sm" aria-label={`Move ${c.name} down`} disabled={list.indexOf(c) === list.length - 1} onClick={() => void reorder(list.indexOf(c), 1)}>↓</button>
               <button type="button" className="btn sm ghost" onClick={() => setEdit({ id: c.id, name: c.name })}>Rename</button>
               <AsyncButton className="icon-btn sm" title="Delete" onClick={async () => { if (await confirm({ title: `Delete “${c.name}”?`, body: c.used ? `${c.used} item(s) will become uncategorised.` : undefined, confirm: 'Delete', danger: true })) s.setData(await del(`/categories/${c.id}`)); }}><Icon name="trash" size={13} /></AsyncButton></li>
           ))}</ul>}</div>;

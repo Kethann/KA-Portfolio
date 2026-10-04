@@ -85,6 +85,7 @@ export default function Checkout({ request, onClose }: { request: Req; onClose()
 const STATUS_LINES: Record<string, string[]> = {
   creating: ['Creating your order…', 'Locking in your price…'],
   paying: ['Complete the payment in the secure window', 'Cards, UPI, net banking and wallets are accepted'],
+  payingUSD: ['Complete the payment in the secure window', 'International Visa, Mastercard and Amex cards are accepted'],
   confirming: ['Contacting Razorpay…', 'Securing payment…', 'Preparing your download…']
 };
 
@@ -245,7 +246,8 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
 
   const step = stepOf(s.phase);
   const amount = s.success ? s.success.total : quote?.total ?? 0;
-  const lines = STATUS_LINES[s.phase];
+  const lines = STATUS_LINES[s.phase === 'paying' && (quote?.currency || currency) === 'USD' ? 'payingUSD' : s.phase];
+  const usd = (quote?.currency || currency) === 'USD';
   return <div className={`kco kas-modal-card ${stage ? 'is-stage' : ''}`} data-phase={s.phase}>
     <header className="kco-head">
       <ol className="kco-steps" style={{ ['--step' as string]: step } as React.CSSProperties} aria-label="Checkout progress">
@@ -326,7 +328,9 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
             <li><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>Instant download</li>
           </ul>
         </div>
-        <p className="kas-co-fine">Pay by card, UPI, net banking or wallet in Razorpay’s secure window. By continuing you agree to the <a href="/legal/terms" target="_blank" rel="noopener">Terms</a>, <a href="/legal/refunds" target="_blank" rel="noopener">Refund policy</a> and the item’s license.</p>
+        <p className="kas-co-fine">{usd
+          ? <>Pay with an international card in Razorpay’s secure window. You’re charged in US dollars; your bank may add a foreign-transaction fee.</>
+          : <>Pay by card, UPI, net banking or wallet in Razorpay’s secure window.</>} By continuing you agree to the <a href="/legal/terms" target="_blank" rel="noopener">Terms</a>, <a href="/legal/refunds" target="_blank" rel="noopener">Refund policy</a> and the item’s license.</p>
       </form>}
     </div>
     {demo && s.phase === 'paying' && s.order?.demo && quote &&
