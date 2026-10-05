@@ -1,6 +1,6 @@
 # Run the whole site (homepage, store, portal, API) as one container: the same code the Cloudflare Worker runs,
 # on the Node host adapter (server/platform/node-dev.js) with a SQLite file and local file storage under /data.
-# Production for kethan.pages.dev stays on Cloudflare (docs/CLOUDFLARE.md); use this for self-hosting, a VPS,
+# Production for kethan.pages.dev stays on Cloudflare (docs/operations/CLOUDFLARE.md); use this for self-hosting, a VPS,
 # or to run an exact copy of the site on any machine with Docker.
 #   docker build -t ka-site .
 #   docker run -p 8787:8787 -v ka-data:/data --env-file .env ka-site      (or: docker compose up --build)

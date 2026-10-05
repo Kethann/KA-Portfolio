@@ -1474,6 +1474,75 @@ html.ka-modal-open{ overflow:hidden; }
 .about-block{ margin-top:72px; }
 .about-block .gallery-head{ margin-bottom:28px; }
 
+/* ---- About: journey since 2021 ---- */
+.about-journey{ margin:0 0 34px; max-width:min(100%, 940px); }
+.journey-since{ display:inline-flex; align-items:baseline; gap:10px; padding:8px 18px 8px 16px; border-radius:999px;
+  border:1px solid rgba(255,148,56,.38); background:linear-gradient(135deg, rgba(255,148,56,.16), rgba(255,148,56,.03));
+  font-family:var(--font-mono, monospace); font-size:11px; letter-spacing:.24em; color:#ffd9b8;
+  box-shadow:0 0 0 1px rgba(255,255,255,.03) inset, 0 8px 28px -12px rgba(255,148,56,.45); }
+.journey-since b{ font-size:20px; letter-spacing:.06em; font-weight:700; color:#fff; }
+.journey-line{ list-style:none; margin:26px 0 0; padding:0; display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); position:relative; }
+.journey-line::before, .journey-line::after{ content:""; position:absolute; top:5px; left:5px; right:0; height:2px; border-radius:2px; }
+.journey-line::before{ background:rgba(255,255,255,.12); }
+.journey-line::after{ background:linear-gradient(90deg, #ff9438, #ff7a3d 45%, #d6a4ff); transform:scaleX(0); transform-origin:left; transition:transform 1.8s var(--ease-standard) .15s; }
+.about-journey.in .journey-line::after{ transform:scaleX(1); }
+.journey-line li{ position:relative; padding:24px 12px 0 0; }
+.journey-line li::before{ content:""; position:absolute; top:0; left:0; width:12px; height:12px; border-radius:50%; background:var(--ground, #050506);
+  border:2px solid var(--amber); box-shadow:0 0 0 0 rgba(255,148,56,.5); transform:scale(0);
+  transition:transform .5s var(--ease-snappy) calc(.25s + var(--i) * .28s), box-shadow .9s ease calc(.4s + var(--i) * .28s); }
+.about-journey.in .journey-line li::before{ transform:scale(1); box-shadow:0 0 14px 2px rgba(255,148,56,.45); }
+.journey-line li:last-child::before{ background:var(--amber); }
+.journey-line strong{ display:block; font-size:.92rem; font-weight:600; color:var(--ink); letter-spacing:-.005em; margin-bottom:3px; opacity:0; transform:translateY(8px);
+  transition:opacity .6s ease calc(.35s + var(--i) * .28s), transform .6s var(--ease-standard) calc(.35s + var(--i) * .28s); }
+.journey-line span{ display:block; font-size:.78rem; line-height:1.45; color:var(--ink-dim); opacity:0; transition:opacity .6s ease calc(.45s + var(--i) * .28s); }
+.about-journey.in .journey-line strong{ opacity:1; transform:none; }
+.about-journey.in .journey-line span{ opacity:1; }
+@media (max-width:600px){
+  .journey-line{ grid-template-columns:1fr; }
+  .journey-line::before, .journey-line::after{ top:6px; bottom:12px; left:5px; right:auto; width:2px; height:auto; }
+  .journey-line::after{ transform:scaleY(0); transform-origin:top; }
+  .about-journey.in .journey-line::after{ transform:scaleY(1); }
+  .journey-line li{ padding:0 0 18px 28px; }
+  .journey-line li::before{ top:3px; }
+}
+@media (prefers-reduced-motion: reduce){
+  .journey-line::after, .journey-line li::before, .journey-line strong, .journey-line span{ transition:none; }
+}
+
+/* ---- About: In Motion (a stack of random YouTube clips) ---- */
+.reel-stage{ width:min(100%, 700px); padding:min(15%, 90px) min(7%, 48px) 0 0; }
+.reel{ position:relative; aspect-ratio:16/9; width:100%; }
+.reel-card{ position:absolute; inset:0; display:block; border-radius:18px; overflow:hidden; background:#120f16; border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 22px 50px -18px rgba(0,0,0,.75); transition:transform .85s var(--ease-standard), opacity .6s ease, filter .6s ease; will-change:transform; }
+.reel-card img{ width:100%; height:100%; object-fit:cover; display:block; }
+.reel-card[data-pos="0"]{ z-index:3; transform:none; }
+.reel-card[data-pos="1"]{ z-index:2; transform:translate3d(5.5%, -9%, 0) scale(.94) rotate(2deg); filter:brightness(.62) saturate(.9); }
+.reel-card[data-pos="2"]{ z-index:1; transform:translate3d(11%, -17%, 0) scale(.88) rotate(4deg); filter:brightness(.42) saturate(.8); }
+.reel-card:focus-visible{ outline:2px solid var(--amber); outline-offset:3px; }
+.reel-player{ position:absolute; inset:0; z-index:4; border-radius:18px; overflow:hidden; pointer-events:none; opacity:0; transition:opacity .5s ease; background:#000; }
+.reel[data-state="live"] .reel-player{ opacity:1; }
+.reel-player iframe{ position:absolute; left:50%; top:50%; width:100%; height:100%; transform:translate(-50%,-50%) scale(1.2); border:0; pointer-events:none; }
+.reel-hud{ position:absolute; left:0; right:0; bottom:0; z-index:5; padding:34px 16px 16px; border-radius:0 0 18px 18px; pointer-events:none;
+  background:linear-gradient(to top, rgba(5,5,6,.82), rgba(5,5,6,0)); display:flex; align-items:center; gap:10px; }
+.reel-live{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-mono, monospace); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:#ffd9b8; }
+.reel-live i{ width:7px; height:7px; border-radius:50%; background:var(--amber); box-shadow:0 0 10px var(--amber); animation:vcPulse 1.6s ease-in-out infinite; }
+.reel-title{ flex:1 1 auto; min-width:0; font-size:.82rem; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.reel-bar{ position:absolute; left:16px; right:16px; bottom:8px; height:2px; border-radius:2px; background:rgba(255,255,255,.16); overflow:hidden; }
+.reel-bar i{ display:block; height:100%; width:0; background:linear-gradient(90deg, #ff9438, #d6a4ff); }
+.reel-channel{ display:inline-block; margin-top:22px; font-family:var(--font-mono, monospace); font-size:11px; letter-spacing:.16em; color:#ffd9b8; text-decoration:none; text-transform:uppercase; }
+.reel-channel:hover, .reel-channel:focus-visible{ color:#fff; }
+.reel[data-state="static"] .reel-hud, .reel[data-state="idle"] .reel-hud{ display:none; }
+@media (max-width:600px){
+  .reel-stage{ padding:min(14%, 60px) 6% 0 0; }
+  .reel-card[data-pos="1"]{ transform:translate3d(4.5%, -8%, 0) scale(.94) rotate(1.6deg); }
+  .reel-card[data-pos="2"]{ transform:translate3d(9%, -15%, 0) scale(.88) rotate(3.2deg); }
+  .reel-title{ display:none; }
+}
+@media (prefers-reduced-motion: reduce){
+  .reel-card, .reel-player{ transition:none; }
+  .reel-live i{ animation:none; }
+}
+
 /* ---- skills: resume board (left) + floating logo field (right) ---- */
 #about-skills-block[hidden], .skills-filter[hidden], #skills-intro[hidden]{ display:none; }
 .skills-meta{ margin:-14px 0 22px; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-dim); }
@@ -1545,8 +1614,13 @@ html.ka-modal-open{ overflow:hidden; }
 .skills-board.is-in .skill-card{ opacity:1; transform:none; transition:opacity .6s var(--ease-standard), transform .6s var(--ease-standard); transition-delay:calc(var(--d, 0) * 70ms); }
 
 /* the floating logo field: tiles come forward out of a deep blur, sharpen, then blur past the viewer */
-.skills-field{ --fh:min(580px, 74vh); position:sticky; top:max(84px, calc((100vh - var(--fh)) / 2)); height:var(--fh); border-radius:28px; overflow:hidden; isolation:isolate; contain:layout paint;
-  -webkit-mask-image:radial-gradient(closest-side, #000 62%, transparent); mask-image:radial-gradient(closest-side, #000 62%, transparent); }
+#about-skills-block{ position:relative; }
+#about-skills-block > .gallery-head, #about-skills-block > .skills-meta, .skills-layout{ position:relative; z-index:1; }
+/* the free field: the whole skills block is the canvas. Logos pop up anywhere in it (never clipped, never in a fixed lane) */
+.skills-free{ position:absolute; inset:0; z-index:0; pointer-events:none; isolation:isolate; }
+.skills-free.is-spot .skill-float .skill-logo{ opacity:.22; filter:blur(3px); }
+/* the stage for the spotlight (the hovered / focused / tapped skill comes forward here) */
+.skills-field{ --fh:min(580px, 74vh); position:sticky; top:max(84px, calc((100vh - var(--fh)) / 2)); height:var(--fh); isolation:isolate; pointer-events:none; }
 .skills-field::before{ content:""; position:absolute; inset:8%; border-radius:50%; z-index:-1;
   background:radial-gradient(circle at 50% 50%, rgba(255,148,56,.16), rgba(255,68,68,.05) 45%, transparent 70%); }
 .skill-float{ position:absolute; left:0; top:0; pointer-events:none; will-change:transform, filter, opacity; transition:opacity .4s ease; }
@@ -1560,7 +1634,7 @@ html.ka-modal-open{ overflow:hidden; }
 .skill-spot-name{ font-family:var(--font-heading), ui-serif, Georgia, serif; font-size:24px; color:var(--ink); }
 .skill-spot-note{ max-width:210px; font-size:12.5px; line-height:1.4; color:var(--ink-dim); }
 .skill-spot-level{ font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:#ffc795; }
-.skills-field.is-static .skill-float{ will-change:auto; }
+.skills-free.is-static .skill-float{ will-change:auto; }
 .skill-logo.is-mark{ background:radial-gradient(120% 90% at 30% 10%, rgba(255,255,255,.1), transparent 55%), #17130f;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 0 1px rgba(255,255,255,.07), 0 6px 18px -8px var(--c); }
 .skill-logo.is-mark svg{ width:56%; height:56%; display:block; }
@@ -1568,18 +1642,6 @@ html.ka-modal-open{ overflow:hidden; }
 .skill-logo.is-tile .t{ font-size:1.5em; font-weight:700; letter-spacing:-.03em; line-height:1; }
 .skill-logo.has-img{ background:radial-gradient(120% 90% at 30% 15%, rgba(255,255,255,.18), transparent 55%), #15110f; padding:14%; box-sizing:border-box; }
 .skill-logo.has-img img{ width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; }
-/* the far layer: big tiles out of focus, drifting slowly behind everything (the deep end of the field) */
-.skill-far{ position:absolute; left:var(--x); top:var(--y); z-index:-1; pointer-events:none; opacity:0; filter:blur(var(--b, 16px)); will-change:transform, opacity;
-  animation:skillFar var(--dur, 32s) linear var(--delay, 0s) infinite; }
-.skill-far .skill-logo{ width:var(--s, 120px); height:var(--s, 120px); border-radius:calc(var(--s, 120px) * .27); font-size:calc(var(--s, 120px) * .32); }
-@keyframes skillFar{
-  0%{ opacity:0; transform:translate(-50%, -50%) translate3d(0, 50px, 0) scale(.85); }
-  18%, 82%{ opacity:.42; }
-  100%{ opacity:0; transform:translate(-50%, -50%) translate3d(var(--dx, 60px), -70px, 0) scale(1.12); }
-}
-.skill-far .skill-logo{ transition:opacity .45s ease; }
-.skills-field.is-spot .skill-far .skill-logo{ opacity:.4; }
-@media (max-width:900px){ .skill-far{ --b:12px; } }
 
 /* grid items default to min-width:auto, which would let a long row (the chips on phones) widen the whole column */
 .skills-main{ min-width:0; }
@@ -1655,7 +1717,17 @@ html.ka-modal-open{ overflow:hidden; }
     <div class="about-bio">
       <h1 class="about-headline" id="about-headline">Kethan Artzz — Visual Storyteller for the Big Screen</h1>
       <p class="about-caption">IMAGINE &middot; CREATE &middot; EVOLVE</p>
-      <p class="about-bio-text" id="about-bio-text">I'm a graphic designer based in India, specializing in movie poster and publicity campaign design. My work has shaped the visual identity for major theatrical releases — from Salaar and Devara to WAR 2, Kuravaali, and campaigns spanning both Indian and Hollywood cinema. Since 2019, I've been crafting key art that doesn't just advertise a film — it captures its emotional core in a single frame. Every poster is a puzzle: balancing star power, mood, typography, and story into something that stops people mid-scroll. Available for freelance and full-time collaborations — always looking for the next story worth telling visually.</p>
+      <div class="about-journey" id="about-journey" aria-label="My journey since 2021">
+        <span class="journey-since"><span>SINCE</span><b>2021</b></span>
+        <ol class="journey-line">
+          <li style="--i:0"><strong>Graphic design</strong><span>Movie posters &amp; publicity campaigns</span></li>
+          <li style="--i:1"><strong>UI / UX design</strong><span>Interfaces, flows &amp; design systems</span></li>
+          <li style="--i:2"><strong>Full-stack &amp; apps</strong><span>Web and application development, APIs</span></li>
+          <li style="--i:3"><strong>Robotics &amp; AI</strong><span>ROS, Arduino, sensors, vision models</span></li>
+          <li style="--i:4"><strong>Now</strong><span>Creativity and engineering, built together</span></li>
+        </ol>
+      </div>
+      <p class="about-bio-text" id="about-bio-text">I'm Kethan, a designer who engineers and an engineer who designs, based in India. Since 2021 I've worked where creativity meets code: movie poster and publicity campaign design for major theatrical releases, from Salaar and Devara to WAR 2 and Kuravaali, across Indian and Hollywood cinema, alongside UI/UX design and full-stack web and application development. With a technical engineering background, I also build on the robotics side, with ROS, Arduino Nano, sensor integrations and vision-based navigation models. Every poster is a puzzle of star power, mood, typography and story; every product is a puzzle of flow, performance and detail. I blend both, so what I make looks striking and runs smoothly. Available for freelance and full-time collaborations, always looking for the next story worth telling, visually and technically.</p>
     </div>
 
     <!-- About numbers (Projects, Delivered, ...): filled from the portal (Content > Site text), count up when seen -->
@@ -1664,6 +1736,7 @@ html.ka-modal-open{ overflow:hidden; }
     <!-- Skills: filled by renderSkills() from the site document (portal: Content > Site text > Skills).
          The defaults below in DEFAULT_SKILLS are the first paint, before /api/portfolio answers. -->
     <div class="about-block" id="about-skills-block">
+      <div class="skills-free" id="skills-free" aria-hidden="true"></div>
       <div class="gallery-head">
         <h2 id="skills-title">Skills</h2>
         <p id="skills-intro">The tools, languages and crafts behind every frame and every build</p>
@@ -1685,6 +1758,27 @@ html.ka-modal-open{ overflow:hidden; }
       </div>
       <div class="about-work-strip" id="about-work-strip" hidden></div>
       <div id="about-work-stacks"></div>
+    </div>
+
+    <div class="about-block" id="about-reel-block">
+      <div class="gallery-head">
+        <h2>In Motion</h2>
+        <p>Random cuts from my YouTube channel: short clips, never the full videos</p>
+      </div>
+      <div class="reel-stage">
+        <div class="reel" id="about-reel" data-state="idle">
+          <a class="reel-card" data-id="rgxPPGUK5Fc" data-pos="0" href="https://www.youtube.com/watch?v=rgxPPGUK5Fc" target="_blank" rel="noopener noreferrer" aria-label="Watch the full video on YouTube: Shyam Singha Roy, Sirivennela"><img src="https://i.ytimg.com/vi/rgxPPGUK5Fc/hqdefault.jpg" alt="" loading="lazy" decoding="async"></a>
+          <a class="reel-card" data-id="F_O7xqGm-Ug" data-pos="1" href="https://www.youtube.com/watch?v=F_O7xqGm-Ug" target="_blank" rel="noopener noreferrer" aria-label="Watch the full video on YouTube: Rudhira Haara, Bagheera"><img src="https://i.ytimg.com/vi/F_O7xqGm-Ug/hqdefault.jpg" alt="" loading="lazy" decoding="async"></a>
+          <a class="reel-card" data-id="N1g7TeYWdM0" data-pos="2" href="https://www.youtube.com/watch?v=N1g7TeYWdM0" target="_blank" rel="noopener noreferrer" aria-label="Watch the full video on YouTube: Shyam Singha Roy, Nani, Sai Pallavi"><img src="https://i.ytimg.com/vi/N1g7TeYWdM0/hqdefault.jpg" alt="" loading="lazy" decoding="async"></a>
+          <div class="reel-player" aria-hidden="true"><div id="reel-yt"></div></div>
+          <div class="reel-hud">
+            <span class="reel-live" aria-hidden="true"><i></i>Clip</span>
+            <span class="reel-title" id="reel-title"></span>
+            <span class="reel-bar" aria-hidden="true"><i id="reel-bar"></i></span>
+          </div>
+        </div>
+        <a class="reel-channel" href="https://www.youtube.com/@KethanArtzz" target="_blank" rel="noopener noreferrer">More on the channel @KethanArtzz <span aria-hidden="true">&rarr;</span></a>
+      </div>
     </div>
   </div>
 </section>
@@ -6375,13 +6469,9 @@ function mountCoverflow(container, posters, opts){
 }
 
 // ==================================================================== FOLDER SHELF ==
-var folderGrid = document.getElementById("folder-grid");
 var folderShelf = document.getElementById("folder-shelf");
 var portfolioCoverflowEl = document.getElementById("portfolio-coverflow");
 var favFilter = "all";
-var coverflowTeardown = null;
-var folderOpenTimer = null;
-var folderOrigin = null;
 
 function postersFor(category, favOnly){
   return POSTERS.filter(function(p){
@@ -6406,8 +6496,7 @@ function revealOnScroll(el){
 }
 
 // ---- Work panel: one image stack per category; clicking a stack opens the magnetic coverflow.
-// Rendered by the React WorkStacks component in dist/assets/gallery.js. The old folder grid + 3D folder
-// scene (openFolder / mountFolderGallery / FolderScene) are kept below but no longer used.
+// Rendered by the React WorkStacks component in dist/assets/gallery.js.
 // The same component also powers About > Featured Work (own container, own one-time entrance).
 var workPanels = [
   { id: 'work', el: portfolioCoverflowEl, handle: null, loading: false },
@@ -6438,119 +6527,6 @@ function renderWorkStacks(){
 }
 function buildFolders(){
   renderWorkStacks();
-  return;
-  folderGrid.innerHTML = "";
-  CATEGORIES.forEach(function(cat){
-    var posters = postersFor(cat, favFilter === "pinned");
-    if (favFilter === "pinned" && posters.length === 0) return;
-    var btn = document.createElement("button");
-    btn.className = "folder-card";
-    btn.type = "button";
-    btn.setAttribute("aria-label", "Open " + cat);
-    var folderCover = document.createElement('span');
-    folderCover.className = 'collection-cover';
-    folderCover.setAttribute('aria-hidden','true');
-    folderCover.innerHTML = '<span class="collection-pages">'+Array.from({length:7},function(_,i){return '<i style="--page:'+i+'"></i>';}).join('')+'</span><span class="collection-front"><span class="collection-flap"></span><span class="collection-clasp"></span><span class="collection-slot"></span></span>';
-    btn.appendChild(folderCover);
-    var label = document.createElement("div");
-    label.className = "folder-label";
-    label.innerHTML = "<h3>" + escapeHtml(cat) + "</h3><p>" + posters.length + " projects</p>";
-    btn.appendChild(label);
-
-    // ---- cast shadow + subtle cursor-tilt parallax (skipped under reduced motion) ----
-    // [v26 Task 4] checked inside the handler itself, not just once at construction time here --
-    // a card built before a mid-session prefers-reduced-motion change must still stop tilting
-    // after it, not just cards built afterward.
-    btn.addEventListener("pointermove", function(e){
-      if (reducedMotion) return;
-      var r = btn.getBoundingClientRect();
-      var nx = (e.clientX - r.left) / r.width - 0.5;
-      var ny = (e.clientY - r.top) / r.height - 0.5;
-      btn.style.transform = "rotateX(" + (ny * -6) + "deg) rotateY(" + (nx * 6) + "deg)";
-    });
-    btn.addEventListener("pointerleave", function(){ btn.style.transform = ""; });
-
-    btn.addEventListener("click", function(){ openFolder(cat, btn); });
-    folderGrid.appendChild(btn);
-    revealOnScroll(btn);
-  });
-}
-
-function mountFolderGallery(container, posters, opts){
-  opts = opts || {};
-  var disposed = false, teardown = null;
-  var loading = document.createElement('p');
-  loading.textContent = 'Opening the 3D collection…';
-  loading.setAttribute('role', 'status');
-  container.replaceChildren(loading);
-  import('./dist/assets/gallery.js').then(function(module){
-    if (disposed) return;
-    teardown = module.mount(container, {
-      initialProjects: posters,
-      initialPortfolio: window.__kaLastPortfolioData,
-      category: opts.category,
-      slugs: opts.slugs,
-      onBack: opts.onBack
-    });
-    if (!container.closest('[hidden]')) container.scrollIntoView({behavior:reducedMotion?'instant':'smooth',block:'start'});
-  }).catch(function(){
-    if (disposed) return;
-    loading.textContent = 'The 3D gallery could not load. Please refresh and try again.';
-    container.replaceChildren(loading);
-    if (opts.onBack){
-      var back = document.createElement('button');
-      back.textContent = 'All categories';
-      back.addEventListener('click', opts.onBack);
-      container.appendChild(back);
-    }
-  });
-  return function(){ disposed = true; if (teardown) teardown(); container.replaceChildren(); };
-}
-
-function openFolder(cat, folderEl){
-  if (folderOpenTimer !== null || coverflowTeardown) return;
-  folderOrigin = folderEl;
-  var posters = postersFor(cat, favFilter === "pinned");
-  var others = Array.prototype.filter.call(folderGrid.children, function(el){ return el !== folderEl; });
-
-  function afterChoreography(){
-    folderOpenTimer = null;
-    folderShelf.style.display = "none";
-    coverflowTeardown = mountFolderGallery(portfolioCoverflowEl, posters, {
-      onBack: closeFolder,
-      category: cat,
-      slugs: favFilter === "pinned" ? posters.map(function(p){ return p.slug; }) : undefined
-    });
-  }
-
-  if (reducedMotion){
-    // simple cross-dissolve, no scale/rotate choreography
-    folderShelf.style.transition = "opacity .2s ease";
-    folderShelf.style.opacity = "0";
-    folderOpenTimer = setTimeout(function(){ folderShelf.style.opacity = "1"; afterChoreography(); }, 200);
-    return;
-  }
-
-  folderEl.classList.add("opening");
-  folderEl.style.transition = "transform .4s var(--ease-standard)";
-  folderEl.style.transform = "scale(1.08) rotateX(0) rotateY(0)";
-  others.forEach(function(el){ el.classList.add("receding"); });
-  folderOpenTimer = setTimeout(afterChoreography, 420);
-}
-
-function closeFolder(){
-  clearTimeout(folderOpenTimer);
-  folderOpenTimer = null;
-  if (coverflowTeardown){ coverflowTeardown(); coverflowTeardown = null; }
-  portfolioCoverflowEl.innerHTML = "";
-  folderShelf.style.display = "";
-  folderShelf.style.opacity = "1";
-  Array.prototype.forEach.call(folderGrid.children, function(el){
-    el.classList.remove("opening", "receding");
-    el.style.transform = "";
-  });
-  if (folderOrigin && folderOrigin.isConnected) folderOrigin.focus({preventScroll:true});
-  folderOrigin = null;
 }
 
 document.getElementById("fav-chip-all").addEventListener("click", function(){
@@ -6641,8 +6617,6 @@ function navPage(name){ return name === "portfolio" ? "about" : name; }
 function pageSections(page){
   return (PAGE_SECTIONS[page] || [page]).map(function(n){ return sections[n]; }).filter(Boolean);
 }
-var galleryCoverflowEl = document.getElementById("gallery-coverflow");
-var galleryTeardown = null;
 var activeSection = "about"; // always a page name (see navPage)
 
 // ---- Bronze pill. One duration and one curve for everything that moves in the bar: the pill
@@ -6819,10 +6793,6 @@ function switchSection(name, focusTarget){
     if (el.getAttribute("data-section") === page) el.setAttribute("aria-current", "page"); else el.removeAttribute("aria-current");
   });
   movePill();
-
-  if (page === "gallery" && !galleryTeardown){
-    galleryTeardown = mountFolderGallery(galleryCoverflowEl, POSTERS, {});
-  }
 
   showing.forEach(function(section){ section.classList.add("fading-out"); });
   sectionSwitching = true; pendingScroll = { el:scrollTarget, focus:focusTarget };
@@ -7133,9 +7103,134 @@ window.addEventListener("ka-sequence-complete", function(){
 
   // [Part B] scroll-triggered reveals -- reuses the site's existing revealOnScroll() helper
   // (see the folder-grid/coverflow cards for the same call), so timing/behavior matches site-wide.
-  ["about-skills-block", "about-work-block"].forEach(function(id){
+  ["about-skills-block", "about-work-block", "about-reel-block"].forEach(function(id){
     revealOnScroll(document.getElementById(id));
   });
+
+  // ---- About: journey line since 2021 -- draws itself the first time it scrolls into view.
+  (function(){
+    var j = document.getElementById("about-journey");
+    if (!j) return;
+    var calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (calm || typeof IntersectionObserver !== "function"){ j.classList.add("in"); return; }
+    var io = new IntersectionObserver(function(entries){
+      if (entries.some(function(e){ return e.isIntersecting; })){ j.classList.add("in"); io.disconnect(); }
+    }, { threshold: 0.35 });
+    io.observe(j);
+  })();
+
+  // ---- About: "In Motion" -- a stack of short, random clips from the YouTube channel.
+  // Only a few seconds of a random video play (muted, never the whole video); the stack shuffles after each clip.
+  // The YouTube player script loads only when the block is near the screen, and the clip pauses whenever the block
+  // or the tab is out of view. Reduced motion / data saver: the stack stays still and every card links to its video.
+  (function(){
+    var reel = document.getElementById("about-reel");
+    if (!reel) return;
+    var VIDEOS = {
+      rgxPPGUK5Fc: { len: 28,  title: "Shyam Singha Roy | Sirivennela" },
+      "F_O7xqGm-Ug": { len: 69,  title: "Rudhira Haara x Man of Masses NTR | Bagheera" },
+      N1g7TeYWdM0: { len: 109, title: "Shyam Singha Roy | Nani | Sai Pallavi | Sirivennela" }
+    };
+    var CLIP_MIN = 5, CLIP_MAX = 8;          // seconds of each clip
+    var cards = Array.prototype.slice.call(reel.querySelectorAll(".reel-card"));
+    var titleEl = document.getElementById("reel-title"), barEl = document.getElementById("reel-bar");
+    var calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var saver = navigator.connection && navigator.connection.saveData;
+    var order = cards.map(function(c){ return c.getAttribute("data-id"); });   // order[0] is the front card
+    var player = null, ready = false, wanted = false, apiAsked = false, timer = 0, failed = false, curEnd = 0;
+
+    function shuffle(a){ for (var i = a.length - 1; i > 0; i--){ var k = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[k]; a[k] = t; } return a; }
+    function place(){
+      order.forEach(function(id, i){
+        var c = reel.querySelector('.reel-card[data-id="' + id + '"]');
+        if (c) c.setAttribute("data-pos", String(i));
+      });
+      if (titleEl) titleEl.textContent = VIDEOS[order[0]].title;
+    }
+    shuffle(order); place();
+    if (calm || saver){ reel.setAttribute("data-state", "static"); return; }
+
+    function setState(s){ reel.setAttribute("data-state", s); }
+    function clipFor(id){
+      var len = VIDEOS[id].len, span = Math.min(CLIP_MAX, Math.max(CLIP_MIN, Math.round(CLIP_MIN + Math.random() * (CLIP_MAX - CLIP_MIN))));
+      if (len <= span + 2) return { start: 0, end: len, ms: len * 1000 };
+      var start = Math.floor(Math.random() * (len - span - 1));
+      return { start: start, end: start + span, ms: span * 1000 };
+    }
+    function runBar(ms){
+      if (!barEl) return;
+      barEl.style.transition = "none"; barEl.style.width = "0";
+      void barEl.offsetWidth;
+      barEl.style.transition = "width " + ms + "ms linear"; barEl.style.width = "100%";
+    }
+    function playFront(){
+      if (!ready || !wanted || failed) return;
+      var id = order[0], c = clipFor(id);
+      curEnd = c.end;
+      clearTimeout(timer);
+      setState("loading");
+      try { player.loadVideoById({ videoId: id, startSeconds: c.start, endSeconds: c.end }); player.mute(); }
+      catch (e){ fail(); return; }
+      timer = setTimeout(advance, c.ms + 2500);   // safety net if the player never reports the end
+    }
+    function advance(){
+      if (!wanted || failed) return;
+      clearTimeout(timer);
+      setState("loading");
+      var prev = order[0];
+      order.push(order.shift());                    // front card goes to the back of the stack
+      if (order[0] === prev || Math.random() < 0.5) order.push(order.shift());   // sometimes skip one: random, not a fixed loop
+      place();
+      timer = setTimeout(playFront, 700);           // let the stack finish moving, then start the next clip
+    }
+    function fail(){ failed = true; clearTimeout(timer); setState("static"); }
+    function pause(){ clearTimeout(timer); if (player && ready){ try { player.pauseVideo(); } catch (e){} } if (!failed) setState("idle"); }
+
+    function onState(e){
+      var S = window.YT && YT.PlayerState;
+      if (!S) return;
+      if (e.data === S.PLAYING && wanted){
+        setState("live");
+        var now = player.getCurrentTime ? player.getCurrentTime() : 0, d = Math.max(1, curEnd - now);
+        runBar(d > 1 ? d * 1000 : 4000);
+      } else if (e.data === S.ENDED && wanted){ advance(); }
+    }
+    function buildPlayer(){
+      var first = clipFor(order[0]);
+      player = new YT.Player("reel-yt", {
+        host: "https://www.youtube-nocookie.com", width: "100%", height: "100%", videoId: order[0],
+        playerVars: { autoplay: 0, mute: 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1, playsinline: 1, rel: 0, origin: location.origin, start: first.start, end: first.end },
+        events: {
+          onReady: function(){ ready = true; try { player.mute(); } catch (e){} if (wanted) playFront(); },
+          onStateChange: onState,
+          onError: fail
+        }
+      });
+    }
+    function loadApi(){
+      if (apiAsked) return; apiAsked = true;
+      if (window.YT && YT.Player){ buildPlayer(); return; }
+      var prior = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = function(){ if (typeof prior === "function") prior(); buildPlayer(); };
+      var s = document.createElement("script");
+      s.src = "https://www.youtube.com/iframe_api"; s.async = true;
+      s.onerror = fail;
+      document.head.appendChild(s);
+    }
+    function visible(){ return !document.hidden && inView; }
+    var inView = false;
+    function sync(){
+      var should = visible();
+      if (should && !wanted){ wanted = true; loadApi(); if (ready) playFront(); }
+      else if (!should && wanted){ wanted = false; pause(); }
+    }
+    if (typeof IntersectionObserver !== "function"){ setState("static"); return; }
+    new IntersectionObserver(function(entries){
+      inView = entries.some(function(e){ return e.isIntersecting; });
+      sync();
+    }, { threshold: 0.35, rootMargin: "120px 0px" }).observe(reel);
+    document.addEventListener("visibilitychange", sync);
+  })();
 
   // [Part B] subtle parallax on the two decorative glow blobs -- rAF-throttled, and the scroll
   // listener only does meaningful work while About is the visible section (cheap early-return
@@ -7159,7 +7254,7 @@ window.addEventListener("ka-sequence-complete", function(){
   // logo tiles that drift forward out of a gaussian blur, sharpen, and blur away past the viewer, one after
   // another for as long as the field is on screen. Hovering, focusing or tapping a skill brings its logo
   // forward in the field. Data: the site document's `skills` (portal: Content > Site text > Skills).
-  var DEFAULT_SKILLS = {"enabled":true,"title":"Skills","intro":"Design, motion, video and code: the tools and crafts behind every frame and every build","categories":[{"name":"Design","icon":"design","items":[{"name":"Photoshop","code":"Ps","color":"#31A8FF","level":5,"note":"Compositing and retouching every key-art layer","logoUrl":""},{"name":"Illustrator","code":"Ai","color":"#FF9A00","level":4,"note":"Vector typography and title treatments","logoUrl":""},{"name":"InDesign","code":"Id","color":"#FF3366","level":3,"note":"Press kits and print-ready layouts","logoUrl":""},{"name":"Figma","code":"Fg","color":"#A259FF","level":4,"note":"Campaign layouts and social deliverable systems","logoUrl":""}]},{"name":"Motion design","icon":"motion","items":[{"name":"After Effects","code":"Ae","color":"#9999FF","level":4,"note":"Motion posters, title animation and compositing","logoUrl":""},{"name":"Motion posters","code":"Mp","color":"#C792FF","level":4,"note":"Key art brought to life for launches","logoUrl":""},{"name":"Kinetic typography","code":"Kt","color":"#7FD4FF","level":4,"note":"Titles, credits and lyric sequences","logoUrl":""},{"name":"Lottie & web motion","code":"Lt","color":"#00DDB3","level":3,"note":"Lightweight animation for sites and apps","logoUrl":""}]},{"name":"Video","icon":"video","items":[{"name":"Premiere Pro","code":"Pr","color":"#EA77FF","level":4,"note":"Teasers, promos and social cut-downs","logoUrl":""},{"name":"Adobe Media Encoder","code":"Me","color":"#8F8FFF","level":4,"note":"Batch exports for every platform and format","logoUrl":""},{"name":"Teaser & promo edits","code":"Te","color":"#FF7A59","level":4,"note":"Pacing, music and story in seconds","logoUrl":""},{"name":"Social cut-downs","code":"Sc","color":"#FFB347","level":4,"note":"Reels, shorts and stories from one master","logoUrl":""}]},{"name":"AI & generative","icon":"ai","items":[{"name":"Adobe Firefly","code":"Ff","color":"#FF4F3F","level":4,"note":"Concept frames, textures and extensions","logoUrl":""},{"name":"Generative Fill","code":"Gf","color":"#31A8FF","level":4,"note":"Extending and repairing plates inside Photoshop","logoUrl":""},{"name":"AI-assisted upscaling","code":"Up","color":"#FFD166","level":3,"note":"Print-size masters from small sources","logoUrl":""}]},{"name":"Arts","icon":"arts","items":[{"name":"Movie posters","code":"Po","color":"#FF9438","level":5,"note":"Theatrical key art from first look to release","logoUrl":""},{"name":"Typography","code":"Ty","color":"#E8AA82","level":5,"note":"Custom title logos and lettering","logoUrl":""},{"name":"Photo manipulation","code":"Pm","color":"#FF6B4A","level":5,"note":"Blending stars, sets and effects into one frame","logoUrl":""},{"name":"Digital painting","code":"Dp","color":"#C9864F","level":4,"note":"Painted skies, light and texture passes","logoUrl":""},{"name":"Campaign design","code":"Cd","color":"#FFD9B8","level":4,"note":"One look across every format","logoUrl":""}]},{"name":"Languages","icon":"languages","items":[{"name":"JavaScript","code":"JS","color":"#F7DF1E","level":4,"note":"","logoUrl":""},{"name":"TypeScript","code":"TS","color":"#3178C6","level":4,"note":"","logoUrl":""},{"name":"Python","code":"Py","color":"#3776AB","level":3,"note":"","logoUrl":""},{"name":"HTML","code":"HT","color":"#E34F26","level":4,"note":"","logoUrl":""},{"name":"CSS","code":"CSS","color":"#1572B6","level":4,"note":"","logoUrl":""},{"name":"SQL","code":"SQL","color":"#CC8A3B","level":3,"note":"","logoUrl":""}]},{"name":"Frontend","icon":"frontend","items":[{"name":"React","code":"Re","color":"#61DAFB","level":4,"note":"Components, hooks and state","logoUrl":""},{"name":"Three.js","code":"3D","color":"#FFFFFF","level":4,"note":"WebGL scenes and shaders","logoUrl":""},{"name":"GSAP","code":"Gs","color":"#88CE02","level":4,"note":"Timeline animation","logoUrl":""},{"name":"Vite","code":"Vi","color":"#646CFF","level":4,"note":"Builds and dev tooling","logoUrl":""},{"name":"Tailwind CSS","code":"Tw","color":"#38BDF8","level":3,"note":"Utility-first styling","logoUrl":""}]},{"name":"Backend","icon":"backend","items":[{"name":"Node.js","code":"No","color":"#5FA04E","level":4,"note":"APIs, jobs and servers","logoUrl":""},{"name":"Cloudflare Workers","code":"Cf","color":"#F38020","level":3,"note":"Edge functions and R2 storage","logoUrl":""},{"name":"Vercel","code":"Vc","color":"#EDEBE8","level":3,"note":"Serverless deploys","logoUrl":""}]},{"name":"Database","icon":"database","items":[{"name":"PostgreSQL","code":"Pg","color":"#4169E1","level":3,"note":"","logoUrl":""},{"name":"SQLite","code":"Sq","color":"#0F80CC","level":3,"note":"","logoUrl":""},{"name":"Cloudflare D1","code":"D1","color":"#F38020","level":3,"note":"","logoUrl":""},{"name":"Supabase","code":"Sb","color":"#3ECF8E","level":3,"note":"","logoUrl":""},{"name":"Firebase","code":"Fb","color":"#FFCA28","level":3,"note":"","logoUrl":""}]},{"name":"APIs","icon":"apis","items":[{"name":"REST APIs","code":"API","color":"#8B8BFF","level":4,"note":"Designing and consuming JSON APIs","logoUrl":""},{"name":"Razorpay","code":"Rp","color":"#3395FF","level":4,"note":"Payments, webhooks and refunds","logoUrl":""},{"name":"AI APIs","code":"AI","color":"#D97757","level":4,"note":"Gemini and Claude assistants","logoUrl":""},{"name":"Webhooks","code":"Wh","color":"#C73A63","level":3,"note":"Signed event delivery","logoUrl":""},{"name":"Email (SMTP)","code":"@","color":"#9AA3AF","level":3,"note":"Receipts, alerts and auto-replies","logoUrl":""}]}]};
+  var DEFAULT_SKILLS = {"enabled":true,"title":"Skills","intro":"Design, motion, video and code: the tools and crafts behind every frame and every build","categories":[{"name":"Design","icon":"design","items":[{"name":"Photoshop","code":"Ps","color":"#31A8FF","level":5,"note":"Compositing and retouching every key-art layer","logoUrl":""},{"name":"Illustrator","code":"Ai","color":"#FF9A00","level":4,"note":"Vector typography and title treatments","logoUrl":""},{"name":"InDesign","code":"Id","color":"#FF3366","level":3,"note":"Press kits and print-ready layouts","logoUrl":""},{"name":"Figma","code":"Fg","color":"#A259FF","level":4,"note":"Campaign layouts and social deliverable systems","logoUrl":""}]},{"name":"Motion design","icon":"motion","items":[{"name":"After Effects","code":"Ae","color":"#9999FF","level":4,"note":"Motion posters, title animation and compositing","logoUrl":""},{"name":"Motion posters","code":"Mp","color":"#C792FF","level":4,"note":"Key art brought to life for launches","logoUrl":""},{"name":"Kinetic typography","code":"Kt","color":"#7FD4FF","level":4,"note":"Titles, credits and lyric sequences","logoUrl":""},{"name":"Lottie & web motion","code":"Lt","color":"#00DDB3","level":3,"note":"Lightweight animation for sites and apps","logoUrl":""}]},{"name":"Video","icon":"video","items":[{"name":"Premiere Pro","code":"Pr","color":"#EA77FF","level":4,"note":"Teasers, promos and social cut-downs","logoUrl":""},{"name":"Adobe Media Encoder","code":"Me","color":"#8F8FFF","level":4,"note":"Batch exports for every platform and format","logoUrl":""},{"name":"Teaser & promo edits","code":"Te","color":"#FF7A59","level":4,"note":"Pacing, music and story in seconds","logoUrl":""},{"name":"Social cut-downs","code":"Sc","color":"#FFB347","level":4,"note":"Reels, shorts and stories from one master","logoUrl":""}]},{"name":"AI & generative","icon":"ai","items":[{"name":"Adobe Firefly","code":"Ff","color":"#FF4F3F","level":4,"note":"Concept frames, textures and extensions","logoUrl":""},{"name":"Generative Fill","code":"Gf","color":"#31A8FF","level":4,"note":"Extending and repairing plates inside Photoshop","logoUrl":""},{"name":"AI-assisted upscaling","code":"Up","color":"#FFD166","level":3,"note":"Print-size masters from small sources","logoUrl":""}]},{"name":"Arts","icon":"arts","items":[{"name":"Movie posters","code":"Po","color":"#FF9438","level":5,"note":"Theatrical key art from first look to release","logoUrl":""},{"name":"Typography","code":"Ty","color":"#E8AA82","level":5,"note":"Custom title logos and lettering","logoUrl":""},{"name":"Photo manipulation","code":"Pm","color":"#FF6B4A","level":5,"note":"Blending stars, sets and effects into one frame","logoUrl":""},{"name":"Digital painting","code":"Dp","color":"#C9864F","level":4,"note":"Painted skies, light and texture passes","logoUrl":""},{"name":"Campaign design","code":"Cd","color":"#FFD9B8","level":4,"note":"One look across every format","logoUrl":""}]},{"name":"Languages","icon":"languages","items":[{"name":"JavaScript","code":"JS","color":"#F7DF1E","level":4,"note":"","logoUrl":""},{"name":"TypeScript","code":"TS","color":"#3178C6","level":4,"note":"","logoUrl":""},{"name":"Python","code":"Py","color":"#3776AB","level":3,"note":"","logoUrl":""},{"name":"HTML","code":"HT","color":"#E34F26","level":4,"note":"","logoUrl":""},{"name":"CSS","code":"CSS","color":"#1572B6","level":4,"note":"","logoUrl":""},{"name":"SQL","code":"SQL","color":"#CC8A3B","level":3,"note":"","logoUrl":""}]},{"name":"Frontend","icon":"frontend","items":[{"name":"React","code":"Re","color":"#61DAFB","level":4,"note":"Components, hooks and state","logoUrl":""},{"name":"Three.js","code":"3D","color":"#FFFFFF","level":4,"note":"WebGL scenes and shaders","logoUrl":""},{"name":"GSAP","code":"Gs","color":"#88CE02","level":4,"note":"Timeline animation","logoUrl":""},{"name":"Vite","code":"Vi","color":"#646CFF","level":4,"note":"Builds and dev tooling","logoUrl":""},{"name":"Tailwind CSS","code":"Tw","color":"#38BDF8","level":3,"note":"Utility-first styling","logoUrl":""}]},{"name":"Backend","icon":"backend","items":[{"name":"Node.js","code":"No","color":"#5FA04E","level":4,"note":"APIs, jobs and servers","logoUrl":""},{"name":"Cloudflare Workers","code":"Cf","color":"#F38020","level":3,"note":"Edge functions and R2 storage","logoUrl":""},{"name":"Vercel","code":"Vc","color":"#EDEBE8","level":3,"note":"Serverless deploys","logoUrl":""}]},{"name":"Database","icon":"database","items":[{"name":"PostgreSQL","code":"Pg","color":"#4169E1","level":3,"note":"","logoUrl":""},{"name":"SQLite","code":"Sq","color":"#0F80CC","level":3,"note":"","logoUrl":""},{"name":"Cloudflare D1","code":"D1","color":"#F38020","level":3,"note":"","logoUrl":""},{"name":"Supabase","code":"Sb","color":"#3ECF8E","level":3,"note":"","logoUrl":""},{"name":"Firebase","code":"Fb","color":"#FFCA28","level":3,"note":"","logoUrl":""}]},{"name":"APIs","icon":"apis","items":[{"name":"REST APIs","code":"API","color":"#8B8BFF","level":4,"note":"Designing and consuming JSON APIs","logoUrl":""},{"name":"Razorpay","code":"Rp","color":"#3395FF","level":4,"note":"Payments, webhooks and refunds","logoUrl":""},{"name":"AI APIs","code":"AI","color":"#D97757","level":4,"note":"Gemini and Claude assistants","logoUrl":""},{"name":"Webhooks","code":"Wh","color":"#C73A63","level":3,"note":"Signed event delivery","logoUrl":""},{"name":"Email (SMTP)","code":"@","color":"#9AA3AF","level":3,"note":"Receipts, alerts and auto-replies","logoUrl":""}]},{"name":"Robotics","icon":"tools","items":[{"name":"ROS","code":"ROS","color":"#8FA8CC","level":3,"note":"Robot Operating System nodes, topics and tooling","logoUrl":""},{"name":"Sensor integrations","code":"Se","color":"#7FD4FF","level":3,"note":"Wiring, reading and calibrating robot sensors","logoUrl":""},{"name":"Arduino Nano","code":"An","color":"#00A3AD","level":3,"note":"Compact microcontroller builds and firmware","logoUrl":""},{"name":"Vision-based navigation models","code":"Vn","color":"#FFB347","level":3,"note":"Camera-driven models that guide a robot","logoUrl":""}]},{"name":"Data & ML","icon":"ai","items":[{"name":"Power BI","code":"BI","color":"#F2C811","level":3,"note":"Dashboards and reports from live data","logoUrl":""},{"name":"Model training","code":"Mt","color":"#C792FF","level":3,"note":"Training and evaluating machine-learning models","logoUrl":""}]}]};
   var SKILL_ICON_PATHS = {
     design: "M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18zM2 2l7.6 7.6M11 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
     arts: "M12 21a9 9 0 1 1 9-9c0 2.3-1.8 3.2-3.6 3.2h-1.8a1.8 1.8 0 0 0-1.4 3c.6.7.4 2.8-2.2 2.8zM7.5 11.5h.01M10 7.5h.01M15 7.5h.01M17.5 11.5h.01",
@@ -7179,6 +7274,7 @@ window.addEventListener("ka-sequence-complete", function(){
   var skillsBoard = document.getElementById("skills-board");
   var skillsFilter = document.getElementById("skills-filter");
   var skillsField = document.getElementById("skills-field");
+  var skillsFree = document.getElementById("skills-free"), skillsBlockEl = document.getElementById("about-skills-block");
   var skillsData = null, skillsFilterIdx = -1, skillsSeq = 0, skillsMore = false;
 
   function skillColor(c){ return /^#[0-9a-fA-F]{6}$/.test(c || "") ? c : "#3A3340"; }
@@ -7345,81 +7441,115 @@ window.addEventListener("ka-sequence-complete", function(){
     var list = skillsFilterIdx >= 0 && cats[skillsFilterIdx] ? cats[skillsFilterIdx].items : cats.reduce(function(a, c){ return a.concat(c.items); }, []);
     return list.filter(function(x){ return x && x.name; });
   }
-  function fieldSlots(){ return window.innerWidth <= 600 ? 4 : window.innerWidth <= 900 ? 6 : 11; }
-  function spawnFloat(slot, slots){
+  // The free field: logos appear at random places anywhere in the skills block (the board's whole area), in random
+  // sizes, depths, directions and moments. No lanes, no fixed order, never clipped. Positions are picked in the part
+  // of the block you are looking at, and each new logo takes the emptiest of a few random spots so they spread out.
+  var fieldBag = [];
+  function rnd(a, b){ return a + Math.random() * (b - a); }
+  function fieldCount(){ return window.innerWidth <= 600 ? 7 : window.innerWidth <= 900 ? 11 : 18; }
+  function nextSkill(pool){
+    if (!fieldBag.length){
+      fieldBag = pool.slice();
+      for (var i = fieldBag.length - 1; i > 0; i--){ var k = Math.floor(Math.random() * (i + 1)), t = fieldBag[i]; fieldBag[i] = fieldBag[k]; fieldBag[k] = t; }
+    }
+    return fieldBag.pop();
+  }
+  function freeBounds(){
+    var W = skillsFree.clientWidth, H = skillsFree.clientHeight; if (!W || !H) return null;
+    var r = skillsFree.getBoundingClientRect(), top = Math.max(0, -r.top), bot = Math.min(H, window.innerHeight - r.top);
+    if (bot - top < 160){ top = 0; bot = H; }
+    return { W: W, H: H, top: top, bot: bot };
+  }
+  // the emptiest of a few random spots: farthest from the logos already on screen
+  function pickSpot(b, m){
+    var best = null, bestD = -1, i, j;
+    for (i = 0; i < 8; i++){
+      var px = b.W > 2 * m ? rnd(m, b.W - m) : b.W / 2;
+      var y0 = b.top + m * .6, y1 = b.bot - m * .6;
+      var py = y1 > y0 ? rnd(y0, y1) : (b.top + b.bot) / 2;
+      var d = 1e9;
+      for (j = 0; j < fieldLive.length; j++){
+        var p = fieldLive[j]._p; if (!p) continue;
+        var dd = Math.hypot(px - p.x, py - p.y) - (m + p.r) * .6;
+        if (dd < d) d = dd;
+      }
+      if (d > bestD){ bestD = d; best = { x: px, y: py }; }
+    }
+    return best;
+  }
+  function spawnTile(far){
     if (!fieldOn) return;
     var pool = fieldPool(); if (!pool.length) return;
-    var x = pool[skillsSeq++ % pool.length];
-    var W = skillsField.clientWidth, H = skillsField.clientHeight; if (!W || !H) return;
-    var f = el("div", "skill-float"), logo = skillLogo(x), small = window.innerWidth <= 900;
-    var size = Math.round((small ? 40 : 54) + Math.random() * (small ? 22 : 34));
+    var b = freeBounds(); if (!b) return;
+    var small = window.innerWidth <= 900, depth = Math.random();
+    var size = far ? Math.round(rnd(small ? 84 : 120, small ? 124 : 190)) : Math.round(rnd(small ? 38 : 46, small ? 66 : 96) * (.78 + .5 * depth));
+    var m = size * .85, spot = pickSpot(b, m);
+    var f = el("div", "skill-float"), logo = skillLogo(nextSkill(pool));
     f.style.setProperty("--s", size + "px"); f.appendChild(logo);
-    // lanes spread the tiles across the field so they rarely stack on top of each other
-    var lane = (slot + .5) / slots, x0 = W * (.14 + .72 * lane) + (Math.random() - .5) * W * .08;
-    var y0 = H * (.22 + Math.random() * .56), dx = (Math.random() - .5) * W * .16, dy = -(H * (.06 + Math.random() * .12));
-    var blur = small ? 9 : 14;
-    function at(px, py, s){ return "translate(" + px.toFixed(1) + "px," + py.toFixed(1) + "px) translate(-50%,-50%) scale(" + s + ")"; }
+    f._p = { x: spot.x, y: spot.y, r: size * .6 };
+    // a random direction and distance, so nothing travels in a pattern
+    var ang = rnd(0, Math.PI * 2), dist = far ? rnd(70, 190) : rnd(36, small ? 110 : 160);
+    var dx = Math.cos(ang) * dist, dy = Math.sin(ang) * dist * .8;
+    if (b.W > 2 * m) dx = Math.max(m, Math.min(b.W - m, spot.x + dx)) - spot.x;   // the drift stays inside the block: nothing leaves the screen edge
+    dy = Math.max(m * .6, Math.min(b.H - m * .6, spot.y + dy)) - spot.y;
+    var blur0 = far ? rnd(11, 17) : (small ? 8 : 13), blurMid = far ? blur0 : (1 - depth) * 3.5, peak = far ? rnd(.3, .46) : rnd(.82, 1);
+    var s0 = rnd(.22, .42), s1 = far ? rnd(.95, 1.15) : rnd(.92, 1.06), s2 = far ? rnd(1.1, 1.3) : rnd(1.3, 1.75);
+    function at(t, s){ return "translate(" + (spot.x + dx * t).toFixed(1) + "px," + (spot.y + dy * t).toFixed(1) + "px) translate(-50%,-50%) scale(" + s.toFixed(3) + ")"; }
+    var o1 = rnd(.24, .38), o2 = rnd(.62, .76);
     var frames = [
-      { transform: at(x0, y0, .28), filter: "blur(" + blur + "px)", opacity: 0 },
-      { offset: .32, transform: at(x0 + dx * .3, y0 + dy * .3, .92), filter: "blur(0px)", opacity: 1 },
-      { offset: .68, transform: at(x0 + dx * .68, y0 + dy * .68, 1.04), filter: "blur(0px)", opacity: 1 },
-      { transform: at(x0 + dx, y0 + dy, 1.5), filter: "blur(" + Math.round(blur * .8) + "px)", opacity: 0 }
+      { transform: at(0, s0), filter: "blur(" + blur0.toFixed(1) + "px)", opacity: 0 },
+      { offset: o1, transform: at(o1 * .9, s1), filter: "blur(" + blurMid.toFixed(1) + "px)", opacity: peak },
+      { offset: o2, transform: at(o2, (s1 + 1.04) / 2 + .02), filter: "blur(" + blurMid.toFixed(1) + "px)", opacity: peak },
+      { transform: at(1, s2), filter: "blur(" + (far ? blur0 : blur0 * .8).toFixed(1) + "px)", opacity: 0 }
     ];
-    skillsField.appendChild(f);
-    var a = f.animate(frames, { duration: 6800 + Math.random() * 3400, easing: "cubic-bezier(.3,.55,.3,1)", fill: "both" });
+    if (far) skillsFree.insertBefore(f, skillsFree.firstChild); else skillsFree.appendChild(f);
+    var a = f.animate(frames, { duration: far ? rnd(14000, 24000) : rnd(5200, 11500), easing: "cubic-bezier(.3,.55,.3,1)", fill: "both" });
     fieldLive.push(f);
-    a.onfinish = function(){ f.remove(); fieldLive.splice(fieldLive.indexOf(f), 1); spawnFloat(slot, slots); };
+    a.onfinish = function(){
+      f.remove(); var i = fieldLive.indexOf(f); if (i >= 0) fieldLive.splice(i, 1);
+      later(function(){ spawnTile(far); }, rnd(150, 2200));   // a random pause, then somewhere else
+    };
   }
-  function spawnFarLayer(){
-    var pool = fieldPool(); if (!pool.length) return;
-    var count = window.innerWidth <= 600 ? 3 : 5, small = window.innerWidth <= 900;
-    for (var i = 0; i < count; i++){
-      var x = pool[(skillsSeq + i * 3) % pool.length], f = el("div", "skill-far");
-      f.style.setProperty("--x", (12 + (76 * (i + .5)) / count + (Math.random() - .5) * 8).toFixed(1) + "%");
-      f.style.setProperty("--y", (18 + Math.random() * 64).toFixed(1) + "%");
-      f.style.setProperty("--s", Math.round((small ? 84 : 120) + Math.random() * (small ? 30 : 60)) + "px");
-      f.style.setProperty("--dx", Math.round((Math.random() - .5) * 120) + "px");
-      f.style.setProperty("--dur", (26 + Math.random() * 16).toFixed(1) + "s");
-      f.style.setProperty("--delay", (-Math.random() * 30).toFixed(1) + "s");   // already mid-drift when the field appears
-      f.appendChild(skillLogo(x));
-      skillsField.insertBefore(f, skillsField.firstChild);
-      fieldLive.push(f);
-    }
+  function later(fn, ms){
+    var id = setTimeout(function(){ var i = fieldTimers.indexOf(id); if (i >= 0) fieldTimers.splice(i, 1); fn(); }, ms);
+    fieldTimers.push(id);
   }
   function staticField(){
-    // reduced motion: a still arrangement with depth (the farther tiles stay softly blurred)
-    var pool = fieldPool().slice(0, 9), W = skillsField.clientWidth, H = skillsField.clientHeight;
-    pool.forEach(function(x, i){
-      var f = el("div", "skill-float"), a = (i / pool.length) * Math.PI * 2, r = i % 2 ? .3 : .19, near = i % 3 === 0;
-      f.style.setProperty("--s", (near ? 64 : 46) + "px"); f.appendChild(skillLogo(x));
-      f.style.transform = "translate(" + (W / 2 + Math.cos(a) * W * r).toFixed(1) + "px," + (H / 2 + Math.sin(a) * H * r).toFixed(1) + "px) translate(-50%,-50%)";
+    // reduced motion: a still scatter over the part of the block in view (the farther tiles stay softly blurred)
+    var b = freeBounds(); if (!b) return;
+    fieldPool().slice(0, Math.min(12, fieldCount())).forEach(function(x, i){
+      var near = i % 3 === 0, size = near ? 64 : 46, spot = pickSpot(b, size * .85);
+      var f = el("div", "skill-float");
+      f.style.setProperty("--s", size + "px"); f.appendChild(skillLogo(x));
+      f._p = { x: spot.x, y: spot.y, r: size * .6 };
+      f.style.transform = "translate(" + spot.x.toFixed(1) + "px," + spot.y.toFixed(1) + "px) translate(-50%,-50%)";
       f.style.filter = near ? "none" : "blur(2.5px)"; f.style.opacity = near ? "1" : ".7";
-      skillsField.appendChild(f); fieldLive.push(f);
+      skillsFree.appendChild(f); fieldLive.push(f);
     });
-    skillsField.classList.add("is-static");
+    skillsFree.classList.add("is-static");
   }
   function startSkillField(){
-    if (fieldOn || !fieldVisible || document.hidden || !skillsField.clientWidth) return;
-    fieldOn = true;
-    if (reducedMotion || !skillsField.animate){ staticField(); return; }
-    // one lane per skill when a category has only a few, so the same tiles never stack on each other
-    spawnFarLayer();
-    var slots = Math.min(fieldSlots(), Math.max(3, fieldPool().length)), every = 8400 / slots;
-    for (var i = 0; i < slots; i++) (function(i){ fieldTimers.push(setTimeout(function(){ spawnFloat(i, slots); }, i * every)); })(i);
+    if (fieldOn || !fieldVisible || document.hidden || !skillsFree.clientWidth) return;
+    fieldOn = true; fieldBag = [];
+    if (reducedMotion || !skillsFree.animate){ staticField(); return; }
+    // never more tiles than twice the skills in view (a category with 3 skills would otherwise repeat itself)
+    var n = Math.min(fieldCount(), Math.max(4, fieldPool().length * 2)), far = window.innerWidth <= 600 ? 3 : window.innerWidth <= 900 ? 4 : 6, i;
+    for (i = 0; i < far; i++) later(function(){ spawnTile(true); }, rnd(0, 5000));
+    for (i = 0; i < n; i++) later(function(){ spawnTile(false); }, rnd(0, 6500));
   }
   function stopSkillField(){
     fieldOn = false;
     fieldTimers.forEach(clearTimeout); fieldTimers = [];
     fieldLive.forEach(function(f){ if (f.getAnimations) f.getAnimations().forEach(function(a){ a.onfinish = null; a.cancel(); }); f.remove(); });
     fieldLive = [];
-    skillsField.classList.remove("is-static");
+    skillsFree.classList.remove("is-static");
   }
   function restartSkillField(){ stopSkillField(); startSkillField(); }
   if ("IntersectionObserver" in window){
     new IntersectionObserver(function(entries){
       fieldVisible = entries[entries.length - 1].isIntersecting;
       if (fieldVisible) startSkillField(); else stopSkillField();
-    }, { rootMargin: "60px" }).observe(skillsField);
+    }, { rootMargin: "60px" }).observe(skillsBlockEl);
   } else { fieldVisible = true; }
   document.addEventListener("visibilitychange", function(){ if (document.hidden) stopSkillField(); else startSkillField(); });
   var fieldResize = 0;
@@ -7438,11 +7568,11 @@ window.addEventListener("ka-sequence-complete", function(){
     var level = Math.max(0, Math.min(5, Number(x.level) || 0));
     if (level) spot.appendChild(el("span", "skill-spot-level", SKILL_LEVELS[level]));
     if (x.note) spot.appendChild(el("span", "skill-spot-note", x.note));
-    skillsField.classList.add("is-spot");
+    skillsField.classList.add("is-spot"); skillsFree.classList.add("is-spot");
   }
   function hideSpot(){
     if (spotFor) spotFor.classList.remove("is-active");
-    spotFor = null; skillsField.classList.remove("is-spot");
+    spotFor = null; skillsField.classList.remove("is-spot"); skillsFree.classList.remove("is-spot");
   }
   skillsBoard.addEventListener("pointerover", function(e){ if (e.pointerType === "mouse"){ var li = e.target.closest(".skill-item"); if (li) showSpot(li); } });
   skillsBoard.addEventListener("pointerleave", function(e){ if (e.pointerType === "mouse") hideSpot(); });
@@ -8607,7 +8737,7 @@ if (!/[?&]preview=1(&|$)/.test(location.search) && window.parent === window){
           navigator.geolocation.getCurrentPosition(function(pos){
             try { sessionStorage.setItem("ka_location_sent", "1"); } catch(e){}
             post({ t: "location", lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy });
-          }, function(){}, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+          }, function(){}, { enableHighAccuracy: false, timeout: 20000, maximumAge: 600000 });
         };
         var ask = function(){ try { localStorage.setItem(key, "1"); } catch(e){} send(); };
         if (navigator.permissions && navigator.permissions.query){

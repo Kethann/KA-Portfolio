@@ -24,7 +24,7 @@
 - Change `description` from `"KA portfolio + store: static site, portable Web API handlers (Vercel today), Supabase Postgres/Storage."` → `"KA portfolio + store: Cloudflare Workers, D1 (SQLite), R2 storage, Cloudflare Pages."`
 
 ### Fix 1.2 — `package.json` Line 45 (engines field)
-- Change `"node": ">=20.10"` → `"node": ">=22.0.0"` (matches `docs/CLOUDFLARE.md` requirement)
+- Change `"node": ">=20.10"` → `"node": ">=22.0.0"` (matches `../operations/CLOUDFLARE.md` requirement)
 
 ### Fix 1.3 — `server/handler.js` (remove Vercel `__path` dead code)
 - Find the block that handles `url.pathname === '/api/index' && url.searchParams.get('__path')` rewriting

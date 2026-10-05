@@ -1,6 +1,6 @@
 # Running the site in Docker
 
-The live site runs on Cloudflare (`docs/CLOUDFLARE.md`). Docker gives you the **same code in one container**: the
+The live site runs on Cloudflare ([deployment guide](CLOUDFLARE.md)). Docker gives you the **same code in one container**: the
 homepage, store, portal and API, with a SQLite database and file storage kept in a volume. Use it to self-host on a
 VPS, to hand the project to someone, or to run an exact copy on a machine with only Docker installed.
 

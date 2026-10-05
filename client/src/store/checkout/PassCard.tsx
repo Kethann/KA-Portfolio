@@ -43,6 +43,19 @@ function useTilt(ref: React.RefObject<HTMLDivElement>, enabled: boolean){
     const el = ref.current;
     if (!el || !enabled) return;
     let tx = 0, ty = 0, x = 0, y = 0, raf = 0, idle = true;
+    // Border glow: a bright arc runs around the card's edge. It follows the pointer while it is over the card
+    // and drifts slowly round the edge when it is not (--ba = angle, --bi = strength; the CSS draws the arc).
+    let ang = 150, tgt = 150, bi = 0.7, hot = false, gRaf = 0;
+    const glow = () => {
+      if (!hot) tgt += 0.3;
+      const d = ((tgt - ang + 540) % 360) - 180;
+      ang = (ang + d * 0.14 + 360) % 360;
+      const want = hot ? 0.85 + 0.15 * Math.min(1, Math.hypot(tx, ty)) : 0.7;
+      bi += (want - bi) * 0.1;
+      el.style.setProperty('--ba', `${ang.toFixed(1)}deg`); el.style.setProperty('--bi', bi.toFixed(3));
+      gRaf = requestAnimationFrame(glow);
+    };
+    gRaf = requestAnimationFrame(glow);
     const apply = () => {
       x += (tx - x) * 0.12; y += (ty - y) * 0.12;
       el.style.setProperty('--rx', `${(-y * 9).toFixed(2)}deg`); el.style.setProperty('--ry', `${(x * 11).toFixed(2)}deg`);
@@ -56,8 +69,9 @@ function useTilt(ref: React.RefObject<HTMLDivElement>, enabled: boolean){
       tx = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1));
       ty = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1));
       idle = false; kick();
+      if (Math.hypot(tx, ty) > 0.06){ hot = true; tgt = Math.atan2(tx, -ty) * 180 / Math.PI + 360; }
     };
-    const onLeave = () => { tx = 0; ty = 0; idle = true; kick(); };
+    const onLeave = () => { tx = 0; ty = 0; idle = true; hot = false; tgt = ang; kick(); };
     // motion sensor: only where it works without a permission prompt (not iOS 13+)
     const D = window.DeviceOrientationEvent as unknown as { requestPermission?: unknown } | undefined;
     const onTilt = (e: DeviceOrientationEvent) => {
@@ -68,7 +82,7 @@ function useTilt(ref: React.RefObject<HTMLDivElement>, enabled: boolean){
     const useGyro = D && typeof D.requestPermission !== 'function' && matchMedia('(pointer: coarse)').matches;
     if (useGyro) window.addEventListener('deviceorientation', onTilt);
     return () => {
-      cancelAnimationFrame(raf);
+      cancelAnimationFrame(raf); cancelAnimationFrame(gRaf);
       el.removeEventListener('pointermove', onMove); el.removeEventListener('pointerleave', onLeave);
       if (useGyro) window.removeEventListener('deviceorientation', onTilt);
     };
@@ -123,6 +137,7 @@ export function PassCard({ product, currency, amount, free, email, orderId, phas
   return <div className={`kco-card-wrap tone-${tone} pass-text-${pass.textPosition} pass-price-${pass.pricePosition} ${pass.foil ? '' : 'pass-no-foil'}`} ref={cardRef} data-phase={phase}
     style={{ ['--kco-dim' as string]: String(pass.dim / 100) } as React.CSSProperties}>
     <div className="kco-tilt" ref={tiltRef}>
+      <span className="kco-halo" aria-hidden="true" />
       <div className={`kco-card ${flipped ? 'is-flipped' : ''}`} role="button" tabIndex={0}
         aria-label={`${product.title} pass. ${flipped ? 'Showing license details' : 'Showing summary'}. Press Enter to flip.`} aria-pressed={flipped}
         onClick={onFlip} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); onFlip(); } }}>

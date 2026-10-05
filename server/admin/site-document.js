@@ -69,7 +69,15 @@ export const SKILLS_DEFAULT = {
     { name: 'APIs', icon: 'apis', items: [
       sk('REST APIs', 'API', '#8B8BFF', 4, 'Designing and consuming JSON APIs'), sk('Razorpay', 'Rp', '#3395FF', 4, 'Payments, webhooks and refunds'),
       sk('AI APIs', 'AI', '#D97757', 4, 'Gemini and Claude assistants'), sk('Webhooks', 'Wh', '#C73A63', 3, 'Signed event delivery'),
-      sk('Email (SMTP)', '@', '#9AA3AF', 3, 'Receipts, alerts and auto-replies') ] }
+      sk('Email (SMTP)', '@', '#9AA3AF', 3, 'Receipts, alerts and auto-replies') ] },
+    { name: 'Robotics', icon: 'tools', items: [
+      sk('ROS', 'ROS', '#8FA8CC', 3, 'Robot Operating System nodes, topics and tooling'),
+      sk('Sensor integrations', 'Se', '#7FD4FF', 3, 'Wiring, reading and calibrating robot sensors'),
+      sk('Arduino Nano', 'An', '#00A3AD', 3, 'Compact microcontroller builds and firmware'),
+      sk('Vision-based navigation models', 'Vn', '#FFB347', 3, 'Camera-driven models that guide a robot') ] },
+    { name: 'Data & ML', icon: 'ai', items: [
+      sk('Power BI', 'BI', '#F2C811', 3, 'Dashboards and reports from live data'),
+      sk('Model training', 'Mt', '#C792FF', 3, 'Training and evaluating machine-learning models') ] }
   ]
 };
 export const SKILL_LIMITS = { categories: 14, items: 24 };

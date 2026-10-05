@@ -278,8 +278,9 @@
   inset:auto 12% -6% 12%; height:18%; border-radius:50%; box-shadow:none; opacity:1; animation:none !important; transition:none;
   background:radial-gradient(closest-side, rgba(0,0,0,.62), rgba(0,0,0,0)); filter:blur(7px); }
 .kco-face, .tone-ok .kco-face, .tone-bad .kco-face{ border-color:transparent; box-shadow:0 1px 1px rgba(0,0,0,.35), 0 14px 34px -10px rgba(0,0,0,.6); }
+.kco-tilt{ --ba:150deg; --bi:.7; }
 .kco-face::after{ content:""; position:absolute; inset:0; z-index:4; border-radius:inherit; padding:1.2px; pointer-events:none;
-  background:linear-gradient(150deg, rgba(255,255,255,.6), rgba(255,255,255,.1) 32%, rgba(255,255,255,0) 58%, rgba(255,255,255,.08) 78%, rgba(255,255,255,.32));
+  background:conic-gradient(from calc(var(--ba) - 150deg) at 50% 50%, rgba(255,255,255,.62), rgba(255,255,255,.1) 32%, rgba(255,255,255,0) 58%, rgba(255,255,255,.08) 78%, rgba(255,255,255,.34));
   -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
 @property --kco-sweep{ syntax:'<angle>'; inherits:false; initial-value:0deg; }
 .tone-busy .kco-face::after{ padding:1.6px; background:conic-gradient(from var(--kco-sweep), rgba(255,255,255,.08) 0 62%, rgba(255,200,150,.95) 80%, rgba(255,255,255,.08) 96%);
@@ -306,3 +307,11 @@
 .pass-price-left .kco-main{ flex-direction:row-reverse; }
 .pass-price-left .kco-main .kco-title{ text-align:right; }
 .pass-price-below .kco-main{ flex-direction:column; align-items:flex-start; gap:4px; }
+
+/* moving gradient glow along the card's edge: follows the pointer (--ba), drifts when idle; colours are the foil's */
+.kco-face::before{ content:""; position:absolute; inset:0; z-index:5; border-radius:inherit; padding:2.5px; pointer-events:none; opacity:var(--bi, .7);
+  background:conic-gradient(from calc(var(--ba) - 62deg) at 50% 50%, transparent 0deg, rgba(255,154,139,0) 8deg, #ff9a8b 22deg, #fecf7a 36deg, #fff 52deg, #a6f0c6 66deg, #8fb8ff 80deg, #d6a4ff 96deg, rgba(214,164,255,0) 116deg, transparent 124deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+.kco-halo{ position:absolute; inset:-5px; z-index:0; border-radius:25px; pointer-events:none; opacity:calc(var(--bi, .7) * .85); filter:blur(12px); transform:translateZ(-2px);
+  background:conic-gradient(from calc(var(--ba) - 70deg) at 50% 50%, transparent 0deg, #ff9a8b 26deg, #fecf7a 42deg, #fff 58deg, #a6f0c6 70deg, #8fb8ff 86deg, #d6a4ff 104deg, transparent 138deg); }
+.tone-ok .kco-face::before, .tone-bad .kco-face::before{ opacity:calc(var(--bi, .7) * .7); }

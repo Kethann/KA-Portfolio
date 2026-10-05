@@ -33,6 +33,9 @@
 /assets/store.js
   ! Cache-Control
   Cache-Control: no-cache
+/assets/skill-logos.js
+  ! Cache-Control
+  Cache-Control: no-cache
 
 /images/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800

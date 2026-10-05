@@ -1,5 +1,5 @@
 // Cloudflare Worker for the whole site: static files (dist/) + the API (server/) + D1 + R2 + cron.
-// Setup steps: docs/CLOUDFLARE.md. Secrets (keys, passwords) are NOT kept here: add them in the Cloudflare
+// Setup steps: docs/operations/CLOUDFLARE.md. Secrets (keys, passwords) are NOT kept here: add them in the Cloudflare
 // dashboard (Worker > Settings > Variables and Secrets) or with `npx wrangler secret put NAME`.
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
