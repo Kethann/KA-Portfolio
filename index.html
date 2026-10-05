@@ -1480,7 +1480,7 @@ html.ka-modal-open{ overflow:hidden; }
   border:1px solid rgba(255,148,56,.38); background:linear-gradient(135deg, rgba(255,148,56,.16), rgba(255,148,56,.03));
   font-family:var(--font-mono, monospace); font-size:11px; letter-spacing:.24em; color:#ffd9b8;
   box-shadow:0 0 0 1px rgba(255,255,255,.03) inset, 0 8px 28px -12px rgba(255,148,56,.45); }
-.journey-since b{ font-size:20px; letter-spacing:.06em; font-weight:700; color:#fff; }
+.journey-since b{ font-size:20px; letter-spacing:.06em; font-weight:700; color:#fff; font-variant-numeric:tabular-nums; min-width:4ch; display:inline-block; }
 .journey-line{ list-style:none; margin:26px 0 0; padding:0; display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); position:relative; }
 .journey-line::before, .journey-line::after{ content:""; position:absolute; top:5px; left:5px; right:0; height:2px; border-radius:2px; }
 .journey-line::before{ background:rgba(255,255,255,.12); }
@@ -1718,7 +1718,7 @@ html.ka-modal-open{ overflow:hidden; }
       <h1 class="about-headline" id="about-headline">Kethan Artzz — Visual Storyteller for the Big Screen</h1>
       <p class="about-caption">IMAGINE &middot; CREATE &middot; EVOLVE</p>
       <div class="about-journey" id="about-journey" aria-label="My journey since 2021">
-        <span class="journey-since"><span>SINCE</span><b>2021</b></span>
+        <span class="journey-since"><span>SINCE</span><b id="journey-year" aria-label="2021">2021</b></span>
         <ol class="journey-line">
           <li style="--i:0"><strong>Graphic design</strong><span>Movie posters &amp; publicity campaigns</span></li>
           <li style="--i:1"><strong>UI / UX design</strong><span>Interfaces, flows &amp; design systems</span></li>
@@ -7113,8 +7113,22 @@ window.addEventListener("ka-sequence-complete", function(){
     if (!j) return;
     var calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (calm || typeof IntersectionObserver !== "function"){ j.classList.add("in"); return; }
+    // the year counts up to 2021 (fast at first, easing to a stop) as the journey line starts to draw
+    var yearEl = document.getElementById("journey-year"), YEAR = 2021, FROM = 2000;
+    function countYear(){
+      if (!yearEl) return;
+      var t0 = 0, dur = 1500;
+      yearEl.textContent = String(FROM);
+      requestAnimationFrame(function step(t){
+        if (!t0) t0 = t;
+        var k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+        yearEl.textContent = String(Math.round(FROM + (YEAR - FROM) * e));
+        if (k < 1) requestAnimationFrame(step);
+      });
+    }
+    if (yearEl) yearEl.textContent = String(FROM);
     var io = new IntersectionObserver(function(entries){
-      if (entries.some(function(e){ return e.isIntersecting; })){ j.classList.add("in"); io.disconnect(); }
+      if (entries.some(function(e){ return e.isIntersecting; })){ j.classList.add("in"); countYear(); io.disconnect(); }
     }, { threshold: 0.35 });
     io.observe(j);
   })();
