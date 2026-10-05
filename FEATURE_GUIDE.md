@@ -1285,6 +1285,8 @@ Note: the line numbers above come from a text search and may shift if the files 
 | GET | `/api/admin/visitors/live` | `live()` | Sessions seen in the last 5 minutes (max 100) |
 | GET | `/api/admin/visitors/log` | `log()` | Up to 1000 rows per request (default 300) |
 | GET | `/api/admin/visitors.csv` | `logCsv()` | CSV file, up to 50000 rows |
+| GET | `/api/admin/visitors/history?v=` | `history()` | One visitor's visits, score and mark |
+| PUT | `/api/admin/visitors/mark` | `markVisitor()` | `{ok, mark}` |
 | External | `https://ipwho.is/<ip>`, `http(s)://api.ipstack.com/<ip>` | `geo.js` → `locate()` | Country, region, city, time zone, postal code, latitude, longitude, ISP |
 
 **Key functions:**
@@ -1306,6 +1308,8 @@ Note: the line numbers above come from a text search and may shift if the files 
 7. The page sends `{t:"location", lat, lon, accuracy}`. The server keeps it **only when `accuracy` is 1000 metres or better**. It stores latitude and longitude rounded to 3 decimals (about 100 m), the accuracy rounded to the nearest 100 m (at least 100), and `location_source = 'browser-consent'`. Anything worse is dropped and the IP-based place stays.
 8. The portal summary excludes bots. Days and hours use the `Asia/Kolkata` offset (+330 minutes). "Live now" counts sessions with `last_seen_at` in the last 5 minutes.
 9. The daily job `visitRetention` deletes visits older than `visitors.retentionDays` (default 365; 0 keeps forever), deletes location cache entries older than 30 days, and clears browser-consented coordinates older than 7 days.
+
+**Visitor history and marks (added later).** In Visitors → Visit log, opening a row now shows **This visitor's history** (`VisitorHistory` in `Visitors.tsx`): every earlier visit by the same device (`ka_vid`, up to 300), visits and sessions, first seen, time spent, pages, places and IP addresses, and an **engagement score** from 0 to 100 (`history()` in `server/admin/visitors.js`: up to 40 for return visits, 30 for pages seen, 30 for minutes). The owner can **mark** the visitor (labels follow-up, interested, client, ignore, plus a note up to 300 characters; `markVisitor()`), see a star on marked rows, and filter the log to **★ Marked**. Marks are stored in the `settings` key `visitorMarks` (at most 500), so no database change was needed. Routes: `GET /api/admin/visitors/history?v=<visitor id>` and `PUT /api/admin/visitors/mark` (both admin only; marking is written to the audit log).
 
 **Data saved:** `visits` (session, visitor, path, referrer, IP, country, region, city, time zone, language, device, OS, browser, screen, bot flag, User-Agent, postal, latitude, longitude, ISP, continent, accuracy, source, duration), `ip_geo_cache`, `geo_quota`. Browser: `ka_vid`, `ka_sid`, `ka_location_asked`, `ka_location_sent`.
 
@@ -2226,7 +2230,7 @@ Outside `package.json` (loaded from the internet by the page): Razorpay Checkout
 
 ## Table D. Every API endpoint → feature
 
-There are 168 routes registered with `route(...)` (read from the running router) plus the two storage paths handled directly by the Worker. "Feature" is the number of the feature section that explains it.
+There are 170 routes registered with `route(...)` (read from the running router) plus the two storage paths handled directly by the Worker. "Feature" is the number of the feature section that explains it.
 
 | # | Method | Path | Server file → function | Access | Feature |
 |---|---|---|---|---|---|
@@ -2362,6 +2366,8 @@ There are 168 routes registered with `route(...)` (read from the running router)
 | 130 | GET | `/api/admin/visitors/live` | `server/admin/visitors.js:81` → `live()` | Portal session (+ CSRF on writes) | 18 |
 | 131 | GET | `/api/admin/visitors/log` | `server/admin/visitors.js:82` → `log()` | Portal session (+ CSRF on writes) | 18 |
 | 132 | GET | `/api/admin/visitors.csv` | `server/admin/visitors.js:83` → `logCsv()` | Portal session (+ CSRF on writes) | 18 |
+| 132a | GET | `/api/admin/visitors/history` | `server/admin/visitors.js` → `history()` | Portal session (+ CSRF on writes) | 18 |
+| 132b | PUT | `/api/admin/visitors/mark` | `server/admin/visitors.js` → `markVisitor()` | Portal session (+ CSRF on writes) | 18 |
 | 133 | POST | `/api/visit` | `server/visitors/track.js:83` → `visit()` | Public (same-origin for writes) | 18 |
 | 134 | GET | `/api/admin/assistant` | `server/admin/assistant.js:145` → `overview()` | Portal session (+ CSRF on writes) | 17 |
 | 135 | GET | `/api/admin/assistant/kb` | `server/admin/assistant.js:146` → `listKb()` | Portal session (+ CSRF on writes) | 17 |
@@ -2409,7 +2415,7 @@ There are 168 routes registered with `route(...)` (read from the running router)
 
 1. Every feature section was written from code that was opened and read (list below).
 2. After writing, a script checked the guide against the project: all **502** function names written like `name()` exist in the source, every `file → function` pair names a function that appears in that file (the two exceptions are routes written as inline handlers), and every file path written in full exists. Short relative names in a few tables were changed to full paths.
-3. Table D was generated from the running router's route list (168 routes) so no endpoint could be skipped, plus the two storage paths that the Worker handles directly.
+3. Table D was generated from the running router's route list (170 routes) so no endpoint could be skipped, plus the two storage paths that the Worker handles directly.
 4. All 29 features were checked for the 15 required headings. Features that first lacked a heading (1, 12, 19, 20, 22, 23, 25, 26, 27, 29) were corrected.
 5. Wrong statements found during checking were corrected in the text. They are listed below so nothing is hidden.
 
@@ -2423,6 +2429,7 @@ There are 168 routes registered with `route(...)` (read from the running router)
 | About bio rewritten, journey line and promo-cut clips added, then made editable in the portal; About numbers start counting when visible | Features 3 and 23 |
 | License card border glow that follows the pointer | Feature 12 |
 | Skills logo field now covers the whole skills block with random positions; phone and tablet fixes | Feature 4 |
+| Visitor history, engagement score and marks in Visitors; the promo-cut reel skips a video that will not play; logos stay off the heading | Features 4, 18 and 3 |
 | Hide a gallery image from the site (portal eye button); tips can be hidden (set back to draft) | Features 5, 23, 24 |
 | Panda greeting waits for the panda; font upload accepts any browser font type; inline signature font upload; stale font faces replaced | Features 9, 12, 25 |
 | Bio rewritten without repeated wording | Feature 3 |

@@ -2,7 +2,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import type { AppProps } from './registry';
 import { useDebounced, useLoad, usePref } from '../hooks';
-import { downloadFile } from '../api';
+import { downloadFile, put } from '../api';
 import { AsyncButton, Badge, Chart, Empty, ErrorState, Modal, Segmented, SkeletonRows, VirtualTable, useToast, SearchBox } from '../ui';
 import type { Column } from '../ui';
 import { Icon } from '../icons';
@@ -96,8 +96,9 @@ function Log(){
   const [q, setQ] = useState('');
   const [bots, setBots] = useState<'exclude' | 'include' | 'only'>('exclude');
   const [open, setOpen] = useState<any>(null);
+  const [markedOnly, setMarkedOnly] = useState(false);
   const dq = useDebounced(q, 300);
-  const qs = new URLSearchParams({ limit: '1000', bots }); if (dq) qs.set('q', dq);
+  const qs = new URLSearchParams({ limit: '1000', bots }); if (dq) qs.set('q', dq); if (markedOnly) qs.set('marked', '1');
   const s = useLoad<{ rows: any[]; hasMore: boolean }>(`/visitors/log?${qs}`);
   const toast = useToast();
   const cols: Column<any>[] = [
@@ -107,12 +108,13 @@ function Log(){
     { key: 'page', label: 'Page', width: '1fr', hideBelow: 720, render: r => <span className="truncate">{r.path}</span> },
     { key: 'dev', label: 'Device', width: '1.2fr', hideBelow: 880, render: r => <span className="truncate" title={[r.device_vendor, r.device_model, r.device_type, r.browser, r.os].filter(Boolean).join(' · ')}>{[r.device_vendor, r.device_model].filter(Boolean).join(' ') || r.device_type || 'Unknown'} · {r.browser || 'browser'} · {r.os || 'system'}</span> },
     { key: 'time', label: 'Time', width: '70px', align: 'right', hideBelow: 560, render: r => dur(r.duration_ms) },
-    { key: 'bot', label: '', width: '44px', render: r => r.is_bot ? <Badge tone="warning">bot</Badge> : r.is_new ? <Badge tone="accent">new</Badge> : null }
+    { key: 'bot', label: '', width: '64px', render: r => <span className="row" style={{ gap: 4 }}>{r.mark && <span title={`Marked: ${r.mark.label}${r.mark.note ? ' · ' + r.mark.note : ''}`} aria-label="Marked visitor" style={{ color: 'var(--accent, #ff9438)' }}>★</span>}{r.is_bot ? <Badge tone="warning">bot</Badge> : r.is_new ? <Badge tone="accent">new</Badge> : null}</span> }
   ];
   return (
     <div className="app" style={{ minHeight: 0, flex: 1 }}>
       <div className="app-toolbar">
         <SearchBox value={q} onChange={setQ} placeholder="IP, city, page, browser…" label="Search the visit log" />
+        <button type="button" className={'btn sm' + (markedOnly ? ' primary' : ' ghost')} aria-pressed={markedOnly} onClick={() => setMarkedOnly(m => !m)}>★ Marked</button>
         <Segmented label="Bots" value={bots} onChange={setBots} options={[{ value: 'exclude', label: 'People' }, { value: 'include', label: 'All' }, { value: 'only', label: 'Bots' }]} />
         <span className="grow" />
         <AsyncButton className="btn sm" onClick={async () => { await downloadFile(`/visitors.csv?${qs}`, `visitors-${todayIST()}.csv`); toast.show('CSV downloaded', { tone: 'success' }); }}><Icon name="downloads" /> CSV</AsyncButton>
@@ -132,6 +134,7 @@ function Log(){
               ['Device', [open.device_type, open.device_vendor, open.device_model].filter(Boolean).join(' · ')], ['System', `${open.os || '—'} ${open.os_version || ''}`], ['Browser', `${open.browser || '—'} ${open.browser_version || ''}`],
               ['Screen', open.screen_w ? `${open.screen_w} × ${open.screen_h}` : '—'], ['Visitor', `${open.visitor_id}${open.is_new ? ' (first visit)' : ''}`], ['Bot', open.is_bot ? 'yes' : 'no']].map(([k, v]) => <Fragment key={k}><dt>{k}</dt><dd className={k === 'IP' || k === 'Visitor' ? 'mono' : ''}>{v}</dd></Fragment>)}
           </dl>
+          <VisitorHistory visitorId={open.visitor_id} onChanged={s.reload} />
           {open.latitude != null && open.longitude != null && <section className="card stack" aria-label="Location map">
             <div className="row between"><b>{open.location_source === 'browser-consent' ? 'Visitor-shared location' : 'Approximate IP area'}</b>
               {open.location_accuracy && <Badge tone={open.location_source === 'browser-consent' ? 'success' : 'neutral'}>{open.location_accuracy >= 1000 ? `about ${(open.location_accuracy / 1000).toFixed(1)} km accuracy` : `about ${open.location_accuracy} m accuracy`}</Badge>}</div>
@@ -143,5 +146,48 @@ function Log(){
         </Modal>
       )}
     </div>
+  );
+}
+
+// One visitor's earlier visits (same device), an engagement score, and a mark with a label and a note so they can be found again.
+const LABELS: [string, string][] = [['follow-up', 'Follow up'], ['interested', 'Interested'], ['client', 'Client'], ['ignore', 'Ignore']];
+function VisitorHistory({ visitorId, onChanged }: { visitorId: string; onChanged: () => void }){
+  const h = useLoad<any>(`/visitors/history?v=${encodeURIComponent(visitorId)}`);
+  const toast = useToast();
+  const [label, setLabel] = useState('follow-up');
+  const [note, setNote] = useState('');
+  const [seen, setSeen] = useState<string | null>(null);
+  const d = h.data;
+  if (d && seen !== d.visitor){ setSeen(d.visitor); setLabel(d.mark?.label || 'follow-up'); setNote(d.mark?.note || ''); }
+  const save = async (marked: boolean) => {
+    try { await put('/visitors/mark', { visitorId, marked, label, note }); toast.show(marked ? 'Visitor marked' : 'Mark removed', { tone: 'success' }); await h.reload(); onChanged(); }
+    catch (e) { toast.error(e); }
+  };
+  return (
+    <section className="card stack" aria-label="Visitor history" style={{ marginTop: 'var(--sp-4)' }}>
+      <div className="row between"><b>This visitor’s history</b>{d && <Badge tone={d.score >= 60 ? 'success' : d.score >= 30 ? 'accent' : 'neutral'}>Engagement {d.score}/100</Badge>}</div>
+      {h.error && !d ? <p className="field-error">{h.error}</p> : !d ? <SkeletonRows rows={3} /> : <>
+        <p className="faint" style={{ margin: 0 }}>{d.total} visit{d.total === 1 ? '' : 's'} in {d.sessions} session{d.sessions === 1 ? '' : 's'} · first seen {dateTime(d.firstSeen)} · {d.minutes} min in total
+          {d.places.length ? ` · ${d.places.join(' · ')}` : ''}{d.ips.length > 1 ? ` · ${d.ips.length} IP addresses` : ''}</p>
+        {d.pages.length > 0 && <p className="faint" style={{ margin: 0 }}>Pages: {d.pages.map((p: any) => `${p.path} ×${p.n}`).join(', ')}</p>}
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <select aria-label="Mark as" value={label} onChange={e => setLabel(e.target.value)} style={{ width: 'auto' }}>{LABELS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+          <input aria-label="Note about this visitor" value={note} maxLength={300} placeholder="Note (optional)" onChange={e => setNote(e.target.value)} style={{ flex: '1 1 200px', minWidth: 140 }} />
+          <AsyncButton className="btn sm primary" onClick={() => save(true)}>{d.mark ? 'Update mark' : '★ Mark visitor'}</AsyncButton>
+          {d.mark && <AsyncButton className="btn sm ghost" onClick={() => save(false)}>Remove mark</AsyncButton>}
+        </div>
+        <ul className="list" style={{ maxHeight: 220, overflow: 'auto', margin: 0 }}>
+          {d.visits.map((v: any) => (
+            <li key={v.id} className="row" style={{ gap: 10 }}>
+              <span className="faint" style={{ width: 120, flex: 'none' }} title={dateTime(v.visited_at)}>{ago(v.visited_at)}</span>
+              <span className="truncate grow">{v.path}</span>
+              <span className="faint truncate" style={{ maxWidth: 160 }}>{[v.city, v.country].filter(Boolean).join(', ')}</span>
+              <span className="faint num" style={{ width: 56, textAlign: 'right' }}>{dur(v.duration_ms)}</span>
+            </li>
+          ))}
+        </ul>
+        {d.total > d.visits.length && <p className="field-hint" style={{ margin: 0 }}>Showing the latest {d.visits.length} of {d.total} visits.</p>}
+      </>}
+    </section>
   );
 }

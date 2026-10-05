@@ -101,3 +101,25 @@ test('portal: summary, live, log and CSV (admin only); retention job deletes old
   const r = await jobHooks.daily.visitRetention();
   assert.equal(r.removed, 2);
 });
+
+test('portal: one visitor\'s history and score, marking a visitor, and the marked-only filter', async () => {
+  const login = await app.call('POST', '/api/admin/login', { body: { email: 'owner@example.com', password: 'a long owner passphrase' }, ip: '198.51.100.98' });
+  assert.equal(login.status, 200);
+  const headers = { cookie: login.headers.get('set-cookie').split(';')[0], 'x-csrf-token': login.json.csrf };
+  const id = ids();
+  await beacon({ t: 'view', ...id, p: '/', n: true }, { ip: '198.51.100.60', country: 'IN' });
+  await beacon({ t: 'view', ...id, p: '/?page=store' }, { ip: '198.51.100.60', country: 'IN' });
+  await beacon({ t: 'leave', ...id, d: 120000 }, { ip: '198.51.100.60' });
+  assert.equal((await app.call('GET', '/api/admin/visitors/history?v=bad', { headers, ip: '198.51.100.98' })).status, 400);
+  const h = await app.call('GET', `/api/admin/visitors/history?v=${id.v}`, { headers, ip: '198.51.100.98' });
+  assert.equal(h.status, 200); assert.equal(h.json.total, 2); assert.equal(h.json.visits.length, 2); assert.equal(h.json.mark, null); assert.ok(h.json.score > 0 && h.json.score <= 100);
+  const marked = await app.call('PUT', '/api/admin/visitors/mark', { headers, ip: '198.51.100.98', body: { visitorId: id.v, marked: true, label: 'client', note: 'asked about the poster kit' } });
+  assert.equal(marked.status, 200); assert.equal(marked.json.mark.label, 'client');
+  assert.equal((await app.call('PUT', '/api/admin/visitors/mark', { headers, ip: '198.51.100.98', body: { visitorId: 'x' } })).status, 400);
+  const only = await app.call('GET', '/api/admin/visitors/log?marked=1&bots=include', { headers, ip: '198.51.100.98' });
+  assert.ok(only.json.rows.length === 2 && only.json.rows.every(r => r.mark && r.mark.note === 'asked about the poster kit'), 'only the marked visitor, with the mark on each row');
+  assert.equal((await app.call('GET', `/api/admin/visitors/history?v=${id.v}`, { headers, ip: '198.51.100.98' })).json.mark.label, 'client');
+  assert.equal((await app.call('PUT', '/api/admin/visitors/mark', { headers, ip: '198.51.100.98', body: { visitorId: id.v, marked: false } })).status, 200);
+  assert.equal((await app.call('GET', '/api/admin/visitors/log?marked=1&bots=include', { headers, ip: '198.51.100.98' })).json.rows.length, 0, 'un-marked');
+  assert.equal((await app.call('GET', `/api/admin/visitors/history?v=${id.v}`, { ip: '198.51.100.98' })).status, 401, 'admin only');
+});

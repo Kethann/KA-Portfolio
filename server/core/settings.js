@@ -43,6 +43,7 @@ export const DEFAULTS = {
   social: { webhook: '', webhookHost: '', defaultPlatforms: ['instagram'], defaultHashtags: [], signature: '', lastTest: null },   // webhook is stored encrypted
   reports: { daily: false, weekly: true, email: '' },
   visitors: { retentionDays: 365 },   // visits older than this are deleted daily (0 = keep forever)
+  visitorMarks: {},                   // visitors the owner has marked: { <visitor id>: { label, note, at } } (kept for follow-up; at most 500)
   site: null,                         // the portfolio document (seeded on first read)
   system: { lastHeartbeat: null, lastBackup: null }
 };

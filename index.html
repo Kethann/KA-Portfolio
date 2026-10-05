@@ -7253,7 +7253,7 @@ window.addEventListener("ka-sequence-complete", function(){
     var titleEl = document.getElementById("reel-title"), barEl = document.getElementById("reel-bar"), hEl = document.getElementById("reel-h"), introEl = document.getElementById("reel-intro");
     var cEl = document.getElementById("reel-count"), plEl = document.getElementById("reel-plabel"), ptEl = document.getElementById("reel-ptitle"), pxEl = document.getElementById("reel-ptext");
     var dotsEl = document.getElementById("reel-dots"), watchEl = document.getElementById("reel-watch"), chanEl = document.getElementById("reel-channel");
-    var rCfg = null, order = [], cards = [], dots = [];
+    var rCfg = null, order = [], cards = [], dots = [], bad = {};
     var player = null, ready = false, wanted = false, apiAsked = false, timer = 0, failed = false, curEnd = 0, curClip = null, inView = false, observed = false;
     var YT_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>';
     var ARROW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M9 7h8v8"/></svg>';
@@ -7307,6 +7307,7 @@ window.addEventListener("ka-sequence-complete", function(){
       var prev = order[0];
       order.push(order.shift());
       if (order.length > 2 && (order[0] === prev || Math.random() < 0.5)) order.push(order.shift());   // sometimes skip one: random, not a fixed loop
+      for (var g = 0; g < order.length && bad[vidAt(order[0]).id]; g++) order.push(order.shift());   // never land on a video that would not play
       place();
       timer = setTimeout(playFront, 700);
     }
@@ -7335,12 +7336,19 @@ window.addEventListener("ka-sequence-complete", function(){
         runBar(dur * 1000);
       } else if (e.data === S.ENDED){ advance(); }
     }
+    // one video that will not play (YouTube refuses some embeds now and then) is skipped; the stack only goes still when none of them play
+    function onVideoError(e){
+      window.__kaReelError = e && e.data;
+      var v = order.length ? vidAt(order[0]) : null; if (v) bad[v.id] = true;
+      if (Object.keys(bad).length >= rCfg.videos.length){ fail(); return; }
+      if (wanted) advance();
+    }
     function buildPlayer(){
       if (player || !rCfg || !rCfg.videos.length) return;
       var v = vidAt(order[0]), vars = { autoplay: 0, mute: 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1, playsinline: 1, rel: 0, origin: location.origin };
       player = new YT.Player("reel-yt", {
         host: "https://www.youtube-nocookie.com", width: "100%", height: "100%", videoId: v.id, playerVars: vars,
-        events: { onReady: function(){ ready = true; try { player.mute(); } catch (e){} if (wanted) playFront(); }, onStateChange: onState, onError: fail }
+        events: { onReady: function(){ ready = true; try { player.mute(); } catch (e){} if (wanted) playFront(); }, onStateChange: onState, onError: onVideoError }
       });
     }
     function loadApi(){
@@ -7381,6 +7389,7 @@ window.addEventListener("ka-sequence-complete", function(){
           d.addEventListener("click", function(){ jump(i); }); dotsEl.appendChild(d); dots.push(d); }
       });
       if (dotsEl) dotsEl.hidden = cfg.videos.length < 2;
+      bad = {};
       order = shuffle(cfg.videos.map(function(_, i){ return i; }));
       place();
       clearTimeout(timer);
@@ -7633,15 +7642,18 @@ window.addEventListener("ka-sequence-complete", function(){
     var W = skillsFree.clientWidth, H = skillsFree.clientHeight; if (!W || !H) return null;
     var r = skillsFree.getBoundingClientRect(), top = Math.max(0, -r.top), bot = Math.min(H, window.innerHeight - r.top);
     if (bot - top < 160){ top = 0; bot = H; }
-    return { W: W, H: H, top: top, bot: bot };
+    // keep logos out from behind the heading, intro and filter chips: above the board they may only use the free column beside it
+    var br = skillsBoard.getBoundingClientRect(), mr = skillsBoard.parentNode.getBoundingClientRect();
+    return { W: W, H: H, top: top, bot: bot, boardTop: br.top - r.top, mainRight: mr.right - r.left };
   }
   // the emptiest of a few random spots: farthest from the logos already on screen
   function pickSpot(b, m){
-    var best = null, bestD = -1, i, j;
-    for (i = 0; i < 8; i++){
+    var best = null, bestD = -Infinity, i, j;
+    for (i = 0; i < 14; i++){
       var px = b.W > 2 * m ? rnd(m, b.W - m) : b.W / 2;
       var y0 = b.top + m * .6, y1 = b.bot - m * .6;
       var py = y1 > y0 ? rnd(y0, y1) : (b.top + b.bot) / 2;
+      if (py < b.boardTop && px - m * .6 < b.mainRight) continue;   // that part of the page is text
       var d = 1e9;
       for (j = 0; j < fieldLive.length; j++){
         var p = fieldLive[j]._p; if (!p) continue;
@@ -7650,7 +7662,7 @@ window.addEventListener("ka-sequence-complete", function(){
       }
       if (d > bestD){ bestD = d; best = { x: px, y: py }; }
     }
-    return best;
+    return best || { x: b.W > 2 * m ? rnd(m, b.W - m) : b.W / 2, y: Math.min(b.H - m * .6, b.boardTop + m + rnd(0, 160)) };
   }
   function spawnTile(far){
     if (!fieldOn) return;
