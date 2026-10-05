@@ -45,9 +45,21 @@ export function licenseFile({ license, product, order, now = new Date(), verifyU
 
 // Sends one delivery email per item (with the license text and LICENSE.txt attached), then the
 // receipt for paid orders. Returns true only if every email was accepted.
+// What the owner set for one product in the portal (Products > Delivery email): an extra message, a subject and files to attach.
+export async function deliveryExtras(productId){
+  const map = (await getSetting('deliveryEmails')) || {};
+  const cfg = map[productId] || {};
+  const files = [];
+  for (const a of Array.isArray(cfg.attachments) ? cfg.attachments : []){
+    try { files.push({ name: a.name, content: await getStorage().get('deliverables', a.path) }); }
+    catch { /* a missing file must never stop the buyer's email: it is skipped */ }
+  }
+  return { subject: typeof cfg.subject === 'string' ? cfg.subject : '', note: typeof cfg.note === 'string' ? cfg.note : '', files };
+}
+
 export async function sendDeliveryEmails(order, siteUrl){
   const db = await getDb();
-  const items = await db.query(`select i.*, p.title as product_title, p.link_ttl_hours, p.max_downloads, l.name as license_name, l.body_md as license_body
+  const items = await db.query(`select i.*, p.title as product_title, p.summary as product_summary, p.version as product_version, p.link_ttl_hours, p.max_downloads, l.name as license_name, l.body_md as license_body
     from order_items i join products p on p.id = i.product_id left join licenses l on l.key = i.license_key where i.order_id = $1 order by i.id`, [order.id]);
   let ok = true;
   const code = await ensureLicenseCode(db, order.id);
@@ -56,11 +68,13 @@ export async function sendDeliveryEmails(order, siteUrl){
     const url = await issueToken(order.id, it.product_id, 'email', siteUrl);
     const license = it.license_name ? { name: it.license_name, body_md: it.license_body } : null;
     const text = licenseFile({ license, product: { title: it.product_title }, order: licensed, verifyUrl: code ? licenseUrl(siteUrl, code) : '' });
+    const extra = await deliveryExtras(it.product_id);
     const res = await sendEmail({
-      to: order.email, template: 'order_delivery',
+      to: order.email, template: 'order_delivery', subjectOverride: extra.subject || undefined,
       vars: { order_id: order.public_id, product_title: it.product_title, download_url: url, expires: fmtDate(Date.now() + it.link_ttl_hours * 3600000),
-        max_downloads: it.max_downloads, license_name: license ? license.name : 'Personal', license_text: text },
-      attachments: [{ name: 'LICENSE.txt', content: Buffer.from(text, 'utf8') }]
+        max_downloads: it.max_downloads, license_name: license ? license.name : 'Personal', license_text: text, extra_note: extra.note,
+        product_summary: it.product_summary || '', product_version: it.product_version || '' },
+      attachments: [{ name: 'LICENSE.txt', content: Buffer.from(text, 'utf8') }, ...extra.files]
     });
     ok = ok && res.ok;
   }

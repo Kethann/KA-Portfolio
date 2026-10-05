@@ -102,7 +102,7 @@ export const DEFAULT_TEMPLATES = {
   contact_notify: { subject: 'New message: {{subject}}', body: 'From: {{name}} <{{email}}>\n\n{{message}}\n\nOpen the inbox: {{portal_url}}' },
   contact_autoreply: { subject: 'Thanks for your message', body: 'Hi {{name}},\n\nThanks for reaching out. I read every message and will reply soon.\n\n{{signature}}' },
   notify_confirm: { subject: 'You’re on the list', body: 'Thanks! You’ll get one email when {{topic_name}} launches.\n\n{{signature}}' },
-  order_delivery: { subject: 'Your download: {{product_title}}', body: 'Hi,\n\nThank you for your order {{order_id}}.\n\nDownload link (valid until {{expires}}, up to {{max_downloads}} downloads):\n{{download_url}}\n\nLicense: {{license_name}}\n{{license_text}}\n\nNeed a new link later? Use "Resend my link" on the store page with this email address.\n\n{{signature}}' },
+  order_delivery: { subject: 'Your download is ready: {{product_title}} (order {{order_id}})', body: 'Hello,\n\nThank you for your purchase. Your order {{order_id}} is confirmed and {{product_title}} is ready to download.\n\nDownload your files\n{{download_url}}\n\nThis secure link works until {{expires}} and allows up to {{max_downloads}} downloads. Please save the files somewhere safe once they have downloaded.\n\n{{extra_note}}\n\nYour license\n{{license_name}} license. The full terms are attached to this email as LICENSE.txt, and the key points are below.\n\n{{license_text}}\n\nYour receipt follows in a separate email. If the link expires, you can request a new one at any time from the store with "Email me my download links", using this email address.\n\nIf anything does not work as expected, just reply to this email and we will help.\n\n{{signature}}' },
   order_receipt: { subject: 'Receipt {{invoice_number}} for order {{order_id}}', body: 'Receipt / Invoice {{invoice_number}}\nDate: {{date}}\nOrder: {{order_id}}\nBilled to: {{email}}\n\n{{lines}}\n\nSubtotal: {{subtotal}}\nDiscount: {{discount}}\n{{tax_label}}: {{tax}}\nTotal paid: {{total}}\n\nPayment reference: {{payment_id}}\n{{seller_block}}\n\n{{signature}}' },
   resend_link: { subject: 'Your download links', body: 'Here are fresh download links for your orders:\n\n{{links}}\n\nEach link works until {{expires}}.\n\n{{signature}}' },
   report: { subject: '{{period}} sales report', body: '{{summary}}\n\nOpen the portal: {{portal_url}}' },
@@ -128,7 +128,7 @@ export async function sendEmail({ to, template, vars = {}, replyTo, attachments,
   const tpl = await loadTemplate(template);
   const allVars = { signature: env('MAIL_SIGNATURE', `— ${siteName}`), ...vars };
   const subject = fill(subjectOverride ?? tpl.subject, allVars).replace(/[\r\n]+/g, ' ').slice(0, 200);
-  const text = fill(bodyOverride ?? tpl.body, allVars);
+  const text = fill(bodyOverride ?? tpl.body, allVars).replace(/\n{3,}/g, '\n\n');   // an empty placeholder never leaves a gap
   const html = layout(textToHtml(text), siteName);
   try {
     const res = await getTransport().send({ from, to, replyTo, subject, text, html, attachments });

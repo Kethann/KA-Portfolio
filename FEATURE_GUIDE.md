@@ -2526,3 +2526,9 @@ High means the statements were checked against the code that does the work. Medi
 ## `git status` after this task
 
 Only one file was created by this task: `FEATURE_GUIDE.md` (shown as untracked, `??`). The other changes in the working folder were already there or were made earlier in this session at the owner's request, and this task did not touch them: `PROJECT_NOTES.md` and `BEGINNER_NOTES.md` (earlier notes, untracked), the moved documents under `docs/`, edits to `README.md`, `Dockerfile`, `.env.example` and `wrangler.jsonc` (comment and path edits from another editor), `client/public/_headers` (an earlier cache-header fix), and the one-line location-accuracy change in `index.html` (made at the owner's request earlier in this session, listed in finding 2).
+
+## Update: product viewer and delivery email
+
+- **Product viewer (Artifacts):** on screens 900 px and wider the description sits beside the screenshots. Products with both laptop and phone screenshots get a Desktop view / Mobile view switch; the description stays the same in both.
+- **Delivery email (Portal > Products > a for-sale item > Delivery email):** after payment the buyer is emailed the secure download link and license automatically. Per product you can set a subject, an extra message and up to 5 attached files (10 MB each, 15 MB total, uploaded privately). "Save and send me a test" mails you a sample. Empty fields send the standard professional text.
+- **Routes:** `GET/PUT /api/admin/products/:id/delivery`, `POST /api/admin/products/:id/delivery/test`. **Setting:** `deliveryEmails`. The default `order_delivery` text was rewritten; an owner override in Content > Emails still wins.

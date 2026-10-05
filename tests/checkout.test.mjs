@@ -424,3 +424,26 @@ test('the order keeps how it was paid (card network + last 4, or UPI), from chec
   const pm = (await row(b.orderId)).payment_method;
   assert.equal(pm.type, 'upi'); assert.ok(!JSON.stringify(pm).includes('someone@okbank'), 'the UPI ID is never stored');
 });
+
+test('delivery email: the owner\'s message, subject and attachments for a product reach the buyer; a missing attachment never blocks it', async () => {
+  const id = await product('guided-kit');
+  await app.storage.put('deliverables', 'files/abcdefghijklmnop/Setup-guide.pdf', Buffer.from('PDFDATA'));
+  const cfg = { [id]: { subject: 'Welcome to {{product_title}}', note: 'Start with Setup-guide.pdf, then run the installer.', attachments: [
+    { name: 'Setup-guide.pdf', path: 'files/abcdefghijklmnop/Setup-guide.pdf', bytes: 7 }, { name: 'Gone.pdf', path: 'files/zzzzzzzzzzzzzzzz/Gone.pdf', bytes: 9 }] } };
+  await app.pg.query(`insert into settings (key, value) values ('deliveryEmails', $1) on conflict (key) do update set value = excluded.value`, [JSON.stringify(cfg)]);
+  const res = await order(id, { email: 'guided@example.com' });
+  assert.equal(res.status, 201); await pay(res.json);
+  const mail = mailsTo('guided@example.com')[0];
+  assert.equal(mail.subject, 'Welcome to guided kit');
+  assert.match(mail.text, /Start with Setup-guide\.pdf, then run the installer\./); assert.match(mail.text, /secure link works until/);
+  assert.ok(!/\n{3,}/.test(mail.text), 'no stretches of blank lines');
+  assert.deepEqual(mail.attachments.map(a => a.name), ['LICENSE.txt', 'Setup-guide.pdf']);
+  assert.equal(Buffer.from(mail.attachments[1].content).toString(), 'PDFDATA');
+  // a product with nothing set: the default professional text, no extra note, no stray placeholders
+  const plainId = await product('plain-kit');
+  const res2 = await order(plainId, { email: 'plain@example.com' });
+  await pay(res2.json);
+  const plain = mailsTo('plain@example.com')[0];
+  assert.match(plain.subject, /Your download is ready: plain kit/); assert.match(plain.text, /Thank you for your purchase/); assert.ok(!plain.text.includes('{{')); assert.ok(!/\n{3,}/.test(plain.text));
+  assert.deepEqual(plain.attachments.map(a => a.name), ['LICENSE.txt']);
+});

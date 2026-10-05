@@ -202,6 +202,23 @@ div.kas-lb-img{ width:min(80vw, 600px); aspect-ratio:4/5; }
   .kas-lb-caption{ padding:14px 16px; }
 }
 
+/* software items: the screenshots on the left and the description beside them (wide screens); stacked as before on phones */
+.kas-lb-views{ display:inline-flex; gap:4px; margin:8px 0 2px; padding:3px; border-radius:999px; border:1px solid var(--kas-line); background:rgba(255,255,255,.04); }
+.kas-lb-views button{ border:0; background:transparent; color:var(--kas-dim); font:inherit; font-size:12px; letter-spacing:.04em; padding:6px 14px; border-radius:999px; cursor:pointer; }
+.kas-lb-views button.is-on{ background:rgba(255,148,56,.2); color:var(--kas-ink, #efece8); }
+.kas-lb-views button:focus-visible{ outline:2px solid #ffb070; outline-offset:2px; }
+@media (min-width:900px){
+  .kas-lb.is-split{ --kas-panel:clamp(340px, 34vw, 480px); grid-template-columns:minmax(0, 1fr) var(--kas-panel); grid-template-rows:minmax(0, 1fr); }
+  .kas-lb.is-split .kas-lb-stage{ grid-column:1; padding:max(56px, env(safe-area-inset-top)) clamp(20px, 4vw, 64px) 40px; }
+  .kas-lb.is-split .kas-lb-caption{ grid-column:2; width:auto; margin:0; height:100%; box-sizing:border-box; border-radius:0; border-width:0 0 0 1px; display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; flex-wrap:nowrap; gap:12px; padding:max(56px, env(safe-area-inset-top)) 28px 24px; overflow:hidden; }
+  .kas-lb.is-split .kas-lb-caption > div:first-child{ flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain; }
+  .kas-lb.is-split .kas-lb-caption strong{ font-size:calc(var(--kas-text) * 1.45); display:block; line-height:1.15; }
+  .kas-lb.is-split .kas-lb-desc{ max-height:none; overflow:visible; margin-top:12px; }
+  .kas-lb.is-split .kas-lb-buy{ flex:none; padding-top:14px; border-top:1px solid var(--kas-line); }
+  .kas-lb.is-split .kas-lb-nav.is-next{ right:calc(var(--kas-panel) + 12px); }
+  .kas-lb.is-split .kas-lb-close{ right:max(14px, env(safe-area-inset-right)); }
+}
+
 /* ---- modal (checkout) ---- */
 .kas-modal{ position:fixed; inset:0; z-index:260; display:flex; align-items:center; justify-content:center; padding:16px; }
 .kas-modal-backdrop{ position:absolute; inset:0; background:rgba(6,5,8,.72); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); animation:kasIn .2s ease both; }

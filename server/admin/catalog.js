@@ -1,11 +1,14 @@
 // Portal: products (Artzz / Artifacts), categories, media, deliverable files, licenses.
 import { json, readJson, HttpError } from '../core/http.js';
 import { getDb } from '../core/db.js';
+import { env } from '../core/env.js';
 import { getStorage } from '../core/storage.js';
 import { randomToken } from '../core/crypto.js';
 import { str, int, bool, url as vUrl, stringArray, slug as vSlug, uuid as vUuid } from '../core/validate.js';
 import { productDto } from '../handlers/store-public.js';
 import { audit } from './auth.js';
+import { getSettingWithRevision, setSetting } from '../core/settings.js';
+import { sendEmail, DEFAULT_TEMPLATES } from '../core/email.js';
 
 const IMAGE_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/avif': 'avif', 'image/gif': 'gif' };
 const FONT_TYPES = { 'font/woff2': 'woff2', 'font/woff': 'woff', 'font/ttf': 'ttf', 'font/otf': 'otf' };
@@ -440,6 +443,57 @@ export async function deleteRating(ctx){
   return productRatings({ ...ctx, params: { id: r.product_id } });
 }
 
+// ---- the email a buyer gets after paying: an extra message, a subject and attachments, per product -------------
+const FILE_PATH = /^files\/[A-Za-z0-9_-]{16}\/[A-Za-z0-9._-]{1,100}$/;
+export const DELIVERY_LIMITS = { attachments: 5, each: 10 * MB, total: 15 * MB };
+async function readDelivery(){ const { value, revision } = await getSettingWithRevision('deliveryEmails'); return { map: value && typeof value === 'object' ? value : {}, revision }; }
+export async function getDelivery(ctx){
+  const id = vUuid(ctx.params.id, 'Product');
+  const { map } = await readDelivery(); const cfg = map[id] || {};
+  return json({ subject: cfg.subject || '', note: cfg.note || '', attachments: Array.isArray(cfg.attachments) ? cfg.attachments : [], defaultSubject: DEFAULT_TEMPLATES.order_delivery.subject, limits: DELIVERY_LIMITS });
+}
+export async function saveDelivery(ctx){
+  const id = vUuid(ctx.params.id, 'Product');
+  const b = await readJson(ctx.request, 16 * 1024);
+  const db = await getDb();
+  if (!(await db.maybeOne('select 1 from products where id = $1', [id]))) throw new HttpError(404, 'Product not found.');
+  const raw = Array.isArray(b.attachments) ? b.attachments : [];
+  if (raw.length > DELIVERY_LIMITS.attachments) throw new HttpError(400, `Attach up to ${DELIVERY_LIMITS.attachments} files.`);
+  let total = 0; const attachments = [];
+  for (const a of raw){
+    if (!a || typeof a !== 'object' || !FILE_PATH.test(String(a.path || ''))) throw new HttpError(400, 'Upload each attachment first.');
+    const bytes = int(a.bytes, { name: 'File size', min: 1, max: DELIVERY_LIMITS.each });
+    total += bytes;
+    attachments.push({ name: str(a.name, { name: 'File name', max: 100, required: true }).replace(/[^A-Za-z0-9._ -]+/g, '-'), path: a.path, bytes });
+  }
+  if (total > DELIVERY_LIMITS.total) throw new HttpError(400, `The attachments are over ${Math.round(DELIVERY_LIMITS.total / MB)} MB together. Email providers refuse larger messages; put big files in the download itself.`);
+  const cfg = { subject: str(b.subject, { name: 'Subject', max: 200 }), note: str(b.note, { name: 'Message', max: 1500, trim: false }).trim(), attachments };
+  const { map, revision } = await readDelivery();
+  const next = { ...map };
+  if (!cfg.subject && !cfg.note && !attachments.length) delete next[id]; else next[id] = cfg;
+  const rev = await setSetting('deliveryEmails', next, revision || 0);
+  if (rev === null) throw new HttpError(409, 'These settings were changed in another window. Reload and try again.', { code: 'stale' });
+  await audit(ctx, 'delivery_email_saved', id, { attachments: attachments.length });
+  return json({ ok: true, ...cfg });
+}
+// Sends the purchase email for this product to the signed-in person, with sample order details, so the wording can be checked.
+export async function testDelivery(ctx){
+  const id = vUuid(ctx.params.id, 'Product');
+  const db = await getDb();
+  const p = await db.maybeOne('select p.title, p.summary, p.version, p.max_downloads, p.link_ttl_hours, l.name as license_name from products p left join licenses l on l.id = p.license_id where p.id = $1', [id]);
+  if (!p) throw new HttpError(404, 'Product not found.');
+  const { deliveryExtras } = await import('../store/delivery.js');
+  const extra = await deliveryExtras(id);
+  const site = (env('PUBLIC_SITE_URL') || new URL(ctx.request.url).origin).replace(/\/+$/, '');
+  const res = await sendEmail({ to: ctx.admin.email, template: 'order_delivery', subjectOverride: extra.subject ? `[Test] ${extra.subject}` : `[Test] ${DEFAULT_TEMPLATES.order_delivery.subject}`,
+    vars: { order_id: 'KA-TEST0000', product_title: p.title, product_summary: p.summary, product_version: p.version, download_url: `${site}/api/download/this-is-a-test-link`,
+      expires: new Date(Date.now() + p.link_ttl_hours * 3600e3).toDateString(), max_downloads: p.max_downloads, license_name: p.license_name || 'Personal',
+      license_text: 'The key points of the license appear here, as written for this product.', extra_note: extra.note },
+    attachments: extra.files });
+  if (!res.ok) throw new HttpError(502, 'The test email could not be sent. Check Settings > System status (email).');
+  return json({ ok: true, to: ctx.admin.email, attached: extra.files.length });
+}
+
 export function registerCatalog(route){
   const a = { access: 'admin' };
   route('GET', '/api/admin/products/:id/ratings', productRatings, a);
@@ -460,6 +514,9 @@ export function registerCatalog(route){
   route('PATCH', '/api/admin/products/:id/media', updateMedia, a);
   route('DELETE', '/api/admin/products/:id/media/:mediaId', deleteMedia, a);
   route('PUT', '/api/admin/products/:id/file', setFile, a);
+  route('GET', '/api/admin/products/:id/delivery', getDelivery, a);
+  route('PUT', '/api/admin/products/:id/delivery', saveDelivery, a);
+  route('POST', '/api/admin/products/:id/delivery/test', testDelivery, a);
   route('GET', '/api/admin/products/:id/file', fileLink, a);
   route('GET', '/api/admin/categories', listCategories, a);
   route('POST', '/api/admin/categories/reorder', reorderCategories, a);

@@ -338,6 +338,7 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
                 <p className="field-hint">Replacing keeps earlier versions, so links already emailed keep working until they expire.</p>
               </section>
             )}
+            {p.sellable && <DeliveryEmailCard id={id} />}
           </div>
 
           <aside className="stack" aria-label="Store preview">
@@ -443,6 +444,42 @@ const strip = (p: Product) => ({ ...p, media: undefined, file: undefined, update
 // datetime-local works in the viewer's zone; the portal assumes India time is the owner's zone.
 function toLocal(v: string | null){ if (!v) return ''; const d = new Date(v); const ist = new Date(d.getTime() + 330 * 60e3); return ist.toISOString().slice(0, 16); }
 function fromLocal(v: string){ if (!v) return null; return new Date(v + ':00+05:30').toISOString(); }
+
+// The email a buyer gets right after paying: the download link goes out automatically; here the owner adds a message, a subject and files.
+type DeliveryCfg = { subject: string; note: string; attachments: { name: string; path: string; bytes: number }[]; defaultSubject: string; limits: { attachments: number; each: number; total: number } };
+function DeliveryEmailCard({ id }: { id: string }){
+  const r = useLoad<DeliveryCfg>(`/products/${id}/delivery`);
+  const toast = useToast();
+  const [d, setD] = useState<DeliveryCfg | null>(null);
+  useEffect(() => { if (r.data) setD(r.data); }, [r.data]);
+  if (!d) return null;
+  const set = (patch: Partial<DeliveryCfg>) => setD({ ...d, ...patch });
+  const total = d.attachments.reduce((n, a) => n + a.bytes, 0);
+  const save = async () => { const x = await put<DeliveryCfg>(`/products/${id}/delivery`, { subject: d.subject, note: d.note, attachments: d.attachments }); setD({ ...d, ...x }); toast.show('Delivery email saved', { tone: 'success' }); };
+  return (
+    <section className="card stack" aria-labelledby="pe-delivery"><h3 id="pe-delivery">Delivery email</h3>
+      <p className="field-hint" style={{ margin: 0 }}>Right after payment the buyer is emailed their secure download link, the license and this message. Leave everything empty to send the standard professional email.</p>
+      <Field label="Subject" hint="Optional. You can use {{product_title}} and {{order_id}}"><input maxLength={200} value={d.subject} placeholder={d.defaultSubject} onChange={e => set({ subject: e.target.value })} /></Field>
+      <Field label="Extra message" hint={`${d.note.length}/1500 · shown after the download link`}><textarea rows={5} maxLength={1500} value={d.note} onChange={e => set({ note: e.target.value })} placeholder="For example: setup steps, a getting-started link, or how to reach you." /></Field>
+      <div className="stack" style={{ gap: 6 }}>
+        <b>Files attached to the email</b>
+        {d.attachments.length === 0 && <p className="field-hint" style={{ margin: 0 }}>None. The license is always attached.</p>}
+        {d.attachments.map((a, i) => (
+          <div className="file-row" key={a.path}><Icon name="zip" size={18} /><div className="grow truncate">{a.name}<span className="faint"> · {bytes(a.bytes)}</span></div>
+            <button type="button" className="icon-btn sm" aria-label={`Remove ${a.name}`} onClick={() => set({ attachments: d.attachments.filter((_, j) => j !== i) })}><Icon name="trash" size={14} /></button></div>
+        ))}
+        {d.attachments.length < d.limits.attachments && (
+          <Uploader kind="deliverable" accept="*/*" label="Attach a file" onUploaded={(u: any) => set({ attachments: [...d.attachments, { name: u.file.name, path: u.path, bytes: u.file.size }] })}>
+            Up to {d.limits.attachments} files, {bytes(d.limits.each)} each and {bytes(d.limits.total)} together ({bytes(total)} used).
+          </Uploader>)}
+      </div>
+      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+        <AsyncButton className="btn primary" onClick={save}>Save delivery email</AsyncButton>
+        <AsyncButton className="btn" onClick={async () => { await save(); const t = await post<{ to: string }>(`/products/${id}/delivery/test`); toast.show(`Test email sent to ${t.to}`, { tone: 'success' }); }}>Save and send me a test</AsyncButton>
+      </div>
+    </section>
+  );
+}
 
 // Ratings and downloads for one item: buyers rate it from their download page; hide or delete any rating here.
 type RatingRow = { id: string; rating: number; review: string; name: string; status: 'visible' | 'hidden'; created_at: string; order_ref: string };

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { overlayLayer } from './overlay';
-import { getJson, getCurrency, setCurrency, onCurrency, publicConfig, formatPrice, formatDate, type Currency, type Product, type Category, type Price, type Review } from './api';
+import { getJson, getCurrency, setCurrency, onCurrency, publicConfig, formatPrice, formatDate, type Currency, type Product, type Media, type Category, type Price, type Review } from './api';
 import { useFocusTrap, useSwipe } from './hooks';
 
 type Tab = 'artzz' | 'artifacts';
@@ -329,14 +329,26 @@ function Lightbox({ items, index, mediaIndex, opener, currency, onClose, onMove,
   const product = items[index];
   const media = product?.media || [];
   // Artifacts step through their screenshots first; Artzz steps between works.
+  // Screenshots taller than wide are phone screens: when an item has both kinds, a Desktop / Mobile switch shows one kind at a time.
+  const portrait = (m: Media) => !!(m.width && m.height && m.height > m.width * 1.1);
+  const artifact = product?.kind === 'artifacts';
+  const hasBoth = artifact && media.some(portrait) && media.some(m => !portrait(m));
+  const [view, setView] = useState<'desktop' | 'mobile'>(() => (media[mediaIndex] && portrait(media[mediaIndex]) ? 'mobile' : 'desktop'));
+  const list = hasBoth ? media.map((_, i) => i).filter(i => portrait(media[i]) === (view === 'mobile')) : media.map((_, i) => i);
+  const pos = Math.max(0, list.indexOf(mediaIndex));
+  const switchView = (v: 'desktop' | 'mobile') => {
+    setView(v);
+    const first = media.map((_, i) => i).find(i => portrait(media[i]) === (v === 'mobile'));
+    if (first !== undefined) onMove(index, first);
+  };
   const step = useCallback((dir: -1 | 1) => {
     if (!product) return;
-    if (product.kind === 'artifacts' && media.length > 1){
-      onMove(index, (mediaIndex + dir + media.length) % media.length);
+    if (product.kind === 'artifacts' && list.length > 1){
+      onMove(index, list[(pos + dir + list.length) % list.length]);
     } else if (items.length > 1){
       onMove((index + dir + items.length) % items.length, 0);
     }
-  }, [product, media.length, items.length, index, mediaIndex, onMove]);
+  }, [product, list, pos, items.length, index, onMove]);
   const swipe = useSwipe(step);
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowRight'){ e.preventDefault(); step(1); }
@@ -344,8 +356,8 @@ function Lightbox({ items, index, mediaIndex, opener, currency, onClose, onMove,
   };
   if (!product) return null;
   const m = media[mediaIndex] || media[0];
-  const canStep = (product.kind === 'artifacts' && media.length > 1) || items.length > 1;
-  return <div className="kas-lb" role="dialog" aria-modal="true" aria-label={product.title} ref={ref} onKeyDown={onKey}>
+  const canStep = (artifact && list.length > 1) || items.length > 1;
+  return <div className={'kas-lb' + (artifact ? ' is-split' : '')} role="dialog" aria-modal="true" aria-label={product.title} ref={ref} onKeyDown={onKey}>
     <div className="kas-lb-backdrop" onClick={onClose} />
     <div className="kas-lb-stage" {...swipe}>
       {m ? <img key={m.url} className="kas-lb-img" src={m.url} alt={m.alt || product.title} decoding="async" draggable={false} /> : <div className="kas-lb-img kas-img-empty" />}
@@ -360,9 +372,13 @@ function Lightbox({ items, index, mediaIndex, opener, currency, onClose, onMove,
     <div className="kas-lb-caption">
       <div>
         <strong>{product.title}</strong>
+        {hasBoth && <div className="kas-lb-views" role="group" aria-label="Screenshots">
+          <button type="button" className={view === 'desktop' ? 'is-on' : ''} aria-pressed={view === 'desktop'} onClick={() => switchView('desktop')}>Desktop view</button>
+          <button type="button" className={view === 'mobile' ? 'is-on' : ''} aria-pressed={view === 'mobile'} onClick={() => switchView('mobile')}>Mobile view</button>
+        </div>}
         {/* descriptions are Markdown, rendered to safe HTML by the server (the same renderer as Tips) */}
         {product.descriptionHtml ? <div className="kas-lb-desc" dangerouslySetInnerHTML={{ __html: product.descriptionHtml }} /> : product.summary ? <p>{product.summary}</p> : null}
-        {product.kind === 'artifacts' && media.length > 1 && <span className="kas-lb-count" aria-live="polite">{mediaIndex + 1} / {media.length}</span>}
+        {artifact && list.length > 1 && <span className="kas-lb-count" aria-live="polite">{pos + 1} / {list.length}</span>}
         <Social product={product} />
         {product.rating && <Reviews slug={product.slug} />}
       </div>
