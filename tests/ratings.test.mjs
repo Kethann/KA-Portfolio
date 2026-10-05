@@ -12,7 +12,7 @@ const q = async (sql, p) => (await app.pg.query(sql, p)).rows;
 const [prod] = await q(`insert into products (kind, slug, title, status, sellable, is_free) values ('artifacts','free-brushes','Free Brushes','published',1,1) returning id`);
 await q(`insert into product_files (product_id, storage_path, filename, bytes) values ($1,'files/aaaaaaaaaaaaaaaa/b.zip','b.zip',5)`, [prod.id]);
 async function freeOrder(email){
-  const r = await app.call('POST', '/api/checkout/order', { body: { productId: prod.id, currency: 'INR', email }, headers: { origin: 'http://shop.test' } });
+  const r = await app.call('POST', '/api/checkout/order', { body: { productId: prod.id, currency: 'INR', email, licenseHolder: 'Test Buyer' }, headers: { origin: 'http://shop.test' } });
   assert.equal(r.status, 201, JSON.stringify(r.json));
   return new URL(r.json.downloadUrl).pathname.split('/').pop();
 }

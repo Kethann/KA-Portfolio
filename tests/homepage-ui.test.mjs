@@ -26,3 +26,18 @@ test('typing while a contact request is pending cannot re-enable its submit butt
   vm.runInContext(publicFunctions.get('updateContactSubmitState'),context);context.updateContactSubmitState();assert.equal(button.disabled,true);
   context.contactSending=false;context.updateContactSubmitState();assert.equal(button.disabled,false);
 });
+
+test('About Projects uses the portfolio count and count-up starts on scroll then reaches the exact target',()=>{
+  const listeners={},frames=[];
+  const box={hidden:true,children:[],replaceChildren(...items){this.children=items;},getBoundingClientRect(){return {top:100,bottom:250,height:150};},querySelectorAll(){return this.children.map(tile=>tile.children[0].children[0]);}};
+  const document={getElementById:()=>box,createElement(){return {dataset:{},children:[],attrs:{},appendChild(x){this.children.push(x);},append(...xs){this.children.push(...xs);},setAttribute(k,v){this.attrs[k]=v;}};}};
+  const window={innerHeight:800,addEventListener(name,fn){listeners[name]=fn;}};
+  const context=vm.createContext({document,window,matchMedia:()=>({matches:false}),requestAnimationFrame:fn=>{frames.push(fn);},performance:{now:()=>100}});
+  vm.runInContext(publicFunctions.get('renderAboutStats'),context);
+  context.renderAboutStats({enabled:true,items:[{label:'Projects',value:999,suffix:'+'}]},3);
+  const value=box.children[0].children[0].children[0];
+  assert.equal(value.dataset.target,'3');assert.equal(value.textContent,'0','must not animate on render');
+  assert.equal(box.children[0].children[0].children.length,1,'project count has no misleading plus suffix');
+  listeners.scroll();frames.shift()(100);frames.shift()(100);assert.equal(value.textContent,'0','scroll starts the timed count-up');
+  frames.shift()(1000);assert.equal(value.textContent,'3','animation finishes at the exact project count even after scrolling stops');
+});

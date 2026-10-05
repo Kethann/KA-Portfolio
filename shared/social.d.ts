@@ -1,0 +1,13 @@
+export type PlatformId = 'instagram' | 'x' | 'facebook' | 'linkedin' | 'threads' | 'pinterest';
+export const PLATFORMS: Record<PlatformId, { name: string; limit: number; tags: number | null; images: number; needsImage: boolean }>;
+export const PLATFORM_IDS: PlatformId[];
+export const POST_LIMITS: { caption: number; tags: number; media: number; title: number; alt: number };
+export const X_LINK_LENGTH: number;
+export function cleanTag(raw: unknown): string;
+export function parseTags(input: unknown, max?: number): string[];
+export function textLength(text: string, platform?: string): number;
+export function composeText(post: { caption?: string; hashtags?: unknown }, platform?: string): string;
+export type PostIssue = { platform: PlatformId | null; level: 'error' | 'warn'; code: string; message: string };
+export function checkPost(post: { caption?: string; hashtags?: unknown; platforms?: string[]; media?: unknown[] }): PostIssue[];
+export const STARTER_SETS: { name: string; tags: string[] }[];
+export function suggestTags(caption: string, opts?: { used?: unknown; popular?: string[]; limit?: number }): string[];

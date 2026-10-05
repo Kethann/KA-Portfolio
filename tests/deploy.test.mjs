@@ -32,7 +32,7 @@ test('wrangler.jsonc: Worker entry, D1 + migrations, R2, cron, and only dynamic 
   const d1 = wrangler.d1_databases.find(d => d.binding === 'DB');
   assert.equal(d1.migrations_dir, 'migrations');
   assert.ok(wrangler.r2_buckets.find(b => b.binding === 'FILES'));
-  assert.deepEqual(wrangler.triggers.crons, ['0 1 * * *', '0 2 * * 1']);
+  assert.deepEqual(wrangler.triggers.crons, ['0 1 * * *', '0 2 * * 1', '*/15 * * * *']);
   assert.equal(wrangler.vars.KA_ENV, 'production', 'demo payments and dev shortcuts are off on the live site');
   // secrets never live in the config file
   for (const k of Object.keys(wrangler.vars)) assert.ok(!/KEY|SECRET|PASSWORD|TOKEN/.test(k), k + ' belongs in Worker secrets');

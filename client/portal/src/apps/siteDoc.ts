@@ -21,7 +21,7 @@ export const STATS_DEFAULTS: StatsDraft = { enabled: true, items: [{ label: 'Pro
 // About > Skills (validated on the server; the server's SKILLS_DEFAULT fills a document saved before skills existed)
 export const SKILL_ICONS = ['design', 'arts', 'motion', 'video', 'ai', 'languages', 'frontend', 'backend', 'database', 'apis', 'tools', 'star'] as const;
 export const SKILL_LIMITS = { categories: 14, items: 24 };
-export type SkillItem = { name: string; code: string; color: string; level: number; note: string; logoUrl?: string };
+export type SkillItem = { name: string; code: string; color: string; level: number; note: string; logo?: string; logoUrl?: string };
 export type SkillCategory = { name: string; icon: string; items: SkillItem[] };
 export type SkillsDraft = { enabled: boolean; title: string; intro: string; categories: SkillCategory[] };
 // the checkout pass draft is exactly the card's own settings (one definition, in PassCard.tsx)

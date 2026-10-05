@@ -1,0 +1,17 @@
+# docker compose up --build   ->  http://localhost:8787 (site) and http://localhost:8787/portal/
+services:
+  site:
+    build: .
+    image: ka-site
+    ports:
+      - "8787:8787"
+    env_file:
+      - path: .env          # optional: copy .env.example to .env and fill what you use (email, Razorpay, AI ...)
+        required: false
+    environment:
+      PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-http://localhost:8787}
+    volumes:
+      - ka-data:/data       # the SQLite database, uploads and outbox survive rebuilds here
+    restart: unless-stopped
+volumes:
+  ka-data:

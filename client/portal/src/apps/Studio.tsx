@@ -26,12 +26,12 @@ type Device = keyof typeof DEVICES;
 type Section = 'identity' | 'type' | 'notice' | 'social' | 'elements' | 'arrange' | 'pass';
 
 const SECTIONS: Section[] = ['identity', 'type', 'notice', 'social', 'elements', 'arrange', 'pass'];
-export default function Studio({ active, route }: AppProps){
+export default function Studio({ active, route, only }: AppProps & { only?: Section }){
   const site = useSite();
   const toast = useToast();
   // #studio/pass (e.g. from a product's "Design the checkout pass" button) opens that section
-  const [section, setSection] = useState<Section>(() => SECTIONS.includes(route as Section) ? route as Section : 'identity');
-  useEffect(() => { if (SECTIONS.includes(route as Section)) setSection(route as Section); }, [route]);
+  const [section, setSection] = useState<Section>(() => only || (SECTIONS.includes(route as Section) ? route as Section : 'identity'));
+  useEffect(() => { if (!only && SECTIONS.includes(route as Section)) setSection(route as Section); }, [route, only]);
   const [device, setDevice] = useState<Device>('desktop');
   const [selected, setSelected] = useState<string>('portfolio-title');
   useEffect(() => { void loadSite(); }, []);
@@ -45,11 +45,11 @@ export default function Studio({ active, route }: AppProps){
       <WinTools><SiteSaveBar /></WinTools>
       <div className="studio">
         <div className="studio-panel">
-          <div className="studio-nav" role="tablist" aria-label="Studio sections">
+          {!only && <div className="studio-nav" role="tablist" aria-label="Studio sections">
             {([['identity', 'Colour'], ['type', 'Type'], ['notice', 'Banner & nav'], ['social', 'Links'], ['elements', 'Elements'], ['arrange', 'Arrange'], ['pass', 'Checkout pass']] as [Section, string][]).map(([k, l]) => (
               <button key={k} type="button" role="tab" aria-selected={section === k} className={section === k ? 'on' : ''} onClick={() => setSection(k)}>{l}</button>
             ))}
-          </div>
+          </div>}
           <div className="studio-body stack-lg">
             {section === 'identity' && <>
               <Field label="Accent colour" hint="Buttons, highlights and the nav pill">
@@ -323,6 +323,16 @@ function PassSettingsForm({ doc }: { doc: SiteDoc }){
       </div>
       <Field label="Ink"><Segmented label="Signature ink" value={p.signatureTone} onChange={(v: SignatureTone) => set({ signatureTone: v })}
         options={[{ value: 'gold', label: 'Gold' }, { value: 'white', label: 'White' }, { value: 'ink', label: 'Soft' }, { value: 'accent', label: 'Accent' }]} /></Field>
+    </div>
+
+    <div className="stack"><div className="eyebrow">Words on the back of the pass</div>
+      <div className="form-grid">
+        <Field label="Heading" hint="Small label above the license name"><input value={p.backEyebrow} maxLength={24} onChange={e => set({ backEyebrow: e.target.value })} placeholder="License" /></Field>
+        <Field label="Holder label" hint="Above the buyer's name"><input value={p.licensedLabel} maxLength={24} onChange={e => set({ licensedLabel: e.target.value })} placeholder="Licensed to" /></Field>
+        <Field label="Signature label" hint="Under the signature"><input value={p.signLabel} maxLength={32} onChange={e => set({ signLabel: e.target.value })} placeholder="Authorised signature" /></Field>
+      </div>
+      <Field label="Extra line (optional)" hint={`${p.backNote.length}/100 · for example “Commercial use allowed. No resale.”`}><input value={p.backNote} maxLength={100} onChange={e => set({ backNote: e.target.value })} placeholder="A short line of your own" /></Field>
+      <Switch checked={p.showTerms} onChange={v => set({ showTerms: v })} label="Show the delivery line (link time and download count)" />
     </div>
 
     <div className="stack"><div className="eyebrow">License seal</div>

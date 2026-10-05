@@ -80,7 +80,7 @@ Last updated: [DATE]`,
 ## What we collect
 - **When you buy or download:** your email address, the items, the amount, the currency and the payment status. Payments are handled by Razorpay; we never receive your card details.
 - **When you contact us or join a notify-me list:** your name (if you give it), email address and message.
-- **When you visit:** your IP address, approximate location (country and city, worked out from the IP address), device and browser type, the pages you view and where you came from. We use this to understand how the site is used and to stop abuse.
+- **When you visit:** your IP address, approximate location (country and city, worked out from the IP address), device and browser type, the pages you view and where you came from. We use this to understand how the site is used and to stop abuse. After about a minute on the site your browser may ask whether to share your device location. That is optional: only if you choose Allow do we keep a rounded position (about 100 m) for 7 days, to make the visit map more accurate. If you say no, nothing is collected and you are not asked again.
 - **When you chat with the assistant:** your messages and its answers. They are processed by Google's Gemini service to produce the answers and kept for up to 90 days so we can improve it.
 
 ## Stored on your device

@@ -13,6 +13,7 @@ import { SKILL_ICONS, SKILL_LIMITS } from './siteDoc';
 import type { SkillsDraft } from './siteDoc';
 import type { SiteImage, StatItem, SkillCategory, SkillItem } from './siteDoc';
 import { ago, dateTime } from '../format';
+import { SKILL_LOGO_LIST, skillLogoFor, type SkillLogo } from '../../../../shared/skill-logos.js';
 
 type Tab = 'portfolio' | 'text' | 'upscaler' | 'emails';
 const TEXT_FIELDS: [string, string, number, boolean?][] = [
@@ -90,16 +91,18 @@ function AboutStats(){
     <section className="card stack" aria-labelledby="about-stats-h" style={{ marginTop: 'var(--sp-5)' }}>
       <div className="row between"><h3 id="about-stats-h">About numbers</h3>
         <Switch checked={st.enabled} onChange={v => updateSite(d => ({ ...d, stats: { ...d.stats, enabled: v } }))} label="Show on the About page" /></div>
-      <p className="field-hint" style={{ margin: 0 }}>They count up when a visitor scrolls to them. Up to 6.</p>
+      <p className="field-hint" style={{ margin: 0 }}>The Projects total is calculated from the portfolio items. Other numbers count up when a visitor scrolls to them. Up to 6.</p>
       {st.items.map((x, i) => (
+        (() => { const isProjects = /^projects?$/i.test(x.label.trim()); return (
         <div className="row" key={i} style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <Field label={i === 0 ? 'Label' : ''}><input aria-label={`Label ${i + 1}`} value={x.label} maxLength={40} placeholder="Projects" onChange={e => change(i, { label: e.target.value })} /></Field>
-          <Field label={i === 0 ? 'Number' : ''}><input aria-label={`Number ${i + 1}`} type="number" min={0} max={1000000000} value={x.value} onChange={e => change(i, { value: Math.max(0, Math.round(Number(e.target.value) || 0)) })} style={{ width: 120 }} /></Field>
-          <Field label={i === 0 ? 'After it' : ''}><input aria-label={`Suffix ${i + 1}`} value={x.suffix} maxLength={4} placeholder="+" onChange={e => change(i, { suffix: e.target.value })} style={{ width: 70 }} /></Field>
+          <Field label={i === 0 ? 'Number' : ''} hint={isProjects ? 'Auto-counted from portfolio items' : undefined}><input aria-label={`Number ${i + 1}`} type="number" min={0} max={1000000000} value={isProjects ? doc!.images.length : x.value} disabled={isProjects} onChange={e => change(i, { value: Math.max(0, Math.round(Number(e.target.value) || 0)) })} style={{ width: 120 }} /></Field>
+          <Field label={i === 0 ? 'After it' : ''}><input aria-label={`Suffix ${i + 1}`} value={isProjects ? '' : x.suffix} maxLength={4} placeholder="+" disabled={isProjects} onChange={e => change(i, { suffix: e.target.value })} style={{ width: 70 }} /></Field>
           <button type="button" className="icon-btn sm" title="Move up" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
           <button type="button" className="icon-btn sm" title="Move down" disabled={i === st.items.length - 1} onClick={() => move(i, 1)}>↓</button>
           <button type="button" className="icon-btn sm" title="Remove" onClick={() => setItems(st.items.filter((_, j) => j !== i))}><Icon name="trash" size={14} /></button>
         </div>
+        ); })()
       ))}
       <div><button type="button" className="btn sm" disabled={st.items.length >= 6} onClick={() => setItems([...st.items, { label: '', value: 0, suffix: '+' }])}><Icon name="plus" /> Add a number</button></div>
     </section>
@@ -157,6 +160,12 @@ function AboutSkills(){
                 <input aria-label="Skill name" value={x.name} maxLength={40} placeholder="Skill" onChange={e => setItem(ci, ii, { name: e.target.value })} className="sr-name" />
                 <input aria-label="Logo letters" value={x.code} maxLength={3} placeholder={skillCode({ ...x, code: '' })} onChange={e => setItem(ci, ii, { code: e.target.value })} className="sr-code mono" title="1 to 3 letters on the logo tile (blank uses the initials)" />
                 <input aria-label="Logo colour" type="color" value={/^#[0-9a-f]{6}$/i.test(x.color) ? x.color : '#3A3340'} onChange={e => setItem(ci, ii, { color: e.target.value.toUpperCase() })} className="sr-color" title="Logo tile colour" />
+                <select aria-label="Logo" value={x.logo || ''} onChange={e => setItem(ci, ii, { logo: e.target.value })} className="sr-logo" title="Which logo to show. Auto picks one that matches the skill's name.">
+                  <option value="">Logo: auto{skillLogoFor({ name: x.name }) ? ` (${skillLogoFor({ name: x.name })!.n})` : ''}</option>
+                  <option value="none">Letters only</option>
+                  <optgroup label="Tools and brands">{SKILL_LOGO_LIST.filter(l => l.kind === 'b' || l.kind === 't' || l.kind === 'f').map(l => <option key={l.slug} value={l.slug}>{l.name}</option>)}</optgroup>
+                  <optgroup label="Icons">{SKILL_LOGO_LIST.filter(l => l.kind === 'g').map(l => <option key={l.slug} value={l.slug}>{l.name}</option>)}</optgroup>
+                </select>
                 <select aria-label="Level" value={x.level} onChange={e => setItem(ci, ii, { level: Number(e.target.value) })} className="sr-level">
                   {SKILL_LEVELS.map((l, n) => <option key={n} value={n}>{n ? `${n} · ${l}` : l}</option>)}
                 </select>
@@ -168,7 +177,7 @@ function AboutSkills(){
                 </span>
               </div>
             ))}
-            <div><button type="button" className="btn sm" disabled={c.items.length >= SKILL_LIMITS.items} onClick={() => setCat(ci, { items: [...c.items, { name: '', code: '', color: '#FF9438', level: 3, note: '', logoUrl: '' }] })}><Icon name="plus" /> Add a skill</button></div>
+            <div><button type="button" className="btn sm" disabled={c.items.length >= SKILL_LIMITS.items} onClick={() => setCat(ci, { items: [...c.items, { name: '', code: '', color: '#FF9438', level: 3, note: '', logo: '', logoUrl: '' }] })}><Icon name="plus" /> Add a skill</button></div>
           </div>}
         </div>
       ))}
@@ -178,11 +187,22 @@ function AboutSkills(){
   );
 }
 
+// A library logo drawn at tile size (the homepage draws the same data).
+function LogoMark({ logo, color }: { logo: SkillLogo; color: string }){
+  if (logo.k === 't') return <span style={{ font: '700 13px/1 ui-sans-serif, system-ui', letterSpacing: '-.03em' }}>{logo.t}</span>;
+  const stroke = logo.k === 'g';
+  return <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none">
+    {logo.k === 'f' && <defs><linearGradient id="ka-pk-fg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={logo.g[0]} /><stop offset="1" stopColor={logo.g[1]} /></linearGradient></defs>}
+    <path d={logo.p} fill={logo.k === 'b' ? logo.c : logo.k === 'f' ? 'url(#ka-pk-fg)' : 'none'} stroke={stroke ? (color || '#FF9438') : 'none'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>;
+}
+
 // The logo tile in the editor: the letters on their colour, or an uploaded logo image. Click to upload one.
 function LogoTile({ item, onChange }: { item: SkillItem; onChange: (logoUrl: string) => void }){
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const logo = item.logoUrl ? null : skillLogoFor(item);
   const pick = async (file: File) => {
     setBusy(true);
     try { const r = await upload(file, 'image'); if (r.publicUrl) onChange(r.publicUrl); }
@@ -191,8 +211,8 @@ function LogoTile({ item, onChange }: { item: SkillItem; onChange: (logoUrl: str
   };
   return <span className="skill-logo-pick">
     <button type="button" className="skill-tile" title={item.logoUrl ? 'Replace the logo image' : 'Upload a logo image (PNG, WebP or AVIF)'} aria-label={`Logo for ${item.name || 'this skill'}: upload an image`}
-      style={item.logoUrl ? { background: '#14110f' } : { background: item.color || '#3A3340', color: inkOn(item.color || '#3A3340') }} onClick={() => input.current?.click()} disabled={busy}>
-      {busy ? '…' : item.logoUrl ? <img src={item.logoUrl} alt="" /> : skillCode(item)}
+      style={item.logoUrl || (logo && logo.k !== 't') ? { background: '#17130f' } : logo ? { background: logo.bg, color: logo.fg, boxShadow: `inset 0 0 0 2px ${logo.fg}` } : { background: item.color || '#3A3340', color: inkOn(item.color || '#3A3340') }} onClick={() => input.current?.click()} disabled={busy}>
+      {busy ? '…' : item.logoUrl ? <img src={item.logoUrl} alt="" /> : logo ? <LogoMark logo={logo} color={item.color} /> : skillCode(item)}
     </button>
     {item.logoUrl && <button type="button" className="skill-logo-clear" aria-label="Use letters instead of the image" title="Use letters instead" onClick={() => onChange('')}>×</button>}
     <input ref={input} type="file" accept="image/png,image/webp,image/avif,image/jpeg" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void pick(f); }} />

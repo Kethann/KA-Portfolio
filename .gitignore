@@ -28,3 +28,6 @@ dist/
 pages/out/
 .dev.vars
 .wrangler/
+
+# headless-browser screenshots and profiles from local checks
+shots/

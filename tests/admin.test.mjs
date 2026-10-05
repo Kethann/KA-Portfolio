@@ -233,7 +233,7 @@ test('Artifacts category order is portal-controlled and published revisions can 
 });
 
 async function buy(productId, email, currency = 'INR'){
-  const o = (await app.call('POST', '/api/checkout/order', { body: { productId, currency, email }, ip: ip() })).json;
+  const o = (await app.call('POST', '/api/checkout/order', { body: { productId, currency, email, licenseHolder: 'Test Buyer' }, ip: ip() })).json;
   return (await app.call('POST', '/api/checkout/demo-pay', { body: { orderId: o.orderId, clientSecret: o.clientSecret, outcome: 'approve' }, ip: ip() })).json;
 }
 
@@ -296,7 +296,7 @@ test('coupons: create, duplicate code refused, pause, used codes cannot be delet
   assert.equal((await admin('POST', '/api/admin/coupons', { code: 'x', kind: 'percent', percentBp: 500 })).status, 400);
   assert.equal((await admin('POST', '/api/admin/coupons', { code: 'NOVALUE', kind: 'fixed' })).status, 400);
   const [p] = (await app.pg.query(`select id from products where slug = 'kit-bold'`)).rows;
-  const o = (await app.call('POST', '/api/checkout/order', { body: { productId: p.id, currency: 'INR', email: 'coupon@example.com', codes: ['LAUNCH10'] }, ip: ip() })).json;
+  const o = (await app.call('POST', '/api/checkout/order', { body: { productId: p.id, currency: 'INR', email: 'coupon@example.com', codes: ['LAUNCH10'], licenseHolder: 'Test Buyer' }, ip: ip() })).json;
   assert.equal(o.quote?.discount ?? o.discount ?? 2000, 2000);
   await app.call('POST', '/api/checkout/demo-pay', { body: { orderId: o.orderId, clientSecret: o.clientSecret, outcome: 'approve' }, ip: ip() });
   const uses = await admin('GET', `/api/admin/coupons/${coupon.id}/uses`);

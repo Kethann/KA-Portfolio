@@ -11,7 +11,7 @@ const [p] = (await app.pg.query(`insert into products (kind, slug, title, status
 await app.storage.put('deliverables', 'demo/kit.zip', Buffer.from('Z'));
 await app.pg.query(`insert into product_files (product_id, storage_path, filename, bytes) values ($1, 'demo/kit.zip', 'kit.zip', 1)`, [p.id]);
 let n = 0;
-const order = (email) => app.call('POST', '/api/checkout/order', { body: { productId: p.id, currency: 'INR', email }, ip: `198.19.0.${++n}` });
+const order = (email) => app.call('POST', '/api/checkout/order', { body: { productId: p.id, currency: 'INR', email, licenseHolder: 'Test Buyer' }, ip: `198.19.0.${++n}` });
 
 test('demo mode: approve delivers through the normal path, decline never sends a download', async () => {
   const cfg = await app.call('GET', '/api/public-config');

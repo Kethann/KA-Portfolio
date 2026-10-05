@@ -39,7 +39,7 @@ function webhook(event, entity, { eventId = `evt_${++evSeq}`, secret = HOOK_SECR
 let ipSeq = 10;
 const ip = () => `198.18.0.${++ipSeq % 250}`;
 async function order(productId, { currency = 'INR', email = 'buyer@example.com', codes, extra = {} } = {}){
-  return app.call('POST', '/api/checkout/order', { body: { productId, currency, email, codes, ...extra }, ip: ip() });
+  return app.call('POST', '/api/checkout/order', { body: { productId, currency, email, codes, licenseHolder: 'Test Buyer', ...extra }, ip: ip() });
 }
 async function pay(o, { signatureOk = true, via = 'both', paymentId = `pay_T${++seq}abcdef` } = {}){
   const rzOrder = o.razorpay.orderId;
@@ -368,8 +368,14 @@ test('license seal: a permanent code per paid order, a public check page, the ho
   assert.equal((await app.call('GET', '/license?code=not-a-code', { ip: ip() })).status, 400);
   assert.equal((await app.call('GET', '/license/KA-00000-00000', { ip: ip() })).status, 404);
   assert.equal((await app.call('GET', '/license', { ip: ip() })).status, 200);
-  // a masked email when no name was given
+  // the name is required, in the API as in the form
+  for (const bad of [undefined, '', '   ', 'x', '<>']){
+    const r = await order(kit, { email: 'noname@example.com', extra: { licenseHolder: bad } });
+    assert.equal(r.status, 400); assert.equal(r.json.code, 'holder_required');
+  }
+  // an older order with no name on file still shows a masked email
   const plain = (await order(kit, { email: 'noname@example.com' })).json; await pay(plain);
+  await app.pg.query('update orders set license_holder = null where public_id = $1', [plain.orderId]);
   const plainPage = await app.call('GET', `/license/${(await row(plain.orderId)).license_code}`, { ip: ip() });
   assert.match(plainPage.text, /n\u2022\u2022\u2022@example\.com/);
   // a refund revokes the license on the same page

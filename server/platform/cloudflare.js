@@ -140,7 +140,7 @@ export default {
   // Cron Triggers (wrangler.jsonc): 01:00 UTC daily, 02:00 UTC on Mondays.
   async scheduled(event, env, ctx){
     init(env);
-    const job = event.cron === '0 2 * * 1' ? cron.weekly : cron.daily;
+    const job = event.cron === '0 2 * * 1' ? cron.weekly : event.cron === '*/15 * * * *' ? cron.social : cron.daily;
     ctx.waitUntil(job().then(r => r.text()).then(t => console.log(`[cron] ${event.cron}: ${t.slice(0, 300)}`)));
   }
 };

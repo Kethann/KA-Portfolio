@@ -4,6 +4,7 @@
 // so an edit can't quietly disappear.
 import { HttpError } from '../core/http.js';
 import { isOwnMediaUrl } from './catalog.js';
+import { SKILL_LOGOS } from '../../shared/skill-logos.js';
 
 export const FONT_CHOICES = ['Fraunces', 'Manrope', 'Sora', 'Poppins', 'Playfair Display', 'Space Grotesk', 'system-ui'];
 export const SOCIAL_ICONS = ['behance', 'instagram', 'x', 'linkedin', 'youtube', 'website', 'email'];
@@ -23,7 +24,7 @@ export const STATS_DEFAULT = { enabled: true, items: [{ label: 'Projects', value
 // its colour), a 0-5 level (0 hides the meter) and a one-line note. The homepage keeps an identical copy
 // (DEFAULT_SKILLS in index.html) for its first paint, before /api/portfolio answers.
 export const SKILL_ICONS = ['design', 'arts', 'motion', 'video', 'ai', 'languages', 'frontend', 'backend', 'database', 'apis', 'tools', 'star'];
-const sk = (name, code, color, level, note) => ({ name, code, color, level, note, logoUrl: '' });
+const sk = (name, code, color, level, note) => ({ name, code, color, level, note, logo: '', logoUrl: '' });
 export const SKILLS_DEFAULT = {
   enabled: true, title: 'Skills', intro: 'Design, motion, video and code: the tools and crafts behind every frame and every build',
   categories: [
@@ -230,6 +231,11 @@ export function validateSiteDocument(input, current, seed){
     signatureTone: pickOf(pc.signatureTone, ['gold', 'white', 'ink', 'accent'], 'gold'),
     signatureAngle: num(pc.signatureAngle, -12, 12, -4),
     showSeal: pc.showSeal !== false,
+    backEyebrow: text(pc.backEyebrow, 24) || 'License',
+    licensedLabel: text(pc.licensedLabel, 24) || 'Licensed to',
+    signLabel: text(pc.signLabel, 32) || 'Authorised signature',
+    backNote: text(pc.backNote, 100),
+    showTerms: pc.showTerms !== false,
   };
   // About > numbers (count up on the page): up to 6, each a label, a whole number and an optional suffix like "+".
   const st = input.stats && typeof input.stats === 'object' ? input.stats : null;
@@ -262,7 +268,9 @@ export function validateSkills(input){
       const color = text(x.color, 20), level = Number(x.level);
       const logoUrl = text(x.logoUrl, 600);
       if (logoUrl && !isImageUrl(logoUrl)) throw bad(`Upload the logo for ${itemName} before saving.`);
-      items.push({ name: itemName, code: text(x.code, 3), color: /^#[0-9a-fA-F]{6}$/.test(color) ? color.toUpperCase() : '',
+      const logo = text(x.logo, 30);   // '' = match the name, 'none' = letters only, else a library logo
+      if (logo && logo !== 'none' && !Object.prototype.hasOwnProperty.call(SKILL_LOGOS, logo)) throw bad(`Pick a logo from the list for ${itemName}.`);
+      items.push({ name: itemName, code: text(x.code, 3), logo, color: /^#[0-9a-fA-F]{6}$/.test(color) ? color.toUpperCase() : '',
         level: Number.isFinite(level) ? Math.min(5, Math.max(0, Math.round(level))) : 0, note: text(x.note, 140), logoUrl });
     }
     categories.push({ name, icon: SKILL_ICONS.includes(c.icon) ? c.icon : 'star', items });

@@ -48,13 +48,39 @@ test('Skills: defaults for older sites, cleaned input, limits refused, can be hi
       { name: 'Figma', color: 'red', level: -2 } ] } ] } }, seed, seed).skills;
   assert.equal(s.enabled, false); assert.equal(s.title, 'My stack'); assert.equal(s.intro.length, 200);
   assert.equal(s.categories[0].name, 'Design'); assert.equal(s.categories[0].icon, 'star', 'unknown icons fall back');
-  assert.deepEqual(s.categories[0].items[0], { name: 'Photoshop', code: 'Psx', color: '#31A8FF', level: 5, note: 'n'.repeat(140), logoUrl: '' });
+  assert.deepEqual(s.categories[0].items[0], { name: 'Photoshop', code: 'Psx', color: '#31A8FF', level: 5, note: 'n'.repeat(140), logo: '', logoUrl: '' });
   assert.equal(s.categories[0].items.length, 2, 'unfinished empty rows are dropped');
   assert.deepEqual([s.categories[0].items[1].color, s.categories[0].items[1].level], ['', 0], 'bad colour and level cleaned');
   assert.throws(() => validateSiteDocument({ ...base, skills: { categories: Array.from({ length: 15 }, (_, i) => ({ name: 'C' + i, items: [] })) } }, seed, seed), /up to 14/);
   assert.throws(() => validateSiteDocument({ ...base, skills: { categories: [{ name: 'X', items: [{ name: 'Logo', logoUrl: 'https://evil.example/a.png' }] }] } }, seed, seed), /Upload the logo/);
   assert.throws(() => validateSiteDocument({ ...base, skills: { categories: [{ name: 'Big', items: Array.from({ length: 25 }, (_, i) => ({ name: 'S' + i })) }] } }, seed, seed), /up to 24/);
   assert.throws(() => validateSiteDocument({ ...base, skills: { categories: [{ name: '  ', items: [] }] } }, seed, seed), /needs a name/);
+});
+
+test('skill logos: every default tool resolves to a real logo, names match loosely, a bad pick is refused', async () => {
+  const { SKILL_LOGOS, SKILL_LOGO_ALIASES, skillLogoFor } = await import('../shared/skill-logos.js');
+  const { SKILLS_DEFAULT } = await import('../server/admin/site-document.js');
+  for (const [alias, slug] of Object.entries(SKILL_LOGO_ALIASES)) assert.ok(SKILL_LOGOS[slug], `${alias} -> ${slug}`);
+  for (const [slug, l] of Object.entries(SKILL_LOGOS)){
+    if (l.k === 'b' || l.k === 'g' || l.k === 'f') assert.match(l.p, /^[MmLlHhVvCcSsQqTtAaZz0-9eE.,\s-]+$/, slug);
+    if (l.k === 't') assert.match(l.bg + l.fg, /^#[0-9A-Fa-f]{6}#[0-9A-Fa-f]{6}$/, slug);
+  }
+  // nothing in the shipped skills is left as bare letters
+  const bare = SKILLS_DEFAULT.categories.flatMap(c => c.items).filter(x => !skillLogoFor(x)).map(x => x.name);
+  assert.deepEqual(bare, []);
+  assert.equal(skillLogoFor({ name: 'Adobe Premiere Pro' }).slug, 'premierepro');
+  assert.equal(skillLogoFor({ name: 'after effects' }).slug, 'aftereffects');
+  assert.equal(skillLogoFor({ name: 'Node.js' }).slug, 'nodejs');
+  assert.equal(skillLogoFor({ name: 'Photoshop', logo: 'figma' }).slug, 'figma', 'a chosen logo beats the name');
+  assert.equal(skillLogoFor({ name: 'Photoshop', logo: 'none' }), null, '"none" means letters only');
+  assert.equal(skillLogoFor({ name: 'My secret tool' }), null);
+  const base = structuredClone(seed);
+  const item = (logo) => ({ ...base, skills: { enabled: true, title: 'Skills', intro: '', categories: [{ name: 'X', icon: 'star', items: [{ name: 'Tool', code: '', color: '#FF9438', level: 3, note: '', logo }] }] } });
+  assert.equal(validateSiteDocument(item('react'), seed, seed).skills.categories[0].items[0].logo, 'react');
+  assert.equal(validateSiteDocument(item('none'), seed, seed).skills.categories[0].items[0].logo, 'none');
+  assert.equal(validateSiteDocument(item(undefined), seed, seed).skills.categories[0].items[0].logo, '');
+  assert.throws(() => validateSiteDocument(item('<script>'), seed, seed), /logo/i);
+  assert.throws(() => validateSiteDocument(item('__proto__'), seed, seed), /logo/i);
 });
 
 test('pass signature + seal: defaults, any allowed font, bounded size and slant, unknown fonts fall back', () => {
@@ -64,6 +90,10 @@ test('pass signature + seal: defaults, any allowed font, bounded size and slant,
   const p = validateSiteDocument({ ...base, passCard: { signatureText: '  K. Artzz  ', signatureFont: 'Not Uploaded', signatureSize: 300, signatureTone: 'rainbow', signatureAngle: -40, showSeal: false } }, seed, seed).passCard;
   assert.deepEqual([p.signatureText, p.signatureFont, p.signatureSize, p.signatureTone, p.signatureAngle, p.showSeal], ['K. Artzz', '', 60, 'gold', -12, false]);
   assert.equal(validateSiteDocument({ ...base, passCard: { signatureFont: 'Poppins' } }, seed, seed).passCard.signatureFont, 'Poppins');
+  // the words on the back: defaults, trimmed, bounded, and the delivery line can be switched off
+  assert.deepEqual([d.backEyebrow, d.licensedLabel, d.signLabel, d.backNote, d.showTerms], ['License', 'Licensed to', 'Authorised signature', '', true]);
+  const w = validateSiteDocument({ ...base, passCard: { backEyebrow: '  Pass  ', licensedLabel: 'Owner', signLabel: '', backNote: 'x'.repeat(300), showTerms: false } }, seed, seed).passCard;
+  assert.deepEqual([w.backEyebrow, w.licensedLabel, w.signLabel, w.backNote.length, w.showTerms], ['Pass', 'Owner', 'Authorised signature', 100, false]);
 });
 
 test('About numbers: defaults for older sites, up to 6, whole numbers, short suffix, can be hidden', () => {

@@ -86,10 +86,13 @@ export type SignatureTone = 'gold' | 'white' | 'ink' | 'accent';
 export interface PassSettings { label: string; logoUrl: string; logoSize: number; showTag: boolean; tagText: string; titleFont: string; priceFont: string;
   textPosition: 'bottom' | 'center' | 'top'; pricePosition: 'right' | 'left' | 'below'; stampText: string; foil: boolean; dim: number;
   // the signature on the back (any font, including ones uploaded in Studio) and the license seal beside it
-  signatureText: string; signatureFont: string; signatureSize: number; signatureTone: SignatureTone; signatureAngle: number; showSeal: boolean }
+  signatureText: string; signatureFont: string; signatureSize: number; signatureTone: SignatureTone; signatureAngle: number; showSeal: boolean;
+  // the words on the back of the pass
+  backEyebrow: string; licensedLabel: string; signLabel: string; backNote: string; showTerms: boolean }
 export const PASS_DEFAULTS: PassSettings = { label: 'KA PASS', logoUrl: '', logoSize: 24, showTag: true, tagText: '', titleFont: '', priceFont: '',
   textPosition: 'bottom', pricePosition: 'right', stampText: 'PAID', foil: true, dim: 55,
-  signatureText: 'Kethan Artzz', signatureFont: '', signatureSize: 30, signatureTone: 'gold', signatureAngle: -4, showSeal: true };
+  signatureText: 'Kethan Artzz', signatureFont: '', signatureSize: 30, signatureTone: 'gold', signatureAngle: -4, showSeal: true,
+  backEyebrow: 'License', licensedLabel: 'Licensed to', signLabel: 'Authorised signature', backNote: '', showTerms: true };
 export const SIGNATURE_INK: Record<SignatureTone, string> = { gold: '#f2c27b', white: '#fff6ea', ink: '#e9e1d8', accent: 'var(--kas-accent, #ff9438)' };
 declare global { interface Window { kaPassCard?: Partial<PassSettings> | null } }
 function usePassSettings(override?: Partial<PassSettings>): PassSettings {
@@ -147,15 +150,16 @@ export function PassCard({ product, currency, amount, free, email, orderId, phas
           <span className="kco-back-glow" aria-hidden="true" />
           <div className={`kco-back-grid ${pass.showSeal ? '' : 'no-seal'}`}>
             <div className="kco-back-info">
-              <span className="kco-back-eyebrow">License</span>
+              <span className="kco-back-eyebrow">{pass.backEyebrow || PASS_DEFAULTS.backEyebrow}</span>
               <strong className="kco-back-lic">{product.license ? product.license.name : 'Personal'} license</strong>
               {product.license?.summary && <span className="kco-back-sum">{product.license.summary}</span>}
-              <span className="kco-back-to"><small>Licensed to</small>{holder.trim().slice(0, 80) || shown || 'you'}</span>
-              <span className="kco-back-terms">Link by email · {product.delivery.linkHours} h · {product.delivery.maxDownloads} downloads</span>
+              <span className="kco-back-to"><small>{pass.licensedLabel || PASS_DEFAULTS.licensedLabel}</small>{holder.trim().slice(0, 80) || shown || 'you'}</span>
+              {pass.backNote && <span className="kco-back-note">{pass.backNote}</span>}
+              {pass.showTerms && <span className="kco-back-terms">Link by email · {product.delivery.linkHours} h · {product.delivery.maxDownloads} downloads</span>}
               <span className="kco-sign-wrap">
                 <span className="kco-sign" style={{ fontFamily: fam(pass.signatureFont, "'Segoe Script', 'Brush Script MT', cursive"), fontSize: pass.signatureSize,
                   color: SIGNATURE_INK[pass.signatureTone] || SIGNATURE_INK.gold, transform: `rotate(${pass.signatureAngle}deg)` }}>{pass.signatureText || 'Kethan Artzz'}</span>
-                <small>Authorised signature</small>
+                <small>{pass.signLabel || PASS_DEFAULTS.signLabel}</small>
               </span>
             </div>
             {pass.showSeal && <Seal license={license} />}

@@ -5,6 +5,7 @@ import { rateLimit, verifyTurnstile } from '../core/guard.js';
 import { email as vEmail, currency as vCurrency, str } from '../core/validate.js';
 import { getDb } from '../core/db.js';
 import * as orders from '../store/orders.js';
+import { cleanHolder } from '../store/license.js';
 import { downloadPage, redeem, resendLinks, rate } from '../store/delivery.js';
 import { onDaily } from '../jobs/hooks.js';
 
@@ -41,9 +42,11 @@ export async function createOrder(ctx){
   const body = await readJson(ctx.request, 8 * 1024);
   const email = vEmail(body.email);
   await rateLimit(`order-email:${email}`, 10, 60 * 60);
+  const holder = cleanHolder(body.licenseHolder);
+  if (!holder || holder.length < 2) throw new HttpError(400, 'Enter the name for your license.', { code: 'holder_required' });
   await verifyTurnstile(body.turnstileToken, ctx.ip);
   const result = await orders.createOrder({ productId: productIdFrom(body), currency: vCurrency(body.currency), codes: body.codes, email,
-    ip: ctx.ip, country: ctx.geo?.country || null, siteUrl: siteUrl(ctx.request), licenseHolder: body.licenseHolder });
+    ip: ctx.ip, country: ctx.geo?.country || null, siteUrl: siteUrl(ctx.request), licenseHolder: holder });
   return json(result, 201);
 }
 

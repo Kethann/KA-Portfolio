@@ -40,6 +40,7 @@ export const DEFAULTS = {
     buyerRules: { orderStatus: true },
     customRules: []                   // the owner's own rules, added after the built-in ones
   },
+  social: { webhook: '', webhookHost: '', defaultPlatforms: ['instagram'], defaultHashtags: [], signature: '', lastTest: null },   // webhook is stored encrypted
   reports: { daily: false, weekly: true, email: '' },
   visitors: { retentionDays: 365 },   // visits older than this are deleted daily (0 = keep forever)
   site: null,                         // the portfolio document (seeded on first read)

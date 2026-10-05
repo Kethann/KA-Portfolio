@@ -105,6 +105,8 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
   const [codeError, setCodeError] = useState('');
   const [codeBusy, setCodeBusy] = useState(false);
   const [flipped, setFlipped] = useState(false);
+  const [holderError, setHolderError] = useState('');
+  const holderRef = useRef<HTMLInputElement>(null);
   const [demo, setDemo] = useState(false);
   const [line, setLine] = useState(0);
   const ts = useTurnstile();
@@ -186,7 +188,8 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
     const addr = email.trim();
     if (!EMAIL.test(addr)){ setEmailError('Enter the email where your download link should go.'); dispatch({ type: 'INVALID' }); inFlight.current = false; emailRef.current?.focus(); return; }
     if (!online){ dispatch({ type: 'INVALID', error: 'You’re offline. Reconnect and try again.' }); inFlight.current = false; return; }
-    setEmailError('');
+    if (holder.trim().length < 2){ setHolderError('Enter the name for your license.'); setFlipped(true); dispatch({ type: 'INVALID' }); inFlight.current = false; holderRef.current?.focus(); return; }
+    setEmailError(''); setHolderError('');
     try {
       if (remember){ localStorage.setItem(EMAIL_KEY, addr); if (holder.trim()) localStorage.setItem(HOLDER_KEY, holder.trim()); else localStorage.removeItem(HOLDER_KEY); }
       else { localStorage.removeItem(EMAIL_KEY); localStorage.removeItem(HOLDER_KEY); }
@@ -198,7 +201,7 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
     dispatch({ type: 'VALID' });
     let order: OrderResult;
     try {
-      order = await postJson<OrderResult>('/api/checkout/order', { productId: product.id, currency, email: addr, codes, turnstileToken: pass, licenseHolder: holder.trim() || undefined });
+      order = await postJson<OrderResult>('/api/checkout/order', { productId: product.id, currency, email: addr, codes, turnstileToken: pass, licenseHolder: holder.trim() });
     } catch (err){
       ts.reset();
       if (err instanceof ApiError && err.code === 'coupon_rejected') setCodeError((err as Error).message);
@@ -308,10 +311,14 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
           <span id="kco-email-err" className="kco-err" role={emailError ? 'alert' : undefined}>{emailError}</span>
           <span id="kco-email-help" className="kas-sr">Your download link and receipt are sent to this address.</span>
         </div>
-        <div className="kco-field">
-          <input id="kco-holder" type="text" autoComplete="name" maxLength={80} placeholder=" " value={holder} onChange={e => setHolder(e.target.value)} aria-describedby="kco-holder-help" />
-          <label htmlFor="kco-holder">Name on the license <span className="kco-optional">(optional)</span></label>
-          <span id="kco-holder-help" className="kco-hint">Printed on your license and its seal page. Leave empty to show your masked email instead.</span>
+        <div className={`kco-field ${holderError ? 'is-error' : holder.trim().length >= 2 ? 'is-ok' : ''}`}>
+          <input ref={holderRef} id="kco-holder" type="text" autoComplete="name" required maxLength={80} placeholder=" " value={holder}
+            onChange={e => { setHolder(e.target.value); if (holderError) setHolderError(''); setFlipped(true); }}
+            onFocus={() => setFlipped(true)} onBlur={() => setFlipped(false)}
+            aria-invalid={!!holderError} aria-describedby="kco-holder-help kco-holder-err" />
+          <label htmlFor="kco-holder">Name on the license</label>
+          <span id="kco-holder-err" className="kco-err" role={holderError ? 'alert' : undefined}>{holderError}</span>
+          <span id="kco-holder-help" className="kco-hint">Printed on your license and its seal page. The card turns over to show it as you type.</span>
         </div>
         <label className="kco-remember"><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} /> Remember my email and name on this device for receipts</label>
         {quote && !quote.free ? <div className="kco-code">

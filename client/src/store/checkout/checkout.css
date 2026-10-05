@@ -81,7 +81,8 @@
 .kco-sign{ display:block; line-height:1.05; white-space:nowrap; overflow:visible; transform-origin:left bottom; text-shadow:0 1px 10px rgba(0,0,0,.45);
   padding-bottom:3px; border-bottom:1px solid rgba(255,236,220,.22); align-self:flex-start; max-width:100%; }
 .kco-seal{ display:flex; flex-direction:column; align-items:center; gap:4px; width:100%; }
-.kco-seal-art, .kco-seal-art svg{ display:block; width:100%; height:auto; }
+.kco-seal-art, .kco-back-note{ font-size:11px; line-height:1.35; color:rgba(255,236,214,.85); }
+.kco-seal-art svg{ display:block; width:100%; height:auto; }
 .kco-seal-art svg{ filter:drop-shadow(0 8px 18px rgba(0,0,0,.55)); }
 .kco-seal-code{ font:700 8.5px/1 var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace; letter-spacing:.1em; color:#ffd9b0; white-space:nowrap; }
 .kco-seal.is-empty{ aspect-ratio:1; justify-content:center; border-radius:50%; border:1.5px dashed rgba(232,170,106,.55); background:radial-gradient(circle, rgba(255,160,90,.1), transparent 70%);

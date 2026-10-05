@@ -1477,7 +1477,7 @@ html.ka-modal-open{ overflow:hidden; }
 /* ---- skills: resume board (left) + floating logo field (right) ---- */
 #about-skills-block[hidden], .skills-filter[hidden], #skills-intro[hidden]{ display:none; }
 .skills-meta{ margin:-14px 0 22px; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-dim); }
-.skills-layout{ display:grid; grid-template-columns:minmax(0, 1.75fr) minmax(0, 1fr); gap:clamp(24px, 4vw, 56px); align-items:start; }
+.skills-layout{ display:grid; grid-template-columns:minmax(0, 2.15fr) minmax(0, 1fr); gap:clamp(24px, 4vw, 56px); align-items:start; }
 .skills-filter{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 18px; }
 .skills-chip{ display:inline-flex; align-items:center; gap:8px; min-height:38px; padding:0 14px 0 12px; border-radius:999px; cursor:pointer;
   font:500 13px/1 'Manrope', sans-serif; color:var(--ink-dim); background:transparent; border:1px solid rgba(255,255,255,.12);
@@ -1520,12 +1520,32 @@ html.ka-modal-open{ overflow:hidden; }
 .skill-meter i{ width:6px; height:14px; border-radius:2px; background:rgba(255,255,255,.12); }
 .skill-meter i.on{ background:linear-gradient(180deg, #ffd0a6, #ff9438); box-shadow:0 0 8px rgba(255,148,56,.35); }
 
+/* overview ("All"): each category is a card of logo chips (the notes and levels appear in the spotlight and in the
+   one-category view), so the whole board is a fraction of its old height */
+.skills-board:not(.is-solo){ columns:1; }
+.skills-board:not(.is-solo) .skill-card{ display:grid; grid-template-columns:112px minmax(0, 1fr); gap:8px 12px; align-items:start; margin:0 0 8px; padding:10px 14px 10px 12px; border-radius:16px; }
+.skills-board:not(.is-solo) .skill-card-head{ margin:0; min-height:34px; gap:9px; }
+.skills-board:not(.is-solo) .skill-card-ico{ width:28px; height:28px; border-radius:9px; }
+.skills-board:not(.is-solo) .skill-card-ico svg{ width:15px; height:15px; }
+.skills-board:not(.is-solo) .skill-card h3{ font-size:15px; line-height:1.15; }
+.skills-board:not(.is-solo) .skill-card-count{ display:none; }
+.skills-board:not(.is-solo) .skill-list{ padding:1px 0; }
+.skills-board:not(.is-solo) .skill-list{ display:flex; flex-wrap:wrap; gap:5px; }
+.skills-board:not(.is-solo) .skill-item{ display:inline-flex; align-items:center; gap:8px; margin:0; padding:3px 10px 3px 3px; border-radius:999px; cursor:pointer;
+  border:1px solid rgba(255,255,255,.09); background:rgba(255,255,255,.03); transition:background .2s ease, border-color .2s ease, transform .2s var(--ease-snappy); }
+.skills-board:not(.is-solo) .skill-item:hover, .skills-board:not(.is-solo) .skill-item.is-active{ background:rgba(255,148,56,.1); border-color:rgba(255,170,120,.4); transform:translateY(-1px); }
+.skills-board:not(.is-solo) .skill-logo{ width:26px; height:26px; border-radius:8px; font-size:10px; }
+.skills-board:not(.is-solo) .skill-name{ font-size:12.5px; font-weight:500; white-space:nowrap; }
+.skills-more{ margin:2px 0 8px; width:100%; min-height:44px; border-radius:14px; cursor:pointer; font:600 13px/1 'Manrope', sans-serif; color:#ffe3cc;
+  border:1px dashed rgba(255,170,120,.5); background:rgba(255,148,56,.08); }
+.skills-more:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+
 /* entrance: cards rise in one after another the first time the block is seen */
 .skills-board .skill-card{ opacity:0; transform:translateY(16px); }
 .skills-board.is-in .skill-card{ opacity:1; transform:none; transition:opacity .6s var(--ease-standard), transform .6s var(--ease-standard); transition-delay:calc(var(--d, 0) * 70ms); }
 
 /* the floating logo field: tiles come forward out of a deep blur, sharpen, then blur past the viewer */
-.skills-field{ position:sticky; top:96px; height:min(600px, 76vh); border-radius:28px; overflow:hidden; isolation:isolate; contain:layout paint;
+.skills-field{ --fh:min(580px, 74vh); position:sticky; top:max(84px, calc((100vh - var(--fh)) / 2)); height:var(--fh); border-radius:28px; overflow:hidden; isolation:isolate; contain:layout paint;
   -webkit-mask-image:radial-gradient(closest-side, #000 62%, transparent); mask-image:radial-gradient(closest-side, #000 62%, transparent); }
 .skills-field::before{ content:""; position:absolute; inset:8%; border-radius:50%; z-index:-1;
   background:radial-gradient(circle at 50% 50%, rgba(255,148,56,.16), rgba(255,68,68,.05) 45%, transparent 70%); }
@@ -1538,8 +1558,14 @@ html.ka-modal-open{ overflow:hidden; }
 .skills-field.is-spot .skill-spot{ opacity:1; filter:blur(0); transform:translate(-50%, -50%) scale(1); }
 .skill-spot .skill-logo{ width:112px; height:112px; border-radius:30px; font-size:36px; box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 24px 60px -12px var(--c), 0 0 0 1px rgba(255,255,255,.08); }
 .skill-spot-name{ font-family:var(--font-heading), ui-serif, Georgia, serif; font-size:24px; color:var(--ink); }
+.skill-spot-note{ max-width:210px; font-size:12.5px; line-height:1.4; color:var(--ink-dim); }
 .skill-spot-level{ font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:#ffc795; }
 .skills-field.is-static .skill-float{ will-change:auto; }
+.skill-logo.is-mark{ background:radial-gradient(120% 90% at 30% 10%, rgba(255,255,255,.1), transparent 55%), #17130f;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 0 1px rgba(255,255,255,.07), 0 6px 18px -8px var(--c); }
+.skill-logo.is-mark svg{ width:56%; height:56%; display:block; }
+.skill-logo.is-tile{ background:var(--tb); color:var(--tf); box-shadow:inset 0 0 0 .14em var(--tf), 0 6px 18px -8px var(--tf); }
+.skill-logo.is-tile .t{ font-size:1.5em; font-weight:700; letter-spacing:-.03em; line-height:1; }
 .skill-logo.has-img{ background:radial-gradient(120% 90% at 30% 15%, rgba(255,255,255,.18), transparent 55%), #15110f; padding:14%; box-sizing:border-box; }
 .skill-logo.has-img img{ width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; }
 /* the far layer: big tiles out of focus, drifting slowly behind everything (the deep end of the field) */
@@ -1566,6 +1592,8 @@ html.ka-modal-open{ overflow:hidden; }
 @media (max-width:600px){
   .skills-board{ columns:1; }
   .skill-card{ padding:16px 14px 12px; }
+  .skills-board:not(.is-solo) .skill-card{ grid-template-columns:minmax(0, 1fr); gap:8px; padding:10px 12px 12px; }
+  .skills-board:not(.is-solo) .skill-card-head{ min-height:0; }
   .skills-field{ height:180px; }
   /* one sideways-scrolling row of chips instead of four wrapped rows */
   .skills-filter{ flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none; margin:0 -20px 16px; padding:2px 20px;
@@ -7151,7 +7179,7 @@ window.addEventListener("ka-sequence-complete", function(){
   var skillsBoard = document.getElementById("skills-board");
   var skillsFilter = document.getElementById("skills-filter");
   var skillsField = document.getElementById("skills-field");
-  var skillsData = null, skillsFilterIdx = -1, skillsSeq = 0;
+  var skillsData = null, skillsFilterIdx = -1, skillsSeq = 0, skillsMore = false;
 
   function skillColor(c){ return /^#[0-9a-fA-F]{6}$/.test(c || "") ? c : "#3A3340"; }
   function skillCode(x){
@@ -7166,14 +7194,54 @@ window.addEventListener("ka-sequence-complete", function(){
     var L = .2126 * lin(n >> 16) + .7152 * lin((n >> 8) & 255) + .0722 * lin(n & 255);
     return L > .4 ? "#14110f" : "#ffffff";
   }
+  // The logo table (real brand marks, Adobe-style tiles, line glyphs) is its own small bundle, fetched the first
+  // time the Skills block comes near the screen; until it arrives (or if it can't) a skill shows its letters.
+  var skillLogoLib = null, skillLogoTried = false;
+  function loadSkillLogos(){
+    if (skillLogoLib || skillLogoTried) return;
+    skillLogoTried = true;
+    import("./dist/assets/skill-logos.js").then(function(m){ skillLogoLib = m; if (skillsData) renderSkills(skillsData); }).catch(function(){});
+  }
+  function skillLum(hex){
+    var n = parseInt(hex.slice(1), 16);
+    function lin(c){ c /= 255; return c <= .04045 ? c / 12.92 : Math.pow((c + .055) / 1.055, 2.4); }
+    return .2126 * lin(n >> 16) + .7152 * lin((n >> 8) & 255) + .0722 * lin(n & 255);
+  }
+  function paintLogo(s, d, c){
+    var ns = "http://www.w3.org/2000/svg";
+    if (d.k === "t"){   // an Adobe app icon: dark square, coloured outline, the two letters
+      s.classList.add("is-tile"); s.style.setProperty("--tb", d.bg); s.style.setProperty("--tf", d.fg); s.style.setProperty("--c", d.fg);
+      s.appendChild(el("span", "t", d.t)); return;
+    }
+    var v = document.createElementNS(ns, "svg"), p = document.createElementNS(ns, "path");
+    v.setAttribute("viewBox", "0 0 24 24"); v.setAttribute("aria-hidden", "true"); v.setAttribute("focusable", "false");
+    p.setAttribute("d", d.p);
+    s.classList.add("is-mark");
+    if (d.k === "b"){ s.style.setProperty("--c", d.c); p.setAttribute("fill", d.c); }
+    else if (d.k === "f"){
+      s.style.setProperty("--c", d.g[1]);
+      var defs = document.createElementNS(ns, "defs"), g = document.createElementNS(ns, "linearGradient");
+      g.setAttribute("id", "ka-sk-fg"); g.setAttribute("x1", "0"); g.setAttribute("y1", "0"); g.setAttribute("x2", "1"); g.setAttribute("y2", "1");
+      d.g.forEach(function(col, i){ var st = document.createElementNS(ns, "stop"); st.setAttribute("offset", String(i)); st.setAttribute("stop-color", col); g.appendChild(st); });
+      defs.appendChild(g); v.appendChild(defs); p.setAttribute("fill", "url(#ka-sk-fg)");
+    } else {
+      var tint = skillLum(c) < .12 ? "#ffd9b8" : c;
+      v.setAttribute("fill", "none"); p.setAttribute("fill", "none"); p.setAttribute("stroke", tint);
+      p.setAttribute("stroke-width", "1.7"); p.setAttribute("stroke-linecap", "round"); p.setAttribute("stroke-linejoin", "round");
+    }
+    v.appendChild(p); s.appendChild(v);
+  }
   function skillLogo(x){
     var s = document.createElement("span"), c = skillColor(x.color);
     s.className = "skill-logo"; s.setAttribute("aria-hidden", "true");
     s.style.setProperty("--c", c); s.style.setProperty("--ink", skillInk(c));
-    if (x.logoUrl && /^(https:\/\/|\/)[^\s"'<>()]+$/.test(x.logoUrl)){
+    var own = x.logoUrl && /^(https:\/\/|\/)[^\s"'<>()]+$/.test(x.logoUrl);
+    var def = !own && skillLogoLib ? skillLogoLib.skillLogoFor(x) : null;
+    if (own){   // the creator's own uploaded logo always wins
       var img = document.createElement("img"); img.src = x.logoUrl; img.alt = ""; img.decoding = "async"; img.loading = "lazy"; img.draggable = false;
       s.classList.add("has-img"); s.appendChild(img);
-    } else s.textContent = skillCode(x);
+    } else if (def) paintLogo(s, def, c);
+    else s.textContent = skillCode(x);
     return s;
   }
   function skillIcon(name){
@@ -7229,9 +7297,12 @@ window.addEventListener("ka-sequence-complete", function(){
   function renderSkillBoard(animate){
     var cats = skillCats();
     skillsBoard.replaceChildren();
-    skillsBoard.classList.toggle("is-solo", skillsFilterIdx >= 0);
+    var solo = skillsFilterIdx >= 0, cap = !solo && !skillsMore && window.innerWidth <= 600 ? 4 : cats.length, shown = 0;
+    skillsBoard.classList.toggle("is-solo", solo);
     cats.forEach(function(c, ci){
-      if (skillsFilterIdx >= 0 && ci !== skillsFilterIdx) return;
+      if (solo && ci !== skillsFilterIdx) return;
+      if (shown >= cap) return;
+      shown++;
       var card = el("article", "skill-card"); card.style.setProperty("--d", String(ci));
       card.setAttribute("aria-label", c.name);
       var head = el("header", "skill-card-head"), ico = el("span", "skill-card-ico");
@@ -7246,9 +7317,9 @@ window.addEventListener("ka-sequence-complete", function(){
         li.setAttribute("aria-label", x.name + (level ? ", " + SKILL_LEVELS[level] : "") + (x.note ? ". " + x.note : ""));
         li.appendChild(skillLogo(x));
         var t = el("span", "skill-text"); t.setAttribute("aria-hidden", "true");
-        t.appendChild(el("span", "skill-name", x.name)); if (x.note) t.appendChild(el("span", "skill-note", x.note));
+        t.appendChild(el("span", "skill-name", x.name)); if (solo && x.note) t.appendChild(el("span", "skill-note", x.note));
         li.appendChild(t);
-        if (level){
+        if (solo && level){
           var m = el("span", "skill-meter"); m.setAttribute("aria-hidden", "true"); m.title = SKILL_LEVELS[level];
           for (var k = 1; k <= 5; k++) m.appendChild(el("i", k <= level ? "on" : ""));
           li.appendChild(m);
@@ -7259,6 +7330,11 @@ window.addEventListener("ka-sequence-complete", function(){
       card.appendChild(ul);
       skillsBoard.appendChild(card);
     });
+    if (shown < cats.length){
+      var more = el("button", "skills-more", "Show all " + cats.length + " categories"); more.type = "button";
+      more.addEventListener("click", function(){ skillsMore = true; renderSkillBoard(false); restartSkillField(); });
+      skillsBoard.appendChild(more);
+    }
     if (animate === false || reducedMotion) skillsBoard.classList.add("is-in");
   }
 
@@ -7361,7 +7437,7 @@ window.addEventListener("ka-sequence-complete", function(){
     spot.replaceChildren(skillLogo(x), el("span", "skill-spot-name", x.name));
     var level = Math.max(0, Math.min(5, Number(x.level) || 0));
     if (level) spot.appendChild(el("span", "skill-spot-level", SKILL_LEVELS[level]));
-    var c = spot.querySelector(".skill-logo"); if (c) c.style.setProperty("--c", skillColor(x.color));
+    if (x.note) spot.appendChild(el("span", "skill-spot-note", x.note));
     skillsField.classList.add("is-spot");
   }
   function hideSpot(){
@@ -7395,6 +7471,12 @@ window.addEventListener("ka-sequence-complete", function(){
     restartSkillField();
   }
   window.kaRenderSkills = renderSkills;
+  if ("IntersectionObserver" in window){
+    var logoIo = new IntersectionObserver(function(entries){
+      if (entries.some(function(en){ return en.isIntersecting; })){ loadSkillLogos(); logoIo.disconnect(); }
+    }, { rootMargin: "500px" });
+    logoIo.observe(skillsBlock);
+  } else loadSkillLogos();
   renderSkills(window.__kaLastPortfolioData && window.__kaLastPortfolioData.skills);
   // cards rise in the first time the board scrolls into view
   if (!reducedMotion && "IntersectionObserver" in window){
@@ -8143,8 +8225,9 @@ function applyFavicon(url){
   if (url){ if (!link.dataset.kaDefault) link.dataset.kaDefault = link.getAttribute("href") || ""; link.href = url; }
   else if (link.dataset.kaDefault !== undefined){ link.href = link.dataset.kaDefault; }
 }
-// About numbers: one tile per item; each counts from 0 when it scrolls into view (instantly with reduced motion).
-function renderAboutStats(stats){
+// About numbers: project total comes from the actual portfolio list. Other totals remain portal-editable.
+// A count-up begins only on a scroll into view and finishes on its own, even if scrolling stops.
+function renderAboutStats(stats, projectCount){
   var box = document.getElementById("about-stats");
   if (!box) return;
   var items = stats && stats.enabled !== false && Array.isArray(stats.items) ? stats.items.filter(function(x){ return x && x.label; }) : [];
@@ -8153,49 +8236,58 @@ function renderAboutStats(stats){
   box.replaceChildren.apply(box, items.map(function(x){
     var tile = document.createElement("div"); tile.className = "about-stat"; tile.setAttribute("role", "listitem");
     var num = document.createElement("span"); num.className = "about-stat-num";
-    var val = document.createElement("span"); val.textContent = "0"; val.dataset.target = String(Math.max(0, Number(x.value) || 0));
+    var isProjects = /^projects?$/i.test(String(x.label).trim());
+    var target = isProjects ? Math.max(0, Math.floor(Number(projectCount) || 0)) : Math.max(0, Math.round(Number(x.value) || 0));
+    var suffix = isProjects ? "" : (x.suffix || "");
+    var val = document.createElement("span"); val.textContent = "0"; val.dataset.target = String(target);
     num.appendChild(val);
-    if (x.suffix){ var sfx = document.createElement("span"); sfx.className = "sfx"; sfx.textContent = x.suffix; num.appendChild(sfx); }
+    if (suffix){ var sfx = document.createElement("span"); sfx.className = "sfx"; sfx.textContent = suffix; num.appendChild(sfx); }
     var label = document.createElement("span"); label.className = "about-stat-label"; label.textContent = x.label;
-    tile.setAttribute("aria-label", fmt(val.dataset.target) + (x.suffix || "") + " " + x.label);
+    tile.setAttribute("aria-label", fmt(target) + suffix + " " + x.label);
     tile.append(num, label);
     return tile;
   }));
   // Scroll-linked count: starts as soon as the tiles enter the screen, reaches the exact number when they are
   // centred, never goes back down while they stay on screen, and starts over once they have left it completely.
   var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var state = window.__kaStats || (window.__kaStats = { box: null, best: 0, queued: false });
-  state.box = box; state.best = 0;
+  var state = window.__kaStats || (window.__kaStats = { box: null, queued: false, completed: false, running: false, frame: 0 });
+  state.box = box; state.completed = false; state.running = false; state.frame++;
   var paint = function(p){
     var eased = 1 - Math.pow(1 - p, 3);
     box.querySelectorAll(".about-stat-num > span:first-child").forEach(function(el){
       el.textContent = fmt((Number(el.dataset.target) || 0) * eased);
     });
   };
-  if (reduce){ paint(1); return; }
+  if (reduce){ state.completed = true; paint(1); return; }
   var update = function(){
     state.queued = false;
     var b = state.box; if (!b || b.hidden) return;
     var r = b.getBoundingClientRect(), vh = window.innerHeight || 1;
-    if (!r.height || r.bottom <= 0 || r.top >= vh){ if (state.best !== 0){ state.best = 0; paint(0); } return; }   // fully off screen: start over
-    // 0 as the tiles enter from either edge, 1 when they are centred (scrolling down or back up alike)
-    var p = Math.min(1, Math.max(0, 1 - Math.abs((r.top + r.height / 2) - vh / 2) / (vh / 2 + r.height / 2)));
-    if (p > state.best){ state.best = p; paint(p); }
+    if (!r.height || r.bottom <= 0 || r.top >= vh){ if (state.completed){ state.completed = false; paint(0); } return; }
+    if (state.completed || state.running) return;
+    state.running = true;
+    var frame = state.frame, start = 0, duration = 900;
+    var step = function(now){
+      if (frame !== state.frame || state.box !== b) return;
+      if (!start) start = now || 1;
+      var p = Math.min(1, Math.max(0, ((now || start) - start) / duration));
+      paint(p);
+      if (p < 1) requestAnimationFrame(step);
+      else { state.running = false; state.completed = true; paint(1); }
+    };
+    requestAnimationFrame(step);
   };
   state.update = update;
   if (!state.bound){
     state.bound = true;
     var queue = function(){ if (!state.queued){ state.queued = true; requestAnimationFrame(function(){ state.update && state.update(); }); } };
     window.addEventListener("scroll", queue, { passive: true });
-    window.addEventListener("resize", queue);
-    document.addEventListener("click", function(){ setTimeout(queue, 50); setTimeout(queue, 600); }, true);   // section switches
   }
   paint(0);
-  requestAnimationFrame(update);
 }
 
 function applySiteAppearance(data){
-  try { renderAboutStats(data && data.stats); } catch(e){}
+  try { renderAboutStats(data && data.stats, data && data.images && data.images.length); } catch(e){}
   try { if (window.kaRenderSkills) window.kaRenderSkills(data && data.skills); } catch(e){}
   var root = document.documentElement.style;
   if (data.details){
@@ -8502,25 +8594,34 @@ if (!/[?&]preview=1(&|$)/.test(location.search) && window.parent === window){
       isNew = false;
     };
     window.kaTrackView(location.pathname + location.search);
-    // A visible opt-in; the browser permission prompt only follows this visitor action.
-    var consented = false; try { consented = localStorage.getItem("ka_location_consent") === "1"; } catch(e){}
+    // Location: there is no button on the page. After a minute of real use (the tab in view) the browser's own
+    // permission prompt asks once; only "Allow" shares anything. If it is declined or ignored it is not asked
+    // again on this device. A visitor who already allowed it shares once per visit, with no new prompt.
     if (navigator.geolocation && !/[?&]preview=1(&|$)/.test(location.search)){
-      var share = document.createElement('button');
-      share.type = 'button'; share.className = 'location-share';
-      share.textContent = 'Share location for a more accurate visit map';
-      share.setAttribute('aria-label', 'Optionally share your location once for a more accurate visit map');
-      share.addEventListener('click', function(){
-        try { localStorage.setItem('ka_location_consent', '1'); } catch(e){}
-        share.disabled = true; share.textContent = 'Waiting for browser permission…';
-        navigator.geolocation.getCurrentPosition(function(pos){
-          post({ t: 'location', lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy });
-          share.textContent = 'Location shared for this visit';
-        }, function(){ share.disabled = false; share.textContent = 'Share location for a more accurate visit map'; }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
-      });
-      if (consented){ share.textContent = 'Share location for a more accurate visit map'; }
-      document.body.appendChild(share);
+      var locAsked = false;
+      var locAsk = function(){
+        var key = "ka_location_asked", asked = false, sentThisVisit = false;
+        try { asked = localStorage.getItem(key) === "1"; sentThisVisit = sessionStorage.getItem("ka_location_sent") === "1"; } catch(e){}
+        if (sentThisVisit) return;
+        var send = function(){
+          navigator.geolocation.getCurrentPosition(function(pos){
+            try { sessionStorage.setItem("ka_location_sent", "1"); } catch(e){}
+            post({ t: "location", lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy });
+          }, function(){}, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+        };
+        var ask = function(){ try { localStorage.setItem(key, "1"); } catch(e){} send(); };
+        if (navigator.permissions && navigator.permissions.query){
+          navigator.permissions.query({ name: "geolocation" }).then(function(r){
+            if (r.state === "granted") send();                 // already allowed: no prompt
+            else if (r.state === "prompt" && !asked) ask();     // the browser's own question, once
+          }).catch(function(){ if (!asked) ask(); });
+        } else if (!asked) ask();
+      };
+      var locTimer = setInterval(function(){
+        if (locAsked || document.visibilityState !== "visible" || elapsed() < 60000) return;
+        locAsked = true; clearInterval(locTimer); locAsk();
+      }, 5000);
     }
-    // Precise location is only collected after a visitor clicks and the browser grants permission.
     setInterval(function(){ if (document.visibilityState === "visible") post({ t: "ping", d: elapsed() }); }, 30000);
     document.addEventListener("visibilitychange", function(){
       if (document.visibilityState === "hidden"){ visibleMs += Date.now() - shownAt; post({ t: "leave", d: visibleMs }, true); }
@@ -8533,7 +8634,7 @@ if (!/[?&]preview=1(&|$)/.test(location.search) && window.parent === window){
 </script>
 
 <style>
-.location-share{position:fixed;right:18px;bottom:96px;z-index:60;max-width:min(320px,calc(100vw - 36px));padding:11px 15px;border:1px solid rgba(255,190,130,.42);border-radius:999px;background:rgba(24,22,25,.88);backdrop-filter:blur(14px);color:#f0e9df;font:500 12px 'DM Sans',sans-serif;box-shadow:0 8px 28px #0006;cursor:pointer}.location-share:hover,.location-share:focus-visible{border-color:#ffbb7a;background:rgba(40,34,33,.96)}.location-share:disabled{opacity:.72;cursor:wait}/* ============================================================ AI ASSISTANT WIDGET ========== */
+/* ============================================================ AI ASSISTANT WIDGET ========== */
 
 .assistant-launcher{
   position:fixed; bottom:28px; right:28px; z-index:70;

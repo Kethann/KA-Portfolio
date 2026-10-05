@@ -21,6 +21,12 @@ export async function daily(){
   return json({ ok: true, results });
 }
 
+// Scheduled social posts (every 15 minutes): sends what is due through the connected webhook.
+export async function social(){
+  const { runDue } = await import('../store/social.js');
+  return json({ ok: true, results: await runDue() });
+}
+
 export async function weekly(){
   const results = {};
   try {

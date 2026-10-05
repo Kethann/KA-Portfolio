@@ -16,6 +16,8 @@
     "cf:dev": "npm run build:cf && wrangler dev",
     "cf:migrate": "wrangler d1 migrations apply ka-db --remote",
     "cf:deploy": "npm run build:cf && wrangler d1 migrations apply ka-db --remote && wrangler deploy && node scripts/deploy-pages.mjs",
+    "docker:build": "docker build -t ka-site .",
+    "docker:up": "docker compose up --build",
     "cf:upload-files": "node scripts/upload-files-to-r2.mjs",
     "cf:deploy-pages": "node scripts/deploy-pages.mjs"
   },

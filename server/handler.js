@@ -21,6 +21,7 @@ import { registerVisitors } from './admin/visitors.js';
 import { registerVisits } from './visitors/track.js';
 import { registerAssistantAdmin } from './admin/assistant.js';
 import { registerUsage } from './admin/usage.js';
+import { registerSocial } from './admin/social.js';
 
 export const router = createRouter();
 const { route } = router;
@@ -42,6 +43,7 @@ registerSystem(route);
 registerVisitors(route);
 registerVisits(route);
 registerAssistantAdmin(route);
+registerSocial(route);
 registerUsage(route);
 
 // ---- public site
@@ -56,6 +58,7 @@ route('GET', '/api/health', async () => json({ ok: true }));
 // ---- scheduled jobs
 route('GET', '/api/cron/daily', cron.daily, { access: 'cron' });
 route('GET', '/api/cron/weekly', cron.weekly, { access: 'cron' });
+route('GET', '/api/cron/social', cron.social, { access: 'cron' });
 
 // Extension point for later phases: each module registers its own routes.
 export function register(fn){ fn(route); }

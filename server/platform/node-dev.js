@@ -170,6 +170,19 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const { port, address } = server.address();
     console.log(`Site:    http://${address}:${port}\nPortal:  http://${address}:${port}/portal/`);
     console.log('Data:    local SQLite database (.data/ka.sqlite) + storage in .data/');
+    // The jobs Cloudflare Cron Triggers run on the live site, on timers here (self-hosting / Docker): scheduled social
+    // posts every minute; the daily job after 01:00 UTC and the weekly one on Mondays after 02:00 UTC, once each.
+    const cron = import('../handlers/cron.js');
+    const ran = { daily: '', weekly: '' };
+    const tick = async () => {
+      try {
+        const c = await cron, now = new Date(), day = now.toISOString().slice(0, 10);
+        await c.social();
+        if (now.getUTCHours() >= 1 && ran.daily !== day){ ran.daily = day; await c.daily(); }
+        if (now.getUTCDay() === 1 && now.getUTCHours() >= 2 && ran.weekly !== day){ ran.weekly = day; await c.weekly(); }
+      } catch (err){ console.error('[cron] timer job failed:', err && err.message); }
+    };
+    const timer = setInterval(tick, 60e3); timer.unref();
     const stop = () => server.shutdown().then(() => process.exit(0));
     process.once('SIGINT', stop); process.once('SIGTERM', stop);
   }).catch((err) => {

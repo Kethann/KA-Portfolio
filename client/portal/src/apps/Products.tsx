@@ -195,6 +195,7 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
   useSaveKey(active, () => void save());
   const history = useLoad<{ revisions: { id: number; action: 'publish' | 'restore'; created_at: string; actor: string | null }[] }>(`/products/${id}/history`);
 
+  const packed = useRef(false);   // a hook: it must run before the early returns below, on every render
   if (s.error && !s.data) return <ErrorState message={s.error} retry={s.reload} />;
   if (!draft || !saved) return <div className="pad"><SkeletonRows rows={10} /></div>;
   const p = draft;
@@ -211,7 +212,6 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
   // Deliverable: optionally repackaged so LICENSE.txt travels inside the download.
   // LICENSE.txt is packed into the download in the browser (the whole file in memory, ZIP up to 4 GB), so only for
   // files up to 1 GB; bigger files go up as they are (buyers still get LICENSE.txt attached to the delivery email).
-  const packed = useRef(false);
   const prepareFile = async (file: File) => {
     packed.current = false;
     if (!packLicense || !license) return file;
