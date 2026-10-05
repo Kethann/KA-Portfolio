@@ -31,3 +31,7 @@ pages/out/
 
 # headless-browser screenshots and profiles from local checks
 shots/
+
+# staged Pages bundle (scripts/stage-pages.mjs)
+/out/
+/pages/out/
