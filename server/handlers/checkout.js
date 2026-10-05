@@ -43,7 +43,7 @@ export async function createOrder(ctx){
   await rateLimit(`order-email:${email}`, 10, 60 * 60);
   await verifyTurnstile(body.turnstileToken, ctx.ip);
   const result = await orders.createOrder({ productId: productIdFrom(body), currency: vCurrency(body.currency), codes: body.codes, email,
-    ip: ctx.ip, country: ctx.geo?.country || null, siteUrl: siteUrl(ctx.request) });
+    ip: ctx.ip, country: ctx.geo?.country || null, siteUrl: siteUrl(ctx.request), licenseHolder: body.licenseHolder });
   return json(result, 201);
 }
 

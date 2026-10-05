@@ -11,6 +11,7 @@ import { sendEmail, escapeHtml } from '../core/email.js';
 import { getStorage } from '../core/storage.js';
 import { markdownToText } from '../core/markdown.js';
 import { formatMoney } from './pricing.js';
+import { ensureLicenseCode, licenseUrl, sealSvg } from './license.js';
 
 export const SIGNED_URL_SECONDS = 60;
 const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
@@ -28,12 +29,14 @@ function fmtDate(d){
   return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(d)) + ' IST';
 }
 
-export function licenseFile({ license, product, order, now = new Date() }){
+export function licenseFile({ license, product, order, now = new Date(), verifyUrl = '' }){
   const body = license ? markdownToText(license.body_md) : 'Personal use only. Contact the seller for any other use.';
   return [
     `${license ? license.name : 'Personal'} license — ${product.title}`,
-    `Licensed to: ${order.email}`,
+    `Licensed to: ${order.license_holder ? `${order.license_holder} <${order.email}>` : order.email}`,
     `Order: ${order.public_id}   Date: ${now.toISOString().slice(0, 10)}`,
+    ...(order.license_code ? [`License code: ${order.license_code}`] : []),
+    ...(verifyUrl ? [`Verify this license: ${verifyUrl}`] : []),
     '',
     body.trim(),
     ''
@@ -47,10 +50,12 @@ export async function sendDeliveryEmails(order, siteUrl){
   const items = await db.query(`select i.*, p.title as product_title, p.link_ttl_hours, p.max_downloads, l.name as license_name, l.body_md as license_body
     from order_items i join products p on p.id = i.product_id left join licenses l on l.key = i.license_key where i.order_id = $1 order by i.id`, [order.id]);
   let ok = true;
+  const code = await ensureLicenseCode(db, order.id);
+  const licensed = { ...order, license_code: code };
   for (const it of items){
     const url = await issueToken(order.id, it.product_id, 'email', siteUrl);
     const license = it.license_name ? { name: it.license_name, body_md: it.license_body } : null;
-    const text = licenseFile({ license, product: { title: it.product_title }, order });
+    const text = licenseFile({ license, product: { title: it.product_title }, order: licensed, verifyUrl: code ? licenseUrl(siteUrl, code) : '' });
     const res = await sendEmail({
       to: order.email, template: 'order_delivery',
       vars: { order_id: order.public_id, product_title: it.product_title, download_url: url, expires: fmtDate(Date.now() + it.link_ttl_hours * 3600000),
@@ -111,6 +116,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #ff9438;outline-offset:3p
 .stars label{font-size:32px;line-height:1;color:rgba(255,255,255,.22);cursor:pointer;transition:color .15s}
 .stars input:checked~label,.stars label:hover,.stars label:hover~label{color:#ffb35c}.stars input:focus-visible+label{outline:2px solid #ff9438;border-radius:4px}
 .rate textarea,.rate input[name=name]{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(0,0,0,.25);color:#edebe8;font:inherit}
+.seal{display:block;width:150px;margin:24px auto 6px}.seal svg{display:block;width:100%;height:auto}.seal-code{text-align:center;margin:0}
 button.ghost{background:transparent;border-color:rgba(255,255,255,.25);justify-self:start}.ts{margin:0 0 16px}.brand{font:600 11px/1 ui-monospace,monospace;letter-spacing:.14em;color:#c9864f;margin-bottom:18px;display:block}
 </style>${withTs ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>' : ''}</head>
 <body><main class="card"><span class="brand">${escapeHtml(env('SITE_NAME', 'KETHAN ARTZZ').toUpperCase())}</span>${bodyHtml.replace('{{TURNSTILE}}', withTs ? `<div class="ts cf-turnstile" data-sitekey="${escapeHtml(siteKey)}" data-theme="dark"></div>` : '')}</main></body></html>`;
@@ -184,9 +190,13 @@ export async function downloadPage(token, siteUrl, { rated = false } = {}){
   const rateHtml = canRate ? ratingForm(token, await ratingFor(t), rated) : '';
   if (error) return errorPage(error, siteUrl, rateHtml);
   const left = t.max_downloads - t.download_count;
+  // the license seal: scanning it (or the link) proves this purchase to anyone, without the download link
+  const code = await ensureLicenseCode(await getDb(), t.order_id);
+  const seal = code ? `<a class="seal" href="${escapeHtml(licenseUrl(siteUrl, code))}" aria-label="Your license ${escapeHtml(code)}: open the license check page">${sealSvg({ url: licenseUrl(siteUrl, code), code, issuer: env('SITE_NAME', 'Kethan Artzz') })}</a>
+<p class="seal-code"><small>Your license seal · ${escapeHtml(code)}</small></p>` : '';
   return page(200, `Download ${t.product_title}`, `<h1>${escapeHtml(t.product_title)}</h1>
 <p>Order ${escapeHtml(t.public_id)} · ${left} download${left === 1 ? '' : 's'} left · link valid until ${escapeHtml(fmtDate(t.expires_at))}</p>
-<form method="post">{{TURNSTILE}}<button type="submit">Download</button></form>${rateHtml}`, { turnstile: true });
+<form method="post">{{TURNSTILE}}<button type="submit">Download</button></form>${seal}${rateHtml}`, { turnstile: true });
 }
 
 // Counts one download (atomic: never above the limit) and redirects to a short-lived signed URL.

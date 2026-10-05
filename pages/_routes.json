@@ -1,1 +1,1 @@
-{ "version": 1, "include": ["/api/*", "/legal", "/legal/*", "/__storage/*", "/__storage-upload/*"], "exclude": [] }
+{ "version": 1, "include": ["/api/*", "/legal", "/legal/*", "/license", "/license/*", "/__storage/*", "/__storage-upload/*"], "exclude": [] }

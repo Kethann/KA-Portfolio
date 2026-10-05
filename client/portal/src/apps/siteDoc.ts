@@ -3,6 +3,7 @@
 // device's newer save is never overwritten silently).
 import { useSyncExternalStore } from 'react';
 import { get, put } from '../api';
+import { PASS_DEFAULTS, type PassSettings } from '../../../src/store/checkout/PassCard';
 
 export type SiteImage = { id: string; slug: string; title: string; cat: string; description: string; technologies: string[]; link: string; downloadable?: boolean; src?: string; widths: number[]; full: number; width?: number; height?: number };
 export type SiteDoc = {
@@ -18,14 +19,14 @@ export type StatItem = { label: string; value: number; suffix: string };
 export type StatsDraft = { enabled: boolean; items: StatItem[] };
 export const STATS_DEFAULTS: StatsDraft = { enabled: true, items: [{ label: 'Projects', value: 150, suffix: '+' }, { label: 'Delivered', value: 120, suffix: '+' }, { label: 'Happy clients', value: 60, suffix: '+' }, { label: 'Years', value: 6, suffix: '+' }] };
 // About > Skills (validated on the server; the server's SKILLS_DEFAULT fills a document saved before skills existed)
-export const SKILL_ICONS = ['design', 'arts', 'languages', 'frontend', 'backend', 'database', 'apis', 'motion', 'tools', 'star'] as const;
-export type SkillItem = { name: string; code: string; color: string; level: number; note: string };
+export const SKILL_ICONS = ['design', 'arts', 'motion', 'video', 'ai', 'languages', 'frontend', 'backend', 'database', 'apis', 'tools', 'star'] as const;
+export const SKILL_LIMITS = { categories: 14, items: 24 };
+export type SkillItem = { name: string; code: string; color: string; level: number; note: string; logoUrl?: string };
 export type SkillCategory = { name: string; icon: string; items: SkillItem[] };
 export type SkillsDraft = { enabled: boolean; title: string; intro: string; categories: SkillCategory[] };
-export type PassDraft = { label: string; logoUrl: string; logoSize: number; showTag: boolean; tagText: string; titleFont: string; priceFont: string;
-  textPosition: 'bottom' | 'center' | 'top'; pricePosition: 'right' | 'left' | 'below'; stampText: string; foil: boolean; dim: number };
-export const PASS_DRAFT_DEFAULTS: PassDraft = { label: 'KA PASS', logoUrl: '', logoSize: 24, showTag: true, tagText: '', titleFont: '', priceFont: '',
-  textPosition: 'bottom', pricePosition: 'right', stampText: 'PAID', foil: true, dim: 55 };
+// the checkout pass draft is exactly the card's own settings (one definition, in PassCard.tsx)
+export type PassDraft = PassSettings;
+export const PASS_DRAFT_DEFAULTS: PassDraft = PASS_DEFAULTS;
 type State = { doc: SiteDoc | null; saved: string; error: string | null; loading: boolean; saving: boolean };
 let state: State = { doc: null, saved: '', error: null, loading: false, saving: false };
 const subs = new Set<() => void>();

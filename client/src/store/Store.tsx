@@ -130,7 +130,7 @@ function CurrencySwitch({ value, onChange, international }: { value: Currency; o
 
 type PriceFilter = 'all' | 'free' | 'paid' | 'sale';
 type Sort = 'featured' | 'price-asc' | 'price-desc' | 'popular' | 'rating';
-const PRICE_FILTERS: { id: PriceFilter; label: string }[] = [{ id: 'all', label: 'All' }, { id: 'free', label: 'Free' }, { id: 'paid', label: 'Paid' }, { id: 'sale', label: 'On sale' }];
+const PRICE_FILTERS: { id: PriceFilter; label: string }[] = [{ id: 'all', label: 'Any price' }, { id: 'free', label: 'Free' }, { id: 'paid', label: 'Paid' }, { id: 'sale', label: 'On sale' }];
 const isFree = (p: Product, c: Currency) => p.free || (p.sellable && p.prices[c].available && p.prices[c].free);
 const priceMatches = (p: Product, c: Currency, f: PriceFilter) => {
   const pr = p.prices[c];

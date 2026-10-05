@@ -4,7 +4,7 @@
 export default {
   async fetch(request, env){
     const path = new URL(request.url).pathname;
-    if (/^\/(api\/|legal(\/|$)|__storage\/|__storage-upload\/)/.test(path)) return env.SITE.fetch(request);
+    if (/^\/(api\/|legal(\/|$)|license(\/|$)|__storage\/|__storage-upload\/)/.test(path)) return env.SITE.fetch(request);
     return env.ASSETS.fetch(request);
   }
 };

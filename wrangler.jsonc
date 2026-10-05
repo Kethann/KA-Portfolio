@@ -19,6 +19,8 @@
 			"/api/*",
 			"/legal",
 			"/legal/*",
+			"/license",
+			"/license/*",
 			"/__storage/*",
 			"/__storage-upload/*"
 		]

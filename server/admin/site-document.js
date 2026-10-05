@@ -22,23 +22,36 @@ export const STATS_DEFAULT = { enabled: true, items: [{ label: 'Projects', value
 // About > Skills: a resume-style board, one card per category. Each skill shows a logo tile (a short code on
 // its colour), a 0-5 level (0 hides the meter) and a one-line note. The homepage keeps an identical copy
 // (DEFAULT_SKILLS in index.html) for its first paint, before /api/portfolio answers.
-export const SKILL_ICONS = ['design', 'arts', 'languages', 'frontend', 'backend', 'database', 'apis', 'motion', 'tools', 'star'];
-const sk = (name, code, color, level, note) => ({ name, code, color, level, note });
+export const SKILL_ICONS = ['design', 'arts', 'motion', 'video', 'ai', 'languages', 'frontend', 'backend', 'database', 'apis', 'tools', 'star'];
+const sk = (name, code, color, level, note) => ({ name, code, color, level, note, logoUrl: '' });
 export const SKILLS_DEFAULT = {
-  enabled: true, title: 'Skills', intro: 'The tools, languages and crafts behind every frame and every build',
+  enabled: true, title: 'Skills', intro: 'Design, motion, video and code: the tools and crafts behind every frame and every build',
   categories: [
     { name: 'Design', icon: 'design', items: [
       sk('Photoshop', 'Ps', '#31A8FF', 5, 'Compositing and retouching every key-art layer'),
       sk('Illustrator', 'Ai', '#FF9A00', 4, 'Vector typography and title treatments'),
-      sk('Figma', 'Fg', '#A259FF', 4, 'Campaign layouts and social deliverable systems'),
       sk('InDesign', 'Id', '#FF3366', 3, 'Press kits and print-ready layouts'),
-      sk('After Effects', 'Ae', '#9999FF', 3, 'Motion posters and animated titles') ] },
+      sk('Figma', 'Fg', '#A259FF', 4, 'Campaign layouts and social deliverable systems') ] },
+    { name: 'Motion design', icon: 'motion', items: [
+      sk('After Effects', 'Ae', '#9999FF', 4, 'Motion posters, title animation and compositing'),
+      sk('Motion posters', 'Mp', '#C792FF', 4, 'Key art brought to life for launches'),
+      sk('Kinetic typography', 'Kt', '#7FD4FF', 4, 'Titles, credits and lyric sequences'),
+      sk('Lottie & web motion', 'Lt', '#00DDB3', 3, 'Lightweight animation for sites and apps') ] },
+    { name: 'Video', icon: 'video', items: [
+      sk('Premiere Pro', 'Pr', '#EA77FF', 4, 'Teasers, promos and social cut-downs'),
+      sk('Adobe Media Encoder', 'Me', '#8F8FFF', 4, 'Batch exports for every platform and format'),
+      sk('Teaser & promo edits', 'Te', '#FF7A59', 4, 'Pacing, music and story in seconds'),
+      sk('Social cut-downs', 'Sc', '#FFB347', 4, 'Reels, shorts and stories from one master') ] },
+    { name: 'AI & generative', icon: 'ai', items: [
+      sk('Adobe Firefly', 'Ff', '#FF4F3F', 4, 'Concept frames, textures and extensions'),
+      sk('Generative Fill', 'Gf', '#31A8FF', 4, 'Extending and repairing plates inside Photoshop'),
+      sk('AI-assisted upscaling', 'Up', '#FFD166', 3, 'Print-size masters from small sources') ] },
     { name: 'Arts', icon: 'arts', items: [
-      sk('Movie posters', 'Mp', '#FF9438', 5, 'Theatrical key art from first look to release'),
+      sk('Movie posters', 'Po', '#FF9438', 5, 'Theatrical key art from first look to release'),
       sk('Typography', 'Ty', '#E8AA82', 5, 'Custom title logos and lettering'),
       sk('Photo manipulation', 'Pm', '#FF6B4A', 5, 'Blending stars, sets and effects into one frame'),
       sk('Digital painting', 'Dp', '#C9864F', 4, 'Painted skies, light and texture passes'),
-      sk('Campaign design', 'Cd', '#FFD9B8', 4, 'Consistent looks across every format') ] },
+      sk('Campaign design', 'Cd', '#FFD9B8', 4, 'One look across every format') ] },
     { name: 'Languages', icon: 'languages', items: [
       sk('JavaScript', 'JS', '#F7DF1E', 4, ''), sk('TypeScript', 'TS', '#3178C6', 4, ''), sk('Python', 'Py', '#3776AB', 3, ''),
       sk('HTML', 'HT', '#E34F26', 4, ''), sk('CSS', 'CSS', '#1572B6', 4, ''), sk('SQL', 'SQL', '#CC8A3B', 3, '') ] },
@@ -58,7 +71,7 @@ export const SKILLS_DEFAULT = {
       sk('Email (SMTP)', '@', '#9AA3AF', 3, 'Receipts, alerts and auto-replies') ] }
   ]
 };
-const SKILL_LIMITS = { categories: 10, items: 24 };
+export const SKILL_LIMITS = { categories: 14, items: 24 };
 const isImageUrl = (u) => isOwnMediaUrl(u) && /\.(png|jpe?g|webp|avif)$/i.test(u);
 const isFontUrl = (u) => isOwnMediaUrl(u) && /\/fonts\/[A-Za-z0-9_-]+\.(woff2|woff|ttf|otf)$/i.test(u);
 function httpUrl(u){ try { return ['https:', 'http:'].includes(new URL(u).protocol); } catch { return false; } }
@@ -211,6 +224,12 @@ export function validateSiteDocument(input, current, seed){
     stampText: text(pc.stampText, 12) || 'PAID',
     foil: pc.foil !== false,
     dim: num(pc.dim, 0, 90, 55),
+    signatureText: text(pc.signatureText, 40) || 'Kethan Artzz',
+    signatureFont: allowedFonts.includes(pc.signatureFont) ? pc.signatureFont : '',
+    signatureSize: num(pc.signatureSize, 16, 60, 30),
+    signatureTone: pickOf(pc.signatureTone, ['gold', 'white', 'ink', 'accent'], 'gold'),
+    signatureAngle: num(pc.signatureAngle, -12, 12, -4),
+    showSeal: pc.showSeal !== false,
   };
   // About > numbers (count up on the page): up to 6, each a label, a whole number and an optional suffix like "+".
   const st = input.stats && typeof input.stats === 'object' ? input.stats : null;
@@ -241,8 +260,10 @@ export function validateSkills(input){
       const itemName = text(x.name, 40);
       if (!itemName) continue;                                   // an empty row is an unfinished edit, not an error
       const color = text(x.color, 20), level = Number(x.level);
+      const logoUrl = text(x.logoUrl, 600);
+      if (logoUrl && !isImageUrl(logoUrl)) throw bad(`Upload the logo for ${itemName} before saving.`);
       items.push({ name: itemName, code: text(x.code, 3), color: /^#[0-9a-fA-F]{6}$/.test(color) ? color.toUpperCase() : '',
-        level: Number.isFinite(level) ? Math.min(5, Math.max(0, Math.round(level))) : 0, note: text(x.note, 140) });
+        level: Number.isFinite(level) ? Math.min(5, Math.max(0, Math.round(level))) : 0, note: text(x.note, 140), logoUrl });
     }
     categories.push({ name, icon: SKILL_ICONS.includes(c.icon) ? c.icon : 'star', items });
   }

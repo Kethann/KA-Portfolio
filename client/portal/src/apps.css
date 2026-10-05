@@ -290,3 +290,15 @@
   .skill-row{ grid-template-columns:34px 1fr 58px 40px; padding-bottom:8px; border-bottom:1px dashed var(--border); }
   .skill-row .sr-level{ grid-column:1 / 3; } .skill-row .sr-note{ grid-column:3 / -1; } .skill-row .sr-actions{ grid-column:1 / -1; justify-content:flex-end; }
 }
+
+/* ---- Studio > Checkout pass: signature sample and font list ---- */
+.sig-sample{ display:inline-block; align-self:flex-start; padding:10px 16px 8px; margin:2px 0 4px; line-height:1.1; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis;
+  border-radius:var(--r-md); background:radial-gradient(120% 120% at 80% 50%, #2a1810, #120d0b); transform-origin:left center; }
+.font-list .font-row{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.font-sample{ font-size:22px; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.skill-logo-pick{ position:relative; display:inline-grid; }
+.skill-logo-pick .skill-tile{ border:0; padding:0; cursor:pointer; overflow:hidden; }
+.skill-logo-pick .skill-tile img{ width:100%; height:100%; object-fit:contain; padding:4px; box-sizing:border-box; }
+.skill-logo-pick .skill-tile:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+.skill-logo-clear{ position:absolute; top:-6px; right:-6px; width:18px; height:18px; border-radius:50%; border:1px solid var(--border); background:var(--surface-window-solid); color:var(--text-2);
+  font-size:12px; line-height:1; display:grid; place-items:center; padding:0; cursor:pointer; }

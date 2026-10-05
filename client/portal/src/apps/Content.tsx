@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppProps } from './registry';
 import { useDraft, useLoad, useUnsavedGuard } from '../hooks';
-import { del, post, put } from '../api';
+import { del, get, post, put, upload } from '../api';
 import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, SkeletonRows, Switch, useConfirm, useToast } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
 import { TagInput, Uploader, useSaveKey } from './common';
 import { discardSite, keepMineOverTheirs, loadSite, saveSite, thumb, updateSite, useSite } from './siteDoc';
-import { SKILL_ICONS } from './siteDoc';
+import { SKILL_ICONS, SKILL_LIMITS } from './siteDoc';
+import type { SkillsDraft } from './siteDoc';
 import type { SiteImage, StatItem, SkillCategory, SkillItem } from './siteDoc';
 import { ago, dateTime } from '../format';
 
@@ -107,7 +108,7 @@ function AboutStats(){
 
 // About > Skills: categories of skills, each with a logo tile (short code on a colour), a 0-5 level and a note.
 const SKILL_LEVELS = ['No meter', 'Learning', 'Familiar', 'Proficient', 'Advanced', 'Expert'];
-const ICON_LABEL: Record<string, string> = { design: 'Design', arts: 'Arts', languages: 'Code', frontend: 'Frontend', backend: 'Backend', database: 'Database', apis: 'APIs', motion: 'Motion', tools: 'Tools', star: 'Star' };
+const ICON_LABEL: Record<string, string> = { design: 'Design', arts: 'Arts', motion: 'Motion', video: 'Video', ai: 'AI', languages: 'Code', frontend: 'Frontend', backend: 'Backend', database: 'Database', apis: 'APIs', tools: 'Tools', star: 'Star' };
 const skillCode = (x: SkillItem) => x.code || x.name.split(/[\s.\-/]+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
 // dark or light text, whichever reads better on the tile colour
 function inkOn(hex: string){
@@ -130,7 +131,7 @@ function AboutSkills(){
     <section className="card stack" aria-labelledby="about-skills-h" style={{ marginTop: 'var(--sp-5)' }}>
       <div className="row between"><h3 id="about-skills-h">Skills</h3>
         <Switch checked={sk.enabled} onChange={v => setSk({ enabled: v })} label="Show on the About page" /></div>
-      <p className="field-hint" style={{ margin: 0 }}>A resume-style board with one card per category. The logo tiles also float through the space beside it. {sk.categories.length} categories, {total} skills (up to 10 categories, 24 skills each).</p>
+      <p className="field-hint" style={{ margin: 0 }}>A resume-style board with one card per category. The logo tiles also float through the space beside it. {sk.categories.length} categories, {total} skills (up to {SKILL_LIMITS.categories} categories, {SKILL_LIMITS.items} skills each). Click a logo tile to upload a real logo.</p>
       <div className="form-grid">
         <Field label="Heading" hint={`${sk.title.length}/60`}><input maxLength={60} value={sk.title} onChange={e => setSk({ title: e.target.value })} placeholder="Skills" /></Field>
         <Field label="Intro" hint={`${sk.intro.length}/200`}><input maxLength={200} value={sk.intro} onChange={e => setSk({ intro: e.target.value })} placeholder="The tools, languages and crafts behind every frame" /></Field>
@@ -152,7 +153,7 @@ function AboutSkills(){
           {openCat === ci && <div className="stack" style={{ gap: 8 }}>
             {c.items.map((x, ii) => (
               <div className="skill-row" key={ii}>
-                <span className="skill-tile" style={{ background: x.color || '#3A3340', color: inkOn(x.color || '#3A3340') }} aria-hidden="true">{skillCode(x)}</span>
+                <LogoTile item={x} onChange={logoUrl => setItem(ci, ii, { logoUrl })} />
                 <input aria-label="Skill name" value={x.name} maxLength={40} placeholder="Skill" onChange={e => setItem(ci, ii, { name: e.target.value })} className="sr-name" />
                 <input aria-label="Logo letters" value={x.code} maxLength={3} placeholder={skillCode({ ...x, code: '' })} onChange={e => setItem(ci, ii, { code: e.target.value })} className="sr-code mono" title="1 to 3 letters on the logo tile (blank uses the initials)" />
                 <input aria-label="Logo colour" type="color" value={/^#[0-9a-f]{6}$/i.test(x.color) ? x.color : '#3A3340'} onChange={e => setItem(ci, ii, { color: e.target.value.toUpperCase() })} className="sr-color" title="Logo tile colour" />
@@ -167,13 +168,49 @@ function AboutSkills(){
                 </span>
               </div>
             ))}
-            <div><button type="button" className="btn sm" disabled={c.items.length >= 24} onClick={() => setCat(ci, { items: [...c.items, { name: '', code: '', color: '#FF9438', level: 3, note: '' }] })}><Icon name="plus" /> Add a skill</button></div>
+            <div><button type="button" className="btn sm" disabled={c.items.length >= SKILL_LIMITS.items} onClick={() => setCat(ci, { items: [...c.items, { name: '', code: '', color: '#FF9438', level: 3, note: '', logoUrl: '' }] })}><Icon name="plus" /> Add a skill</button></div>
           </div>}
         </div>
       ))}
-      <div><button type="button" className="btn sm" disabled={sk.categories.length >= 10} onClick={() => { setCats([...sk.categories, { name: '', icon: 'star', items: [] }]); setOpenCat(sk.categories.length); }}><Icon name="plus" /> Add a category</button></div>
+      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}><SuggestedSkills onUse={d => setSk({ categories: d.categories, intro: sk.intro || d.intro })} />
+        <button type="button" className="btn sm" disabled={sk.categories.length >= SKILL_LIMITS.categories} onClick={() => { setCats([...sk.categories, { name: '', icon: 'star', items: [] }]); setOpenCat(sk.categories.length); }}><Icon name="plus" /> Add a category</button></div>
     </section>
   );
+}
+
+// The logo tile in the editor: the letters on their colour, or an uploaded logo image. Click to upload one.
+function LogoTile({ item, onChange }: { item: SkillItem; onChange: (logoUrl: string) => void }){
+  const toast = useToast();
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const pick = async (file: File) => {
+    setBusy(true);
+    try { const r = await upload(file, 'image'); if (r.publicUrl) onChange(r.publicUrl); }
+    catch (e){ toast.error(e); }
+    finally { setBusy(false); }
+  };
+  return <span className="skill-logo-pick">
+    <button type="button" className="skill-tile" title={item.logoUrl ? 'Replace the logo image' : 'Upload a logo image (PNG, WebP or AVIF)'} aria-label={`Logo for ${item.name || 'this skill'}: upload an image`}
+      style={item.logoUrl ? { background: '#14110f' } : { background: item.color || '#3A3340', color: inkOn(item.color || '#3A3340') }} onClick={() => input.current?.click()} disabled={busy}>
+      {busy ? '…' : item.logoUrl ? <img src={item.logoUrl} alt="" /> : skillCode(item)}
+    </button>
+    {item.logoUrl && <button type="button" className="skill-logo-clear" aria-label="Use letters instead of the image" title="Use letters instead" onClick={() => onChange('')}>×</button>}
+    <input ref={input} type="file" accept="image/png,image/webp,image/avif,image/jpeg" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void pick(f); }} />
+  </span>;
+}
+
+// Replaces the categories with the suggested board (design, motion, video, AI, arts and code), after a confirm.
+function SuggestedSkills({ onUse }: { onUse: (d: SkillsDraft) => void }){
+  const confirm = useConfirm();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  return <button type="button" className="btn sm ghost" disabled={busy} onClick={async () => {
+    if (!await confirm({ title: 'Use the suggested skills?', body: 'Your current categories and skills are replaced with the suggested board (Design, Motion design, Video, AI & generative, Arts and the code groups). Nothing goes live until you publish.', confirm: 'Replace' })) return;
+    setBusy(true);
+    try { onUse(await get<SkillsDraft>('/site/skills-defaults')); toast.show('Suggested skills loaded. Edit them, then publish.', { tone: 'success' }); }
+    catch (e){ toast.error(e); }
+    finally { setBusy(false); }
+  }}><Icon name="sparkle" /> Use the suggested set</button>;
 }
 
 function Portfolio(){

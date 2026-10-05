@@ -38,7 +38,8 @@ test('passCard: defaults for older sites, values kept in range, fonts and logo c
 test('Skills: defaults for older sites, cleaned input, limits refused, can be hidden', () => {
   const base = structuredClone(seed); delete base.skills;
   const d = validateSiteDocument({ ...base }, seed, seed).skills;
-  assert.equal(d.enabled, true); assert.deepEqual(d.categories.map(c => c.name), ['Design', 'Arts', 'Languages', 'Frontend', 'Backend', 'Database', 'APIs']);
+  assert.equal(d.enabled, true); assert.deepEqual(d.categories.map(c => c.name), ['Design', 'Motion design', 'Video', 'AI & generative', 'Arts', 'Languages', 'Frontend', 'Backend', 'Database', 'APIs']);
+  assert.ok(['After Effects', 'Premiere Pro', 'Adobe Media Encoder', 'Adobe Firefly'].every(n => d.categories.some(c => c.items.some(x => x.name === n))));
   assert.ok(d.categories.every(c => c.items.length && c.items.every(x => /^#[0-9A-F]{6}$/.test(x.color) && x.level >= 0 && x.level <= 5)));
   const s = validateSiteDocument({ ...base, skills: { enabled: false, title: '  My stack  ', intro: 'x'.repeat(300), categories: [
     { name: ' Design ', icon: 'nope', items: [
@@ -47,12 +48,22 @@ test('Skills: defaults for older sites, cleaned input, limits refused, can be hi
       { name: 'Figma', color: 'red', level: -2 } ] } ] } }, seed, seed).skills;
   assert.equal(s.enabled, false); assert.equal(s.title, 'My stack'); assert.equal(s.intro.length, 200);
   assert.equal(s.categories[0].name, 'Design'); assert.equal(s.categories[0].icon, 'star', 'unknown icons fall back');
-  assert.deepEqual(s.categories[0].items[0], { name: 'Photoshop', code: 'Psx', color: '#31A8FF', level: 5, note: 'n'.repeat(140) });
+  assert.deepEqual(s.categories[0].items[0], { name: 'Photoshop', code: 'Psx', color: '#31A8FF', level: 5, note: 'n'.repeat(140), logoUrl: '' });
   assert.equal(s.categories[0].items.length, 2, 'unfinished empty rows are dropped');
   assert.deepEqual([s.categories[0].items[1].color, s.categories[0].items[1].level], ['', 0], 'bad colour and level cleaned');
-  assert.throws(() => validateSiteDocument({ ...base, skills: { categories: Array.from({ length: 11 }, (_, i) => ({ name: 'C' + i, items: [] })) } }, seed, seed), /up to 10/);
+  assert.throws(() => validateSiteDocument({ ...base, skills: { categories: Array.from({ length: 15 }, (_, i) => ({ name: 'C' + i, items: [] })) } }, seed, seed), /up to 14/);
+  assert.throws(() => validateSiteDocument({ ...base, skills: { categories: [{ name: 'X', items: [{ name: 'Logo', logoUrl: 'https://evil.example/a.png' }] }] } }, seed, seed), /Upload the logo/);
   assert.throws(() => validateSiteDocument({ ...base, skills: { categories: [{ name: 'Big', items: Array.from({ length: 25 }, (_, i) => ({ name: 'S' + i })) }] } }, seed, seed), /up to 24/);
   assert.throws(() => validateSiteDocument({ ...base, skills: { categories: [{ name: '  ', items: [] }] } }, seed, seed), /needs a name/);
+});
+
+test('pass signature + seal: defaults, any allowed font, bounded size and slant, unknown fonts fall back', () => {
+  const base = structuredClone(seed);
+  const d = validateSiteDocument({ ...base }, seed, seed).passCard;
+  assert.deepEqual([d.signatureText, d.signatureFont, d.signatureSize, d.signatureTone, d.signatureAngle, d.showSeal], ['Kethan Artzz', '', 30, 'gold', -4, true]);
+  const p = validateSiteDocument({ ...base, passCard: { signatureText: '  K. Artzz  ', signatureFont: 'Not Uploaded', signatureSize: 300, signatureTone: 'rainbow', signatureAngle: -40, showSeal: false } }, seed, seed).passCard;
+  assert.deepEqual([p.signatureText, p.signatureFont, p.signatureSize, p.signatureTone, p.signatureAngle, p.showSeal], ['K. Artzz', '', 60, 'gold', -12, false]);
+  assert.equal(validateSiteDocument({ ...base, passCard: { signatureFont: 'Poppins' } }, seed, seed).passCard.signatureFont, 'Poppins');
 });
 
 test('About numbers: defaults for older sites, up to 6, whole numbers, short suffix, can be hidden', () => {

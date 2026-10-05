@@ -1,9 +1,10 @@
 // The live 3D "pass" above the checkout form: product, license, amount (counting), the buyer's
 // email as it is typed, and after payment how it was paid. Tilt follows the pointer (or the
 // phone's motion sensor where no permission prompt is needed); tap or Enter flips it.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatPrice, type Currency, type Product } from '../api';
-import type { Phase, PaymentMethod } from './machine';
+import type { Phase, PaymentMethod, LicenseRef } from './machine';
+import { sealSvg } from '../../../../shared/seal.js';
 
 export function useCountUp(target: number, reduced: boolean){
   const value = useRef(target);
@@ -81,10 +82,15 @@ function methodText(m: PaymentMethod | null){
 }
 
 // The pass design from the portal (Studio > Checkout pass); every field has a default.
+export type SignatureTone = 'gold' | 'white' | 'ink' | 'accent';
 export interface PassSettings { label: string; logoUrl: string; logoSize: number; showTag: boolean; tagText: string; titleFont: string; priceFont: string;
-  textPosition: 'bottom' | 'center' | 'top'; pricePosition: 'right' | 'left' | 'below'; stampText: string; foil: boolean; dim: number }
+  textPosition: 'bottom' | 'center' | 'top'; pricePosition: 'right' | 'left' | 'below'; stampText: string; foil: boolean; dim: number;
+  // the signature on the back (any font, including ones uploaded in Studio) and the license seal beside it
+  signatureText: string; signatureFont: string; signatureSize: number; signatureTone: SignatureTone; signatureAngle: number; showSeal: boolean }
 export const PASS_DEFAULTS: PassSettings = { label: 'KA PASS', logoUrl: '', logoSize: 24, showTag: true, tagText: '', titleFont: '', priceFont: '',
-  textPosition: 'bottom', pricePosition: 'right', stampText: 'PAID', foil: true, dim: 55 };
+  textPosition: 'bottom', pricePosition: 'right', stampText: 'PAID', foil: true, dim: 55,
+  signatureText: 'Kethan Artzz', signatureFont: '', signatureSize: 30, signatureTone: 'gold', signatureAngle: -4, showSeal: true };
+export const SIGNATURE_INK: Record<SignatureTone, string> = { gold: '#f2c27b', white: '#fff6ea', ink: '#e9e1d8', accent: 'var(--kas-accent, #ff9438)' };
 declare global { interface Window { kaPassCard?: Partial<PassSettings> | null } }
 function usePassSettings(override?: Partial<PassSettings>): PassSettings {
   const [live, setLive] = useState(() => window.kaPassCard || null);
@@ -97,9 +103,11 @@ export interface PassCardProps {
   product: Product; currency: Currency; amount: number; free: boolean; email: string; orderId: string | null;
   phase: Phase; method: PaymentMethod | null; flipped: boolean; onFlip(): void; reduced: boolean; cardRef: React.RefObject<HTMLDivElement>;
   settings?: Partial<PassSettings>;   // the portal's live preview passes its draft here
+  holder?: string;                     // the name typed for the license (optional)
+  license?: LicenseRef | null;         // set once the order is paid: the seal then carries its code
 }
 
-export function PassCard({ product, currency, amount, free, email, orderId, phase, method, flipped, onFlip, reduced, cardRef, settings }: PassCardProps){
+export function PassCard({ product, currency, amount, free, email, orderId, phase, method, flipped, onFlip, reduced, cardRef, settings, holder = '', license = null }: PassCardProps){
   const pass = usePassSettings(settings);
   const tiltRef = useRef<HTMLDivElement>(null);
   useTilt(tiltRef, !reduced);
@@ -136,14 +144,35 @@ export function PassCard({ product, currency, amount, free, email, orderId, phas
           {phase === 'success' && <span className="kco-stamp" aria-hidden="true">{free ? 'YOURS' : pass.stampText}</span>}
         </div>
         <div className="kco-face kco-back" aria-hidden={!flipped}>
-          <span className="kco-stripe" aria-hidden="true" />
-          <div className="kco-back-body">
-            <p><b>{product.license ? product.license.name : 'Personal'} license</b>{product.license?.summary ? ` — ${product.license.summary}` : ''}</p>
-            <p>Download link by email, valid for {product.delivery.linkHours} hours and {product.delivery.maxDownloads} downloads. Receipt to {shown || 'your email'}.</p>
-            <p className="kco-sign">Kethan Artzz</p>
+          <span className="kco-back-glow" aria-hidden="true" />
+          <div className={`kco-back-grid ${pass.showSeal ? '' : 'no-seal'}`}>
+            <div className="kco-back-info">
+              <span className="kco-back-eyebrow">License</span>
+              <strong className="kco-back-lic">{product.license ? product.license.name : 'Personal'} license</strong>
+              {product.license?.summary && <span className="kco-back-sum">{product.license.summary}</span>}
+              <span className="kco-back-to"><small>Licensed to</small>{holder.trim().slice(0, 80) || shown || 'you'}</span>
+              <span className="kco-back-terms">Link by email · {product.delivery.linkHours} h · {product.delivery.maxDownloads} downloads</span>
+              <span className="kco-sign-wrap">
+                <span className="kco-sign" style={{ fontFamily: fam(pass.signatureFont, "'Segoe Script', 'Brush Script MT', cursive"), fontSize: pass.signatureSize,
+                  color: SIGNATURE_INK[pass.signatureTone] || SIGNATURE_INK.gold, transform: `rotate(${pass.signatureAngle}deg)` }}>{pass.signatureText || 'Kethan Artzz'}</span>
+                <small>Authorised signature</small>
+              </span>
+            </div>
+            {pass.showSeal && <Seal license={license} />}
           </div>
         </div>
       </div>
     </div>
   </div>;
+}
+
+// The license seal on the back: the real, scannable seal once the order is paid; before that, an empty seal
+// that says where it will appear. Drawn as an image (the card itself is the button that flips it).
+function Seal({ license }: { license: LicenseRef | null }){
+  const svg = useMemo(() => license ? sealSvg({ url: license.url, code: license.code, id: 'kco-seal-' + license.code }) : '', [license]);
+  if (!license) return <span className="kco-seal is-empty" aria-hidden="true"><span>Seal issued<br />at purchase</span></span>;
+  return <span className="kco-seal" role="img" aria-label={`License seal ${license.code}. Scan it to check the license.`}>
+    <span className="kco-seal-art" aria-hidden="true" dangerouslySetInnerHTML={{ __html: svg }} />
+    <span className="kco-seal-code" aria-hidden="true">{license.code}</span>
+  </span>;
 }

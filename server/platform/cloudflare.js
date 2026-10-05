@@ -2,7 +2,7 @@
 //   * environment variables and secrets come from the Worker `env` (wrangler.jsonc vars + dashboard secrets)
 //   * the database is the D1 binding DB, files are the R2 binding FILES
 //   * the client IP is cf-connecting-ip; approximate location comes from request.cf (free, no lookups)
-//   * /api/*, /legal and the file links (/__storage, /__storage-upload) run here; every other path is a
+//   * /api/*, /legal, /license and the file links (/__storage, /__storage-upload) run here; every other path is a
 //     static file served by Cloudflare directly (wrangler.jsonc "assets"), without running the Worker.
 //   * the daily and weekly jobs run from Cron Triggers.
 import { setEnvSource } from '../core/env.js';
@@ -129,7 +129,7 @@ export default {
         if (!env.FILES) return text(503, 'File storage is not connected yet (R2 binding FILES).');
         return await storageRequest(request, env, ctx, url);
       }
-      if (url.pathname.startsWith('/api/') || url.pathname === '/legal' || url.pathname.startsWith('/legal/')) return await handle(request, platform);
+      if (url.pathname.startsWith('/api/') || url.pathname === '/legal' || url.pathname.startsWith('/legal/') || url.pathname === '/license' || url.pathname.startsWith('/license/')) return await handle(request, platform);
       return env.ASSETS.fetch(request);   // anything else routed here by mistake: the static site
     } catch (err){
       console.error('[worker] request failed:', err && err.message);

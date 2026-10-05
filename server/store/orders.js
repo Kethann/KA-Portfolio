@@ -17,6 +17,7 @@ import { priceFor, formatMoney } from './pricing.js';
 import { evaluateCoupons, normalizeCodes } from './coupons.js';
 import * as razorpay from './razorpay.js';
 import { issueToken, sendDeliveryEmails } from './delivery.js';
+import { newLicenseCode, licenseFor, cleanHolder } from './license.js';
 import { NEXT_INVOICE, INVOICE_VALUE } from '../core/atomic.js';
 
 export const MIN_CHARGE = 100;   // Razorpay's minimum: 100 minor units (₹1 / $1)
@@ -133,7 +134,7 @@ export function quoteDto(q){
 
 // Creates the order (and the Razorpay order when there's something to pay). Returns what the
 // browser needs to open Razorpay Checkout, or a download link right away for free orders.
-export async function createOrder({ productId, currency, codes, email, ip, country, siteUrl }){
+export async function createOrder({ productId, currency, codes, email, ip, country, siteUrl, licenseHolder = null }){
   const db = await getDb();
   const store = await getSetting('store');
   if (store.enabled === false) throw new HttpError(503, 'The store is closed right now.');
@@ -147,9 +148,10 @@ export async function createOrder({ productId, currency, codes, email, ip, count
   let order;
   try {
     const rs = await db.batch([
-      [`insert into orders (id, public_id, email, currency, subtotal, discount, tax, total, status, is_free, paid_at, ip, country, expires_at, client_secret_hash)
-        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) returning *`,
-        [orderId, newPublicId(), email, q.currency, q.subtotal, q.discount, q.tax, q.total, free ? 'paid' : 'created', free, free ? new Date() : null, ip, country, expires, sha256hex(clientSecret)]],
+      [`insert into orders (id, public_id, email, currency, subtotal, discount, tax, total, status, is_free, paid_at, ip, country, expires_at, client_secret_hash, license_code, license_holder)
+        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) returning *`,
+        [orderId, newPublicId(), email, q.currency, q.subtotal, q.discount, q.tax, q.total, free ? 'paid' : 'created', free, free ? new Date() : null, ip, country, expires, sha256hex(clientSecret),
+          newLicenseCode(), cleanHolder(licenseHolder)]],
       [`insert into order_items (order_id, product_id, title, license_key, license_version, unit_price, discount, total) values ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [orderId, q.product.id, q.product.title, license?.key || null, license?.version || null, q.subtotal, q.discount, q.subtotal - q.discount]],
       ...q.applied.flatMap(a => [
@@ -170,7 +172,7 @@ export async function createOrder({ productId, currency, codes, email, ip, count
     await deliver(order.id, siteUrl);
     const link = await issueScreenLink(order.id, siteUrl);
     const after = await db.maybeOne('select status from orders where id = $1', [order.id]);
-    return { orderId: order.public_id, clientSecret, free: true, downloadUrl: link, emailed: after?.status === 'delivered' };
+    return { orderId: order.public_id, clientSecret, free: true, downloadUrl: link, emailed: after?.status === 'delivered', license: await licenseFor(order.id, siteUrl) };
   }
   if (demoPaymentsEnabled()){
     const demoId = `demo_${order.public_id}`;
@@ -405,7 +407,9 @@ export async function statusFor(publicId, clientSecret, siteUrl){
   let downloadUrl = null;
   // paid = both proofs are in; the on-screen link works even if the email is slow or failed
   if (order.status === 'delivered' || order.status === 'paid') downloadUrl = await issueScreenLink(order.id, siteUrl);
-  return { orderId: order.public_id, status: order.status, total: order.total, currency: order.currency, downloadUrl };
+  // the license seal appears once the order is paid (and disappears again if it is refunded)
+  const license = order.status === 'delivered' || order.status === 'paid' ? await licenseFor(order.id, siteUrl) : null;
+  return { orderId: order.public_id, status: order.status, total: order.total, currency: order.currency, downloadUrl, license };
 }
 
 async function issueScreenLink(orderId, siteUrl){

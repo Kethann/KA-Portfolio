@@ -3,12 +3,12 @@
 // and scaled right in the preview; positions are stored per screen size.
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { PassCard } from '../../../src/store/checkout/PassCard';
+import { PassCard, SIGNATURE_INK, type SignatureTone } from '../../../src/store/checkout/PassCard';
 import type { Product } from '../../../src/store/api';
 import storeCss from '../../../src/store/store.css?inline';
 import checkoutCss from '../../../src/store/checkout/checkout.css?inline';
 import type { AppProps } from './registry';
-import { Badge, ErrorState, Field, Segmented, SkeletonRows, Switch, useToast } from '../ui';
+import { Badge, ErrorState, Field, Segmented, SkeletonRows, Switch, useConfirm, useToast } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
 import { Uploader, useSaveKey } from './common';
@@ -113,10 +113,9 @@ export default function Studio({ active, route }: AppProps){
 const fam = (f: string) => f === 'system-ui' ? 'system-ui' : `'${f}', system-ui`;
 const fontList = (d: SiteDoc) => [...FONTS, ...d.details.customFonts.map(f => f.family)];
 
-function CustomFonts({ doc }: { doc: SiteDoc }){
-  const [family, setFamily] = useState('');
-  const toast = useToast();
-  // show uploaded fonts in their own face here in the portal
+// Uploaded fonts are registered with the browser once, so every select, sample and the pass preview
+// (in its own shadow root; fonts are document-wide) can draw them.
+function useCustomFontFaces(doc: SiteDoc){
   useEffect(() => {
     for (const f of doc.details.customFonts){
       if ([...document.fonts].some(x => x.family.replace(/"/g, '') === f.family)) continue;
@@ -124,18 +123,51 @@ function CustomFonts({ doc }: { doc: SiteDoc }){
       face.load().then(x => document.fonts.add(x)).catch(() => {});
     }
   }, [doc.details.customFonts]);
+}
+// Where a font is in use, in words, so removing it is never a surprise.
+function fontUses(doc: SiteDoc, family: string){
+  const out: string[] = [];
+  if (doc.details.headingFont === family) out.push('Headings');
+  if (doc.details.bodyFont === family) out.push('Body text');
+  if (doc.passCard.titleFont === family) out.push('Pass title');
+  if (doc.passCard.priceFont === family) out.push('Pass price');
+  if (doc.passCard.signatureFont === family) out.push('Signature');
+  const els = Object.entries(doc.elementStyles || {}).filter(([, st]) => (st as { font?: string })?.font === family).length;
+  if (els) out.push(els === 1 ? '1 element' : `${els} elements`);
+  return out;
+}
+function CustomFonts({ doc, sample: initialSample = '' }: { doc: SiteDoc; sample?: string }){
+  const [family, setFamily] = useState('');
+  const [sample, setSample] = useState(initialSample);
+  const toast = useToast();
+  const confirm = useConfirm();
+  useCustomFontFaces(doc);
   const valid = /^[A-Za-z0-9 _-]{1,60}$/.test(family.trim()) && !fontList(doc).includes(family.trim());
+  const remove = async (name: string) => {
+    const uses = fontUses(doc, name);
+    if (uses.length && !await confirm({ title: `Remove “${name}”?`, body: `It is used by: ${uses.join(', ')}. Those go back to their default font.`, confirm: 'Remove font', danger: true })) return;
+    updateSite(x => ({ ...x,
+      details: { ...x.details, customFonts: x.details.customFonts.filter(c => c.family !== name),
+        headingFont: x.details.headingFont === name ? 'Fraunces' : x.details.headingFont, bodyFont: x.details.bodyFont === name ? 'Manrope' : x.details.bodyFont },
+      passCard: { ...x.passCard, titleFont: x.passCard.titleFont === name ? '' : x.passCard.titleFont, priceFont: x.passCard.priceFont === name ? '' : x.passCard.priceFont,
+        signatureFont: x.passCard.signatureFont === name ? '' : x.passCard.signatureFont },
+      elementStyles: Object.fromEntries(Object.entries(x.elementStyles || {}).map(([id, st]) => [id, (st as { font?: string })?.font === name ? { ...(st as object), font: undefined } : st])) }));
+    toast.show(`Removed “${name}”. Publish to make it final.`, { tone: 'success' });
+  };
   return (
     <section className="stack"><div className="eyebrow">Your fonts</div>
-      {doc.details.customFonts.length ? <ul className="list">{doc.details.customFonts.map(f => (
-        <li key={f.family}><span className="grow" style={{ fontFamily: `'${f.family}', system-ui`, fontSize: 18 }}>{f.family} · Aa Bb 123</span>
-          <button type="button" className="icon-btn sm" aria-label={`Remove ${f.family}`} onClick={() => updateSite(x => ({ ...x, details: { ...x.details, customFonts: x.details.customFonts.filter(c => c.family !== f.family),
-            headingFont: x.details.headingFont === f.family ? 'Fraunces' : x.details.headingFont, bodyFont: x.details.bodyFont === f.family ? 'Manrope' : x.details.bodyFont } }))}><Icon name="trash" size={13} /></button></li>
-      ))}</ul> : <p className="faint">No custom fonts yet.</p>}
-      <Field label="Font name" hint="Letters, numbers, spaces, - and _. Upload the file after naming it."><input value={family} onChange={e => setFamily(e.target.value)} maxLength={60} placeholder="e.g. Kethan Display" /></Field>
+      {doc.details.customFonts.length > 0 && <Field label="Preview text"><input value={sample} maxLength={60} onChange={e => setSample(e.target.value)} placeholder="Aa Bb 123 · type your name" /></Field>}
+      {doc.details.customFonts.length ? <ul className="list font-list">{doc.details.customFonts.map(f => {
+        const uses = fontUses(doc, f.family);
+        return <li key={f.family}>
+          <span className="grow font-row"><span className="font-sample" style={{ fontFamily: `'${f.family}', system-ui` }}>{sample || `${f.family} · Aa Bb 123`}</span>
+            <span className="faint" style={{ fontSize: 12 }}>{f.family}{uses.length ? ` · used by ${uses.join(', ')}` : ' · not used yet'}</span></span>
+          <button type="button" className="icon-btn sm" aria-label={`Remove ${f.family}`} title="Remove" onClick={() => void remove(f.family)}><Icon name="trash" size={13} /></button></li>;
+      })}</ul> : <p className="faint">No custom fonts yet. Upload your own (a signature font, for example) and it appears in every font menu.</p>}
+      <Field label="New font name" hint="Letters, numbers, spaces, - and _. Upload the file after naming it."><input value={family} onChange={e => setFamily(e.target.value)} maxLength={60} placeholder="e.g. Kethan Signature" /></Field>
       {valid ? <Uploader kind="font" accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf" label={`Upload “${family.trim()}”`} onUploaded={u => {
         updateSite(x => ({ ...x, details: { ...x.details, customFonts: [...x.details.customFonts, { family: family.trim(), url: u.publicUrl! }] } }));
-        setFamily(''); toast.show('Font added. Pick it above, then publish.', { tone: 'success' });
+        setFamily(''); toast.show('Font added. Pick it in any font menu, then publish.', { tone: 'success' });
       }}>WOFF2 is smallest · up to 6 MB · make sure your font license allows web use</Uploader> : family && <p className="field-error">Use a new name with letters, numbers, spaces, - or _.</p>}
     </section>
   );
@@ -248,6 +280,7 @@ function Preview({ doc, device, setDevice, arrange, onSelect }: { doc: SiteDoc; 
 }
 
 // ---- Checkout pass: the ticket buyers see at checkout -------------------------------------------
+const SAMPLE_CODE = 'KA-SAMP1-E0000';   // the preview's seal (a sample: it opens a “not found” license page)
 function PassSettingsForm({ doc }: { doc: SiteDoc }){
   const p = doc.passCard;
   const set = (patch: Partial<PassDraft>) => updateSite(x => ({ ...x, passCard: { ...x.passCard, ...patch } }));
@@ -273,6 +306,31 @@ function PassSettingsForm({ doc }: { doc: SiteDoc }){
       <Field label={`Darken the artwork · ${p.dim}%`} hint="More keeps text readable on bright art"><input type="range" min={0} max={90} value={p.dim} onChange={e => set({ dim: Number(e.target.value) })} /></Field>
     </div>
     <Switch checked={p.foil} onChange={v => set({ foil: v })} label="Holographic shimmer that follows the tilt" />
+
+    <div className="stack"><div className="eyebrow">Signature (back of the pass)</div>
+      <p className="field-hint" style={{ margin: 0 }}>Shown on the license side of the pass and on the license check page that the seal opens. Upload a signature font below and pick it here.</p>
+      <Field label="Signature text" hint={`${p.signatureText.length}/40`}><input value={p.signatureText} maxLength={40} onChange={e => set({ signatureText: e.target.value })} placeholder="Kethan Artzz" /></Field>
+      <Field label="Signature font"><select value={p.signatureFont} onChange={e => set({ signatureFont: e.target.value })} style={{ fontFamily: p.signatureFont ? fam(p.signatureFont) : 'cursive' }}>
+        <option value="">Handwriting (default)</option>
+        {doc.details.customFonts.length > 0 && <optgroup label="Your fonts">{doc.details.customFonts.map(f => <option key={f.family} value={f.family} style={{ fontFamily: fam(f.family) }}>{f.family}</option>)}</optgroup>}
+        <optgroup label="Site fonts">{FONTS.map(f => <option key={f} value={f} style={{ fontFamily: fam(f) }}>{f}</option>)}</optgroup>
+      </select></Field>
+      <div className="sig-sample" style={{ fontFamily: p.signatureFont ? fam(p.signatureFont) : "'Segoe Script', 'Brush Script MT', cursive", fontSize: p.signatureSize,
+        color: SIGNATURE_INK[p.signatureTone].startsWith('var') ? '#ff9438' : SIGNATURE_INK[p.signatureTone], transform: `rotate(${p.signatureAngle}deg)` }} aria-hidden="true">{p.signatureText || 'Kethan Artzz'}</div>
+      <div className="form-grid">
+        <Field label={`Size · ${p.signatureSize}px`}><input type="range" min={16} max={60} value={p.signatureSize} onChange={e => set({ signatureSize: Number(e.target.value) })} /></Field>
+        <Field label={`Slant · ${p.signatureAngle}°`}><input type="range" min={-12} max={12} value={p.signatureAngle} onChange={e => set({ signatureAngle: Number(e.target.value) })} /></Field>
+      </div>
+      <Field label="Ink"><Segmented label="Signature ink" value={p.signatureTone} onChange={(v: SignatureTone) => set({ signatureTone: v })}
+        options={[{ value: 'gold', label: 'Gold' }, { value: 'white', label: 'White' }, { value: 'ink', label: 'Soft' }, { value: 'accent', label: 'Accent' }]} /></Field>
+    </div>
+
+    <div className="stack"><div className="eyebrow">License seal</div>
+      <Switch checked={p.showSeal} onChange={v => set({ showSeal: v })} label="Show the scannable license seal on the back" />
+      <p className="field-hint" style={{ margin: 0 }}>Every purchase gets its own code (like KA-7F3QX-9MK2D). Scanning the seal with any phone camera, or typing the code at /license, shows the item, the license, who holds it and whether it is still valid. Refunds revoke it automatically.</p>
+    </div>
+
+    <CustomFonts doc={doc} sample={p.signatureText} />
     <div><button type="button" className="btn sm ghost" onClick={() => set({ ...PASS_DRAFT_DEFAULTS })}>Reset the pass to defaults</button></div>
   </>;
 }
@@ -284,6 +342,8 @@ function PassPreview({ doc }: { doc: SiteDoc }){
   const cardRef = useRef<HTMLDivElement>(null);
   const [target, setTarget] = useState<HTMLElement | null>(null);
   const [paid, setPaid] = useState(false);
+  const [back, setBack] = useState(false);
+  useCustomFontFaces(doc);
   useEffect(() => {
     const h = host.current; if (!h) return;
     const root = h.shadowRoot || h.attachShadow({ mode: 'open' });
@@ -297,13 +357,17 @@ function PassPreview({ doc }: { doc: SiteDoc }){
   return (
     <div className="studio-preview">
       <div className="row between" style={{ padding: '8px 12px' }}>
-        <Segmented label="Preview state" value={paid ? 'paid' : 'before'} onChange={v => setPaid(v === 'paid')} options={[{ value: 'before', label: 'Before payment' }, { value: 'paid', label: 'Paid' }]} />
-        <span className="faint" style={{ fontSize: 12 }}>Live preview · move the pointer over the card</span>
+        <span className="row" style={{ gap: 8 }}>
+          <Segmented label="Preview state" value={paid ? 'paid' : 'before'} onChange={v => setPaid(v === 'paid')} options={[{ value: 'before', label: 'Before payment' }, { value: 'paid', label: 'Paid' }]} />
+          <Segmented label="Side" value={back ? 'back' : 'front'} onChange={v => setBack(v === 'back')} options={[{ value: 'front', label: 'Front' }, { value: 'back', label: 'Back' }]} />
+        </span>
+        <span className="faint" style={{ fontSize: 12 }}>Live preview · click the card to flip{paid ? ' · sample seal' : ''}</span>
       </div>
       <div className="preview-stage" ref={host} style={{ background: 'radial-gradient(80% 60% at 50% 40%, #241a1c, #0c0a0d)' }} />
       {target && createPortal(<div className="kpp"><PassCard product={product} currency="INR" amount={49900} free={false} email="buyer@example.com" orderId="KA-8H2KQ4ZP"
-        phase={paid ? 'success' : 'idle'} method={paid ? { type: 'card', network: 'Visa', last4: '4242' } : null} flipped={false} onFlip={() => {}} reduced={false}
-        cardRef={cardRef} settings={doc.passCard} /></div>, target)}
+        phase={paid ? 'success' : 'idle'} method={paid ? { type: 'card', network: 'Visa', last4: '4242' } : null} flipped={back} onFlip={() => setBack(b => !b)} reduced={false}
+        cardRef={cardRef} settings={doc.passCard} holder="Buyer Name"
+        license={paid ? { code: SAMPLE_CODE, url: `${location.origin}/license/${SAMPLE_CODE}` } : null} /></div>, target)}
     </div>
   );
 }

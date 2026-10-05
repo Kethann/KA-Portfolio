@@ -1540,6 +1540,20 @@ html.ka-modal-open{ overflow:hidden; }
 .skill-spot-name{ font-family:var(--font-heading), ui-serif, Georgia, serif; font-size:24px; color:var(--ink); }
 .skill-spot-level{ font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:#ffc795; }
 .skills-field.is-static .skill-float{ will-change:auto; }
+.skill-logo.has-img{ background:radial-gradient(120% 90% at 30% 15%, rgba(255,255,255,.18), transparent 55%), #15110f; padding:14%; box-sizing:border-box; }
+.skill-logo.has-img img{ width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; }
+/* the far layer: big tiles out of focus, drifting slowly behind everything (the deep end of the field) */
+.skill-far{ position:absolute; left:var(--x); top:var(--y); z-index:-1; pointer-events:none; opacity:0; filter:blur(var(--b, 16px)); will-change:transform, opacity;
+  animation:skillFar var(--dur, 32s) linear var(--delay, 0s) infinite; }
+.skill-far .skill-logo{ width:var(--s, 120px); height:var(--s, 120px); border-radius:calc(var(--s, 120px) * .27); font-size:calc(var(--s, 120px) * .32); }
+@keyframes skillFar{
+  0%{ opacity:0; transform:translate(-50%, -50%) translate3d(0, 50px, 0) scale(.85); }
+  18%, 82%{ opacity:.42; }
+  100%{ opacity:0; transform:translate(-50%, -50%) translate3d(var(--dx, 60px), -70px, 0) scale(1.12); }
+}
+.skill-far .skill-logo{ transition:opacity .45s ease; }
+.skills-field.is-spot .skill-far .skill-logo{ opacity:.4; }
+@media (max-width:900px){ .skill-far{ --b:12px; } }
 
 /* grid items default to min-width:auto, which would let a long row (the chips on phones) widen the whole column */
 .skills-main{ min-width:0; }
@@ -7117,7 +7131,7 @@ window.addEventListener("ka-sequence-complete", function(){
   // logo tiles that drift forward out of a gaussian blur, sharpen, and blur away past the viewer, one after
   // another for as long as the field is on screen. Hovering, focusing or tapping a skill brings its logo
   // forward in the field. Data: the site document's `skills` (portal: Content > Site text > Skills).
-  var DEFAULT_SKILLS = {"enabled":true,"title":"Skills","intro":"The tools, languages and crafts behind every frame and every build","categories":[{"name":"Design","icon":"design","items":[{"name":"Photoshop","code":"Ps","color":"#31A8FF","level":5,"note":"Compositing and retouching every key-art layer"},{"name":"Illustrator","code":"Ai","color":"#FF9A00","level":4,"note":"Vector typography and title treatments"},{"name":"Figma","code":"Fg","color":"#A259FF","level":4,"note":"Campaign layouts and social deliverable systems"},{"name":"InDesign","code":"Id","color":"#FF3366","level":3,"note":"Press kits and print-ready layouts"},{"name":"After Effects","code":"Ae","color":"#9999FF","level":3,"note":"Motion posters and animated titles"}]},{"name":"Arts","icon":"arts","items":[{"name":"Movie posters","code":"Mp","color":"#FF9438","level":5,"note":"Theatrical key art from first look to release"},{"name":"Typography","code":"Ty","color":"#E8AA82","level":5,"note":"Custom title logos and lettering"},{"name":"Photo manipulation","code":"Pm","color":"#FF6B4A","level":5,"note":"Blending stars, sets and effects into one frame"},{"name":"Digital painting","code":"Dp","color":"#C9864F","level":4,"note":"Painted skies, light and texture passes"},{"name":"Campaign design","code":"Cd","color":"#FFD9B8","level":4,"note":"Consistent looks across every format"}]},{"name":"Languages","icon":"languages","items":[{"name":"JavaScript","code":"JS","color":"#F7DF1E","level":4,"note":""},{"name":"TypeScript","code":"TS","color":"#3178C6","level":4,"note":""},{"name":"Python","code":"Py","color":"#3776AB","level":3,"note":""},{"name":"HTML","code":"HT","color":"#E34F26","level":4,"note":""},{"name":"CSS","code":"CSS","color":"#1572B6","level":4,"note":""},{"name":"SQL","code":"SQL","color":"#CC8A3B","level":3,"note":""}]},{"name":"Frontend","icon":"frontend","items":[{"name":"React","code":"Re","color":"#61DAFB","level":4,"note":"Components, hooks and state"},{"name":"Three.js","code":"3D","color":"#FFFFFF","level":4,"note":"WebGL scenes and shaders"},{"name":"GSAP","code":"Gs","color":"#88CE02","level":4,"note":"Timeline animation"},{"name":"Vite","code":"Vi","color":"#646CFF","level":4,"note":"Builds and dev tooling"},{"name":"Tailwind CSS","code":"Tw","color":"#38BDF8","level":3,"note":"Utility-first styling"}]},{"name":"Backend","icon":"backend","items":[{"name":"Node.js","code":"No","color":"#5FA04E","level":4,"note":"APIs, jobs and servers"},{"name":"Cloudflare Workers","code":"Cf","color":"#F38020","level":3,"note":"Edge functions and R2 storage"},{"name":"Vercel","code":"Vc","color":"#EDEBE8","level":3,"note":"Serverless deploys"}]},{"name":"Database","icon":"database","items":[{"name":"PostgreSQL","code":"Pg","color":"#4169E1","level":3,"note":""},{"name":"SQLite","code":"Sq","color":"#0F80CC","level":3,"note":""},{"name":"Cloudflare D1","code":"D1","color":"#F38020","level":3,"note":""},{"name":"Supabase","code":"Sb","color":"#3ECF8E","level":3,"note":""},{"name":"Firebase","code":"Fb","color":"#FFCA28","level":3,"note":""}]},{"name":"APIs","icon":"apis","items":[{"name":"REST APIs","code":"API","color":"#8B8BFF","level":4,"note":"Designing and consuming JSON APIs"},{"name":"Razorpay","code":"Rp","color":"#3395FF","level":4,"note":"Payments, webhooks and refunds"},{"name":"AI APIs","code":"AI","color":"#D97757","level":4,"note":"Gemini and Claude assistants"},{"name":"Webhooks","code":"Wh","color":"#C73A63","level":3,"note":"Signed event delivery"},{"name":"Email (SMTP)","code":"@","color":"#9AA3AF","level":3,"note":"Receipts, alerts and auto-replies"}]}]};
+  var DEFAULT_SKILLS = {"enabled":true,"title":"Skills","intro":"Design, motion, video and code: the tools and crafts behind every frame and every build","categories":[{"name":"Design","icon":"design","items":[{"name":"Photoshop","code":"Ps","color":"#31A8FF","level":5,"note":"Compositing and retouching every key-art layer","logoUrl":""},{"name":"Illustrator","code":"Ai","color":"#FF9A00","level":4,"note":"Vector typography and title treatments","logoUrl":""},{"name":"InDesign","code":"Id","color":"#FF3366","level":3,"note":"Press kits and print-ready layouts","logoUrl":""},{"name":"Figma","code":"Fg","color":"#A259FF","level":4,"note":"Campaign layouts and social deliverable systems","logoUrl":""}]},{"name":"Motion design","icon":"motion","items":[{"name":"After Effects","code":"Ae","color":"#9999FF","level":4,"note":"Motion posters, title animation and compositing","logoUrl":""},{"name":"Motion posters","code":"Mp","color":"#C792FF","level":4,"note":"Key art brought to life for launches","logoUrl":""},{"name":"Kinetic typography","code":"Kt","color":"#7FD4FF","level":4,"note":"Titles, credits and lyric sequences","logoUrl":""},{"name":"Lottie & web motion","code":"Lt","color":"#00DDB3","level":3,"note":"Lightweight animation for sites and apps","logoUrl":""}]},{"name":"Video","icon":"video","items":[{"name":"Premiere Pro","code":"Pr","color":"#EA77FF","level":4,"note":"Teasers, promos and social cut-downs","logoUrl":""},{"name":"Adobe Media Encoder","code":"Me","color":"#8F8FFF","level":4,"note":"Batch exports for every platform and format","logoUrl":""},{"name":"Teaser & promo edits","code":"Te","color":"#FF7A59","level":4,"note":"Pacing, music and story in seconds","logoUrl":""},{"name":"Social cut-downs","code":"Sc","color":"#FFB347","level":4,"note":"Reels, shorts and stories from one master","logoUrl":""}]},{"name":"AI & generative","icon":"ai","items":[{"name":"Adobe Firefly","code":"Ff","color":"#FF4F3F","level":4,"note":"Concept frames, textures and extensions","logoUrl":""},{"name":"Generative Fill","code":"Gf","color":"#31A8FF","level":4,"note":"Extending and repairing plates inside Photoshop","logoUrl":""},{"name":"AI-assisted upscaling","code":"Up","color":"#FFD166","level":3,"note":"Print-size masters from small sources","logoUrl":""}]},{"name":"Arts","icon":"arts","items":[{"name":"Movie posters","code":"Po","color":"#FF9438","level":5,"note":"Theatrical key art from first look to release","logoUrl":""},{"name":"Typography","code":"Ty","color":"#E8AA82","level":5,"note":"Custom title logos and lettering","logoUrl":""},{"name":"Photo manipulation","code":"Pm","color":"#FF6B4A","level":5,"note":"Blending stars, sets and effects into one frame","logoUrl":""},{"name":"Digital painting","code":"Dp","color":"#C9864F","level":4,"note":"Painted skies, light and texture passes","logoUrl":""},{"name":"Campaign design","code":"Cd","color":"#FFD9B8","level":4,"note":"One look across every format","logoUrl":""}]},{"name":"Languages","icon":"languages","items":[{"name":"JavaScript","code":"JS","color":"#F7DF1E","level":4,"note":"","logoUrl":""},{"name":"TypeScript","code":"TS","color":"#3178C6","level":4,"note":"","logoUrl":""},{"name":"Python","code":"Py","color":"#3776AB","level":3,"note":"","logoUrl":""},{"name":"HTML","code":"HT","color":"#E34F26","level":4,"note":"","logoUrl":""},{"name":"CSS","code":"CSS","color":"#1572B6","level":4,"note":"","logoUrl":""},{"name":"SQL","code":"SQL","color":"#CC8A3B","level":3,"note":"","logoUrl":""}]},{"name":"Frontend","icon":"frontend","items":[{"name":"React","code":"Re","color":"#61DAFB","level":4,"note":"Components, hooks and state","logoUrl":""},{"name":"Three.js","code":"3D","color":"#FFFFFF","level":4,"note":"WebGL scenes and shaders","logoUrl":""},{"name":"GSAP","code":"Gs","color":"#88CE02","level":4,"note":"Timeline animation","logoUrl":""},{"name":"Vite","code":"Vi","color":"#646CFF","level":4,"note":"Builds and dev tooling","logoUrl":""},{"name":"Tailwind CSS","code":"Tw","color":"#38BDF8","level":3,"note":"Utility-first styling","logoUrl":""}]},{"name":"Backend","icon":"backend","items":[{"name":"Node.js","code":"No","color":"#5FA04E","level":4,"note":"APIs, jobs and servers","logoUrl":""},{"name":"Cloudflare Workers","code":"Cf","color":"#F38020","level":3,"note":"Edge functions and R2 storage","logoUrl":""},{"name":"Vercel","code":"Vc","color":"#EDEBE8","level":3,"note":"Serverless deploys","logoUrl":""}]},{"name":"Database","icon":"database","items":[{"name":"PostgreSQL","code":"Pg","color":"#4169E1","level":3,"note":"","logoUrl":""},{"name":"SQLite","code":"Sq","color":"#0F80CC","level":3,"note":"","logoUrl":""},{"name":"Cloudflare D1","code":"D1","color":"#F38020","level":3,"note":"","logoUrl":""},{"name":"Supabase","code":"Sb","color":"#3ECF8E","level":3,"note":"","logoUrl":""},{"name":"Firebase","code":"Fb","color":"#FFCA28","level":3,"note":"","logoUrl":""}]},{"name":"APIs","icon":"apis","items":[{"name":"REST APIs","code":"API","color":"#8B8BFF","level":4,"note":"Designing and consuming JSON APIs","logoUrl":""},{"name":"Razorpay","code":"Rp","color":"#3395FF","level":4,"note":"Payments, webhooks and refunds","logoUrl":""},{"name":"AI APIs","code":"AI","color":"#D97757","level":4,"note":"Gemini and Claude assistants","logoUrl":""},{"name":"Webhooks","code":"Wh","color":"#C73A63","level":3,"note":"Signed event delivery","logoUrl":""},{"name":"Email (SMTP)","code":"@","color":"#9AA3AF","level":3,"note":"Receipts, alerts and auto-replies","logoUrl":""}]}]};
   var SKILL_ICON_PATHS = {
     design: "M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18zM2 2l7.6 7.6M11 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
     arts: "M12 21a9 9 0 1 1 9-9c0 2.3-1.8 3.2-3.6 3.2h-1.8a1.8 1.8 0 0 0-1.4 3c.6.7.4 2.8-2.2 2.8zM7.5 11.5h.01M10 7.5h.01M15 7.5h.01M17.5 11.5h.01",
@@ -7127,6 +7141,8 @@ window.addEventListener("ka-sequence-complete", function(){
     database: "M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
     apis: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1",
     motion: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM10 8.5l5.5 3.5-5.5 3.5z",
+    video: "M3 6h13v12H3zM16 10.5l5-3v9l-5-3zM6.5 9.5h.01",
+    ai: "M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8zM18.5 14.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z",
     tools: "M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z",
     star: "M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"
   };
@@ -7154,7 +7170,10 @@ window.addEventListener("ka-sequence-complete", function(){
     var s = document.createElement("span"), c = skillColor(x.color);
     s.className = "skill-logo"; s.setAttribute("aria-hidden", "true");
     s.style.setProperty("--c", c); s.style.setProperty("--ink", skillInk(c));
-    s.textContent = skillCode(x);
+    if (x.logoUrl && /^(https:\/\/|\/)[^\s"'<>()]+$/.test(x.logoUrl)){
+      var img = document.createElement("img"); img.src = x.logoUrl; img.alt = ""; img.decoding = "async"; img.loading = "lazy"; img.draggable = false;
+      s.classList.add("has-img"); s.appendChild(img);
+    } else s.textContent = skillCode(x);
     return s;
   }
   function skillIcon(name){
@@ -7275,6 +7294,22 @@ window.addEventListener("ka-sequence-complete", function(){
     fieldLive.push(f);
     a.onfinish = function(){ f.remove(); fieldLive.splice(fieldLive.indexOf(f), 1); spawnFloat(slot, slots); };
   }
+  function spawnFarLayer(){
+    var pool = fieldPool(); if (!pool.length) return;
+    var count = window.innerWidth <= 600 ? 3 : 5, small = window.innerWidth <= 900;
+    for (var i = 0; i < count; i++){
+      var x = pool[(skillsSeq + i * 3) % pool.length], f = el("div", "skill-far");
+      f.style.setProperty("--x", (12 + (76 * (i + .5)) / count + (Math.random() - .5) * 8).toFixed(1) + "%");
+      f.style.setProperty("--y", (18 + Math.random() * 64).toFixed(1) + "%");
+      f.style.setProperty("--s", Math.round((small ? 84 : 120) + Math.random() * (small ? 30 : 60)) + "px");
+      f.style.setProperty("--dx", Math.round((Math.random() - .5) * 120) + "px");
+      f.style.setProperty("--dur", (26 + Math.random() * 16).toFixed(1) + "s");
+      f.style.setProperty("--delay", (-Math.random() * 30).toFixed(1) + "s");   // already mid-drift when the field appears
+      f.appendChild(skillLogo(x));
+      skillsField.insertBefore(f, skillsField.firstChild);
+      fieldLive.push(f);
+    }
+  }
   function staticField(){
     // reduced motion: a still arrangement with depth (the farther tiles stay softly blurred)
     var pool = fieldPool().slice(0, 9), W = skillsField.clientWidth, H = skillsField.clientHeight;
@@ -7292,6 +7327,7 @@ window.addEventListener("ka-sequence-complete", function(){
     fieldOn = true;
     if (reducedMotion || !skillsField.animate){ staticField(); return; }
     // one lane per skill when a category has only a few, so the same tiles never stack on each other
+    spawnFarLayer();
     var slots = Math.min(fieldSlots(), Math.max(3, fieldPool().length)), every = 8400 / slots;
     for (var i = 0; i < slots; i++) (function(i){ fieldTimers.push(setTimeout(function(){ spawnFloat(i, slots); }, i * every)); })(i);
   }

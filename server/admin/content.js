@@ -8,7 +8,7 @@ import { DEFAULT_TEMPLATES, sendEmail } from '../core/email.js';
 import { renderMarkdown } from '../core/markdown.js';
 import { str, stringArray, uuid as vUuid, url as vUrl } from '../core/validate.js';
 import { loadSiteDocument, TOPICS } from '../handlers/public.js';
-import { validateSiteDocument } from './site-document.js';
+import { validateSiteDocument, SKILLS_DEFAULT } from './site-document.js';
 import { isOwnMediaUrl, slugify } from './catalog.js';
 import { audit } from './auth.js';
 // bundled with the code (the Worker has no file system to read it from at runtime)
@@ -240,6 +240,8 @@ export function registerContent(route){
   const a = { access: 'admin' };
   route('GET', '/api/admin/site', getSite, a);
   route('PUT', '/api/admin/site', saveSite, a);
+  // the suggested Skills board (Content > Site text > Skills > Use the suggested set)
+  route('GET', '/api/admin/site/skills-defaults', async () => json(SKILLS_DEFAULT), a);
   route('GET', '/api/admin/tips', listTips, a);
   route('POST', '/api/admin/tips', saveTip, a);
   route('PUT', '/api/admin/tips/:id', saveTip, a);

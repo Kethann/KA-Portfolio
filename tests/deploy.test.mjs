@@ -28,7 +28,7 @@ test('wrangler.jsonc: Worker entry, D1 + migrations, R2, cron, and only dynamic 
   assert.equal(wrangler.main, 'server/platform/cloudflare.js');
   assert.ok(wrangler.compatibility_flags.includes('nodejs_compat'));
   assert.equal(wrangler.assets.directory, './dist');
-  for (const p of ['/api/*', '/legal', '/legal/*', '/__storage/*', '/__storage-upload/*']) assert.ok(wrangler.assets.run_worker_first.includes(p), p);
+  for (const p of ['/api/*', '/legal', '/legal/*', '/license', '/license/*', '/__storage/*', '/__storage-upload/*']) assert.ok(wrangler.assets.run_worker_first.includes(p), p);
   const d1 = wrangler.d1_databases.find(d => d.binding === 'DB');
   assert.equal(d1.migrations_dir, 'migrations');
   assert.ok(wrangler.r2_buckets.find(b => b.binding === 'FILES'));
@@ -57,13 +57,16 @@ test('R2 links: public media is plain, private files need a valid unexpired sign
   assert.throws(() => s.publicUrl('media', '../secret'), /Invalid storage path/);
 });
 
-test('the rewritten /api/index?__path= form still routes like the original URL', async () => {
+test('direct /api paths route correctly; legacy Vercel __path rewrite is removed (Cloudflare uses direct paths)', async () => {
   const app = await createTestApp();
   try {
+    // Direct paths always work
     assert.equal((await app.call('GET', '/api/health')).status, 200);
+    // The legacy Vercel /api/index?__path= rewrite is intentionally removed.
+    // Cloudflare Workers always receive the original direct path, so this
+    // workaround is no longer needed and correctly returns 404 now.
     const r = await app.call('GET', '/api/index?__path=health');
-    assert.equal(r.status, 200);
-    assert.deepEqual(r.json, { ok: true });
+    assert.equal(r.status, 404);
   } finally { await app.close(); }
 });
 

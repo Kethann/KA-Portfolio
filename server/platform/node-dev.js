@@ -59,7 +59,7 @@ export async function createDevServer({ port = Number(env('PORT', 9878)), host =
     try {
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
       const path = decodeURIComponent(url.pathname);
-      if (path.startsWith('/api/') || path === '/legal' || path.startsWith('/legal/')){
+      if (path.startsWith('/api/') || path === '/legal' || path.startsWith('/legal/') || path === '/license' || path.startsWith('/license/')){
         const headers = new Headers();
         for (const [k, v] of Object.entries(req.headers)) if (v !== undefined) headers.set(k, Array.isArray(v) ? v.join(', ') : v);
         const hasBody = req.method !== 'GET' && req.method !== 'HEAD';

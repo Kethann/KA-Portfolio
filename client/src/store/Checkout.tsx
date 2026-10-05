@@ -4,18 +4,19 @@
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { useFocusTrap, useMedia } from './hooks';
 import { postJson, publicConfig, formatPrice, ApiError, type Currency, type Product } from './api';
-import { reduce, initialState, stepOf, isStage, type Quote, type OrderResult, type Success, type PaymentMethod } from './checkout/machine';
+import { reduce, initialState, stepOf, isStage, type Quote, type OrderResult, type Success, type PaymentMethod, type LicenseRef } from './checkout/machine';
 import { PassCard, CountingPrice } from './checkout/PassCard';
 import { DemoPay } from './checkout/DemoPay';
 
 type Req = { mode: 'buy'; product: Product; currency: Currency; opener?: HTMLElement | null } | { mode: 'resend'; opener?: HTMLElement | null };
-interface Status { orderId: string; status: string; downloadUrl: string | null; method?: PaymentMethod | null }
+interface Status { orderId: string; status: string; downloadUrl: string | null; method?: PaymentMethod | null; license?: LicenseRef | null }
 type Widget = { token(): string; reset(): void; remove(): void; live?: boolean };
 
 declare global { interface Window { Razorpay?: new (options: Record<string, unknown>) => { open(): void; on(event: string, fn: (resp: { error?: { description?: string } }) => void): void } } }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const EMAIL_KEY = 'ka-buyer-email';
+const HOLDER_KEY = 'ka-license-name';   // remembered together with the email (same checkbox)
 let razorpayScript: Promise<void> | null = null;
 function loadRazorpay(){
   if (window.Razorpay) return Promise.resolve();
@@ -95,6 +96,8 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
   const [s, dispatch] = useReducer(reduce, initialState);
   const [email, setEmail] = useState(() => { try { return localStorage.getItem(EMAIL_KEY) || ''; } catch { return ''; } });
   const [remember, setRemember] = useState(() => { try { return !!localStorage.getItem(EMAIL_KEY); } catch { return false; } });
+  // the name printed on the license (optional): without it the license shows the masked email
+  const [holder, setHolder] = useState(() => { try { return localStorage.getItem(HOLDER_KEY) || ''; } catch { return ''; } });
   const [emailError, setEmailError] = useState('');
   const [codeOpen, setCodeOpen] = useState(false);
   const [code, setCode] = useState('');
@@ -173,7 +176,7 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
   };
   const validateEmail = () => { const ok = EMAIL.test(email.trim()); setEmailError(ok || !email ? '' : 'Enter a valid email address.'); return ok; };
 
-  const successFrom = (order: OrderResult, st: Status): Success => ({ orderId: order.orderId, downloadUrl: st.downloadUrl, method: st.method || null, total: quote?.total || 0, currency: quote?.currency || currency, free: false, emailed: st.status === 'delivered' });
+  const successFrom = (order: OrderResult, st: Status): Success => ({ orderId: order.orderId, downloadUrl: st.downloadUrl, method: st.method || null, total: quote?.total || 0, currency: quote?.currency || currency, free: false, emailed: st.status === 'delivered', license: st.license || null });
 
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -184,7 +187,10 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
     if (!EMAIL.test(addr)){ setEmailError('Enter the email where your download link should go.'); dispatch({ type: 'INVALID' }); inFlight.current = false; emailRef.current?.focus(); return; }
     if (!online){ dispatch({ type: 'INVALID', error: 'You’re offline. Reconnect and try again.' }); inFlight.current = false; return; }
     setEmailError('');
-    try { if (remember) localStorage.setItem(EMAIL_KEY, addr); else localStorage.removeItem(EMAIL_KEY); } catch {}
+    try {
+      if (remember){ localStorage.setItem(EMAIL_KEY, addr); if (holder.trim()) localStorage.setItem(HOLDER_KEY, holder.trim()); else localStorage.removeItem(HOLDER_KEY); }
+      else { localStorage.removeItem(EMAIL_KEY); localStorage.removeItem(HOLDER_KEY); }
+    } catch {}
     // The bot-check pass is collected now, while the form (and the check inside it) is still on screen: the
     // next step swaps the form for the payment view, which removes the check.
     const pass = await ts.token();
@@ -192,7 +198,7 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
     dispatch({ type: 'VALID' });
     let order: OrderResult;
     try {
-      order = await postJson<OrderResult>('/api/checkout/order', { productId: product.id, currency, email: addr, codes, turnstileToken: pass });
+      order = await postJson<OrderResult>('/api/checkout/order', { productId: product.id, currency, email: addr, codes, turnstileToken: pass, licenseHolder: holder.trim() || undefined });
     } catch (err){
       ts.reset();
       if (err instanceof ApiError && err.code === 'coupon_rejected') setCodeError((err as Error).message);
@@ -200,7 +206,7 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
       return;
     }
     ts.reset();
-    if (order.free){ dispatch({ type: 'ORDER_FREE', success: { orderId: order.orderId, downloadUrl: order.downloadUrl || null, method: null, total: 0, currency, free: true, emailed: order.emailed !== false } }); return; }
+    if (order.free){ dispatch({ type: 'ORDER_FREE', success: { orderId: order.orderId, downloadUrl: order.downloadUrl || null, method: null, total: 0, currency, free: true, emailed: order.emailed !== false, license: order.license || null } }); return; }
     dispatch({ type: 'ORDER_CREATED', order });
     if (order.demo) return;                                   // DemoPay renders instead of Razorpay
     try { await loadRazorpay(); } catch {
@@ -263,7 +269,8 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
     <div className="kco-body">
       <section className="kco-visual" aria-label="Order">
         <PassCard product={product} currency={quote?.currency || currency} amount={amount} free={!!quote?.free} email={email} orderId={s.order?.orderId || s.success?.orderId || null}
-          phase={s.phase} method={s.success?.method || null} flipped={flipped} onFlip={() => setFlipped(f => !f)} reduced={reduced} cardRef={cardRef} />
+          phase={s.phase} method={s.success?.method || null} flipped={flipped} onFlip={() => setFlipped(f => !f)} reduced={reduced} cardRef={cardRef}
+          holder={holder} license={s.success?.license || null} />
         {!stage && <Summary quote={quote} reduced={reduced} />}
         {stage && <div className="kco-status" aria-live="polite">
           {lines ? <>
@@ -279,6 +286,7 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
               : <>Your download link{s.success.free ? '' : ' and receipt'} will be emailed to <strong>{email.trim()}</strong> shortly. Use “Download now” to get it right away.</>}</p>
             <div className="kas-co-actions">
               {s.success.downloadUrl && <a className="kas-buy" href={s.success.downloadUrl}>Download now</a>}
+              {s.success.license && <a className="kas-btn is-ghost" href={s.success.license.url} target="_blank" rel="noopener">View your license<span className="kas-sr"> {s.success.license.code} (opens in a new tab)</span></a>}
               <button type="button" className={s.success.downloadUrl ? 'kas-btn is-ghost' : 'kas-buy'} onClick={onClose}>Continue browsing</button>
             </div>
           </> : <>
@@ -300,7 +308,12 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
           <span id="kco-email-err" className="kco-err" role={emailError ? 'alert' : undefined}>{emailError}</span>
           <span id="kco-email-help" className="kas-sr">Your download link and receipt are sent to this address.</span>
         </div>
-        <label className="kco-remember"><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} /> Remember my email on this device for receipts</label>
+        <div className="kco-field">
+          <input id="kco-holder" type="text" autoComplete="name" maxLength={80} placeholder=" " value={holder} onChange={e => setHolder(e.target.value)} aria-describedby="kco-holder-help" />
+          <label htmlFor="kco-holder">Name on the license <span className="kco-optional">(optional)</span></label>
+          <span id="kco-holder-help" className="kco-hint">Printed on your license and its seal page. Leave empty to show your masked email instead.</span>
+        </div>
+        <label className="kco-remember"><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} /> Remember my email and name on this device for receipts</label>
         {quote && !quote.free ? <div className="kco-code">
           {!codeOpen ? <button type="button" className="kas-link" onClick={() => setCodeOpen(true)}>Have a discount code?</button> : <>
             <div className="kco-code-row">

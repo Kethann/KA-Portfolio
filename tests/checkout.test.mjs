@@ -332,6 +332,56 @@ test('refunds: blocked after download when turned off, confirmed otherwise, then
   await assert.rejects(refundOrder(nRow.id), /Only paid orders/);
 });
 
+test('license seal: a permanent code per paid order, a public check page, the holder name, revoked by a refund', async () => {
+  const { refundOrder } = await import('../server/store/orders.js');
+  const CODE = /^KA-[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/;
+  // an unpaid order has a code, but no license: its page reads exactly like an unknown code
+  const o = (await order(kit, { email: 'seal@example.com', extra: { licenseHolder: '  Ravi   <b>Kumar</b>\u0007 ' } })).json;
+  const unpaid = await row(o.orderId);
+  assert.match(unpaid.license_code, CODE);
+  assert.equal(unpaid.license_holder, 'Ravi bKumar/b', 'markup and control characters stripped, spaces collapsed');
+  assert.equal((await app.call('GET', `/license/${unpaid.license_code}`, { ip: ip() })).status, 404);
+  const paid = await pay(o);
+  // checkout polls the status until delivery; once both payment proofs are in, it carries the seal
+  const done = await app.call('POST', '/api/checkout/status', { body: { orderId: o.orderId, clientSecret: o.clientSecret }, ip: ip() });
+  assert.equal(done.json.license.code, unpaid.license_code, 'the code never changes');
+  assert.equal(done.json.license.url, `http://shop.test/license/${unpaid.license_code}`);
+  // the page: valid, holder name, the item, a seal pointing back at itself
+  const page = await app.call('GET', `/license/${unpaid.license_code}`, { ip: ip() });
+  assert.equal(page.status, 200);
+  assert.match(page.text, /Valid license/); assert.match(page.text, /Ravi bKumar\/b/); assert.match(page.text, /poster kit/i);
+  assert.match(page.text, /<svg[^>]+class="ka-seal"/); assert.ok(!page.text.includes('seal@example.com'), 'never the full email');
+  assert.match(page.headers.get('content-security-policy'), /default-src 'none'/);
+  // LICENSE.txt carries the code and the check link; the download page shows the seal
+  const mail = mailsTo('seal@example.com')[0];
+  const lic = Buffer.from(mail.attachments.find(a => a.name === 'LICENSE.txt').content).toString('utf8');
+  assert.match(lic, new RegExp(`License code: ${unpaid.license_code}`)); assert.match(lic, /Verify this license: http:\/\/shop\.test\/license\//);
+  assert.match(lic, /Licensed to: Ravi bKumar\/b <seal@example\.com>/);
+  const dl = await app.call('GET', `/api/download/${linkIn(mail).split('/').pop()}`, { ip: ip() });
+  assert.match(dl.text, new RegExp(`Your license seal · ${unpaid.license_code}`));
+  // typed codes are forgiving: lower case, spaces, O for 0 -> the canonical page
+  const typed = unpaid.license_code.toLowerCase().replace(/-/g, ' ');
+  const r1 = await app.call('GET', `/license?code=${encodeURIComponent(typed)}`, { ip: ip() });
+  assert.equal(r1.status, 303); assert.equal(r1.headers.get('location'), `/license/${unpaid.license_code}`);
+  const r2 = await app.call('GET', `/license/${unpaid.license_code.toLowerCase()}`, { ip: ip() });
+  assert.equal(r2.status, 301); assert.equal(r2.headers.get('location'), `/license/${unpaid.license_code}`);
+  assert.equal((await app.call('GET', '/license?code=not-a-code', { ip: ip() })).status, 400);
+  assert.equal((await app.call('GET', '/license/KA-00000-00000', { ip: ip() })).status, 404);
+  assert.equal((await app.call('GET', '/license', { ip: ip() })).status, 200);
+  // a masked email when no name was given
+  const plain = (await order(kit, { email: 'noname@example.com' })).json; await pay(plain);
+  const plainPage = await app.call('GET', `/license/${(await row(plain.orderId)).license_code}`, { ip: ip() });
+  assert.match(plainPage.text, /n\u2022\u2022\u2022@example\.com/);
+  // a refund revokes the license on the same page
+  const oRow = await row(o.orderId);
+  const ref = await refundOrder(oRow.id, { allowAfterDownload: true, reason: 'test' });
+  await webhook('refund.processed', { id: ref.refundId, payment_id: paid.paymentId, amount: 49900 }, { key: 'refund' });
+  const revoked = await app.call('GET', `/license/${oRow.license_code}`, { ip: ip() });
+  assert.equal(revoked.status, 200); assert.match(revoked.text, /Revoked/);
+  const st = await app.call('POST', '/api/checkout/status', { body: { orderId: o.orderId, clientSecret: o.clientSecret }, ip: ip() });
+  assert.equal(st.json.license, null, 'a refunded order no longer hands out its seal');
+});
+
 test('resend gives the same answer for unknown emails and new links for buyers', async () => {
   app.mail.sent.length = 0;
   const unknown = await app.call('POST', '/api/downloads/resend', { body: { email: 'nobody@example.com' }, ip: ip() });
