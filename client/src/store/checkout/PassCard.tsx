@@ -93,6 +93,8 @@ export const PASS_DEFAULTS: PassSettings = { label: 'KA PASS', logoUrl: '', logo
   textPosition: 'bottom', pricePosition: 'right', stampText: 'PAID', foil: true, dim: 55,
   signatureText: 'Kethan Artzz', signatureFont: '', signatureSize: 30, signatureTone: 'gold', signatureAngle: -4, showSeal: true,
   backEyebrow: 'License', licensedLabel: 'Licensed to', signLabel: 'Authorised signature', backNote: '', showTerms: true };
+// What the signature is drawn in until a font is chosen (the portal's sample uses the same stack).
+export const SIGNATURE_DEFAULT_FONT = "'Segoe Script', 'Bradley Hand', 'Brush Script MT', 'Lucida Handwriting', cursive";
 export const SIGNATURE_INK: Record<SignatureTone, string> = { gold: '#f2c27b', white: '#fff6ea', ink: '#e9e1d8', accent: 'var(--kas-accent, #ff9438)' };
 declare global { interface Window { kaPassCard?: Partial<PassSettings> | null } }
 function usePassSettings(override?: Partial<PassSettings>): PassSettings {
@@ -157,7 +159,7 @@ export function PassCard({ product, currency, amount, free, email, orderId, phas
               {pass.backNote && <span className="kco-back-note">{pass.backNote}</span>}
               {pass.showTerms && <span className="kco-back-terms">Link by email · {product.delivery.linkHours} h · {product.delivery.maxDownloads} downloads</span>}
               <span className="kco-sign-wrap">
-                <span className="kco-sign" style={{ fontFamily: fam(pass.signatureFont, "'Segoe Script', 'Brush Script MT', cursive"), fontSize: pass.signatureSize,
+                <span className="kco-sign" style={{ fontFamily: pass.signatureFont ? fam(pass.signatureFont, 'cursive') : SIGNATURE_DEFAULT_FONT, fontSize: pass.signatureSize,
                   color: SIGNATURE_INK[pass.signatureTone] || SIGNATURE_INK.gold, transform: `rotate(${pass.signatureAngle}deg)` }}>{pass.signatureText || 'Kethan Artzz'}</span>
                 <small>{pass.signLabel || PASS_DEFAULTS.signLabel}</small>
               </span>

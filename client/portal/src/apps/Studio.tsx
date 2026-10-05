@@ -3,7 +3,7 @@
 // and scaled right in the preview; positions are stored per screen size.
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { PassCard, SIGNATURE_INK, type SignatureTone } from '../../../src/store/checkout/PassCard';
+import { PassCard, SIGNATURE_INK, SIGNATURE_DEFAULT_FONT, type SignatureTone } from '../../../src/store/checkout/PassCard';
 import type { Product } from '../../../src/store/api';
 import storeCss from '../../../src/store/store.css?inline';
 import checkoutCss from '../../../src/store/checkout/checkout.css?inline';
@@ -136,7 +136,7 @@ function fontUses(doc: SiteDoc, family: string){
   if (els) out.push(els === 1 ? '1 element' : `${els} elements`);
   return out;
 }
-function CustomFonts({ doc, sample: initialSample = '' }: { doc: SiteDoc; sample?: string }){
+function CustomFonts({ doc, sample: initialSample = '', onAdded }: { doc: SiteDoc; sample?: string; onAdded?: (family: string) => void }){
   const [family, setFamily] = useState('');
   const [sample, setSample] = useState(initialSample);
   const toast = useToast();
@@ -164,10 +164,11 @@ function CustomFonts({ doc, sample: initialSample = '' }: { doc: SiteDoc; sample
             <span className="faint" style={{ fontSize: 12 }}>{f.family}{uses.length ? ` · used by ${uses.join(', ')}` : ' · not used yet'}</span></span>
           <button type="button" className="icon-btn sm" aria-label={`Remove ${f.family}`} title="Remove" onClick={() => void remove(f.family)}><Icon name="trash" size={13} /></button></li>;
       })}</ul> : <p className="faint">No custom fonts yet. Upload your own (a signature font, for example) and it appears in every font menu.</p>}
-      <Field label="New font name" hint="Letters, numbers, spaces, - and _. Upload the file after naming it."><input value={family} onChange={e => setFamily(e.target.value)} maxLength={60} placeholder="e.g. Kethan Signature" /></Field>
+      <Field label="New font name" hint="Letters, numbers, spaces, - and _. Upload the file after naming it."><input id="font-new-name" value={family} onChange={e => setFamily(e.target.value)} maxLength={60} placeholder="e.g. Kethan Signature" /></Field>
       {valid ? <Uploader kind="font" accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf" label={`Upload “${family.trim()}”`} onUploaded={u => {
         updateSite(x => ({ ...x, details: { ...x.details, customFonts: [...x.details.customFonts, { family: family.trim(), url: u.publicUrl! }] } }));
-        setFamily(''); toast.show('Font added. Pick it in any font menu, then publish.', { tone: 'success' });
+        if (onAdded) onAdded(family.trim());
+        setFamily(''); toast.show(onAdded ? 'Font added and chosen for the signature. Publish to make it live.' : 'Font added. Pick it in any font menu, then publish.', { tone: 'success' });
       }}>WOFF2 is smallest · up to 6 MB · make sure your font license allows web use</Uploader> : family && <p className="field-error">Use a new name with letters, numbers, spaces, - or _.</p>}
     </section>
   );
@@ -310,12 +311,13 @@ function PassSettingsForm({ doc }: { doc: SiteDoc }){
     <div className="stack"><div className="eyebrow">Signature (back of the pass)</div>
       <p className="field-hint" style={{ margin: 0 }}>Shown on the license side of the pass and on the license check page that the seal opens. Upload a signature font below and pick it here.</p>
       <Field label="Signature text" hint={`${p.signatureText.length}/40`}><input value={p.signatureText} maxLength={40} onChange={e => set({ signatureText: e.target.value })} placeholder="Kethan Artzz" /></Field>
-      <Field label="Signature font"><select value={p.signatureFont} onChange={e => set({ signatureFont: e.target.value })} style={{ fontFamily: p.signatureFont ? fam(p.signatureFont) : 'cursive' }}>
+      <Field label="Signature font"><select value={p.signatureFont} onChange={e => set({ signatureFont: e.target.value })} style={{ fontFamily: p.signatureFont ? fam(p.signatureFont) : SIGNATURE_DEFAULT_FONT }}>
         <option value="">Handwriting (default)</option>
         {doc.details.customFonts.length > 0 && <optgroup label="Your fonts">{doc.details.customFonts.map(f => <option key={f.family} value={f.family} style={{ fontFamily: fam(f.family) }}>{f.family}</option>)}</optgroup>}
         <optgroup label="Site fonts">{FONTS.map(f => <option key={f} value={f} style={{ fontFamily: fam(f) }}>{f}</option>)}</optgroup>
-      </select></Field>
-      <div className="sig-sample" style={{ fontFamily: p.signatureFont ? fam(p.signatureFont) : "'Segoe Script', 'Brush Script MT', cursive", fontSize: p.signatureSize,
+      </select>
+        <button type="button" className="btn sm ghost" style={{ marginTop: 6 }} onClick={() => { const i = document.getElementById('font-new-name') as HTMLInputElement | null; i?.scrollIntoView({ block: 'center', behavior: 'smooth' }); i?.focus(); }}><Icon name="upload" /> Add your own signature font</button></Field>
+      <div className="sig-sample" style={{ fontFamily: p.signatureFont ? fam(p.signatureFont) : SIGNATURE_DEFAULT_FONT, fontSize: p.signatureSize,
         color: SIGNATURE_INK[p.signatureTone].startsWith('var') ? '#ff9438' : SIGNATURE_INK[p.signatureTone], transform: `rotate(${p.signatureAngle}deg)` }} aria-hidden="true">{p.signatureText || 'Kethan Artzz'}</div>
       <div className="form-grid">
         <Field label={`Size · ${p.signatureSize}px`}><input type="range" min={16} max={60} value={p.signatureSize} onChange={e => set({ signatureSize: Number(e.target.value) })} /></Field>
@@ -340,7 +342,7 @@ function PassSettingsForm({ doc }: { doc: SiteDoc }){
       <p className="field-hint" style={{ margin: 0 }}>Every purchase gets its own code (like KA-7F3QX-9MK2D). Scanning the seal with any phone camera, or typing the code at /license, shows the item, the license, who holds it and whether it is still valid. Refunds revoke it automatically.</p>
     </div>
 
-    <CustomFonts doc={doc} sample={p.signatureText} />
+    <CustomFonts doc={doc} sample={p.signatureText} onAdded={family => set({ signatureFont: family })} />
     <div><button type="button" className="btn sm ghost" onClick={() => set({ ...PASS_DRAFT_DEFAULTS })}>Reset the pass to defaults</button></div>
   </>;
 }

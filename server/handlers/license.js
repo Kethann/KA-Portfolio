@@ -20,7 +20,7 @@ async function signature(issuer){
   const face = font && /^(https?:\/\/|\/)[^\s"'()\\]+$/.test(font.url) ? `@font-face{font-family:"ka-sign";src:url("${font.url}");font-display:swap}` : '';
   const builtIn = !font && pc.signatureFont && /^[A-Za-z0-9 _-]+$/.test(pc.signatureFont) ? `"${pc.signatureFont}",` : '';
   const ink = { gold: '#f2c27b', white: '#fff6ea', ink: '#e9e1d8', accent: '#ff9438' }[pc.signatureTone] || '#f2c27b';
-  return { face, family: `${face ? '"ka-sign",' : ''}${builtIn}"Segoe Script","Brush Script MT",cursive`, text: pc.signatureText || issuer, ink };
+  return { face, family: `${face ? '"ka-sign",' : ''}${builtIn}"Segoe Script","Bradley Hand","Brush Script MT","Lucida Handwriting",cursive`, text: pc.signatureText || issuer, ink };
 }
 
 function page(status, title, body, extraCss = ''){
