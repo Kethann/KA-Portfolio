@@ -11,7 +11,8 @@ import { TagInput, Uploader, useSaveKey } from './common';
 import { discardSite, keepMineOverTheirs, loadSite, saveSite, thumb, updateSite, useSite } from './siteDoc';
 import { SKILL_ICONS, SKILL_LIMITS } from './siteDoc';
 import type { SkillsDraft } from './siteDoc';
-import type { SiteImage, StatItem, SkillCategory, SkillItem } from './siteDoc';
+import type { SiteImage, StatItem, SkillCategory, SkillItem, AboutDraft, JourneyStep, ReelVideo } from './siteDoc';
+import { ABOUT_LIMITS, aboutDefaults } from './siteDoc';
 import { ago, dateTime } from '../format';
 import { SKILL_LOGO_LIST, skillLogoFor, type SkillLogo } from '../../../../shared/skill-logos.js';
 
@@ -74,9 +75,88 @@ function SiteText(){
           </Field>
         ))}
       </div>
+      <AboutStory />
       <AboutStats />
       <AboutSkills />
     </div>
+  );
+}
+
+// About > story: the bio, the journey (points on a line, counting up from a year) and the promo-cut clips from YouTube.
+function ytId(v: string){
+  const t = v.trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(t)) return t;
+  try {
+    const u = new URL(t);
+    if (/(^|\.)youtu\.be$/.test(u.hostname)) return u.pathname.slice(1, 12);
+    if (/(^|\.)youtube\.com$/.test(u.hostname)) return u.searchParams.get('v') || (/^\/(shorts|embed|live)\/([A-Za-z0-9_-]{11})/.exec(u.pathname) || [])[2] || '';
+  } catch { /* not a link */ }
+  return '';
+}
+function AboutStory(){
+  const { doc } = useSite();
+  const a = doc!.about;
+  const confirm = useConfirm();
+  const setA = (patch: Partial<AboutDraft>) => updateSite(d => ({ ...d, about: { ...d.about, ...patch } }));
+  const setJ = (patch: Partial<AboutDraft['journey']>) => setA({ journey: { ...a.journey, ...patch } });
+  const setR = (patch: Partial<AboutDraft['reel']>) => setA({ reel: { ...a.reel, ...patch } });
+  const setStep = (i: number, patch: Partial<JourneyStep>) => setJ({ steps: a.journey.steps.map((x, j) => j === i ? { ...x, ...patch } : x) });
+  const setVid = (i: number, patch: Partial<ReelVideo>) => setR({ videos: a.reel.videos.map((x, j) => j === i ? { ...x, ...patch } : x) });
+  const reset = async () => { if (await confirm({ title: 'Use the suggested About story?', body: 'This replaces the bio, the journey and the clips with the suggested set. Nothing is saved until you press Publish changes.', confirm: 'Use the suggested set' })) setA(aboutDefaults()); };
+  return (
+    <section className="card stack" aria-labelledby="about-story-h" style={{ marginTop: 'var(--sp-5)' }}>
+      <div className="row between"><h3 id="about-story-h">About story</h3>
+        <button type="button" className="btn sm ghost" onClick={() => void reset()}>Use the suggested set</button></div>
+      <p className="field-hint" style={{ margin: 0 }}>The bio under the About title, the journey line and the promo cuts. Publish changes to put them live.</p>
+      <Field label="Bio" hint={`${a.bio.length}/1600`}><textarea rows={8} maxLength={1600} value={a.bio} onChange={e => setA({ bio: e.target.value })} /></Field>
+
+      <div className="row between" style={{ marginTop: 8 }}><h4 style={{ margin: 0 }}>Journey</h4>
+        <Switch checked={a.journey.enabled} onChange={v => setJ({ enabled: v })} label="Show on the About page" /></div>
+      <div className="form-grid">
+        <Field label="Since (year)" hint="The badge counts up to this year"><input type="number" min={1990} max={2100} value={a.journey.since} onChange={e => setJ({ since: Number(e.target.value) || 2021 })} style={{ width: 120 }} /></Field>
+      </div>
+      {a.journey.steps.map((x, i) => (
+        <div className="row" key={i} style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input aria-label={`Step ${i + 1} title`} value={x.title} maxLength={40} placeholder="Point title" onChange={e => setStep(i, { title: e.target.value })} style={{ flex: '1 1 160px', minWidth: 120 }} />
+          <input aria-label={`Step ${i + 1} text`} value={x.text} maxLength={90} placeholder="One line (optional)" onChange={e => setStep(i, { text: e.target.value })} style={{ flex: '2 1 220px', minWidth: 160 }} />
+          <button type="button" className="icon-btn sm" title="Move up" aria-label="Move step up" disabled={i === 0} onClick={() => setJ({ steps: moveIn(a.journey.steps, i, -1) })}>↑</button>
+          <button type="button" className="icon-btn sm" title="Move down" aria-label="Move step down" disabled={i === a.journey.steps.length - 1} onClick={() => setJ({ steps: moveIn(a.journey.steps, i, 1) })}>↓</button>
+          <button type="button" className="icon-btn sm" title="Remove" aria-label={`Remove step ${i + 1}`} onClick={() => setJ({ steps: a.journey.steps.filter((_, j) => j !== i) })}><Icon name="trash" size={14} /></button>
+        </div>
+      ))}
+      <div><button type="button" className="btn sm" disabled={a.journey.steps.length >= ABOUT_LIMITS.steps} onClick={() => setJ({ steps: [...a.journey.steps, { title: '', text: '' }] })}><Icon name="plus" /> Add a point</button></div>
+
+      <div className="row between" style={{ marginTop: 8 }}><h4 style={{ margin: 0 }}>Promo cuts (YouTube)</h4>
+        <Switch checked={a.reel.enabled} onChange={v => setR({ enabled: v })} label="Show on the About page" /></div>
+      <p className="field-hint" style={{ margin: 0 }}>A stack of videos that plays a few random seconds of each, muted, then moves to another. Visitors can open the full video on YouTube.</p>
+      <div className="form-grid">
+        <Field label="Heading" hint={`${a.reel.title.length}/60`}><input maxLength={60} value={a.reel.title} onChange={e => setR({ title: e.target.value })} /></Field>
+        <Field label="Intro" hint={`${a.reel.intro.length}/200`}><input maxLength={200} value={a.reel.intro} onChange={e => setR({ intro: e.target.value })} /></Field>
+        <Field label="Small label" hint="Above the video title"><input maxLength={30} value={a.reel.panelLabel} onChange={e => setR({ panelLabel: e.target.value })} /></Field>
+        <Field label="Side text" hint={`${a.reel.panelText.length}/220`}><textarea rows={2} maxLength={220} value={a.reel.panelText} onChange={e => setR({ panelText: e.target.value })} /></Field>
+        <Field label="Watch button"><input maxLength={40} value={a.reel.buttonLabel} onChange={e => setR({ buttonLabel: e.target.value })} /></Field>
+        <Field label="Channel button"><input maxLength={40} value={a.reel.channelLabel} onChange={e => setR({ channelLabel: e.target.value })} /></Field>
+        <Field label="Channel link" hint="youtube.com link"><input type="url" maxLength={300} value={a.reel.channelUrl} onChange={e => setR({ channelUrl: e.target.value })} /></Field>
+        <Field label="Clip length (seconds)" hint="Each clip is random between these">
+          <span className="row" style={{ gap: 8 }}>
+            <input type="number" aria-label="Shortest clip" min={2} max={30} value={a.reel.clipMin} onChange={e => setR({ clipMin: Number(e.target.value) || 5 })} style={{ width: 80 }} />
+            <span className="faint">to</span>
+            <input type="number" aria-label="Longest clip" min={2} max={30} value={a.reel.clipMax} onChange={e => setR({ clipMax: Number(e.target.value) || 8 })} style={{ width: 80 }} />
+          </span></Field>
+      </div>
+      {a.reel.videos.map((v, i) => (
+        <div className="row" key={i} style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {ytId(v.id) ? <img src={`https://i.ytimg.com/vi/${ytId(v.id)}/default.jpg`} alt="" width={56} height={32} style={{ borderRadius: 6, objectFit: 'cover' }} /> : <span style={{ width: 56, height: 32, borderRadius: 6, background: 'rgba(255,255,255,.06)' }} aria-hidden="true" />}
+          <input aria-label={`Video ${i + 1} link`} value={v.id} maxLength={300} placeholder="YouTube link or video ID" onChange={e => setVid(i, { id: e.target.value })} style={{ flex: '2 1 240px', minWidth: 180 }} />
+          <input aria-label={`Video ${i + 1} title`} value={v.title} maxLength={120} placeholder="Title shown beside the clip" onChange={e => setVid(i, { title: e.target.value })} style={{ flex: '2 1 200px', minWidth: 160 }} />
+          <input aria-label={`Video ${i + 1} length in seconds`} type="number" min={0} max={86400} value={v.len || ''} placeholder="Length s" title="Optional. Leave empty and the page reads it from YouTube" onChange={e => setVid(i, { len: Number(e.target.value) || 0 })} style={{ width: 92 }} />
+          <button type="button" className="icon-btn sm" title="Move up" aria-label="Move video up" disabled={i === 0} onClick={() => setR({ videos: moveIn(a.reel.videos, i, -1) })}>↑</button>
+          <button type="button" className="icon-btn sm" title="Move down" aria-label="Move video down" disabled={i === a.reel.videos.length - 1} onClick={() => setR({ videos: moveIn(a.reel.videos, i, 1) })}>↓</button>
+          <button type="button" className="icon-btn sm" title="Remove" aria-label={`Remove video ${i + 1}`} onClick={() => setR({ videos: a.reel.videos.filter((_, j) => j !== i) })}><Icon name="trash" size={14} /></button>
+        </div>
+      ))}
+      <div><button type="button" className="btn sm" disabled={a.reel.videos.length >= ABOUT_LIMITS.videos} onClick={() => setR({ videos: [...a.reel.videos, { id: '', len: 0, title: '' }] })}><Icon name="plus" /> Add a video</button></div>
+    </section>
   );
 }
 

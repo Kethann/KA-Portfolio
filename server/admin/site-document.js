@@ -5,6 +5,7 @@
 import { HttpError } from '../core/http.js';
 import { isOwnMediaUrl } from './catalog.js';
 import { SKILL_LOGOS } from '../../shared/skill-logos.js';
+import { ABOUT_DEFAULT, ABOUT_LIMITS } from '../../shared/about-default.js';
 
 export const FONT_CHOICES = ['Fraunces', 'Manrope', 'Sora', 'Poppins', 'Playfair Display', 'Space Grotesk', 'system-ui'];
 export const SOCIAL_ICONS = ['behance', 'instagram', 'x', 'linkedin', 'youtube', 'website', 'email'];
@@ -81,6 +82,23 @@ export const SKILLS_DEFAULT = {
   ]
 };
 export const SKILL_LIMITS = { categories: 14, items: 24 };
+
+export { ABOUT_DEFAULT, ABOUT_LIMITS };
+const YT_ID = /^[A-Za-z0-9_-]{11}$/;
+// a YouTube video id from an id, a watch link, a youtu.be link or a shorts/embed link; '' when it is none of those
+export function youtubeId(v){
+  const t = text(v, 300);
+  if (YT_ID.test(t)) return t;
+  try {
+    const u = new URL(t);
+    if (/(^|\.)youtu\.be$/.test(u.hostname)){ const id = u.pathname.slice(1, 12); return YT_ID.test(id) ? id : ''; }
+    if (/(^|\.)youtube\.com$/.test(u.hostname)){
+      const q = u.searchParams.get('v'); if (q && YT_ID.test(q)) return q;
+      const m = /^\/(shorts|embed|live)\/([A-Za-z0-9_-]{11})/.exec(u.pathname); return m ? m[2] : '';
+    }
+  } catch { /* not a link */ }
+  return '';
+}
 const isImageUrl = (u) => isOwnMediaUrl(u) && /\.(png|jpe?g|webp|avif)$/i.test(u);
 const isFontUrl = (u) => isOwnMediaUrl(u) && /\/fonts\/[A-Za-z0-9_-]+\.(woff2|woff|ttf|otf)$/i.test(u);
 function httpUrl(u){ try { return ['https:', 'http:'].includes(new URL(u).protocol); } catch { return false; } }
@@ -252,7 +270,54 @@ export function validateSiteDocument(input, current, seed){
     items: (Array.isArray(st.items) ? st.items : []).slice(0, 6).map(x => ({ label: text(x && x.label, 40), value: num(x && x.value, 0, 1e9, 0), suffix: text(x && x.suffix, 4) })).filter(x => x.label),
   } : structuredClone(STATS_DEFAULT);
   const skills = validateSkills(input.skills);
-  return { typeV2: true, details, folders, images, notice, visibility, stacks, layoutOverrides, branding, elementStyles, socialLinks, passCard, stats, skills };
+  const about = validateAbout(input.about);
+  return { typeV2: true, details, folders, images, notice, visibility, stacks, layoutOverrides, branding, elementStyles, socialLinks, passCard, stats, skills, about };
+}
+
+// About > story. Missing (a document saved before the story was editable) means the defaults; bad values are refused.
+export function validateAbout(input){
+  const D = ABOUT_DEFAULT;
+  if (!input || typeof input !== 'object') return structuredClone(D);
+  const bio = text(input.bio, 1600) || D.bio;
+  const j = input.journey && typeof input.journey === 'object' ? input.journey : {};
+  const since = Number(j.since);
+  const rawSteps = Array.isArray(j.steps) ? j.steps : [];
+  if (rawSteps.length > ABOUT_LIMITS.steps) throw bad(`Use up to ${ABOUT_LIMITS.steps} journey steps.`);
+  const steps = [];
+  for (const x of rawSteps){
+    if (!x || typeof x !== 'object') throw bad('Invalid journey step.');
+    const title = text(x.title, 40);
+    if (!title) continue;                                       // an empty row is an unfinished edit, not an error
+    steps.push({ title, text: text(x.text, 90) });
+  }
+  const journey = { enabled: j.enabled !== false, since: Number.isFinite(since) ? Math.min(2100, Math.max(1990, Math.round(since))) : D.journey.since, steps };
+  const r = input.reel && typeof input.reel === 'object' ? input.reel : {};
+  const rawVideos = Array.isArray(r.videos) ? r.videos : [];
+  if (rawVideos.length > ABOUT_LIMITS.videos) throw bad(`Use up to ${ABOUT_LIMITS.videos} videos.`);
+  const videos = [], seen = new Set();
+  for (const v of rawVideos){
+    if (!v || typeof v !== 'object') throw bad('Invalid video.');
+    const raw = text(v.id, 300);
+    if (!raw && !text(v.title, 120)) continue;                  // an empty row
+    const id = youtubeId(raw);
+    if (!id) throw bad('Paste a YouTube link or the 11-character video ID for each video.');
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const len = Number(v.len);
+    videos.push({ id, len: Number.isFinite(len) ? Math.min(86400, Math.max(0, Math.round(len))) : 0, title: text(v.title, 120) });
+  }
+  const enabled = r.enabled !== false;
+  if (enabled && !videos.length) throw bad('Add at least one video, or turn the clips section off.');
+  const channelUrl = text(r.channelUrl, 300) || D.reel.channelUrl;
+  if (!/^https:\/\/(www\.)?(youtube\.com|youtu\.be)\//.test(channelUrl)) throw bad('The channel link must be a youtube.com link starting with https://.');
+  let clipMin = Math.round(Number(r.clipMin)), clipMax = Math.round(Number(r.clipMax));
+  if (!Number.isFinite(clipMin)) clipMin = D.reel.clipMin;
+  if (!Number.isFinite(clipMax)) clipMax = D.reel.clipMax;
+  clipMin = Math.min(30, Math.max(2, clipMin)); clipMax = Math.min(30, Math.max(clipMin, clipMax));
+  const reel = { enabled, title: text(r.title, 60) || D.reel.title, intro: text(r.intro, 200), panelLabel: text(r.panelLabel, 30) || D.reel.panelLabel,
+    panelText: text(r.panelText, 220), buttonLabel: text(r.buttonLabel, 40) || D.reel.buttonLabel, channelLabel: text(r.channelLabel, 40) || D.reel.channelLabel,
+    channelUrl, clipMin, clipMax, videos };
+  return { bio, journey, reel };
 }
 
 // About > Skills. Missing (a document saved before skills existed) means the defaults; anything sent is

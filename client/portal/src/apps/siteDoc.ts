@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from 'react';
 import { get, put } from '../api';
 import { PASS_DEFAULTS, type PassSettings } from '../../../src/store/checkout/PassCard';
+import { ABOUT_DEFAULT, ABOUT_LIMITS } from '../../../../shared/about-default.js';
 
 export type SiteImage = { id: string; slug: string; title: string; cat: string; description: string; technologies: string[]; link: string; downloadable?: boolean; src?: string; widths: number[]; full: number; width?: number; height?: number };
 export type SiteDoc = {
@@ -14,7 +15,18 @@ export type SiteDoc = {
   passCard: PassDraft;
   stats: StatsDraft;
   skills: SkillsDraft;
+  about: AboutDraft;
 };
+// About > story: the bio, the journey since a year and the promo-cut clips (validated on the server; the shared defaults fill an older document)
+export type JourneyStep = { title: string; text: string };
+export type ReelVideo = { id: string; len: number; title: string };
+export type AboutDraft = {
+  bio: string;
+  journey: { enabled: boolean; since: number; steps: JourneyStep[] };
+  reel: { enabled: boolean; title: string; intro: string; panelLabel: string; panelText: string; buttonLabel: string; channelLabel: string; channelUrl: string; clipMin: number; clipMax: number; videos: ReelVideo[] };
+};
+export { ABOUT_DEFAULT, ABOUT_LIMITS };
+export const aboutDefaults = (): AboutDraft => structuredClone(ABOUT_DEFAULT) as AboutDraft;
 export type StatItem = { label: string; value: number; suffix: string };
 export type StatsDraft = { enabled: boolean; items: StatItem[] };
 export const STATS_DEFAULTS: StatsDraft = { enabled: true, items: [{ label: 'Projects', value: 150, suffix: '+' }, { label: 'Delivered', value: 120, suffix: '+' }, { label: 'Happy clients', value: 60, suffix: '+' }, { label: 'Years', value: 6, suffix: '+' }] };
@@ -46,7 +58,7 @@ function withDefaults(d: SiteDoc): SiteDoc {
   return { ...d, notice: d.notice || { enabled: false, text: '', tone: 'info' }, visibility: { navGallery: d.visibility?.navGallery ?? true, navAbout: d.visibility?.navAbout ?? true, autoFullscreen: d.visibility?.autoFullscreen ?? true },
     stacks: d.stacks || { loop: true, covers: {} }, layoutOverrides: d.layoutOverrides || { mobile: {}, tablet: {}, desktop: {} }, branding: d.branding || { enabled: false, logoUrl: '' },
     elementStyles: d.elementStyles || {}, socialLinks: d.socialLinks || [], passCard: { ...PASS_DRAFT_DEFAULTS, ...(d.passCard || {}) }, stats: d.stats ? { enabled: d.stats.enabled !== false, items: d.stats.items || [] } : STATS_DEFAULTS,
-    skills: d.skills ? { enabled: d.skills.enabled !== false, title: d.skills.title || 'Skills', intro: d.skills.intro || '', categories: d.skills.categories || [] } : { enabled: true, title: 'Skills', intro: '', categories: [] }, details: { ...d.details, customFonts: d.details?.customFonts || [] } };
+    skills: d.skills ? { enabled: d.skills.enabled !== false, title: d.skills.title || 'Skills', intro: d.skills.intro || '', categories: d.skills.categories || [] } : { enabled: true, title: 'Skills', intro: '', categories: [] }, about: d.about ? { ...aboutDefaults(), ...d.about, journey: { ...ABOUT_DEFAULT.journey, ...(d.about.journey || {}) }, reel: { ...ABOUT_DEFAULT.reel, ...(d.about.reel || {}) } } : aboutDefaults(), details: { ...d.details, customFonts: d.details?.customFonts || [] } };
 }
 export function updateSite(fn: (d: SiteDoc) => SiteDoc){ if (state.doc) emit({ doc: fn(state.doc) }); }
 export function discardSite(){ if (state.saved) emit({ doc: { ...JSON.parse(state.saved), revision: state.doc!.revision } }); }

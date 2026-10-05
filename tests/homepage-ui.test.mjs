@@ -39,5 +39,6 @@ test('About Projects uses the portfolio count and count-up starts on scroll then
   assert.equal(value.dataset.target,'3');assert.equal(value.textContent,'0','must not animate on render');
   assert.equal(box.children[0].children[0].children.length,1,'project count has no misleading plus suffix');
   listeners.scroll();frames.shift()(100);frames.shift()(100);assert.equal(value.textContent,'0','scroll starts the timed count-up');
-  frames.shift()(1000);assert.equal(value.textContent,'3','animation finishes at the exact project count even after scrolling stops');
+  let t=100;while(frames.length){frames.shift()(t);t+=1000;}   // the count starts as soon as the tiles are on screen (also without a scroll), then runs to the end
+  assert.equal(value.textContent,'3','animation finishes at the exact project count even after scrolling stops');
 });

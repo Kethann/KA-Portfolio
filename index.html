@@ -1474,54 +1474,60 @@ html.ka-modal-open{ overflow:hidden; }
 .about-block{ margin-top:72px; }
 .about-block .gallery-head{ margin-bottom:28px; }
 
-/* ---- About: journey since 2021 ---- */
+/* ---- About: journey since a year (points on a line; fast, letter-by-letter text) ---- */
 .about-journey{ margin:0 0 34px; max-width:min(100%, 940px); }
+.about-journey[hidden]{ display:none; }
 .journey-since{ display:inline-flex; align-items:baseline; gap:10px; padding:8px 18px 8px 16px; border-radius:999px;
   border:1px solid rgba(255,148,56,.38); background:linear-gradient(135deg, rgba(255,148,56,.16), rgba(255,148,56,.03));
   font-family:var(--font-mono, monospace); font-size:11px; letter-spacing:.24em; color:#ffd9b8;
   box-shadow:0 0 0 1px rgba(255,255,255,.03) inset, 0 8px 28px -12px rgba(255,148,56,.45); }
 .journey-since b{ font-size:20px; letter-spacing:.06em; font-weight:700; color:#fff; font-variant-numeric:tabular-nums; min-width:4ch; display:inline-block; }
-.journey-line{ list-style:none; margin:26px 0 0; padding:0; display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); position:relative; }
-.journey-line::before, .journey-line::after{ content:""; position:absolute; top:5px; left:5px; right:0; height:2px; border-radius:2px; }
+.journey-line{ list-style:none; margin:26px 0 0; padding:0; display:grid; grid-template-columns:repeat(var(--n, 5), minmax(0,1fr)); position:relative; }
+.journey-line::before, .journey-line::after{ content:""; position:absolute; top:6px; left:6px; right:0; height:2px; border-radius:2px; }
 .journey-line::before{ background:rgba(255,255,255,.12); }
-.journey-line::after{ background:linear-gradient(90deg, #ff9438, #ff7a3d 45%, #d6a4ff); transform:scaleX(0); transform-origin:left; transition:transform 1.8s var(--ease-standard) .15s; }
+.journey-line::after{ background:linear-gradient(90deg, #ff9438, #ff7a3d 45%, #d6a4ff); transform:scaleX(0); transform-origin:left; transition:transform .9s cubic-bezier(.2,.8,.2,1) .05s; }
 .about-journey.in .journey-line::after{ transform:scaleX(1); }
-.journey-line li{ position:relative; padding:24px 12px 0 0; }
-.journey-line li::before{ content:""; position:absolute; top:0; left:0; width:12px; height:12px; border-radius:50%; background:var(--ground, #050506);
-  border:2px solid var(--amber); box-shadow:0 0 0 0 rgba(255,148,56,.5); transform:scale(0);
-  transition:transform .5s var(--ease-snappy) calc(.25s + var(--i) * .28s), box-shadow .9s ease calc(.4s + var(--i) * .28s); }
-.about-journey.in .journey-line li::before{ transform:scale(1); box-shadow:0 0 14px 2px rgba(255,148,56,.45); }
+.journey-line li{ position:relative; padding:26px 12px 0 0; }
+.journey-line li::before{ content:""; position:absolute; top:0; left:0; width:14px; height:14px; border-radius:50%; background:var(--ground, #050506);
+  border:2px solid var(--amber); transform:scale(0); transition:transform .3s var(--ease-snappy) calc(.06s + var(--i) * .1s), box-shadow .5s ease calc(.12s + var(--i) * .1s); }
+.about-journey.in .journey-line li::before{ transform:scale(1); box-shadow:0 0 14px 2px rgba(255,148,56,.5); }
 .journey-line li:last-child::before{ background:var(--amber); }
-.journey-line strong{ display:block; font-size:.92rem; font-weight:600; color:var(--ink); letter-spacing:-.005em; margin-bottom:3px; opacity:0; transform:translateY(8px);
-  transition:opacity .6s ease calc(.35s + var(--i) * .28s), transform .6s var(--ease-standard) calc(.35s + var(--i) * .28s); }
-.journey-line span{ display:block; font-size:.78rem; line-height:1.45; color:var(--ink-dim); opacity:0; transition:opacity .6s ease calc(.45s + var(--i) * .28s); }
-.about-journey.in .journey-line strong{ opacity:1; transform:none; }
-.about-journey.in .journey-line span{ opacity:1; }
-@media (max-width:600px){
+.journey-line li::after{ content:""; position:absolute; top:0; left:0; width:14px; height:14px; border-radius:50%; border:2px solid var(--amber); opacity:0; pointer-events:none; }
+.about-journey.in .journey-line li::after{ animation:journeyPing .9s ease-out calc(.12s + var(--i) * .1s) 1 both; }
+@keyframes journeyPing{ 0%{ opacity:.8; transform:scale(1); } 100%{ opacity:0; transform:scale(2.6); } }
+.journey-line strong{ display:block; font-size:.92rem; font-weight:600; color:var(--ink); letter-spacing:-.005em; margin-bottom:3px; }
+.journey-line span.jt{ display:block; font-size:.78rem; line-height:1.45; color:var(--ink-dim); }
+.journey-line li:not(.on) strong, .journey-line li:not(.on) span.jt{ opacity:0; }
+@media (max-width:760px){
   .journey-line{ grid-template-columns:1fr; }
-  .journey-line::before, .journey-line::after{ top:6px; bottom:12px; left:5px; right:auto; width:2px; height:auto; }
+  .journey-line::before, .journey-line::after{ top:7px; bottom:14px; left:6px; right:auto; width:2px; height:auto; }
   .journey-line::after{ transform:scaleY(0); transform-origin:top; }
   .about-journey.in .journey-line::after{ transform:scaleY(1); }
-  .journey-line li{ padding:0 0 18px 28px; }
-  .journey-line li::before{ top:3px; }
+  .journey-line li{ padding:0 0 18px 30px; }
+  .journey-line li::before, .journey-line li::after{ top:3px; }
 }
 @media (prefers-reduced-motion: reduce){
-  .journey-line::after, .journey-line li::before, .journey-line strong, .journey-line span{ transition:none; }
+  .journey-line::after, .journey-line li::before{ transition:none; }
+  .about-journey.in .journey-line li::after{ animation:none; }
 }
 
-/* ---- About: In Motion (a stack of random YouTube clips) ---- */
-.reel-stage{ width:min(100%, 700px); padding:min(15%, 90px) min(7%, 48px) 0 0; }
+/* ---- About: promo cuts (a stack of random YouTube clips, with a small panel beside it) ---- */
+#about-reel-block[hidden]{ display:none; }
+.reel-layout{ display:grid; grid-template-columns:minmax(0, 1.5fr) minmax(0, 1fr); gap:clamp(24px, 4vw, 56px); align-items:center; }
+.reel-stage{ padding:min(15%, 90px) min(7%, 48px) 0 0; }
 .reel{ position:relative; aspect-ratio:16/9; width:100%; }
 .reel-card{ position:absolute; inset:0; display:block; border-radius:18px; overflow:hidden; background:#120f16; border:1px solid rgba(255,255,255,.12);
   box-shadow:0 22px 50px -18px rgba(0,0,0,.75); transition:transform .85s var(--ease-standard), opacity .6s ease, filter .6s ease; will-change:transform; }
-.reel-card img{ width:100%; height:100%; object-fit:cover; display:block; }
+.reel-card img{ width:100%; height:100%; object-fit:cover; display:block; transform:scale(1.25); }
 .reel-card[data-pos="0"]{ z-index:3; transform:none; }
 .reel-card[data-pos="1"]{ z-index:2; transform:translate3d(5.5%, -9%, 0) scale(.94) rotate(2deg); filter:brightness(.62) saturate(.9); }
 .reel-card[data-pos="2"]{ z-index:1; transform:translate3d(11%, -17%, 0) scale(.88) rotate(4deg); filter:brightness(.42) saturate(.8); }
+.reel-card[data-pos="3"]{ z-index:0; transform:translate3d(11%, -17%, 0) scale(.88) rotate(4deg); opacity:0; pointer-events:none; }
 .reel-card:focus-visible{ outline:2px solid var(--amber); outline-offset:3px; }
 .reel-player{ position:absolute; inset:0; z-index:4; border-radius:18px; overflow:hidden; pointer-events:none; opacity:0; transition:opacity .5s ease; background:#000; }
 .reel[data-state="live"] .reel-player{ opacity:1; }
-.reel-player iframe{ position:absolute; left:50%; top:50%; width:100%; height:100%; transform:translate(-50%,-50%) scale(1.2); border:0; pointer-events:none; }
+/* cropped hard: YouTube's own title, time and controls sit in the outer edges of the frame, so they are cut away */
+.reel-player iframe{ position:absolute; left:50%; top:50%; width:100%; height:100%; transform:translate(-50%,-50%) scale(1.55); border:0; pointer-events:none; }
 .reel-hud{ position:absolute; left:0; right:0; bottom:0; z-index:5; padding:34px 16px 16px; border-radius:0 0 18px 18px; pointer-events:none;
   background:linear-gradient(to top, rgba(5,5,6,.82), rgba(5,5,6,0)); display:flex; align-items:center; gap:10px; }
 .reel-live{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-mono, monospace); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:#ffd9b8; }
@@ -1529,17 +1535,35 @@ html.ka-modal-open{ overflow:hidden; }
 .reel-title{ flex:1 1 auto; min-width:0; font-size:.82rem; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .reel-bar{ position:absolute; left:16px; right:16px; bottom:8px; height:2px; border-radius:2px; background:rgba(255,255,255,.16); overflow:hidden; }
 .reel-bar i{ display:block; height:100%; width:0; background:linear-gradient(90deg, #ff9438, #d6a4ff); }
-.reel-channel{ display:inline-block; margin-top:22px; font-family:var(--font-mono, monospace); font-size:11px; letter-spacing:.16em; color:#ffd9b8; text-decoration:none; text-transform:uppercase; }
-.reel-channel:hover, .reel-channel:focus-visible{ color:#fff; }
 .reel[data-state="static"] .reel-hud, .reel[data-state="idle"] .reel-hud{ display:none; }
+.reel-panel{ display:flex; flex-direction:column; gap:14px; min-width:0; }
+.reel-eyebrow{ margin:0; display:flex; align-items:center; gap:12px; font-family:var(--font-mono, monospace); font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:#ffd9b8; }
+.reel-count{ padding:4px 10px; border-radius:999px; border:1px solid rgba(255,148,56,.38); background:rgba(255,148,56,.1); color:#fff; letter-spacing:.12em; font-variant-numeric:tabular-nums; }
+.reel-ptitle{ margin:0; font-family:var(--font-heading), ui-serif, Georgia, serif; font-weight:var(--heading-weight, 500); font-size:clamp(20px, 2.2vw, 28px); line-height:1.15; letter-spacing:-.015em; color:var(--ink); }
+.reel-ptext{ margin:0; font-size:.92rem; line-height:1.6; color:var(--ink-dim); max-width:40ch; }
+.reel-dots{ display:flex; gap:8px; flex-wrap:wrap; }
+.reel-dot{ width:26px; height:6px; padding:0; border:0; border-radius:6px; background:rgba(255,255,255,.18); cursor:pointer; transition:background .3s ease, width .3s ease; }
+.reel-dot:hover{ background:rgba(255,255,255,.34); }
+.reel-dot.is-on{ width:44px; background:linear-gradient(90deg, #ff9438, #d6a4ff); }
+.reel-dot:focus-visible{ outline:2px solid var(--amber); outline-offset:3px; }
+.reel-actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:4px; }
+.reel-btn{ display:inline-flex; align-items:center; gap:8px; padding:11px 18px; border-radius:999px; font-size:.85rem; font-weight:600; letter-spacing:.01em; text-decoration:none; color:#1b1008;
+  background:linear-gradient(180deg, #ffb37a, #ff8a3c); border:1px solid rgba(255,200,150,.6); box-shadow:0 10px 26px -12px rgba(255,138,60,.7); transition:transform .25s var(--ease-standard), box-shadow .25s ease; }
+.reel-btn:hover, .reel-btn:focus-visible{ transform:translateY(-2px); box-shadow:0 14px 30px -12px rgba(255,138,60,.85); }
+.reel-btn.is-ghost{ color:var(--ink); background:rgba(255,255,255,.05); border-color:rgba(255,255,255,.18); box-shadow:none; }
+.reel-btn svg{ width:13px; height:13px; flex:none; }
+@media (max-width:900px){
+  .reel-layout{ grid-template-columns:minmax(0, 1fr); }
+  .reel-ptext{ max-width:none; }
+}
 @media (max-width:600px){
   .reel-stage{ padding:min(14%, 60px) 6% 0 0; }
   .reel-card[data-pos="1"]{ transform:translate3d(4.5%, -8%, 0) scale(.94) rotate(1.6deg); }
-  .reel-card[data-pos="2"]{ transform:translate3d(9%, -15%, 0) scale(.88) rotate(3.2deg); }
+  .reel-card[data-pos="2"], .reel-card[data-pos="3"]{ transform:translate3d(9%, -15%, 0) scale(.88) rotate(3.2deg); }
   .reel-title{ display:none; }
 }
 @media (prefers-reduced-motion: reduce){
-  .reel-card, .reel-player{ transition:none; }
+  .reel-card, .reel-player, .reel-dot, .reel-btn{ transition:none; }
   .reel-live i{ animation:none; }
 }
 
@@ -1717,17 +1741,11 @@ html.ka-modal-open{ overflow:hidden; }
     <div class="about-bio">
       <h1 class="about-headline" id="about-headline">Kethan Artzz — Visual Storyteller for the Big Screen</h1>
       <p class="about-caption">IMAGINE &middot; CREATE &middot; EVOLVE</p>
-      <div class="about-journey" id="about-journey" aria-label="My journey since 2021">
-        <span class="journey-since"><span>SINCE</span><b id="journey-year" aria-label="2021">2021</b></span>
-        <ol class="journey-line">
-          <li style="--i:0"><strong>Graphic design</strong><span>Movie posters &amp; publicity campaigns</span></li>
-          <li style="--i:1"><strong>UI / UX design</strong><span>Interfaces, flows &amp; design systems</span></li>
-          <li style="--i:2"><strong>Full-stack &amp; apps</strong><span>Web and application development, APIs</span></li>
-          <li style="--i:3"><strong>Robotics &amp; AI</strong><span>ROS, Arduino, sensors, vision models</span></li>
-          <li style="--i:4"><strong>Now</strong><span>Creativity and engineering, built together</span></li>
-        </ol>
+      <div class="about-journey" id="about-journey" aria-label="My journey">
+        <span class="journey-since"><span>SINCE</span><b id="journey-year">2021</b></span>
+        <ol class="journey-line" id="journey-steps"></ol>
       </div>
-      <p class="about-bio-text" id="about-bio-text">I'm Kethan, a designer who engineers and an engineer who designs, based in India. Since 2021 I've worked where creativity meets code: movie poster and publicity campaign design for major theatrical releases, from Salaar and Devara to WAR 2 and Kuravaali, across Indian and Hollywood cinema, alongside UI/UX design and full-stack web and application development. With a technical engineering background, I also build on the robotics side, with ROS, Arduino Nano, sensor integrations and vision-based navigation models. Every poster is a puzzle of star power, mood, typography and story; every product is a puzzle of flow, performance and detail. I blend both, so what I make looks striking and runs smoothly. Available for freelance and full-time collaborations, always looking for the next story worth telling, visually and technically.</p>
+      <p class="about-bio-text" id="about-bio-text">I'm Kethan, a designer who engineers and an engineer who designs, based in India. Since 2021 I've worked where creativity meets code. On the creative side: movie campaign and publicity design for major theatrical releases across Indian and Hollywood cinema, plus UI/UX design and campaign design. On the tech side: full-stack web and application development with React, Node.js and cloud platforms, APIs, databases and AI integrations. With an engineering background, I also build in robotics: ROS, Arduino Nano, sensor integrations and vision-based navigation models, alongside model training and Power BI dashboards. Every poster is a puzzle of star power, mood, typography and story; every product is a puzzle of flow, performance and detail. I blend both, so what I make looks striking and runs smoothly. Available for freelance and full-time collaborations, always looking for the next story worth telling, visually and technically.</p>
     </div>
 
     <!-- About numbers (Projects, Delivered, ...): filled from the portal (Content > Site text), count up when seen -->
@@ -1762,22 +1780,30 @@ html.ka-modal-open{ overflow:hidden; }
 
     <div class="about-block" id="about-reel-block">
       <div class="gallery-head">
-        <h2>In Motion</h2>
-        <p>Random cuts from my YouTube channel: short clips, never the full videos</p>
+        <h2 id="reel-h">Promo Cuts</h2>
+        <p id="reel-intro"></p>
       </div>
-      <div class="reel-stage">
-        <div class="reel" id="about-reel" data-state="idle">
-          <a class="reel-card" data-id="rgxPPGUK5Fc" data-pos="0" href="https://www.youtube.com/watch?v=rgxPPGUK5Fc" target="_blank" rel="noopener noreferrer" aria-label="Watch the full video on YouTube: Shyam Singha Roy, Sirivennela"><img src="https://i.ytimg.com/vi/rgxPPGUK5Fc/hqdefault.jpg" alt="" loading="lazy" decoding="async"></a>
-          <a class="reel-card" data-id="F_O7xqGm-Ug" data-pos="1" href="https://www.youtube.com/watch?v=F_O7xqGm-Ug" target="_blank" rel="noopener noreferrer" aria-label="Watch the full video on YouTube: Rudhira Haara, Bagheera"><img src="https://i.ytimg.com/vi/F_O7xqGm-Ug/hqdefault.jpg" alt="" loading="lazy" decoding="async"></a>
-          <a class="reel-card" data-id="N1g7TeYWdM0" data-pos="2" href="https://www.youtube.com/watch?v=N1g7TeYWdM0" target="_blank" rel="noopener noreferrer" aria-label="Watch the full video on YouTube: Shyam Singha Roy, Nani, Sai Pallavi"><img src="https://i.ytimg.com/vi/N1g7TeYWdM0/hqdefault.jpg" alt="" loading="lazy" decoding="async"></a>
-          <div class="reel-player" aria-hidden="true"><div id="reel-yt"></div></div>
-          <div class="reel-hud">
-            <span class="reel-live" aria-hidden="true"><i></i>Clip</span>
-            <span class="reel-title" id="reel-title"></span>
-            <span class="reel-bar" aria-hidden="true"><i id="reel-bar"></i></span>
+      <div class="reel-layout">
+        <div class="reel-stage">
+          <div class="reel" id="about-reel" data-state="idle">
+            <div class="reel-player" aria-hidden="true"><div id="reel-yt"></div></div>
+            <div class="reel-hud">
+              <span class="reel-live" aria-hidden="true"><i></i>Clip</span>
+              <span class="reel-title" id="reel-title"></span>
+              <span class="reel-bar" aria-hidden="true"><i id="reel-bar"></i></span>
+            </div>
           </div>
         </div>
-        <a class="reel-channel" href="https://www.youtube.com/@KethanArtzz" target="_blank" rel="noopener noreferrer">More on the channel @KethanArtzz <span aria-hidden="true">&rarr;</span></a>
+        <aside class="reel-panel" aria-label="About these cuts">
+          <p class="reel-eyebrow"><span class="reel-count" id="reel-count"></span><span id="reel-plabel"></span></p>
+          <h3 class="reel-ptitle" id="reel-ptitle"></h3>
+          <p class="reel-ptext" id="reel-ptext"></p>
+          <div class="reel-dots" id="reel-dots" role="group" aria-label="Choose a cut"></div>
+          <div class="reel-actions">
+            <a class="reel-btn" id="reel-watch" href="https://www.youtube.com/@KethanArtzz" target="_blank" rel="noopener noreferrer"></a>
+            <a class="reel-btn is-ghost" id="reel-channel" href="https://www.youtube.com/@KethanArtzz" target="_blank" rel="noopener noreferrer"></a>
+          </div>
+        </aside>
       </div>
     </div>
   </div>
@@ -7107,118 +7133,192 @@ window.addEventListener("ka-sequence-complete", function(){
     revealOnScroll(document.getElementById(id));
   });
 
-  // ---- About: journey line since 2021 -- draws itself the first time it scrolls into view.
+  // ---- About story: the bio, the journey (points on a line) and the promo-cut clips. Everything here is drawn from one
+  // config (the site document's `about`, edited in the portal: Content > Site text > About story). DEFAULT_ABOUT below is
+  // the first paint, before /api/portfolio answers; window.kaRenderAbout(about) applies the saved version.
   (function(){
-    var j = document.getElementById("about-journey");
-    if (!j) return;
+    var DEFAULT_ABOUT = {"bio": "I'm Kethan, a designer who engineers and an engineer who designs, based in India. Since 2021 I've worked where creativity meets code. On the creative side: movie campaign and publicity design for major theatrical releases across Indian and Hollywood cinema, plus UI/UX design and campaign design. On the tech side: full-stack web and application development with React, Node.js and cloud platforms, APIs, databases and AI integrations. With an engineering background, I also build in robotics: ROS, Arduino Nano, sensor integrations and vision-based navigation models, alongside model training and Power BI dashboards. Every poster is a puzzle of star power, mood, typography and story; every product is a puzzle of flow, performance and detail. I blend both, so what I make looks striking and runs smoothly. Available for freelance and full-time collaborations, always looking for the next story worth telling, visually and technically.", "journey": {"enabled": true, "since": 2021, "steps": [{"title": "Graphic design", "text": "Movie campaigns & publicity design"}, {"title": "UI / UX design", "text": "Interfaces, flows & design systems"}, {"title": "Full-stack & apps", "text": "React, Node, cloud & APIs"}, {"title": "Robotics & AI", "text": "ROS, Arduino, sensors, vision models"}, {"title": "Now", "text": "Creativity and engineering, built together"}]}, "reel": {"enabled": true, "title": "Promo Cuts", "intro": "Random clips from my YouTube channel: a few seconds of each, never the full video", "panelLabel": "Now playing", "panelText": "Short promo and teaser cuts, trimmed to the beat. Every visit plays different seconds from a different video.", "buttonLabel": "Watch the full video", "channelLabel": "Visit the channel", "channelUrl": "https://www.youtube.com/@KethanArtzz", "clipMin": 5, "clipMax": 8, "videos": [{"id": "rgxPPGUK5Fc", "len": 28, "title": "Shyam Singha Roy | Sirivennela"}, {"id": "F_O7xqGm-Ug", "len": 69, "title": "Rudhira Haara x Man of Masses NTR | Bagheera"}, {"id": "N1g7TeYWdM0", "len": 109, "title": "Shyam Singha Roy | Nani | Sai Pallavi | Sirivennela"}]}};
     var calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (calm || typeof IntersectionObserver !== "function"){ j.classList.add("in"); return; }
-    // the year counts up to 2021 (fast at first, easing to a stop) as the journey line starts to draw
-    var yearEl = document.getElementById("journey-year"), YEAR = 2021, FROM = 2000;
+    var saver = navigator.connection && navigator.connection.saveData;
+    function h(tag, cls, text){ var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+    function rnd(a, b){ return a + Math.random() * (b - a); }
+    function norm(a){
+      a = a && typeof a === "object" ? a : {};
+      var j = a.journey || {}, r = a.reel || {}, D = DEFAULT_ABOUT;
+      return {
+        bio: typeof a.bio === "string" && a.bio.trim() ? a.bio : D.bio,
+        journey: { enabled: j.enabled !== false, since: Number(j.since) || D.journey.since, steps: Array.isArray(j.steps) ? j.steps.filter(function(s){ return s && s.title; }) : D.journey.steps },
+        reel: {
+          enabled: r.enabled !== false, title: r.title || D.reel.title, intro: r.intro != null ? r.intro : D.reel.intro, panelLabel: r.panelLabel || D.reel.panelLabel,
+          panelText: r.panelText != null ? r.panelText : D.reel.panelText, buttonLabel: r.buttonLabel || D.reel.buttonLabel, channelLabel: r.channelLabel || D.reel.channelLabel,
+          channelUrl: /^https:\/\/(www\.)?(youtube\.com|youtu\.be)\//.test(r.channelUrl || "") ? r.channelUrl : D.reel.channelUrl,
+          clipMin: Number(r.clipMin) || D.reel.clipMin, clipMax: Number(r.clipMax) || D.reel.clipMax,
+          videos: Array.isArray(r.videos) ? r.videos.filter(function(v){ return v && /^[A-Za-z0-9_-]{11}$/.test(v.id || ""); }) : D.reel.videos
+        }
+      };
+    }
+
+    // ---------------- bio
+    var bioEl = document.getElementById("about-bio-text");
+    function renderBio(text){ if (bioEl && bioEl.textContent !== text) bioEl.textContent = text; }
+
+    // ---------------- journey
+    var jEl = document.getElementById("about-journey"), yearEl = document.getElementById("journey-year"), stepsEl = document.getElementById("journey-steps");
+    var jCfg = null, jPlayed = false, jIO = null;
+    function ghost(el, text){
+      el.textContent = "";
+      if (window.kaGhost && !calm) window.kaGhost(el, text, { spread: 360 }); else el.textContent = text;
+    }
+    function showYear(){ if (yearEl && jCfg){ yearEl.textContent = String(jCfg.since); yearEl.setAttribute("aria-label", String(jCfg.since)); } }
     function countYear(){
-      if (!yearEl) return;
-      var t0 = 0, dur = 1500;
-      yearEl.textContent = String(FROM);
+      if (!yearEl || !jCfg) return;
+      var to = jCfg.since, from = Math.max(1990, to - 21), t0 = 0, dur = 1100, mine = jCfg;
+      yearEl.textContent = String(from);
       requestAnimationFrame(function step(t){
+        if (jCfg !== mine) return;
         if (!t0) t0 = t;
         var k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
-        yearEl.textContent = String(Math.round(FROM + (YEAR - FROM) * e));
+        yearEl.textContent = String(Math.round(from + (to - from) * e));
         if (k < 1) requestAnimationFrame(step);
       });
     }
-    if (yearEl) yearEl.textContent = String(FROM);
-    var io = new IntersectionObserver(function(entries){
-      if (entries.some(function(e){ return e.isIntersecting; })){ j.classList.add("in"); countYear(); io.disconnect(); }
-    }, { threshold: 0.35 });
-    io.observe(j);
-  })();
+    function showSteps(instant){
+      var lis = stepsEl ? Array.prototype.slice.call(stepsEl.children) : [];
+      lis.forEach(function(li, i){
+        function on(){
+          li.classList.add("on");
+          var s = li.querySelector("strong"), t = li.querySelector(".jt");
+          if (s) ghost(s, s.getAttribute("data-t") || "");
+          if (t) ghost(t, t.getAttribute("data-t") || "");
+        }
+        if (instant || calm) on(); else setTimeout(on, 80 + i * 110);
+      });
+    }
+    function playJourney(){
+      if (!jEl || !jCfg || jPlayed) return;
+      jPlayed = true; jEl.classList.add("in");
+      if (calm){ showYear(); showSteps(true); return; }
+      countYear(); showSteps(false);
+    }
+    function renderJourney(cfg){
+      if (!jEl || !stepsEl) return;
+      var was = jPlayed;
+      jCfg = cfg;
+      jEl.hidden = !(cfg.enabled && cfg.steps.length);
+      stepsEl.replaceChildren();
+      stepsEl.style.setProperty("--n", String(Math.max(1, cfg.steps.length)));
+      cfg.steps.forEach(function(s, i){
+        var li = h("li"); li.style.setProperty("--i", String(i));
+        var t = h("strong", null, s.title); t.setAttribute("data-t", s.title);
+        var d = h("span", "jt", s.text || ""); d.setAttribute("data-t", s.text || "");
+        li.append(t, d); stepsEl.appendChild(li);
+      });
+      jEl.classList.remove("in"); jPlayed = false;
+      showYear();
+      if (jEl.hidden) return;
+      if (was){ jPlayed = true; jEl.classList.add("in"); showSteps(true); return; }   // a live edit: show the new points at once
+      if (calm || typeof IntersectionObserver !== "function"){ playJourney(); return; }
+      if (yearEl) yearEl.textContent = String(Math.max(1990, cfg.since - 21));
+      if (jIO) jIO.disconnect();
+      jIO = new IntersectionObserver(function(entries){
+        if (entries.some(function(e){ return e.isIntersecting; })){ playJourney(); jIO.disconnect(); }
+      }, { threshold: 0.3 });
+      jIO.observe(jEl);
+    }
 
-  // ---- About: "In Motion" -- a stack of short, random clips from the YouTube channel.
-  // Only a few seconds of a random video play (muted, never the whole video); the stack shuffles after each clip.
-  // The YouTube player script loads only when the block is near the screen, and the clip pauses whenever the block
-  // or the tab is out of view. Reduced motion / data saver: the stack stays still and every card links to its video.
-  (function(){
-    var reel = document.getElementById("about-reel");
-    if (!reel) return;
-    var VIDEOS = {
-      rgxPPGUK5Fc: { len: 28,  title: "Shyam Singha Roy | Sirivennela" },
-      "F_O7xqGm-Ug": { len: 69,  title: "Rudhira Haara x Man of Masses NTR | Bagheera" },
-      N1g7TeYWdM0: { len: 109, title: "Shyam Singha Roy | Nani | Sai Pallavi | Sirivennela" }
-    };
-    var CLIP_MIN = 5, CLIP_MAX = 8;          // seconds of each clip
-    var cards = Array.prototype.slice.call(reel.querySelectorAll(".reel-card"));
-    var titleEl = document.getElementById("reel-title"), barEl = document.getElementById("reel-bar");
-    var calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    var saver = navigator.connection && navigator.connection.saveData;
-    var order = cards.map(function(c){ return c.getAttribute("data-id"); });   // order[0] is the front card
-    var player = null, ready = false, wanted = false, apiAsked = false, timer = 0, failed = false, curEnd = 0;
+    // ---------------- promo cuts
+    var block = document.getElementById("about-reel-block"), reel = document.getElementById("about-reel");
+    var titleEl = document.getElementById("reel-title"), barEl = document.getElementById("reel-bar"), hEl = document.getElementById("reel-h"), introEl = document.getElementById("reel-intro");
+    var cEl = document.getElementById("reel-count"), plEl = document.getElementById("reel-plabel"), ptEl = document.getElementById("reel-ptitle"), pxEl = document.getElementById("reel-ptext");
+    var dotsEl = document.getElementById("reel-dots"), watchEl = document.getElementById("reel-watch"), chanEl = document.getElementById("reel-channel");
+    var rCfg = null, order = [], cards = [], dots = [];
+    var player = null, ready = false, wanted = false, apiAsked = false, timer = 0, failed = false, curEnd = 0, curClip = null, inView = false, observed = false;
+    var YT_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>';
+    var ARROW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M9 7h8v8"/></svg>';
 
     function shuffle(a){ for (var i = a.length - 1; i > 0; i--){ var k = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[k]; a[k] = t; } return a; }
-    function place(){
-      order.forEach(function(id, i){
-        var c = reel.querySelector('.reel-card[data-id="' + id + '"]');
-        if (c) c.setAttribute("data-pos", String(i));
-      });
-      if (titleEl) titleEl.textContent = VIDEOS[order[0]].title;
+    function two(n){ return (n < 10 ? "0" : "") + n; }
+    function vidAt(i){ return rCfg.videos[i]; }
+    function setWatch(i, start){
+      var v = vidAt(i); if (!v || !watchEl) return;
+      watchEl.href = "https://www.youtube.com/watch?v=" + v.id + (start > 0 ? "&t=" + Math.floor(start) + "s" : "");
     }
-    shuffle(order); place();
-    if (calm || saver){ reel.setAttribute("data-state", "static"); return; }
-
-    function setState(s){ reel.setAttribute("data-state", s); }
-    function clipFor(id){
-      var len = VIDEOS[id].len, span = Math.min(CLIP_MAX, Math.max(CLIP_MIN, Math.round(CLIP_MIN + Math.random() * (CLIP_MAX - CLIP_MIN))));
+    function place(){
+      if (!rCfg || !order.length) return;
+      order.forEach(function(vi, pos){ cards[vi].setAttribute("data-pos", String(Math.min(3, pos))); });
+      var v = vidAt(order[0]);
+      if (titleEl) titleEl.textContent = v.title || "";
+      if (cEl) cEl.textContent = two(order[0] + 1) + " / " + two(rCfg.videos.length);
+      if (ptEl) ptEl.textContent = v.title || "";
+      dots.forEach(function(d, i){ d.classList.toggle("is-on", i === order[0]); d.setAttribute("aria-current", i === order[0] ? "true" : "false"); });
+      setWatch(order[0], 0);
+    }
+    function clipFor(len){
+      var lo = rCfg.clipMin, hi = Math.max(lo, rCfg.clipMax), span = Math.round(rnd(lo, hi));
       if (len <= span + 2) return { start: 0, end: len, ms: len * 1000 };
       var start = Math.floor(Math.random() * (len - span - 1));
       return { start: start, end: start + span, ms: span * 1000 };
     }
+    function setState(s){ if (reel) reel.setAttribute("data-state", s); }
     function runBar(ms){
       if (!barEl) return;
       barEl.style.transition = "none"; barEl.style.width = "0";
       void barEl.offsetWidth;
       barEl.style.transition = "width " + ms + "ms linear"; barEl.style.width = "100%";
     }
+    function fail(){ failed = true; clearTimeout(timer); setState("static"); }
     function playFront(){
-      if (!ready || !wanted || failed) return;
-      var id = order[0], c = clipFor(id);
-      curEnd = c.end;
-      clearTimeout(timer);
-      setState("loading");
-      try { player.loadVideoById({ videoId: id, startSeconds: c.start, endSeconds: c.end }); player.mute(); }
-      catch (e){ fail(); return; }
-      timer = setTimeout(advance, c.ms + 2500);   // safety net if the player never reports the end
+      if (!ready || !wanted || failed || !order.length) return;
+      var i = order[0], v = vidAt(i);
+      clearTimeout(timer); setState("loading");
+      curClip = v.len > 0 ? clipFor(v.len) : null;
+      try {
+        if (curClip){ curEnd = curClip.end; player.loadVideoById({ videoId: v.id, startSeconds: curClip.start, endSeconds: curClip.end }); setWatch(i, curClip.start); }
+        else player.loadVideoById({ videoId: v.id });            // length unknown: it is read once the video starts, then a random part is picked
+        player.mute();
+      } catch (e){ fail(); return; }
+      timer = setTimeout(advance, (curClip ? curClip.ms : rCfg.clipMax * 1000 + 6000) + 2500);   // safety net if the player never reports the end
     }
     function advance(){
-      if (!wanted || failed) return;
-      clearTimeout(timer);
-      setState("loading");
+      if (!wanted || failed || !order.length) return;
+      clearTimeout(timer); setState("loading");
       var prev = order[0];
-      order.push(order.shift());                    // front card goes to the back of the stack
-      if (order[0] === prev || Math.random() < 0.5) order.push(order.shift());   // sometimes skip one: random, not a fixed loop
+      order.push(order.shift());
+      if (order.length > 2 && (order[0] === prev || Math.random() < 0.5)) order.push(order.shift());   // sometimes skip one: random, not a fixed loop
       place();
-      timer = setTimeout(playFront, 700);           // let the stack finish moving, then start the next clip
+      timer = setTimeout(playFront, 700);
     }
-    function fail(){ failed = true; clearTimeout(timer); setState("static"); }
-    function pause(){ clearTimeout(timer); if (player && ready){ try { player.pauseVideo(); } catch (e){} } if (!failed) setState("idle"); }
-
+    function jump(vi){
+      var k = order.indexOf(vi); if (k < 0 || k === 0) return;
+      order.unshift(order.splice(k, 1)[0]); place();
+      if (wanted && ready && !failed){ clearTimeout(timer); setState("loading"); timer = setTimeout(playFront, 600); }
+    }
     function onState(e){
-      var S = window.YT && YT.PlayerState;
-      if (!S) return;
-      if (e.data === S.PLAYING && wanted){
+      var S = window.YT && YT.PlayerState; if (!S || !wanted) return;
+      if (e.data === S.PLAYING){
+        if (!curClip){                                             // first play of a video whose length we did not know
+          var d = 0; try { d = player.getDuration(); } catch (x){}
+          if (d > 2){
+            vidAt(order[0]).len = Math.floor(d);
+            curClip = clipFor(vidAt(order[0]).len); curEnd = curClip.end;
+            try { player.seekTo(curClip.start, true); } catch (x){}
+            setWatch(order[0], curClip.start);
+            clearTimeout(timer); timer = setTimeout(advance, curClip.ms + 400);
+            return;
+          }
+        }
         setState("live");
-        var now = player.getCurrentTime ? player.getCurrentTime() : 0, d = Math.max(1, curEnd - now);
-        runBar(d > 1 ? d * 1000 : 4000);
-      } else if (e.data === S.ENDED && wanted){ advance(); }
+        var now = 0; try { now = player.getCurrentTime(); } catch (x){}
+        var dur = Math.max(1, curEnd - now);
+        runBar(dur * 1000);
+      } else if (e.data === S.ENDED){ advance(); }
     }
     function buildPlayer(){
-      var first = clipFor(order[0]);
+      if (player || !rCfg || !rCfg.videos.length) return;
+      var v = vidAt(order[0]), vars = { autoplay: 0, mute: 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1, playsinline: 1, rel: 0, origin: location.origin };
       player = new YT.Player("reel-yt", {
-        host: "https://www.youtube-nocookie.com", width: "100%", height: "100%", videoId: order[0],
-        playerVars: { autoplay: 0, mute: 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1, playsinline: 1, rel: 0, origin: location.origin, start: first.start, end: first.end },
-        events: {
-          onReady: function(){ ready = true; try { player.mute(); } catch (e){} if (wanted) playFront(); },
-          onStateChange: onState,
-          onError: fail
-        }
+        host: "https://www.youtube-nocookie.com", width: "100%", height: "100%", videoId: v.id, playerVars: vars,
+        events: { onReady: function(){ ready = true; try { player.mute(); } catch (e){} if (wanted) playFront(); }, onStateChange: onState, onError: fail }
       });
     }
     function loadApi(){
@@ -7227,23 +7327,62 @@ window.addEventListener("ka-sequence-complete", function(){
       var prior = window.onYouTubeIframeAPIReady;
       window.onYouTubeIframeAPIReady = function(){ if (typeof prior === "function") prior(); buildPlayer(); };
       var s = document.createElement("script");
-      s.src = "https://www.youtube.com/iframe_api"; s.async = true;
-      s.onerror = fail;
+      s.src = "https://www.youtube.com/iframe_api"; s.async = true; s.onerror = fail;
       document.head.appendChild(s);
     }
-    function visible(){ return !document.hidden && inView; }
-    var inView = false;
     function sync(){
-      var should = visible();
+      var should = !document.hidden && inView && !calm && !saver && !failed;
       if (should && !wanted){ wanted = true; loadApi(); if (ready) playFront(); }
-      else if (!should && wanted){ wanted = false; pause(); }
+      else if (!should && wanted){ wanted = false; clearTimeout(timer); if (player && ready){ try { player.pauseVideo(); } catch (e){} } if (!failed) setState("idle"); }
     }
-    if (typeof IntersectionObserver !== "function"){ setState("static"); return; }
-    new IntersectionObserver(function(entries){
-      inView = entries.some(function(e){ return e.isIntersecting; });
-      sync();
-    }, { threshold: 0.35, rootMargin: "120px 0px" }).observe(reel);
-    document.addEventListener("visibilitychange", sync);
+    function renderReel(cfg){
+      var first = !rCfg;
+      rCfg = cfg;
+      if (!block || !reel) return;
+      block.hidden = !(cfg.enabled && cfg.videos.length);
+      if (hEl && hEl.textContent !== cfg.title) hEl.textContent = cfg.title;
+      if (introEl && introEl.textContent !== cfg.intro){ introEl.textContent = cfg.intro; introEl.hidden = !cfg.intro; }
+      if (plEl) plEl.textContent = cfg.panelLabel;
+      if (pxEl){ pxEl.textContent = cfg.panelText; pxEl.hidden = !cfg.panelText; }
+      if (watchEl){ watchEl.innerHTML = YT_ICON; watchEl.appendChild(document.createTextNode(cfg.buttonLabel)); }
+      if (chanEl){ chanEl.href = cfg.channelUrl; chanEl.innerHTML = ""; chanEl.appendChild(document.createTextNode(cfg.channelLabel + " ")); var sp = h("span"); sp.innerHTML = ARROW; chanEl.appendChild(sp.firstChild); }
+      // cards (one per video) and dots
+      cards.forEach(function(c){ c.remove(); }); cards = []; dots = [];
+      if (dotsEl) dotsEl.replaceChildren();
+      var anchor = reel.querySelector(".reel-player");
+      cfg.videos.forEach(function(v, i){
+        var a = h("a", "reel-card"); a.href = "https://www.youtube.com/watch?v=" + v.id; a.target = "_blank"; a.rel = "noopener noreferrer";
+        a.setAttribute("aria-label", "Watch the full video on YouTube" + (v.title ? ": " + v.title : "")); a.setAttribute("data-pos", "3");
+        var img = h("img"); img.src = "https://i.ytimg.com/vi/" + v.id + "/hqdefault.jpg"; img.alt = ""; img.loading = "lazy"; img.decoding = "async";
+        a.appendChild(img); reel.insertBefore(a, anchor); cards.push(a);
+        if (dotsEl){ var d = h("button", "reel-dot"); d.type = "button"; d.setAttribute("aria-label", "Show cut " + (i + 1) + (v.title ? ": " + v.title : ""));
+          d.addEventListener("click", function(){ jump(i); }); dotsEl.appendChild(d); dots.push(d); }
+      });
+      if (dotsEl) dotsEl.hidden = cfg.videos.length < 2;
+      order = shuffle(cfg.videos.map(function(_, i){ return i; }));
+      place();
+      clearTimeout(timer);
+      if (!first && player && ready){ try { player.pauseVideo(); } catch (e){} }
+      if (calm || saver){ setState("static"); return; }
+      setState(wanted ? "loading" : "idle");
+      if (!observed && typeof IntersectionObserver === "function"){
+        observed = true;
+        new IntersectionObserver(function(entries){ inView = entries.some(function(e){ return e.isIntersecting; }); sync(); }, { threshold: 0.35, rootMargin: "120px 0px" }).observe(reel);
+        document.addEventListener("visibilitychange", sync);
+      } else if (!observed){ setState("static"); }
+      if (wanted && ready) playFront();
+    }
+
+    // ---------------- apply
+    var keys = { journey: "", reel: "" };
+    function render(about){
+      var a = norm(about);
+      renderBio(a.bio);
+      var jk = JSON.stringify(a.journey); if (jk !== keys.journey){ keys.journey = jk; renderJourney(a.journey); }
+      var rk = JSON.stringify(a.reel); if (rk !== keys.reel){ keys.reel = rk; renderReel(a.reel); }
+    }
+    window.kaRenderAbout = render;
+    render(DEFAULT_ABOUT);
   })();
 
   // [Part B] subtle parallax on the two decorative glow blobs -- rAF-throttled, and the scroll
@@ -8422,17 +8561,24 @@ function renderAboutStats(stats, projectCount){
     requestAnimationFrame(step);
   };
   state.update = update;
+  if (state.io){ try { state.io.disconnect(); } catch(e){} }
+  if ("IntersectionObserver" in window){
+    state.io = new IntersectionObserver(function(){ state.update && state.update(); }, { threshold: [0, 0.25] });
+    state.io.observe(box);
+  }
   if (!state.bound){
     state.bound = true;
     var queue = function(){ if (!state.queued){ state.queued = true; requestAnimationFrame(function(){ state.update && state.update(); }); } };
     window.addEventListener("scroll", queue, { passive: true });
   }
   paint(0);
+  requestAnimationFrame(function(){ state.update && state.update(); });
 }
 
 function applySiteAppearance(data){
   try { renderAboutStats(data && data.stats, data && data.images && data.images.length); } catch(e){}
   try { if (window.kaRenderSkills) window.kaRenderSkills(data && data.skills); } catch(e){}
+  try { if (window.kaRenderAbout) window.kaRenderAbout(data && data.about); } catch(e){}
   var root = document.documentElement.style;
   if (data.details){
     if (data.details.customFonts) applyCustomFonts(data.details.customFonts);

@@ -115,3 +115,20 @@ test('the full portfolio (18 artworks in 3 folders) is the starting data, so any
   assert.equal(seed.images.length, 18);
   for (const f of seed.folders) assert.ok(seed.images.some(i => i.cat === f), f + ' has images');
 });
+
+test('About story: defaults for older sites, YouTube links accepted, bad videos and links refused, clip range kept sane', async () => {
+  const { ABOUT_DEFAULT, youtubeId } = await import('../server/admin/site-document.js');
+  const base = structuredClone(seed); delete base.about;
+  const d = validateSiteDocument({ ...base }, seed, seed).about;
+  assert.equal(d.journey.since, 2021); assert.equal(d.reel.videos.length, 3); assert.ok(!/Salaar|Devara|WAR 2|Kuravaali/.test(d.bio), 'no film names in the bio');
+  assert.equal(ABOUT_DEFAULT.reel.channelUrl, d.reel.channelUrl);
+  assert.equal(youtubeId('https://youtu.be/rgxPPGUK5Fc?t=4'), 'rgxPPGUK5Fc'); assert.equal(youtubeId('https://www.youtube.com/watch?v=F_O7xqGm-Ug&x=1'), 'F_O7xqGm-Ug'); assert.equal(youtubeId('nope'), '');
+  const a = validateSiteDocument({ ...base, about: { bio: '  Hello  ', journey: { since: 1800, steps: [{ title: ' One ', text: 'x'.repeat(200) }, { title: '' }] },
+    reel: { channelUrl: 'https://www.youtube.com/@x', clipMin: 20, clipMax: 3, videos: [{ id: 'https://youtu.be/rgxPPGUK5Fc', len: -4, title: 'A' }, { id: 'rgxPPGUK5Fc' }, { id: '', title: '' }] } } }, seed, seed).about;
+  assert.equal(a.bio, 'Hello'); assert.equal(a.journey.since, 1990); assert.deepEqual(a.journey.steps, [{ title: 'One', text: 'x'.repeat(90) }], 'empty rows dropped, text cut');
+  assert.equal(a.reel.videos.length, 1, 'duplicates and empty rows dropped'); assert.equal(a.reel.videos[0].len, 0); assert.equal(a.reel.clipMin, 20); assert.equal(a.reel.clipMax, 20);
+  assert.throws(() => validateSiteDocument({ ...base, about: { reel: { videos: [{ id: 'bad id' }] } } }, seed, seed), /YouTube link/);
+  assert.throws(() => validateSiteDocument({ ...base, about: { reel: { videos: [] } } }, seed, seed), /at least one video/);
+  assert.throws(() => validateSiteDocument({ ...base, about: { reel: { channelUrl: 'https://evil.example/x', videos: [{ id: 'rgxPPGUK5Fc' }] } } }, seed, seed), /youtube\.com/);
+  assert.equal(validateSiteDocument({ ...base, about: { reel: { enabled: false, videos: [] } } }, seed, seed).about.reel.enabled, false, 'switched off needs no videos');
+});
