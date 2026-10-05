@@ -8,6 +8,7 @@ import { getSetting } from '../core/settings.js';
 import { sendEmail } from '../core/email.js';
 import { retrieve, seedIfEmpty } from './knowledge.js';
 import { stream, providerInfo, costMicros, ProviderError } from './providers.js';
+import { findLearnedAnswer } from './learning.js';
 
 export const MAX_HISTORY = 12, MAX_MESSAGE = 4000, MAX_TOKENS = 700;
 const TZ_OFFSET_MIN = 330;   // usage days follow India time
@@ -132,6 +133,14 @@ If links expired or the email is missing, tell them to use "Resend my link" on t
       }
     }
   }
+  if (!dryRun && !handedOff && audience !== 'playground'){
+    const learned = await findLearnedAnswer(db, last);
+    if (learned){
+      const reply = learned.answer;
+      return await finish({ db, audience, conversationId, visitorId, ip, country, userText: last, reply,
+        usage: { in: 0, out: 0 }, cost: 0, sources: [`Learned answer (${(learned.source_titles || []).join(', ')})`], fixed: true });
+    }
+  }
   const k = await retrieve(last, { includeProducts: settings.visitorRules?.recommendProducts !== false });
   const system = buildSystem(settings, k.context, blocks, locale, projectId, audience);
   if (dryRun) return { system, sources: k.sources, info };
@@ -180,9 +189,11 @@ ${blocks.join('\n')}
 }
 
 // Continues the visitor's own conversation (never someone else's), or starts a new one.
+// A conversationId is only honoured when the caller also supplies the matching visitorId —
+// supplying a conversationId without a visitorId always starts a fresh conversation.
 async function ensureConversation(db, { conversationId, visitorId, audience, ip, country }){
-  const found = conversationId && /^[0-9a-f-]{36}$/i.test(conversationId)
-    ? await db.maybeOne('select id from assistant_conversations where id = $1 and ($2 is null or visitor_id = $2)', [conversationId, visitorId]) : null;
+  const found = conversationId && visitorId && /^[0-9a-f-]{36}$/i.test(conversationId)
+    ? await db.maybeOne('select id from assistant_conversations where id = $1 and visitor_id = $2', [conversationId, visitorId]) : null;
   if (found) return found.id;
   return (await db.one(`insert into assistant_conversations (visitor_id, audience, ip, country) values ($1, $2, $3, $4) returning id`, [visitorId, audience, ip, country])).id;
 }

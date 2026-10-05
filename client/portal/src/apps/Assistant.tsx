@@ -10,7 +10,7 @@ import { TagInput } from './common';
 import { ago, dateTime, num } from '../format';
 import logo from '../assets/ka-logo.png';
 
-type Tab = 'overview' | 'knowledge' | 'logs' | 'playground' | 'settings';
+type Tab = 'overview' | 'knowledge' | 'repeats' | 'logs' | 'playground' | 'settings';
 const usd = (micros: number) => `$${(Number(micros) / 1e6).toFixed(Number(micros) < 10000 ? 4 : 2)}`;
 
 // Training hand-offs between tabs (in memory only): a weak answer → "Teach it" opens the knowledge
@@ -18,15 +18,15 @@ const usd = (micros: number) => `$${(Number(micros) / 1e6).toFixed(Number(micros
 const handoff: { teach?: { question: string; answer?: string }; ask?: string } = {};
 
 export default function Assistant({ route, go }: AppProps){
-  const tab: Tab = (['overview', 'knowledge', 'logs', 'playground', 'settings'] as Tab[]).includes(route.split('/')[0] as Tab) ? route.split('/')[0] as Tab : 'overview';
+  const tab: Tab = (['overview', 'knowledge', 'repeats', 'logs', 'playground', 'settings'] as Tab[]).includes(route.split('/')[0] as Tab) ? route.split('/')[0] as Tab : 'overview';
   return (
     <div className="app">
       <div className="tabs" role="tablist" aria-label="Assistant sections">
-        {([['overview', 'Overview'], ['knowledge', 'Knowledge'], ['logs', 'Conversations'], ['playground', 'Playground'], ['settings', 'Rules & settings']] as [Tab, string][]).map(([k, l]) => (
+        {([['overview', 'Overview'], ['knowledge', 'Knowledge'], ['repeats', 'Repeated questions'], ['logs', 'Conversations'], ['playground', 'Playground'], ['settings', 'Rules & settings']] as [Tab, string][]).map(([k, l]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => go(k)}>{l}</button>
         ))}
       </div>
-      {tab === 'knowledge' ? <Knowledge go={go} /> : tab === 'logs' ? <Logs id={route.split('/')[1]} go={go} /> : tab === 'playground' ? <Playground /> : tab === 'settings' ? <SettingsTab /> : <Overview go={go} />}
+      {tab === 'knowledge' ? <Knowledge go={go} /> : tab === 'repeats' ? <RepeatedQuestions go={go} /> : tab === 'logs' ? <Logs id={route.split('/')[1]} go={go} /> : tab === 'playground' ? <Playground /> : tab === 'settings' ? <SettingsTab /> : <Overview go={go} />}
     </div>
   );
 }
@@ -178,6 +178,20 @@ function Knowledge({ go }: { go: (r: string) => void }){
   );
 }
 
+function RepeatedQuestions({ go }: { go: (r: string) => void }){
+  const s = useLoad<{ repeats: { key: string; question: string; conversations: number; count: number; latest: string }[]; windowDays: number }>('/assistant/repeated');
+  if (s.error && !s.data) return <ErrorState message={s.error} retry={s.reload} />;
+  if (!s.data) return <div className="pad"><SkeletonRows rows={5} cols={2} /></div>;
+  const teach = (question: string) => { handoff.teach = { question: question.slice(0, 500) }; go('knowledge'); };
+  return <div className="app-main">
+    <div className="row between"><p className="muted" style={{ maxWidth: 650 }}>The assistant automatically saves an exact-question shortcut for 14 days after the same safe question appears in two visitor chats and you give a source-backed answer a 👍. Private details and answers without an enabled knowledge source are excluded. Use Add FAQ to write an answer yourself.</p><button type="button" className="btn sm ghost" onClick={s.reload}>Refresh</button></div>
+    {!s.data.repeats.length ? <Empty icon="assistant" title="No repeated questions yet">Questions need to appear in at least two separate visitor chats.</Empty> : <ul className="list">{s.data.repeats.map(r => <li key={r.key}>
+      <span className="grow"><b>{r.question}</b><span className="faint" style={{ display: 'block', fontSize: 12 }}>{r.conversations} chats · {r.count} asks · latest {ago(r.latest)}</span></span>
+      <button type="button" className="btn sm primary" onClick={() => teach(r.question)}><Icon name="sparkle" size={13} /> Add FAQ</button>
+    </li>)}</ul>}
+  </div>;
+}
+
 function Logs({ id, go }: { id?: string; go: (r: string) => void }){
   const [q, setQ] = useState('');
   const dq = useDebounced(q, 300);
@@ -189,7 +203,7 @@ function Logs({ id, go }: { id?: string; go: (r: string) => void }){
   const confirm = useConfirm();
   const rate = async (mid: number, rating: number) => {
     c.setData(d => d ? { ...d, messages: d.messages.map(m => m.id === mid ? { ...m, rating } : m) } : d);
-    try { await post(`/assistant/messages/${mid}/rate`, { rating }); } catch (e){ toast.error(e); c.reload(); }
+    try { const r = await post<{ learned?: boolean }>(`/assistant/messages/${mid}/rate`, { rating }); if (r.learned) toast.show('Learned this answer for repeated questions', { tone: 'success' }); } catch (e){ toast.error(e); c.reload(); }
   };
   const teach = (mid: number) => {
     const msgs = c.data!.messages, i = msgs.findIndex(m => m.id === mid);

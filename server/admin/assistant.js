@@ -10,6 +10,7 @@ import { reindex, seedIfEmpty } from '../assistant/knowledge.js';
 import { runTurn, todayUsage, PROHIBITIONS } from '../assistant/engine.js';
 import { audit } from './auth.js';
 import { quotaReport } from '../assistant/quota.js';
+import { maybeLearnFromRatedAnswer } from '../assistant/learning.js';
 
 const LOG_DAYS = 90;
 
@@ -48,12 +49,14 @@ export async function saveKb(ctx){
     if (!r.length) throw new HttpError(404, 'Source not found.');
   } else id = (await db.one('insert into kb_sources (kind, title, body, enabled) values ($1, $2, $3, $4) returning id', [kind, title, body, bool(b.enabled, true)])).id;
   await reindex(db, id, body);
+  await db.query('delete from assistant_learnings'); // owner knowledge changes invalidate any cached wording derived from it
   await audit(ctx, 'kb_saved', title);
   return listKb();
 }
 export async function deleteKb(ctx){
   const db = await getDb();
   await db.query('delete from kb_sources where id = $1', [ctx.params.id]);
+  await db.query('delete from assistant_learnings');
   await audit(ctx, 'kb_deleted', ctx.params.id);
   return listKb();
 }
@@ -75,6 +78,32 @@ export async function conversations(ctx){
     from assistant_conversations c ${where.length ? 'where ' + where.join(' and ') : ''} order by c.last_at desc limit 300`, args);
   return json({ conversations: rows });
 }
+const REPEAT_STOP = new Set(['a','an','and','are','can','could','do','does','for','how','i','in','is','it','me','my','of','on','please','the','to','what','when','where','which','who','why','would','you','your']);
+function repeatKey(value){
+  return String(value || '').toLowerCase().replace(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi, ' ')
+    .replace(/\bka-[a-z0-9]{6,12}\b/gi, ' ').replace(/\b\d{7,}\b/g, ' ')
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '').match(/[\p{L}\p{N}]+/gu)?.filter(w => !REPEAT_STOP.has(w)).join(' ') || '';
+}
+export async function repeatedQuestions(){
+  const db = await getDb();
+  const rows = await db.query(`select m.content, m.created_at, m.conversation_id from assistant_messages m
+    join assistant_conversations c on c.id = m.conversation_id
+    where m.role = 'user' and c.audience in ('visitor','buyer')
+      and c.last_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-90 days')
+    order by m.id desc limit 10000`);
+  const groups = new Map();
+  for (const row of rows){
+    const key = repeatKey(row.content);
+    if (key.length < 8 || key.split(' ').length < 2) continue;
+    let group = groups.get(key);
+    if (!group){ group = { key, question: String(row.content).slice(0, 500), conversations: new Set(), count: 0, latest: row.created_at }; groups.set(key, group); }
+    group.conversations.add(row.conversation_id); group.count++;
+  }
+  const repeats = [...groups.values()].filter(g => g.conversations.size >= 2)
+    .map(({ key, question, conversations, count, latest }) => ({ key, question, conversations: conversations.size, count, latest }))
+    .sort((a, b) => b.conversations - a.conversations || b.latest.localeCompare(a.latest)).slice(0, 100);
+  return json({ repeats, windowDays: 90 });
+}
 export async function conversation(ctx){
   const db = await getDb();
   const c = await db.maybeOne('select * from assistant_conversations where id = $1', [ctx.params.id]);
@@ -92,7 +121,8 @@ export async function rate(ctx){
   const rating = b.rating === 1 || b.rating === -1 ? b.rating : null;
   const db = await getDb();
   await db.query(`update assistant_messages set rating = $2 where id = $1 and role = 'assistant'`, [ctx.params.id, rating]);
-  return json({ ok: true });
+  const learned = rating === 1 ? await maybeLearnFromRatedAnswer(db, Number(ctx.params.id)) : false;
+  return json({ ok: true, learned });
 }
 
 // ---- playground: the real pipeline (it costs money and counts toward the daily cap)
@@ -106,7 +136,8 @@ export async function playground(ctx){
 onDaily('assistantLogRetention', async () => {
   const db = await getDb();
   const rows = await db.query(`delete from assistant_conversations where last_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-' || $1 || ' days') returning 1`, [LOG_DAYS]);
-  return { removed: rows.length };
+  const expiredLearnings = await db.query('delete from assistant_learnings where expires_at <= now() returning 1');
+  return { removed: rows.length, expiredLearnings: expiredLearnings.length };
 });
 
 export function registerAssistantAdmin(route){
@@ -117,6 +148,7 @@ export function registerAssistantAdmin(route){
   route('PUT', '/api/admin/assistant/kb/:id', saveKb, a);
   route('DELETE', '/api/admin/assistant/kb/:id', deleteKb, a);
   route('GET', '/api/admin/assistant/conversations', conversations, a);
+  route('GET', '/api/admin/assistant/repeated', repeatedQuestions, a);
   route('GET', '/api/admin/assistant/conversations/:id', conversation, a);
   route('DELETE', '/api/admin/assistant/conversations/:id', deleteConversation, a);
   route('POST', '/api/admin/assistant/messages/:id/rate', rate, a);

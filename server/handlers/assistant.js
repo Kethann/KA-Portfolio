@@ -8,7 +8,7 @@ import { clampHistory, runTurn } from '../assistant/engine.js';
 import { providerInfo } from '../assistant/providers.js';
 
 export async function assistant(ctx){
-  await rateLimit(`assistant:${ctx.ip}`, 12, 10 * 60);
+  await rateLimit(`assistant:${ctx.ip}`, 8, 10 * 60);
   const body = await readJson(ctx.request, 64 * 1024);
   const history = clampHistory(body?.messages);
   const submitted = Array.isArray(body?.messages) ? body.messages.at(-1) : null;

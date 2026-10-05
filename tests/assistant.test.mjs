@@ -5,6 +5,7 @@ import { createTestApp } from './helpers/app.mjs';
 import { setAiFetch, providerInfo, costMicros, resetModelRest } from '../server/assistant/providers.js';
 import { clampHistory, containsCardNumber, redactOutput, MAX_HISTORY } from '../server/assistant/engine.js';
 import { chunk } from '../server/assistant/knowledge.js';
+import { learningQuestionKey } from '../server/assistant/learning.js';
 import { setEnvSource } from '../server/core/env.js';
 
 const app = await createTestApp({ GEMINI_API_KEY: 'test-gemini-key', ADMIN_SETUP_TOKEN: 'setup-code-123', ADMIN_ENCRYPTION_KEY: 'k', PUBLIC_SITE_URL: 'http://shop.test' });
@@ -105,6 +106,41 @@ test('knowledge base: sources are chunked and retrieved; injected tags can’t b
   assert.equal(p.json.system.split('</knowledge>').length, 2, 'only our own closing tag exists');
   assert.ok(p.json.sources.includes('Turnaround'));
   assert.match(p.json.system, /Kit A \[Artifacts download\] price: ₹499 in India, \$9\.99 elsewhere/);
+});
+
+test('repeated visitor questions are grouped across chats and can be saved as compact FAQ knowledge', async () => {
+  const question = 'How long do poster commissions take?';
+  for (let i = 0; i < 2; i++){
+    const c = (await app.pg.query(`insert into assistant_conversations (visitor_id, audience) values ($1, 'visitor') returning id`, [`repeat-visitor-${i}`])).rows[0];
+    await app.pg.query(`insert into assistant_messages (conversation_id, role, content) values ($1, 'user', $2)`, [c.id, question]);
+  }
+  const repeats = await admin('GET', '/api/admin/assistant/repeated');
+  assert.equal(repeats.status, 200);
+  const match = repeats.json.repeats.find(r => r.question === question);
+  assert.equal(match.conversations, 2);
+  const saved = await admin('POST', '/api/admin/assistant/kb', { kind: 'faq', title: 'Poster commission timing', body: `Q: ${question}\nA: Poster commissions usually take ten working days.` });
+  assert.equal(saved.status, 200);
+  const preview = await admin('POST', '/api/admin/assistant/playground', { preview: true, messages: [{ role: 'user', content: question }] });
+  assert.match(preview.json.system, /ten working days/);
+});
+
+test('assistant automatically learns a repeated, source-backed answer after a positive admin rating', async () => {
+  assert.equal(learningQuestionKey('Where is order KA-TESTORD1?'), '');
+  const question = 'How many days for hand painted poster commissions?';
+  ai.reply = ['Poster commissions take ten working days.'];
+  const callsBefore = ai.calls.length;
+  const first = await chat([{ role: 'user', content: question }], { visitorId: 'learn-visitor-001' });
+  await chat([{ role: 'user', content: question }], { visitorId: 'learn-visitor-002' });
+  const message = (await app.pg.query(`select id from assistant_messages where conversation_id = $1 and role = 'assistant' order by id desc limit 1`, [first.conversation])).rows[0];
+  const rated = await admin('POST', `/api/admin/assistant/messages/${message.id}/rate`, { rating: 1 });
+  assert.equal(rated.status, 200);
+  assert.equal(rated.json.learned, true, 'positive rating plus recurrence learns the answer');
+  const providerCalls = ai.calls.length;
+  assert.ok(providerCalls >= callsBefore + 2);
+  const repeated = await chat([{ role: 'user', content: question }], { visitorId: 'learn-visitor-003' });
+  assert.equal(ai.calls.length, providerCalls, 'the learned exact answer bypasses the model');
+  assert.equal(repeated.text, 'Poster commissions take ten working days.');
+  ai.reply = ['Hello ', 'there!'];
 });
 
 test('hand-off: a visitor’s request with an email becomes one inbox message and one owner email', async () => {
