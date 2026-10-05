@@ -132,3 +132,14 @@ test('About story: defaults for older sites, YouTube links accepted, bad videos 
   assert.throws(() => validateSiteDocument({ ...base, about: { reel: { channelUrl: 'https://evil.example/x', videos: [{ id: 'rgxPPGUK5Fc' }] } } }, seed, seed), /youtube\.com/);
   assert.equal(validateSiteDocument({ ...base, about: { reel: { enabled: false, videos: [] } } }, seed, seed).about.reel.enabled, false, 'switched off needs no videos');
 });
+
+test('hidden gallery images: kept by the validator, left out of what visitors get, and their stack cover is dropped', async () => {
+  const { visibleSite } = await import('../server/handlers/public.js');
+  const base = structuredClone(seed);
+  const first = base.images[0], second = base.images[1];
+  const doc = validateSiteDocument({ ...base, images: base.images.map(i => i.slug === first.slug ? { ...i, hidden: true } : i), stacks: { loop: true, covers: { [first.cat]: first.slug } } }, seed, seed);
+  assert.equal(doc.images.find(i => i.slug === first.slug).hidden, true); assert.equal(doc.images.find(i => i.slug === second.slug).hidden, false);
+  const pub = visibleSite(doc);
+  assert.equal(pub.images.length, doc.images.length - 1); assert.ok(!pub.images.some(i => i.slug === first.slug)); assert.equal(pub.stacks.covers[first.cat], undefined);
+  assert.equal(visibleSite({ images: [{ slug: 'a' }] }).images.length, 1, 'nothing hidden: unchanged');
+});

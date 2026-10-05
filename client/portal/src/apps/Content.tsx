@@ -375,7 +375,7 @@ function Portfolio(){
         <div className="row between">
           <div>{renaming !== null
             ? <input autoFocus aria-label="Folder name" value={renaming} maxLength={70} onChange={e => setRenaming(e.target.value)} onBlur={renameFolder} onKeyDown={e => { if (e.key === 'Enter') renameFolder(); if (e.key === 'Escape') setRenaming(null); }} />
-            : <h2 className="section-title">{folder || 'No folder'}</h2>}<p className="faint">{images.length} image{images.length === 1 ? '' : 's'} · drag to reorder · the star picks the stack cover</p></div>
+            : <h2 className="section-title">{folder || 'No folder'}</h2>}<p className="faint">{images.length} image{images.length === 1 ? '' : 's'}{images.some(i => i.hidden) ? ` (${images.filter(i => i.hidden).length} hidden)` : ''} · drag to reorder · the star picks the stack cover · the eye hides an image from the site</p></div>
           <div className="row"><button type="button" className="btn sm ghost" onClick={() => setRenaming(folder)}>Rename</button><button type="button" className="btn sm ghost" onClick={removeFolder}>Remove</button></div>
         </div>
         <Uploader kind="image" accept="image/png,image/jpeg,image/webp,image/avif" label={`Add images to “${folder}”`} multiple onUploaded={uploaded}>PNG, JPG, WebP or AVIF, up to 10 MB. Large images are shown sharp on 4K screens.</Uploader>
@@ -383,9 +383,12 @@ function Portfolio(){
           <ul className="pf-grid">
             {images.map(i => (
               <li key={i.slug} draggable onDragStart={() => setDragSlug(i.slug)} onDragEnd={() => setDragSlug(null)} onDragOver={e => e.preventDefault()}
-                onDrop={() => { if (dragSlug && dragSlug !== i.slug) moveImage(dragSlug, i.slug); }} className={dragSlug === i.slug ? 'dragging' : ''}>
+                onDrop={() => { if (dragSlug && dragSlug !== i.slug) moveImage(dragSlug, i.slug); }} className={(dragSlug === i.slug ? 'dragging' : '') + (i.hidden ? ' is-hidden' : '')}>
                 <button type="button" className="pf-thumb" onClick={() => setEditing(i.slug)} aria-label={`Edit ${i.title}`}><img src={thumb(i)} alt="" loading="lazy" decoding="async" /></button>
+                {i.hidden && <Badge>Hidden</Badge>}
                 <div className="pf-meta"><span className="truncate">{i.title}</span>
+                  <button type="button" className="icon-btn sm" aria-pressed={!!i.hidden} aria-label={i.hidden ? 'Show on the site' : 'Hide from the site'} title={i.hidden ? 'Hidden: show on the site' : 'Hide from the site'}
+                    onClick={() => updateSite(d => ({ ...d, images: d.images.map(x => x.slug === i.slug ? { ...x, hidden: !x.hidden } : x) }))}><Icon name={i.hidden ? 'eyeOff' : 'eye'} size={13} /></button>
                   <button type="button" className={'icon-btn sm' + (cover === i.slug ? ' star-on' : '')} aria-pressed={cover === i.slug} aria-label={cover === i.slug ? 'Stack cover' : 'Use as stack cover'} title="Stack cover"
                     onClick={() => updateSite(d => ({ ...d, stacks: { ...d.stacks, covers: { ...d.stacks.covers, [folder]: cover === i.slug ? '' : i.slug } } }))}><Icon name="star" size={13} /></button></div>
               </li>
@@ -422,6 +425,7 @@ function ImageEditor({ slug, onClose }: { slug: string; onClose: () => void }){
           <Field label="Title"><input value={f.title} onChange={e => setF({ ...f, title: e.target.value })} maxLength={160} /></Field>
           <Field label="Folder"><select value={f.cat} onChange={e => setF({ ...f, cat: e.target.value })}>{doc!.folders.map(x => <option key={x}>{x}</option>)}</select></Field>
           <Field label="Link" hint="Optional, e.g. Behance"><input type="url" value={f.link} onChange={e => setF({ ...f, link: e.target.value })} placeholder="https://" /></Field>
+          <Switch checked={!f.hidden} onChange={v => setF({ ...f, hidden: !v })} label="Show on the site" />
           <Switch checked={f.downloadable !== false} onChange={v => setF({ ...f, downloadable: v })} label="Visitors may download this image" />
         </div>
       </div>

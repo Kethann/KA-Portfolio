@@ -214,7 +214,7 @@ export function validateSiteDocument(input, current, seed){
     if (link && !httpUrl(link)) throw bad('Project links must start with https:// or http://.');
     if (image.technologies !== undefined && (!Array.isArray(image.technologies) || image.technologies.length > 20)) throw bad('Use up to 20 technology labels.');
     const technologies = (image.technologies || []).map(v => text(v, 60)).filter(Boolean);
-    const common = { id: slug, slug, title, cat, description, technologies, link, downloadable: image.downloadable !== false };
+    const common = { id: slug, slug, title, cat, description, technologies, link, downloadable: image.downloadable !== false, hidden: image.hidden === true };
     const w = Number(image.width), h = Number(image.height);
     const dims = Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0 && w <= 20000 && h <= 20000 ? { width: Math.round(w), height: Math.round(h) } : {};
     if (image.src){

@@ -66,7 +66,7 @@ function Editor({ id, tip, loading, go, active, onSaved, onDeleted }: { id: stri
       const body = { ...d, status: status || d.status };
       const r = id ? await put<{ tip: Tip }>(`/tips/${id}`, body) : await post<{ tip: Tip }>('/tips', body);
       setD({ ...r.tip }); setBase(JSON.stringify({ ...r.tip })); onSaved(r.tip);
-      toast.show(status === 'published' ? 'Published' : status === 'draft' ? 'Moved to drafts' : 'Saved', { tone: 'success' });
+      toast.show(status === 'published' ? 'Published' : status === 'draft' ? 'Hidden from the site (kept as a draft)' : 'Saved', { tone: 'success' });
       if (!id) go(r.tip.id);
     } catch (e: any){ toast.error(e); } finally { setBusy(false); }
   };
@@ -78,7 +78,7 @@ function Editor({ id, tip, loading, go, active, onSaved, onDeleted }: { id: stri
       <WinTools>
         {dirty && <span className="faint" style={{ fontSize: 12 }}>Unsaved</span>}
         <button type="button" className="btn sm" disabled={busy || (!dirty && !!id)} onClick={() => save()}>Save</button>
-        {d.status === 'published' ? <button type="button" className="btn sm" disabled={busy} onClick={() => save('draft')}>Unpublish</button> : <button type="button" className="btn primary sm" disabled={busy} onClick={() => save('published')}>Publish</button>}
+        {d.status === 'published' ? <button type="button" className="btn sm" disabled={busy} onClick={() => save('draft')}>Hide from the site</button> : <button type="button" className="btn primary sm" disabled={busy} onClick={() => save('published')}>Publish</button>}
       </WinTools>
       <div className="app-main" style={{ maxWidth: 900, margin: '0 auto', width: '100%' }}>
         <DetailHeader back={() => { if (!dirty) return go(''); void confirm({ title: 'Leave without saving?', confirm: 'Discard changes', danger: true }).then(ok => ok && go('')); }}

@@ -59,8 +59,16 @@ export async function loadSiteDocument(){
   return { ...initial, skills: initial.skills || SKILLS_DEFAULT, about: initial.about || ABOUT_DEFAULT, revision: rev };
 }
 
+// What visitors get: images the owner has hidden in the portal are left out (they stay in the portal, and so does the stack cover choice)
+export function visibleSite(doc){
+  if (!doc || !Array.isArray(doc.images)) return doc;
+  const hidden = new Set(doc.images.filter(i => i.hidden === true).map(i => i.slug));
+  if (!hidden.size) return doc;
+  const covers = Object.fromEntries(Object.entries(doc.stacks?.covers || {}).filter(([, slug]) => !hidden.has(slug)));
+  return { ...doc, images: doc.images.filter(i => !hidden.has(i.slug)), stacks: { ...(doc.stacks || {}), covers } };
+}
 export async function portfolio(){
-  return json(await loadSiteDocument(), 200, PUBLIC_CACHE);
+  return json(visibleSite(await loadSiteDocument()), 200, PUBLIC_CACHE);
 }
 
 const NAME_MAX = 100;

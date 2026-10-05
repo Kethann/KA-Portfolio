@@ -72,7 +72,8 @@ export async function retrieve(question, { includeProducts = true } = {}){
   const seen = new Set(), chunks = [];
   for (const h of [...hits, ...basics]){ const k = h.title + '|' + h.content.slice(0, 60); if (!seen.has(k)){ seen.add(k); chunks.push(h); } }
 
-  const site = await getSetting('site');
+  const siteAll = await getSetting('site');
+  const site = siteAll && Array.isArray(siteAll.images) ? { ...siteAll, images: siteAll.images.filter(i => i.hidden !== true) } : siteAll;   // hidden pieces are not talked about
   const tips = await db.query(`select title, slug, excerpt from tips where status = 'published' order by published_at desc limit 15`);
   const legal = await db.query(`select slug, title from legal_pages where published`);
   let products = [];

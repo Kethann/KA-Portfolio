@@ -38,7 +38,11 @@ async function guarded(fn){
 export async function signUpload(ctx){
   const body = await readJson(ctx.request, 4096);
   const kind = body.kind;
-  const type = str(body.contentType, { max: 100 }).toLowerCase();
+  let type = str(body.contentType, { max: 100 }).toLowerCase();
+  // the file's own extension is more reliable than the type a browser reports (fonts often arrive as application/x-font-ttf or empty)
+  const ext = String(body.filename || '').toLowerCase().split('.').pop();
+  if (kind === 'font'){ const byExt = Object.entries(FONT_TYPES).find(([, e]) => e === ext); if (byExt) type = byExt[0]; }
+  if (kind === 'image'){ const byExt = Object.entries(IMAGE_TYPES).find(([, e]) => e === ext || (ext === 'jpeg' && e === 'jpg')); if (byExt) type = byExt[0]; }
   const bytes = int(body.bytes, { name: 'File size', min: 1, max: MAX_FILE });
   const name = str(body.filename, { name: 'File name', max: 160, required: true }).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+/, '').slice(-100) || 'file';
   let bucket, path;

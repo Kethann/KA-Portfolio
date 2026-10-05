@@ -1667,20 +1667,29 @@ html.ka-modal-open{ overflow:hidden; }
 .skill-logo.has-img{ background:radial-gradient(120% 90% at 30% 15%, rgba(255,255,255,.18), transparent 55%), #15110f; padding:14%; box-sizing:border-box; }
 .skill-logo.has-img img{ width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; }
 
+/* small screens: the spotlight is a card below the menu bar (it is moved to <body> by script, so it is always in view) */
+.skill-spot.is-sheet{ position:fixed; left:50%; bottom:auto; top:calc(88px + env(safe-area-inset-top, 0px)); z-index:60; width:min(88vw, 340px); box-sizing:border-box;
+  display:grid; grid-template-columns:auto minmax(0, 1fr); column-gap:14px; row-gap:3px; align-items:center; text-align:left; padding:14px 16px; border-radius:20px;
+  background:var(--glass-bg-heavy); border:var(--glass-border); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  box-shadow:0 22px 54px -14px rgba(0,0,0,.85); opacity:0; filter:none; transform:translate(-50%, -18px) scale(.96); pointer-events:none;
+  transition:opacity .3s ease, transform .4s var(--ease-snappy); }
+.skill-spot.is-sheet.is-open{ opacity:1; transform:translate(-50%, 0) scale(1); pointer-events:auto; }
+.skill-spot.is-sheet .skill-logo{ grid-row:1 / span 3; width:60px; height:60px; border-radius:16px; font-size:20px; }
+.skill-spot.is-sheet .skill-spot-name{ font-size:18px; }
+.skill-spot.is-sheet .skill-spot-note{ max-width:none; }
+@media (prefers-reduced-motion: reduce){ .skill-spot.is-sheet{ transition:none; } }
+
 /* grid items default to min-width:auto, which would let a long row (the chips on phones) widen the whole column */
 .skills-main{ min-width:0; }
 @media (max-width:900px){
   .skills-layout{ grid-template-columns:minmax(0, 1fr); gap:8px; }
-  .skills-field{ position:relative; top:auto; height:210px; order:-1; margin:-8px -8px 4px; border-radius:20px; }
-  .skill-spot .skill-logo{ width:76px; height:76px; border-radius:21px; font-size:24px; }
-  .skill-spot-name{ font-size:18px; }
+  .skills-field{ display:none; }
 }
 @media (max-width:600px){
   .skills-board{ columns:1; }
   .skill-card{ padding:16px 14px 12px; }
   .skills-board:not(.is-solo) .skill-card{ grid-template-columns:minmax(0, 1fr); gap:8px; padding:10px 12px 12px; }
   .skills-board:not(.is-solo) .skill-card-head{ min-height:0; }
-  .skills-field{ height:180px; }
   /* one sideways-scrolling row of chips instead of four wrapped rows */
   .skills-filter{ flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none; margin:0 -20px 16px; padding:2px 20px;
     -webkit-mask-image:linear-gradient(90deg, transparent, #000 20px, #000 calc(100% - 20px), transparent); mask-image:linear-gradient(90deg, transparent, #000 20px, #000 calc(100% - 20px), transparent); }
@@ -1745,7 +1754,7 @@ html.ka-modal-open{ overflow:hidden; }
         <span class="journey-since"><span>SINCE</span><b id="journey-year">2021</b></span>
         <ol class="journey-line" id="journey-steps"></ol>
       </div>
-      <p class="about-bio-text" id="about-bio-text">I'm Kethan, a designer who engineers and an engineer who designs, based in India. Since 2021 I've worked where creativity meets code. On the creative side: movie campaign and publicity design for major theatrical releases across Indian and Hollywood cinema, plus UI/UX design and campaign design. On the tech side: full-stack web and application development with React, Node.js and cloud platforms, APIs, databases and AI integrations. With an engineering background, I also build in robotics: ROS, Arduino Nano, sensor integrations and vision-based navigation models, alongside model training and Power BI dashboards. Every poster is a puzzle of star power, mood, typography and story; every product is a puzzle of flow, performance and detail. I blend both, so what I make looks striking and runs smoothly. Available for freelance and full-time collaborations, always looking for the next story worth telling, visually and technically.</p>
+      <p class="about-bio-text" id="about-bio-text">I'm Kethan, based in India, working where art meets engineering. Since 2021 I have shaped the look of film campaigns and publicity for major theatrical releases across Indian and Hollywood cinema, and crafted interfaces and brand systems that feel effortless to use. On the engineering side I build full-stack web and application products with React, Node.js and cloud platforms, backed by APIs, databases and AI integrations. That technical grounding extends into robotics: ROS, Arduino Nano, sensor integration, vision-based navigation and model training, with Power BI turning raw data into clear stories. Every project is held to one standard: striking on screen and dependable underneath. Open to freelance work and full-time roles.</p>
     </div>
 
     <!-- About numbers (Projects, Delivered, ...): filled from the portal (Content > Site text), count up when seen -->
@@ -7137,7 +7146,7 @@ window.addEventListener("ka-sequence-complete", function(){
   // config (the site document's `about`, edited in the portal: Content > Site text > About story). DEFAULT_ABOUT below is
   // the first paint, before /api/portfolio answers; window.kaRenderAbout(about) applies the saved version.
   (function(){
-    var DEFAULT_ABOUT = {"bio": "I'm Kethan, a designer who engineers and an engineer who designs, based in India. Since 2021 I've worked where creativity meets code. On the creative side: movie campaign and publicity design for major theatrical releases across Indian and Hollywood cinema, plus UI/UX design and campaign design. On the tech side: full-stack web and application development with React, Node.js and cloud platforms, APIs, databases and AI integrations. With an engineering background, I also build in robotics: ROS, Arduino Nano, sensor integrations and vision-based navigation models, alongside model training and Power BI dashboards. Every poster is a puzzle of star power, mood, typography and story; every product is a puzzle of flow, performance and detail. I blend both, so what I make looks striking and runs smoothly. Available for freelance and full-time collaborations, always looking for the next story worth telling, visually and technically.", "journey": {"enabled": true, "since": 2021, "steps": [{"title": "Graphic design", "text": "Movie campaigns & publicity design"}, {"title": "UI / UX design", "text": "Interfaces, flows & design systems"}, {"title": "Full-stack & apps", "text": "React, Node, cloud & APIs"}, {"title": "Robotics & AI", "text": "ROS, Arduino, sensors, vision models"}, {"title": "Now", "text": "Creativity and engineering, built together"}]}, "reel": {"enabled": true, "title": "Promo Cuts", "intro": "Random clips from my YouTube channel: a few seconds of each, never the full video", "panelLabel": "Now playing", "panelText": "Short promo and teaser cuts, trimmed to the beat. Every visit plays different seconds from a different video.", "buttonLabel": "Watch the full video", "channelLabel": "Visit the channel", "channelUrl": "https://www.youtube.com/@KethanArtzz", "clipMin": 5, "clipMax": 8, "videos": [{"id": "rgxPPGUK5Fc", "len": 28, "title": "Shyam Singha Roy | Sirivennela"}, {"id": "F_O7xqGm-Ug", "len": 69, "title": "Rudhira Haara x Man of Masses NTR | Bagheera"}, {"id": "N1g7TeYWdM0", "len": 109, "title": "Shyam Singha Roy | Nani | Sai Pallavi | Sirivennela"}]}};
+    var DEFAULT_ABOUT = {"bio": "I'm Kethan, based in India, working where art meets engineering. Since 2021 I have shaped the look of film campaigns and publicity for major theatrical releases across Indian and Hollywood cinema, and crafted interfaces and brand systems that feel effortless to use. On the engineering side I build full-stack web and application products with React, Node.js and cloud platforms, backed by APIs, databases and AI integrations. That technical grounding extends into robotics: ROS, Arduino Nano, sensor integration, vision-based navigation and model training, with Power BI turning raw data into clear stories. Every project is held to one standard: striking on screen and dependable underneath. Open to freelance work and full-time roles.", "journey": {"enabled": true, "since": 2021, "steps": [{"title": "Graphic design", "text": "Movie campaigns & publicity design"}, {"title": "UI / UX design", "text": "Interfaces, flows & design systems"}, {"title": "Full-stack & apps", "text": "React, Node, cloud & APIs"}, {"title": "Robotics & AI", "text": "ROS, Arduino, sensors, vision models"}, {"title": "Now", "text": "Creativity and engineering, built together"}]}, "reel": {"enabled": true, "title": "Promo Cuts", "intro": "Random clips from my YouTube channel: a few seconds of each, never the full video", "panelLabel": "Now playing", "panelText": "Short promo and teaser cuts, trimmed to the beat. Every visit plays different seconds from a different video.", "buttonLabel": "Watch the full video", "channelLabel": "Visit the channel", "channelUrl": "https://www.youtube.com/@KethanArtzz", "clipMin": 5, "clipMax": 8, "videos": [{"id": "rgxPPGUK5Fc", "len": 28, "title": "Shyam Singha Roy | Sirivennela"}, {"id": "F_O7xqGm-Ug", "len": 69, "title": "Rudhira Haara x Man of Masses NTR | Bagheera"}, {"id": "N1g7TeYWdM0", "len": 109, "title": "Shyam Singha Roy | Nani | Sai Pallavi | Sirivennela"}]}};
     var calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     var saver = navigator.connection && navigator.connection.saveData;
     function h(tag, cls, text){ var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
@@ -7164,7 +7173,7 @@ window.addEventListener("ka-sequence-complete", function(){
 
     // ---------------- journey
     var jEl = document.getElementById("about-journey"), yearEl = document.getElementById("journey-year"), stepsEl = document.getElementById("journey-steps");
-    var jCfg = null, jPlayed = false, jIO = null;
+    var jCfg = null, jPlayed = false, jIO = null, jTimers = [];
     function ghost(el, text){
       el.textContent = "";
       if (window.kaGhost && !calm) window.kaGhost(el, text, { spread: 360 }); else el.textContent = text;
@@ -7191,7 +7200,7 @@ window.addEventListener("ka-sequence-complete", function(){
           if (s) ghost(s, s.getAttribute("data-t") || "");
           if (t) ghost(t, t.getAttribute("data-t") || "");
         }
-        if (instant || calm) on(); else setTimeout(on, 80 + i * 110);
+        if (instant || calm) on(); else jTimers.push(setTimeout(on, 80 + i * 110));
       });
     }
     function playJourney(){
@@ -7199,6 +7208,16 @@ window.addEventListener("ka-sequence-complete", function(){
       jPlayed = true; jEl.classList.add("in");
       if (calm){ showYear(); showSteps(true); return; }
       countYear(); showSteps(false);
+    }
+    // back to the start once it has left the screen, so the journey plays again every time it is scrolled to
+    function resetJourney(){
+      if (!jEl || !jPlayed) return;
+      jTimers.forEach(clearTimeout); jTimers = []; jPlayed = false; jEl.classList.remove("in");
+      Array.prototype.forEach.call(stepsEl.children, function(li){
+        li.classList.remove("on");
+        Array.prototype.forEach.call(li.querySelectorAll("strong, .jt"), function(n){ n.textContent = n.getAttribute("data-t") || ""; });
+      });
+      if (yearEl && jCfg) yearEl.textContent = String(Math.max(1990, jCfg.since - 21));
     }
     function renderJourney(cfg){
       if (!jEl || !stepsEl) return;
@@ -7213,6 +7232,7 @@ window.addEventListener("ka-sequence-complete", function(){
         var d = h("span", "jt", s.text || ""); d.setAttribute("data-t", s.text || "");
         li.append(t, d); stepsEl.appendChild(li);
       });
+      jTimers.forEach(clearTimeout); jTimers = [];
       jEl.classList.remove("in"); jPlayed = false;
       showYear();
       if (jEl.hidden) return;
@@ -7221,8 +7241,10 @@ window.addEventListener("ka-sequence-complete", function(){
       if (yearEl) yearEl.textContent = String(Math.max(1990, cfg.since - 21));
       if (jIO) jIO.disconnect();
       jIO = new IntersectionObserver(function(entries){
-        if (entries.some(function(e){ return e.isIntersecting; })){ playJourney(); jIO.disconnect(); }
-      }, { threshold: 0.3 });
+        var e = entries[entries.length - 1];
+        if (e.isIntersecting && e.intersectionRatio >= 0.3) playJourney();
+        else if (!e.isIntersecting) resetJourney();
+      }, { threshold: [0, 0.3] });
       jIO.observe(jEl);
     }
 
@@ -7588,7 +7610,7 @@ window.addEventListener("ka-sequence-complete", function(){
   }
 
   // ---- the logo field
-  var fieldLive = [], fieldTimers = [], fieldOn = false, fieldVisible = false, spot = null, spotFor = null;
+  var fieldLive = [], fieldTimers = [], fieldOn = false, fieldVisible = false, spot = null, spotFor = null, spotTimer = 0;
   function fieldPool(){
     var cats = skillCats();
     var list = skillsFilterIdx >= 0 && cats[skillsFilterIdx] ? cats[skillsFilterIdx].items : cats.reduce(function(a, c){ return a.concat(c.items); }, []);
@@ -7634,7 +7656,7 @@ window.addEventListener("ka-sequence-complete", function(){
     if (!fieldOn) return;
     var pool = fieldPool(); if (!pool.length) return;
     var b = freeBounds(); if (!b) return;
-    var small = window.innerWidth <= 900, depth = Math.random();
+    var small = window.innerWidth <= 900, depth = Math.random(), lite = small || (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
     var size = far ? Math.round(rnd(small ? 84 : 120, small ? 124 : 190)) : Math.round(rnd(small ? 38 : 46, small ? 66 : 96) * (.78 + .5 * depth));
     var m = size * .85, spot = pickSpot(b, m);
     var f = el("div", "skill-float"), logo = skillLogo(nextSkill(pool));
@@ -7656,6 +7678,11 @@ window.addEventListener("ka-sequence-complete", function(){
       { transform: at(1, s2), filter: "blur(" + (far ? blur0 : blur0 * .8).toFixed(1) + "px)", opacity: 0 }
     ];
     if (far) skillsFree.insertBefore(f, skillsFree.firstChild); else skillsFree.appendChild(f);
+    // phones and tablets: no animated blur (it is the costly part); depth is shown with size, opacity and a still blur instead
+    if (lite){
+      frames.forEach(function(fr){ delete fr.filter; });
+      f.style.filter = far ? "blur(" + Math.round(blur0 * .8) + "px)" : (depth < .3 ? "blur(1.5px)" : "");
+    }
     var a = f.animate(frames, { duration: far ? rnd(14000, 24000) : rnd(5200, 11500), easing: "cubic-bezier(.3,.55,.3,1)", fill: "both" });
     fieldLive.push(f);
     a.onfinish = function(){
@@ -7687,8 +7714,8 @@ window.addEventListener("ka-sequence-complete", function(){
     if (reducedMotion || !skillsFree.animate){ staticField(); return; }
     // never more tiles than twice the skills in view (a category with 3 skills would otherwise repeat itself)
     var n = Math.min(fieldCount(), Math.max(4, fieldPool().length * 2)), far = window.innerWidth <= 600 ? 3 : window.innerWidth <= 900 ? 4 : 6, i;
-    for (i = 0; i < far; i++) later(function(){ spawnTile(true); }, rnd(0, 5000));
-    for (i = 0; i < n; i++) later(function(){ spawnTile(false); }, rnd(0, 6500));
+    for (i = 0; i < far; i++) later(function(){ spawnTile(true); }, rnd(0, 2200));
+    for (i = 0; i < n; i++) later(function(){ spawnTile(false); }, rnd(0, 3400));
   }
   function stopSkillField(){
     fieldOn = false;
@@ -7702,11 +7729,13 @@ window.addEventListener("ka-sequence-complete", function(){
     new IntersectionObserver(function(entries){
       fieldVisible = entries[entries.length - 1].isIntersecting;
       if (fieldVisible) startSkillField(); else stopSkillField();
-    }, { rootMargin: "60px" }).observe(skillsBlockEl);
+    }, { rootMargin: "240px 0px" }).observe(skillsBlockEl);
   } else { fieldVisible = true; }
   document.addEventListener("visibilitychange", function(){ if (document.hidden) stopSkillField(); else startSkillField(); });
   var fieldResize = 0;
   window.addEventListener("resize", function(){ clearTimeout(fieldResize); fieldResize = setTimeout(function(){ if (fieldOn) restartSkillField(); }, 250); });
+  // turning a phone or tablet: start the field again for the new shape, and put the spotlight card away
+  window.addEventListener("orientationchange", function(){ hideSpot(); clearTimeout(fieldResize); fieldResize = setTimeout(function(){ if (fieldOn) restartSkillField(); }, 400); });
 
   // ---- spotlight: the hovered / focused / tapped skill comes forward in the field
   function showSpot(li){
@@ -7715,17 +7744,21 @@ window.addEventListener("ka-sequence-complete", function(){
     spotFor = li;
     skillsBoard.querySelectorAll(".skill-item.is-active").forEach(function(n){ if (n !== li) n.classList.remove("is-active"); });
     li.classList.add("is-active");
-    if (!spot){ spot = el("div", "skill-spot"); skillsField.appendChild(spot); }
-    else if (spot.parentNode !== skillsField) skillsField.appendChild(spot);
+    var sheet = window.matchMedia("(max-width: 900px)").matches;
+    if (!spot){ spot = el("div", "skill-spot"); spot.addEventListener("click", hideSpot); }
+    spot.classList.toggle("is-sheet", sheet);
+    var host = sheet ? document.body : skillsField;
+    if (spot.parentNode !== host) host.appendChild(spot);
     spot.replaceChildren(skillLogo(x), el("span", "skill-spot-name", x.name));
     var level = Math.max(0, Math.min(5, Number(x.level) || 0));
     if (level) spot.appendChild(el("span", "skill-spot-level", SKILL_LEVELS[level]));
     if (x.note) spot.appendChild(el("span", "skill-spot-note", x.note));
     skillsField.classList.add("is-spot"); skillsFree.classList.add("is-spot");
+    if (sheet){ requestAnimationFrame(function(){ spot.classList.add("is-open"); }); clearTimeout(spotTimer); spotTimer = setTimeout(hideSpot, 6000); }
   }
   function hideSpot(){
     if (spotFor) spotFor.classList.remove("is-active");
-    spotFor = null; skillsField.classList.remove("is-spot"); skillsFree.classList.remove("is-spot");
+    spotFor = null; clearTimeout(spotTimer); if (spot) spot.classList.remove("is-open"); skillsField.classList.remove("is-spot"); skillsFree.classList.remove("is-spot");
   }
   skillsBoard.addEventListener("pointerover", function(e){ if (e.pointerType === "mouse"){ var li = e.target.closest(".skill-item"); if (li) showSpot(li); } });
   skillsBoard.addEventListener("pointerleave", function(e){ if (e.pointerType === "mouse") hideSpot(); });
@@ -8337,6 +8370,8 @@ document.getElementById("cc-action").addEventListener("click", function(){
 // right now", so there is exactly one implementation of what that means, not two that could drift.
 function applyPortfolioData(data){
   if (!data || !Array.isArray(data.images) || !Array.isArray(data.folders)) return;
+  // images hidden in the portal are not shown (the server already leaves them out; the live preview sends the whole draft)
+  if (data.images.some(function(i){ return i && i.hidden === true; })) data = Object.assign({}, data, { images: data.images.filter(function(i){ return !(i && i.hidden === true); }) });
   window.__kaLastPortfolioData = data; // re-read by the resize listener below (breakpoint-specific layout overrides)
   POSTERS = data.images.map(function(img){
     return {
@@ -8546,7 +8581,8 @@ function renderAboutStats(stats, projectCount){
     state.queued = false;
     var b = state.box; if (!b || b.hidden) return;
     var r = b.getBoundingClientRect(), vh = window.innerHeight || 1;
-    if (!r.height || r.bottom <= 0 || r.top >= vh){ if (state.completed){ state.completed = false; paint(0); } return; }
+    // out of view: stop whatever is running and go back to zero, so the count plays again (and always runs to the end) the next time it is seen
+    if (!r.height || r.bottom <= 0 || r.top >= vh){ if (state.completed || state.running){ state.frame++; state.running = false; state.completed = false; paint(0); } return; }
     if (state.completed || state.running) return;
     state.running = true;
     var frame = state.frame, start = 0, duration = 900;
@@ -8617,6 +8653,11 @@ function applySiteAppearance(data){
   if (typeof window !== "undefined"){
     window.kaAutoFullscreen = !(data.visibility && data.visibility.autoFullscreen === false);
     window.kaPassCard = data.passCard || null;   // the checkout pass design (Studio > Checkout pass)
+    // load the pass's fonts now (the browser would only fetch a font when it is first drawn, so the signature would flash in the wrong font)
+    try {
+      var pc = data.passCard;
+      if (pc && document.fonts && document.fonts.load) [pc.signatureFont, pc.titleFont, pc.priceFont].filter(Boolean).forEach(function(f){ document.fonts.load('32px "' + String(f).replace(/"/g, "") + '"').catch(function(){}); });
+    } catch(e){}
     try { window.dispatchEvent(new CustomEvent("ka-pass-card")); } catch(e){}
   }
   if (data.visibility && typeof NAV_ITEMS !== "undefined"){
@@ -9451,7 +9492,10 @@ function showWelcome(){
   try{if(sessionStorage.getItem('pandaWelcomeShown'))return;sessionStorage.setItem('pandaWelcomeShown','1');}catch{}
   welcome.classList.add('show');welcomeTimer=setTimeout(hideWelcome,5200);
 }
-window.addEventListener('ka-sequence-complete',showWelcome,{once:true});
+// The greeting waits for the panda itself: it is shown only once the mascot has loaded and faded in, never before it.
+let welcomeWanted=false;
+function tryWelcome(){if(welcomeWanted&&mascot.classList.contains('is-ready')){welcomeWanted=false;setTimeout(showWelcome,700);}}
+new MutationObserver(tryWelcome).observe(mascot,{attributes:true,attributeFilter:['class']});
 launcher.addEventListener('click',hideWelcome);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)hideWelcome();});
 window.addEventListener('pagehide',()=>{generation++;pending=false;disposePanda?.();disposePanda=null;hideWelcome();if('cancelIdleCallback' in window)cancelIdleCallback(idleHandle);else clearTimeout(idleHandle);});
@@ -9459,7 +9503,7 @@ window.addEventListener('pageshow',event=>{if(event.persisted)schedulePanda();})
 // The panda brings its own Three.js (~600 KB): wait for the crystal intro to finish so it never competes
 // with the hero for bandwidth or frames; the timer covers a device where the intro can't run.
 let pandaQueued=false;
-function queuePanda(){if(pandaQueued)return;pandaQueued=true;clearTimeout(pandaFallback);schedulePanda();}
+function queuePanda(){if(pandaQueued)return;pandaQueued=true;welcomeWanted=true;clearTimeout(pandaFallback);schedulePanda();}
 const pandaFallback=setTimeout(queuePanda,12000);
 window.addEventListener('ka-sequence-complete',queuePanda,{once:true});
 </script>
@@ -10154,7 +10198,8 @@ function wireFooterLinkGhost(a){
   try { seen = !!sessionStorage.getItem("kaChatNudge"); } catch (e) {}
   if (touch && !seen){
     setTimeout(function(){
-      if (document.hidden || launcher.getAttribute("aria-expanded") === "true") return;
+      var pm = document.getElementById("panda-mascot");
+      if (document.hidden || launcher.getAttribute("aria-expanded") === "true" || (pm && !pm.classList.contains("is-ready"))) return;
       try { sessionStorage.setItem("kaChatNudge", "1"); } catch (e) {}
       show(); hideTimer = setTimeout(hide, 4800);
     }, 12000);

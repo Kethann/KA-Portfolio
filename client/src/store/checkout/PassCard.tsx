@@ -45,12 +45,12 @@ function useTilt(ref: React.RefObject<HTMLDivElement>, enabled: boolean){
     let tx = 0, ty = 0, x = 0, y = 0, raf = 0, idle = true;
     // Border glow: a bright arc runs around the card's edge. It follows the pointer while it is over the card
     // and drifts slowly round the edge when it is not (--ba = angle, --bi = strength; the CSS draws the arc).
-    let ang = 150, tgt = 150, bi = 0.7, hot = false, gRaf = 0;
+    let ang = 150, tgt = 150, bi = 0.8, hot = false, gRaf = 0;
     const glow = () => {
       if (!hot) tgt += 0.3;
       const d = ((tgt - ang + 540) % 360) - 180;
       ang = (ang + d * 0.14 + 360) % 360;
-      const want = hot ? 0.85 + 0.15 * Math.min(1, Math.hypot(tx, ty)) : 0.7;
+      const want = hot ? 0.9 + 0.1 * Math.min(1, Math.hypot(tx, ty)) : 0.8;
       bi += (want - bi) * 0.1;
       el.style.setProperty('--ba', `${ang.toFixed(1)}deg`); el.style.setProperty('--bi', bi.toFixed(3));
       gRaf = requestAnimationFrame(glow);
@@ -137,7 +137,6 @@ export function PassCard({ product, currency, amount, free, email, orderId, phas
   return <div className={`kco-card-wrap tone-${tone} pass-text-${pass.textPosition} pass-price-${pass.pricePosition} ${pass.foil ? '' : 'pass-no-foil'}`} ref={cardRef} data-phase={phase}
     style={{ ['--kco-dim' as string]: String(pass.dim / 100) } as React.CSSProperties}>
     <div className="kco-tilt" ref={tiltRef}>
-      <span className="kco-halo" aria-hidden="true" />
       <div className={`kco-card ${flipped ? 'is-flipped' : ''}`} role="button" tabIndex={0}
         aria-label={`${product.title} pass. ${flipped ? 'Showing license details' : 'Showing summary'}. Press Enter to flip.`} aria-pressed={flipped}
         onClick={onFlip} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); onFlip(); } }}>
@@ -164,6 +163,7 @@ export function PassCard({ product, currency, amount, free, email, orderId, phas
           {phase === 'success' && <span className="kco-stamp" aria-hidden="true">{free ? 'YOURS' : pass.stampText}</span>}
         </div>
         <div className="kco-face kco-back" aria-hidden={!flipped}>
+          {thumb && <img className="kco-back-art" src={thumb.url} alt="" decoding="async" aria-hidden="true" />}
           <span className="kco-back-glow" aria-hidden="true" />
           <div className={`kco-back-grid ${pass.showSeal ? '' : 'no-seal'}`}>
             <div className="kco-back-info">

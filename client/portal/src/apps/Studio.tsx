@@ -115,14 +115,25 @@ const fontList = (d: SiteDoc) => [...FONTS, ...d.details.customFonts.map(f => f.
 
 // Uploaded fonts are registered with the browser once, so every select, sample and the pass preview
 // (in its own shadow root; fonts are document-wide) can draw them.
+const loadedFonts = new Map<string, { url: string; face: FontFace }>();
 function useCustomFontFaces(doc: SiteDoc){
   useEffect(() => {
     for (const f of doc.details.customFonts){
-      if ([...document.fonts].some(x => x.family.replace(/"/g, '') === f.family)) continue;
+      const have = loadedFonts.get(f.family);
+      if (have && have.url === f.url) continue;
+      if (have) document.fonts.delete(have.face);          // the same name now points at a new file: drop the old one so the new one shows
       const face = new FontFace(f.family, `url(${JSON.stringify(f.url)})`);
-      face.load().then(x => document.fonts.add(x)).catch(() => {});
+      loadedFonts.set(f.family, { url: f.url, face });
+      face.load().then(x => document.fonts.add(x)).catch(() => { if (loadedFonts.get(f.family)?.face === face) loadedFonts.delete(f.family); });
     }
   }, [doc.details.customFonts]);
+}
+// A font name from a file name: "Kethan-Signature_v2.ttf" -> "Kethan Signature v2"; a number is added when the name is taken.
+function fontNameFromFile(name: string, taken: string[]){
+  const base = (name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9 _-]+/g, ' ').replace(/[ _-]{2,}/g, ' ').trim().slice(0, 52)) || 'My signature';
+  let out = base, n = 2;
+  while (taken.includes(out)) out = `${base} ${n++}`;
+  return out;
 }
 // Where a font is in use, in words, so removing it is never a surprise.
 function fontUses(doc: SiteDoc, family: string){
@@ -169,7 +180,7 @@ function CustomFonts({ doc, sample: initialSample = '', onAdded }: { doc: SiteDo
         updateSite(x => ({ ...x, details: { ...x.details, customFonts: [...x.details.customFonts, { family: family.trim(), url: u.publicUrl! }] } }));
         if (onAdded) onAdded(family.trim());
         setFamily(''); toast.show(onAdded ? 'Font added and chosen for the signature. Publish to make it live.' : 'Font added. Pick it in any font menu, then publish.', { tone: 'success' });
-      }}>WOFF2 is smallest · up to 6 MB · make sure your font license allows web use</Uploader> : family && <p className="field-error">Use a new name with letters, numbers, spaces, - or _.</p>}
+      }}>WOFF2 is smallest · up to 50 MB · make sure your font license allows web use</Uploader> : family && <p className="field-error">Use a new name with letters, numbers, spaces, - or _.</p>}
     </section>
   );
 }
@@ -284,6 +295,8 @@ function Preview({ doc, device, setDevice, arrange, onSelect }: { doc: SiteDoc; 
 const SAMPLE_CODE = 'KA-SAMP1-E0000';   // the preview's seal (a sample: it opens a “not found” license page)
 function PassSettingsForm({ doc }: { doc: SiteDoc }){
   const p = doc.passCard;
+  const toast = useToast();
+  useCustomFontFaces(doc);
   const set = (patch: Partial<PassDraft>) => updateSite(x => ({ ...x, passCard: { ...x.passCard, ...patch } }));
   return <>
     <p className="muted">The pass buyers see while they check out. Changes show in the preview straight away and go live when you publish.</p>
@@ -316,7 +329,13 @@ function PassSettingsForm({ doc }: { doc: SiteDoc }){
         {doc.details.customFonts.length > 0 && <optgroup label="Your fonts">{doc.details.customFonts.map(f => <option key={f.family} value={f.family} style={{ fontFamily: fam(f.family) }}>{f.family}</option>)}</optgroup>}
         <optgroup label="Site fonts">{FONTS.map(f => <option key={f} value={f} style={{ fontFamily: fam(f) }}>{f}</option>)}</optgroup>
       </select>
-        <button type="button" className="btn sm ghost" style={{ marginTop: 6 }} onClick={() => { const i = document.getElementById('font-new-name') as HTMLInputElement | null; i?.scrollIntoView({ block: 'center', behavior: 'smooth' }); i?.focus(); }}><Icon name="upload" /> Add your own signature font</button></Field>
+        <div style={{ marginTop: 8 }}><Uploader kind="font" accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf" label="Upload a signature font"
+          onUploaded={u => {
+            const family = fontNameFromFile(u.file.name, fontList(doc));
+            updateSite(x => ({ ...x, details: { ...x.details, customFonts: [...x.details.customFonts, { family, url: u.publicUrl! }] }, passCard: { ...x.passCard, signatureFont: family } }));
+            toast.show(`“${family}” added and chosen for the signature. Publish to make it live.`, { tone: 'success' });
+          }}>.ttf, .otf, .woff or .woff2 · it is named from the file and picked at once</Uploader></div>
+        </Field>
       <div className="sig-sample" style={{ fontFamily: p.signatureFont ? fam(p.signatureFont) : SIGNATURE_DEFAULT_FONT, fontSize: p.signatureSize,
         color: SIGNATURE_INK[p.signatureTone].startsWith('var') ? '#ff9438' : SIGNATURE_INK[p.signatureTone], transform: `rotate(${p.signatureAngle}deg)` }} aria-hidden="true">{p.signatureText || 'Kethan Artzz'}</div>
       <div className="form-grid">

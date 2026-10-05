@@ -278,7 +278,7 @@
   inset:auto 12% -6% 12%; height:18%; border-radius:50%; box-shadow:none; opacity:1; animation:none !important; transition:none;
   background:radial-gradient(closest-side, rgba(0,0,0,.62), rgba(0,0,0,0)); filter:blur(7px); }
 .kco-face, .tone-ok .kco-face, .tone-bad .kco-face{ border-color:transparent; box-shadow:0 1px 1px rgba(0,0,0,.35), 0 14px 34px -10px rgba(0,0,0,.6); }
-.kco-tilt{ --ba:150deg; --bi:.7; }
+.kco-tilt{ --ba:150deg; --bi:.8; }
 .kco-face::after{ content:""; position:absolute; inset:0; z-index:4; border-radius:inherit; padding:1.2px; pointer-events:none;
   background:conic-gradient(from calc(var(--ba) - 150deg) at 50% 50%, rgba(255,255,255,.62), rgba(255,255,255,.1) 32%, rgba(255,255,255,0) 58%, rgba(255,255,255,.08) 78%, rgba(255,255,255,.34));
   -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
@@ -308,10 +308,16 @@
 .pass-price-left .kco-main .kco-title{ text-align:right; }
 .pass-price-below .kco-main{ flex-direction:column; align-items:flex-start; gap:4px; }
 
-/* moving gradient glow along the card's edge: follows the pointer (--ba), drifts when idle; colours are the foil's */
-.kco-face::before{ content:""; position:absolute; inset:0; z-index:5; border-radius:inherit; padding:2.5px; pointer-events:none; opacity:var(--bi, .7);
-  background:conic-gradient(from calc(var(--ba) - 62deg) at 50% 50%, transparent 0deg, rgba(255,154,139,0) 8deg, #ff9a8b 22deg, #fecf7a 36deg, #fff 52deg, #a6f0c6 66deg, #8fb8ff 80deg, #d6a4ff 96deg, rgba(214,164,255,0) 116deg, transparent 124deg);
+/* a thin silver shine that runs along the card's edge: transparent, then white, then transparent again. It follows the pointer (--ba)
+   and drifts slowly when idle. No colour and no glow outside the card. */
+.kco-face::before{ content:""; position:absolute; inset:0; z-index:5; border-radius:inherit; padding:1.2px; pointer-events:none; opacity:var(--bi, .8);
+  background:conic-gradient(from calc(var(--ba) - 58deg) at 50% 50%, rgba(255,255,255,0) 0deg, rgba(226,230,238,.18) 16deg, rgba(232,236,244,.62) 36deg, #fff 58deg, rgba(232,236,244,.62) 80deg, rgba(226,230,238,.18) 100deg, rgba(255,255,255,0) 116deg);
   -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
-.kco-halo{ position:absolute; inset:-5px; z-index:0; border-radius:25px; pointer-events:none; opacity:calc(var(--bi, .7) * .85); filter:blur(12px); transform:translateZ(-2px);
-  background:conic-gradient(from calc(var(--ba) - 70deg) at 50% 50%, transparent 0deg, #ff9a8b 26deg, #fecf7a 42deg, #fff 58deg, #a6f0c6 70deg, #8fb8ff 86deg, #d6a4ff 104deg, transparent 138deg); }
-.tone-ok .kco-face::before, .tone-bad .kco-face::before{ opacity:calc(var(--bi, .7) * .7); }
+.tone-ok .kco-face::before, .tone-bad .kco-face::before{ opacity:calc(var(--bi, .8) * .7); }
+
+/* the license side takes its look from the product: its artwork, blurred and darkened, sits behind the text */
+.kco-back-art{ position:absolute; inset:-20%; width:140%; height:140%; object-fit:cover; filter:blur(34px) saturate(1.2) brightness(.46); opacity:.9; pointer-events:none; }
+.kco-back-art + .kco-back-glow{ mix-blend-mode:screen; opacity:.5; }
+.kco-back::after{ z-index:6; }
+
+.kco-back-grid{ position:relative; z-index:2; }

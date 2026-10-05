@@ -362,7 +362,7 @@ Then: [Step 3. Specific questions](#step-3-answers-to-the-specific-questions), [
 6. The board: filter "All" shows `.skill-card` rows (label column 112 px + chips); a single category shows rows with logo, name, note and a 5-bar level meter (`SKILL_LEVELS`: Learning … Expert).
 7. The field (changed later, now a free field): `#skills-free` covers the whole skills block (`position:absolute; inset:0`, behind the board, no clipping or mask). `spawnTile()` places each logo at a random spot in the part of the block that is on screen (`freeBounds()`), choosing the emptiest of 8 random candidates (`pickSpot()`) so logos spread out. Each logo has a random size, depth (nearer ones are larger and sharper), drift direction and distance (kept inside the block), life of 5.2–11.5 s, and a random 0.15–2.2 s pause before the next one appears somewhere else. Skills come from a shuffled bag (`nextSkill()`), so there is no fixed order. Counts: 18 logos on desktop, 11 up to 900 px, 7 up to 600 px (never more than twice the number of skills in the chosen category, minimum 4), plus 6, 4 or 3 large blurred "far" logos. Start times are random over the first 6.5 s.
 8. Far logos use the same function (`spawnTile(true)`): size 120–190 px, constant heavy blur, opacity about 0.3–0.46, life 14–24 s, inserted behind the others.
-9. The sticky stage `.skills-field` (right column, same height as before) now only holds the spotlight; it no longer draws or clips logos.
+9. The sticky stage `.skills-field` (right column) holds the spotlight on screens wider than 900 px. On phones and tablets (up to 900 px) it is hidden and the spotlight becomes a card below the menu bar (`.skill-spot.is-sheet`, moved to `<body>`, closes after 6 s or on tap). On those screens the floating logos use no animated blur (`lite` mode in `spawnTile()`), the field restarts on rotation (`resize` and `orientationchange`) and the first logos appear within 3.4 s.
 10. Spotlight: hovering (mouse), focusing or tapping a chip shows its logo large (112 px; 76 px ≤ 900) in the stage with name, level and note; `.is-spot` on `#skills-free` dims the floating logos.
 11. Reduced motion: `staticField()` places up to 12 logos at still random spots (the farther ones softly blurred).
 
@@ -892,7 +892,7 @@ Then: [Step 3. Specific questions](#step-3-answers-to-the-specific-questions), [
 
 **When the real seal appears:** `Seal` receives `license` only when `s.success.license` is set, which comes from `statusFor()` or from the free-order response after the order is `paid`/`delivered`. A refunded order returns `license: null`.
 
-**Moving gradient border glow (added later).** `useTilt()` in `PassCard.tsx` also runs a small loop that sets `--ba` (angle) and `--bi` (strength) on `.kco-tilt`. While the pointer is over the card, `--ba` follows the pointer's direction from the card centre (`Math.atan2(tx, -ty)`), eased 14% per frame; when the pointer leaves, the glow drifts slowly round the edge (0.3° per frame). In `checkout.css`: `.kco-face::after` (the existing edge highlight) is now a conic gradient whose start follows `--ba`; `.kco-face::before` is a coloured gradient arc on the border (same foil colours, masked to a 2.5 px ring); `.kco-halo` (a child of `.kco-tilt` in `PassCard.tsx`) is a blurred copy behind the card. It is skipped under reduced motion (the tilt hook is off, so the CSS defaults `--ba:150deg`, `--bi:.7` apply). Touch screens use the idle drift (pointer events from touch are ignored by `onMove`).
+**Moving silver edge shine (added later).** `useTilt()` in `PassCard.tsx` also runs a small loop that sets `--ba` (angle) and `--bi` (strength) on `.kco-tilt`. While the pointer is over the card, `--ba` follows the pointer's direction from the card centre; when it leaves, the shine drifts slowly round the edge. In `checkout.css`: `.kco-face::after` (the existing white edge highlight) is a conic gradient whose start follows `--ba`, and `.kco-face::before` adds a 1.2 px ring that goes transparent, then white, then transparent again (silver, no colour, no glow outside the card). Skipped under reduced motion (CSS defaults apply). The license side takes its look from the product: `.kco-back-art` is the product's own artwork, blurred and darkened, behind the license text.
 
 **Data saved:** `orders.license_code` (unique), `orders.license_holder` (≤ 80 characters; markup characters stripped by `cleanHolder()`); card design in `settings` key `site` → `passCard`.
 
@@ -1637,7 +1637,7 @@ Note: the line numbers above come from a text search and may shift if the files 
 | Navigation | `visibility.navGallery`, `.navAbout`, `.autoFullscreen` | true/false | Filters `NAV_ITEMS` and calls `renderNavItems()` |
 | Social links (max 8) | `socialLinks[{label,url,icon}]` | Icons `behance, instagram, x, linkedin, youtube, website, email`; links `https://`, `http://` or `mailto:` | `renderSocialLinks()` |
 | Logo | `branding.enabled`, `.logoUrl` | Upload required to turn on | Page logo |
-| Folders (max 30), images (max 300) | `folders[]`, `images[]` | Unique folder names; image: unique slug, title, existing folder, description (4000), link, up to 20 technologies, `downloadable` | `applyPortfolioData()`, `buildFolders()` |
+| Folders (max 30), images (max 300) | `folders[]`, `images[]` | Unique folder names; image: unique slug, title, existing folder, description (4000), link, up to 20 technologies, `downloadable`, `hidden` (kept in the portal, left out of `/api/portfolio` by `visibleSite()`) | `applyPortfolioData()`, `buildFolders()` |
 | Folder covers and loop | `stacks.loop`, `stacks.covers` | A cover slug must belong to that folder | Work stacks (feature 5) |
 | About numbers (max 6) | `stats.enabled`, `stats.items[{label,value,suffix}]` | Label 40, whole number 0 to 1,000,000,000, suffix 4 | `renderAboutStats()` |
 | Skills board | `skills` | Up to 14 categories and 24 items | `window.kaRenderSkills()` (feature 4) |
@@ -2422,7 +2422,10 @@ There are 168 routes registered with `route(...)` (read from the running router)
 | Visitor location request set to normal accuracy | Feature 18 and finding 2 below |
 | About bio rewritten, journey line and promo-cut clips added, then made editable in the portal; About numbers start counting when visible | Features 3 and 23 |
 | License card border glow that follows the pointer | Feature 12 |
-| Skills logo field now covers the whole skills block with random positions | Feature 4 |
+| Skills logo field now covers the whole skills block with random positions; phone and tablet fixes | Feature 4 |
+| Hide a gallery image from the site (portal eye button); tips can be hidden (set back to draft) | Features 5, 23, 24 |
+| Panda greeting waits for the panda; font upload accepts any browser font type; inline signature font upload; stale font faces replaced | Features 9, 12, 25 |
+| Bio rewritten without repeated wording | Feature 3 |
 
 ## Corrections made while verifying
 
