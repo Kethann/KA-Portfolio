@@ -161,6 +161,26 @@ legend{ padding:0 0 6px; font:600 11px ui-monospace, monospace; letter-spacing:.
 .is-compact .toolbar .rare::-webkit-scrollbar{ display:none; }
 .is-compact .toolbar .rare:not(:has(button)){ display:none; }
 .is-compact .toolbar .rare button{ width:auto; padding:0 14px; flex:none; }
+/* tighter: smaller targets (still easy to hit), no wasted padding, so the controls leave the canvas as free as possible */
+.studio.is-compact{ --t:42px; }
+.is-compact .toolbar{ padding:4px; gap:2px 2px; border-radius:20px; }
+.is-compact .toolbar .rare{ padding-bottom:3px; }
+.is-compact .toolbar .rare button{ height:32px; min-width:0; padding:0 10px; gap:5px; font-size:12px; }
+.is-compact .toolbar .rare button svg{ width:16px; height:16px; }
+.is-compact .toolbar .size-label{ padding:0 6px 0 2px; }
+.is-compact .color-dot{ width:24px; height:24px; }
+.is-compact .toolbar-wrap{ gap:6px; }
+.is-compact .savebar button{ height:38px; padding:0 16px 0 12px; }
+/* a phone on its side: two rows only, the swipe strip joins the main tools as icons */
+@media (max-height:500px){
+  .is-compact .toolbar{ grid-template-columns:repeat(10, minmax(0, 1fr)); }
+  .is-compact .toolbar .colors{ grid-column:1 / span 3; }
+  .is-compact .toolbar .size{ grid-column:4 / span 7; }
+  .is-compact .toolbar .rare{ order:3; grid-column:7 / -1; border:0; padding:0; justify-content:space-around; overflow:visible; }
+  .is-compact .toolbar .rare .lbl{ display:none; }
+  .is-compact .toolbar .rare button{ width:auto; padding:0 8px; }
+  .is-compact .panel, .is-compact .text-options{ max-height:38vh; }
+}
 .is-compact .panel, .is-compact .text-options{ width:100%; max-height:46vh; }
 .is-compact .brush-grid{ grid-template-columns:repeat(2, 1fr); }
 .is-compact .corner{ top:max(14px, env(safe-area-inset-top)); }
