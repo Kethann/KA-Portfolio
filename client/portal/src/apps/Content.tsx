@@ -474,18 +474,7 @@ function ImageEditor({ slug, onClose }: { slug: string; onClose: () => void }){
         </div>
       </div>
       <SellImage f={f} setF={setF} />
-      <section className="stack" aria-label="Stack preview">
-        <b>Stack preview</b>
-        <p className="field-hint" style={{ margin: 0 }}>Click the picture to choose what stays in view on its card in the stack, and zoom in to crop closer. The card on the right shows the result.</p>
-        <div className="focus-row">
-          <FocusPicker f={f} setF={setF} />
-          <div className="focus-card" aria-hidden="true"><img src={thumb(f, 480)} alt="" style={{ objectPosition: `${f.focusX ?? 50}% ${f.focusY ?? 50}%`, transformOrigin: `${f.focusX ?? 50}% ${f.focusY ?? 50}%`, transform: `scale(${f.zoom ?? 1})` }} /></div>
-          <div className="stack" style={{ flex: '1 1 160px', minWidth: 140 }}>
-            <Field label={`Zoom ${(f.zoom ?? 1).toFixed(1)}×`}><input type="range" min={1} max={3} step={0.1} value={f.zoom ?? 1} aria-label="Zoom" onChange={e => setF({ ...f, zoom: Number(e.target.value) })} /></Field>
-            <button type="button" className="btn sm ghost" disabled={(f.focusX ?? 50) === 50 && (f.focusY ?? 50) === 50 && (f.zoom ?? 1) === 1} onClick={() => setF({ ...f, focusX: undefined, focusY: undefined, zoom: undefined })}>Centre and reset</button>
-          </div>
-        </div>
-      </section>
+      <StackFraming f={f} setF={setF} />
       <Field label="Description"><textarea rows={4} value={f.description} onChange={e => setF({ ...f, description: e.target.value })} maxLength={4000} /></Field>
       <Field label="Tools"><TagInput label="Tools" value={f.technologies} onChange={v => setF({ ...f, technologies: v })} placeholder="Photoshop, Blender…" /></Field>
     </Modal>
@@ -580,22 +569,56 @@ function MoveImage({ slug, onClose }: { slug: string; onClose: () => void }){
   );
 }
 
-// Click or drag on the picture to pick the point that stays in view on its stack card.
-function FocusPicker({ f, setF }: { f: SiteImage; setF: (v: SiteImage) => void }){
-  const ref = useRef<HTMLDivElement>(null);
-  const at = (e: React.PointerEvent) => {
-    const r = ref.current!.getBoundingClientRect();
-    setF({ ...f, focusX: Math.round(Math.min(100, Math.max(0, (e.clientX - r.left) / r.width * 100)) * 10) / 10, focusY: Math.round(Math.min(100, Math.max(0, (e.clientY - r.top) / r.height * 100)) * 10) / 10 });
+// Frame the picture on its card in the stack: drag it any way you like, nudge it with the arrows, zoom with the slider or the wheel.
+// The card is drawn exactly as the site draws it, so what you see is what visitors get.
+function StackFraming({ f, setF }: { f: SiteImage; setF: (v: SiteImage) => void }){
+  const card = useRef<HTMLDivElement>(null);
+  const img = useRef<HTMLImageElement>(null);
+  const drag = useRef<{ x: number; y: number; fx: number; fy: number } | null>(null);
+  const fx = f.focusX ?? 50, fy = f.focusY ?? 50, zoom = f.zoom ?? 1;
+  const put = (x: number, y: number, z = zoom) => setF({ ...f, focusX: Math.round(Math.min(100, Math.max(0, x)) * 10) / 10, focusY: Math.round(Math.min(100, Math.max(0, y)) * 10) / 10, zoom: Math.round(Math.min(3, Math.max(1, z)) * 100) / 100 });
+  // how many screen pixels the picture travels for one percent of focus: what overflows the card, plus what zooming adds
+  const perPercent = () => {
+    const c = card.current, i = img.current; if (!c || !i || !i.naturalWidth) return { x: 2, y: 2 };
+    const cw = c.clientWidth, ch = c.clientHeight, k = Math.max(cw / i.naturalWidth, ch / i.naturalHeight);
+    return { x: Math.max(1.5, (i.naturalWidth * k - cw + (zoom - 1) * cw) / 100), y: Math.max(1.5, (i.naturalHeight * k - ch + (zoom - 1) * ch) / 100) };
   };
+  const step = 4;
+  const nudge = (dx: number, dy: number) => put(fx + dx * step, fy + dy * step);
+  useEffect(() => {
+    const c = card.current; if (!c) return;
+    const wheel = (e: WheelEvent) => { e.preventDefault(); put(fx, fy, zoom + (e.deltaY < 0 ? 0.1 : -0.1)); };
+    c.addEventListener('wheel', wheel, { passive: false });
+    return () => c.removeEventListener('wheel', wheel);
+  });
+  const style: React.CSSProperties = { objectPosition: `${fx}% ${fy}%`, transformOrigin: `${fx}% ${fy}%`, transform: `scale(${zoom})` };
+  const dirty = fx !== 50 || fy !== 50 || zoom !== 1;
   return (
-    <div ref={ref} className="focus-pick" role="slider" tabIndex={0} aria-label="Point that stays in view" aria-valuetext={`${Math.round(f.focusX ?? 50)} percent across, ${Math.round(f.focusY ?? 50)} percent down`}
-      onPointerDown={e => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); at(e); }} onPointerMove={e => { if (e.buttons) at(e); }}
-      onKeyDown={e => { const s = e.shiftKey ? 10 : 2, x = f.focusX ?? 50, y = f.focusY ?? 50;
-        const d: Record<string, [number, number]> = { ArrowLeft: [-s, 0], ArrowRight: [s, 0], ArrowUp: [0, -s], ArrowDown: [0, s] };
-        if (d[e.key]){ e.preventDefault(); setF({ ...f, focusX: Math.min(100, Math.max(0, x + d[e.key][0])), focusY: Math.min(100, Math.max(0, y + d[e.key][1])) }); } }}>
-      <img src={thumb(f, 768)} alt="" draggable={false} />
-      <i style={{ left: `${f.focusX ?? 50}%`, top: `${f.focusY ?? 50}%` }} />
-    </div>
+    <section className="stack" aria-label="Stack preview">
+      <b>Stack preview</b>
+      <p className="field-hint" style={{ margin: 0 }}>Drag the picture inside the card to move it in any direction, or use the arrows. Zoom with the slider or the mouse wheel. This card is how it looks in the stack.</p>
+      <div className="focus-row">
+        <div ref={card} className="focus-card is-drag" role="img" aria-label="Stack card: drag to move the picture"
+          onPointerDown={e => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); drag.current = { x: e.clientX, y: e.clientY, fx, fy }; }}
+          onPointerMove={e => { const d = drag.current; if (!d) return; const pp = perPercent(); put(d.fx - (e.clientX - d.x) / pp.x, d.fy - (e.clientY - d.y) / pp.y); }}
+          onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }}>
+          <img ref={img} src={thumb(f, 768)} alt="" draggable={false} style={style} />
+        </div>
+        <div className="stack" style={{ flex: '1 1 180px', minWidth: 160 }}>
+          <div className="pan-pad" role="group" aria-label="Move the picture">
+            <button type="button" className="icon-btn" aria-label="Move the picture up" onClick={() => nudge(0, -1)}>↑</button>
+            <button type="button" className="icon-btn" aria-label="Move the picture left" onClick={() => nudge(-1, 0)}>←</button>
+            <button type="button" className="icon-btn" aria-label="Centre the picture" title="Centre" onClick={() => put(50, 50)}>●</button>
+            <button type="button" className="icon-btn" aria-label="Move the picture right" onClick={() => nudge(1, 0)}>→</button>
+            <button type="button" className="icon-btn" aria-label="Move the picture down" onClick={() => nudge(0, 1)}>↓</button>
+          </div>
+          <Field label={`Zoom ${zoom.toFixed(1)}×`}><input type="range" min={1} max={3} step={0.1} value={zoom} aria-label="Zoom" onChange={e => put(fx, fy, Number(e.target.value))} /></Field>
+          <span className="faint num" style={{ fontSize: 12 }}>Across {Math.round(fx)}% · down {Math.round(fy)}%</span>
+          {zoom === 1 && <span className="field-hint" style={{ margin: 0 }}>A picture that already fills the card has nothing to slide: zoom in a little to move it.</span>}
+          <button type="button" className="btn sm ghost" disabled={!dirty} onClick={() => setF({ ...f, focusX: undefined, focusY: undefined, zoom: undefined })}>Reset</button>
+        </div>
+      </div>
+    </section>
   );
 }
 

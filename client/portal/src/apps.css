@@ -384,9 +384,10 @@
 
 /* Content > Portfolio: stack preview framing */
 .focus-row{ display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; }
-.focus-pick{ position:relative; display:inline-block; touch-action:none; cursor:crosshair; line-height:0; border-radius:10px; }
-.focus-pick img{ display:block; max-width:100%; max-height:240px; border-radius:10px; user-select:none; -webkit-user-drag:none; }
-.focus-pick i{ position:absolute; width:20px; height:20px; margin:-10px 0 0 -10px; border:2px solid #fff; border-radius:50%; box-shadow:0 0 0 2px rgba(0,0,0,.55), 0 0 14px var(--accent, #ff9438); pointer-events:none; }
-.focus-card{ width:132px; aspect-ratio:3 / 4; border-radius:12px; overflow:hidden; border:1px solid var(--line, rgba(255,255,255,.14)); flex:none; }
-.focus-card img{ width:100%; height:100%; object-fit:cover; display:block; }
+.focus-card{ width:min(220px, 100%); aspect-ratio:3 / 4; border-radius:14px; overflow:hidden; border:1px solid var(--border, rgba(255,255,255,.14)); flex:none; background:#000; touch-action:none; user-select:none; -webkit-user-select:none; }
+.focus-card.is-drag{ cursor:grab; } .focus-card.is-drag:active{ cursor:grabbing; }
+.focus-card img{ width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
+.pan-pad{ display:grid; grid-template-columns:repeat(3, 40px); grid-template-areas:". up ." "left mid right" ". down ."; gap:4px; width:max-content; }
+.pan-pad button:nth-child(1){ grid-area:up; } .pan-pad button:nth-child(2){ grid-area:left; } .pan-pad button:nth-child(3){ grid-area:mid; }
+.pan-pad button:nth-child(4){ grid-area:right; } .pan-pad button:nth-child(5){ grid-area:down; }
 
