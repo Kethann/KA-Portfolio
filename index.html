@@ -1270,7 +1270,7 @@ html.ka-modal-open{ overflow:hidden; }
 .site-section h1[tabindex="-1"]:focus, .site-section h2[tabindex="-1"]:focus{ outline:none; }
 
 /* ---- Portfolio now follows About > Featured Work: less top room than it had as the first section ---- */
-#section-portfolio #folder-shelf.folder-shelf{ padding-top:clamp(32px, 6vw, 72px); }
+#section-portfolio #folder-shelf.folder-shelf{ padding-top:clamp(20px, 3.5vw, 44px); }
 
 /* ---- Store / Tips pages: shell around the lazily mounted bundle ---- */
 .shop-shell{ max-width:1400px; margin:0 auto; padding:120px 0 96px; min-height:80vh; box-sizing:border-box; }
@@ -1410,7 +1410,7 @@ html.ka-modal-open{ overflow:hidden; }
 /* ============================================================ ABOUT PAGE ===================== */
 .about-wrap{
   position:relative; width:100%; max-width:1100px; margin:0 auto;
-  padding:100px clamp(20px,5vw,48px) 80px; isolation:isolate;
+  padding:100px clamp(20px,5vw,48px) 32px; isolation:isolate;   /* a small bottom: the Portfolio follows straight after the promo cuts */
   /* [scroll fix] without this, the page's total scrollable height can end up shorter than
      hero-spacer + one full viewport once every OTHER section is hidden -- scrollIntoView then
      can't actually bring About's top flush with the viewport top (it hits the scroll ceiling
@@ -1472,7 +1472,7 @@ html.ka-modal-open{ overflow:hidden; }
   .about-headline, .about-bio-text{ opacity:1; transform:none; animation:none; }
 }
 
-.about-block{ margin-top:72px; }
+.about-block{ margin-top:clamp(40px, 5vw, 60px); }
 .about-block .gallery-head{ margin-bottom:28px; }
 
 /* ---- About: journey since a year (points on a line; fast, letter-by-letter text) ---- */
@@ -10920,7 +10920,7 @@ html, body{ overscroll-behavior-x:none; }
   // and every picture area (the coverflows and image stacks of the gallery and portfolio, the poster viewer and the
   // store's viewer), where a sideways drag must browse the pictures and never turn the page.
   var OWN = "input, textarea, select, [contenteditable=''], [contenteditable='true'], #site-nav, [data-no-page-swipe], " +
-    ".coverflow-section, #gallery-coverflow, #portfolio-coverflow, #folder-shelf, .folder-card, .cf-card, #lightbox, .kas-lb, .kas-lightbox";
+    ".coverflow-section, #gallery-coverflow, #portfolio-coverflow, #about-work-stacks, #folder-shelf, .folder-card, .cf-card, #lightbox, .kas-lb, .kas-lightbox";
   function ownsSwipe(ev, dir){
     var path = ev.composedPath ? ev.composedPath() : [];
     if (!path.length){ for (var q = ev.target; q; q = q.parentNode) path.push(q); }

@@ -76,6 +76,17 @@ function StackGrid({id,stacks,reduced,onOpen}:{id:string;stacks:Stack[];reduced:
   const keys=stacks.map(s=>s.name).join('|');
   const canHover=useMedia('(hover: hover) and (pointer: fine)');
   const coarse=useMedia('(pointer: coarse)');
+  // Swipe a stack sideways to roll through its pictures (it loops); a tap still opens it. A swipe here never turns the page.
+  const [turn,setTurn]=useState<Record<string,{k:number;dir:number}>>({});
+  const sw=useRef<{name:string;x:number;y:number;id:number;moved:boolean;el:HTMLElement}|null>(null);
+  const suppress=useRef(0);
+  const roll=(name:string,dir:number)=>setTurn(t=>({...t,[name]:{k:(t[name]?.k||0)+dir,dir}}));
+  const swipeEnd=(e:React.PointerEvent,count:number)=>{
+    const g=sw.current;if(!g||g.id!==e.pointerId)return;sw.current=null;
+    const deck=g.el.querySelector<HTMLElement>('.deck');if(deck){deck.style.transition='';deck.style.translate='';deck.style.rotate='';}
+    const dx=e.clientX-g.x;
+    if(g.moved){suppress.current=performance.now()+400;if(e.type==='pointerup'&&Math.abs(dx)>36&&count>1)roll(g.name,dx<0?1:-1);}
+  };
   // Magnetic pull: covers near the cursor lean toward it (tilt in 3D, lift, fan their card edges), eased every frame.
   // Only the inner deck moves (transform + custom properties), so it never fights the entrance animation.
   useEffect(()=>{
@@ -166,11 +177,20 @@ function StackGrid({id,stacks,reduced,onOpen}:{id:string;stacks:Stack[];reduced:
   return <div className={'stack-grid'+(entered?' is-entered':' is-pending')} ref={rootRef}>
     {stacks.map((s,si)=>{
       const count=s.items.length,others=s.items.filter(i=>i.slug!==s.cover.slug);
-      return <button type="button" className="stack" key={s.name} onClick={e=>onOpen(s.name,e.currentTarget)} aria-label={`${s.name}, ${count} ${count===1?'image':'images'}. Open`}>
+      const all=[s.cover,...others],t=turn[s.name],k=t?((t.k%count)+count)%count:0,ord=all.slice(k).concat(all.slice(0,k));
+      const front=ord[0],n1=ord[1]||front,n2=ord[2]||n1;
+      return <button type="button" className="stack" key={s.name} aria-label={`${s.name}, ${count} ${count===1?'image':'images'}. Open. Swipe sideways to look through it.`}
+        onClick={e=>{if(performance.now()<suppress.current){e.preventDefault();return;}onOpen(s.name,e.currentTarget);}}
+        onPointerDown={e=>{if(e.button!==0||!e.isPrimary)return;sw.current={name:s.name,x:e.clientX,y:e.clientY,id:e.pointerId,moved:false,el:e.currentTarget};}}
+        onPointerMove={e=>{const g=sw.current;if(!g||g.id!==e.pointerId)return;const dx=e.clientX-g.x,dy=e.clientY-g.y;
+          if(!g.moved&&Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>10){sw.current=null;return;}
+          if(!g.moved&&Math.abs(dx)>12){g.moved=true;try{g.el.setPointerCapture(e.pointerId);}catch{/* already released */}}
+          if(g.moved&&!reduced){const d=g.el.querySelector<HTMLElement>('.deck');if(d){d.style.transition='none';d.style.translate=`${(dx*.35).toFixed(1)}px 0`;d.style.rotate=`${(dx*.03).toFixed(2)}deg`;}}}}
+        onPointerUp={e=>swipeEnd(e,count)} onPointerCancel={e=>swipeEnd(e,count)}>
         <span className="deck">
-          {count>2&&<span className="layer l2" aria-hidden="true"><StackImg p={others[1]||s.cover} min={q(480,1080)} alt="" eager={si===0}/></span>}
-          {count>1&&<span className="layer l1" aria-hidden="true"><StackImg p={others[0]||s.cover} min={q(480,1080)} alt="" eager={si===0}/></span>}
-          <span className="front"><StackImg p={s.cover} min={q(768,1600)} alt={s.cover.title} eager={si===0}/></span>
+          {count>2&&<span className="layer l2" aria-hidden="true"><StackImg p={n2} min={q(480,1080)} alt="" eager={si===0}/></span>}
+          {count>1&&<span className="layer l1" aria-hidden="true"><StackImg p={n1} min={q(480,1080)} alt="" eager={si===0}/></span>}
+          <span className={'front'+(t&&!reduced?(t.dir>0?' roll-next':' roll-prev'):'')} key={front.slug}><StackImg p={front} min={q(768,1600)} alt={front.title} eager={si===0}/></span>
         </span>
         <span className="meta"><strong>{s.name}</strong><small>{count} {count===1?'image':'images'}</small></span>
       </button>;
