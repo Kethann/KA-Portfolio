@@ -10878,11 +10878,13 @@ html{ font-size:calc(100% * var(--text-scale, 1) * var(--screen-scale, 1)); }
 /* ============================================================ SWIPE BETWEEN PAGES (touch) == */
 /* sideways swipes from the sides of the screen switch pages here, so the browser must not also treat them as Back/Forward */
 html, body{ overscroll-behavior-x:none; }
+/* the page only pans up and down natively, so a sideways drag is handed to the page swipe untouched (no vertical wobble while it follows the finger); pinch zoom stays */
+.site-section{ touch-action:pan-y pinch-zoom; }
 .edge-swipe-hint{ position:fixed; top:50%; z-index:120; display:flex; align-items:center; gap:10px; padding:8px 16px 8px 8px;
-  border-radius:999px; background:var(--glass-bg-heavy, rgba(20,16,22,.82)); border:var(--glass-border, 1px solid rgba(255,255,255,.16));
-  box-shadow:var(--glass-highlight, none), 0 10px 30px rgba(0,0,0,.45); backdrop-filter:blur(14px) saturate(140%); -webkit-backdrop-filter:blur(14px) saturate(140%);
+  border-radius:999px; background:var(--glass-bg-heavy, rgba(20,16,22,.94)); border:var(--glass-border, 1px solid rgba(255,255,255,.16));
+  box-shadow:var(--glass-highlight, none), 0 10px 30px rgba(0,0,0,.45);
   color:var(--ink, #edebe8); font:600 11px/1 'JetBrains Mono', ui-monospace, monospace; letter-spacing:.14em; text-transform:uppercase;
-  pointer-events:none; opacity:0; transform:translate3d(0,-50%,0); will-change:transform,opacity; transition:opacity .2s ease, border-color .2s ease; }
+  pointer-events:none; opacity:0; transform:translate3d(0,-50%,0); will-change:transform,opacity; transition:opacity .18s ease, border-color .2s ease; }
 .edge-swipe-hint.is-next{ right:14px; flex-direction:row-reverse; padding:8px 8px 8px 16px; } .edge-swipe-hint.is-prev{ left:14px; }
 .edge-swipe-hint .ring{ position:relative; width:30px; height:30px; flex:none; display:grid; place-items:center; }
 .edge-swipe-hint .ring svg{ position:absolute; inset:0; width:30px; height:30px; transform:rotate(-90deg); }
@@ -10963,23 +10965,36 @@ html, body{ overscroll-behavior-x:none; }
     }
     return false;
   }
-  function zone(){ return Math.max(28, Math.min(120, window.innerWidth * 0.2)); }
-  function need(){ return Math.max(70, Math.min(150, window.innerWidth * 0.24)); }
+  function zone(){ return Math.max(32, Math.min(120, window.innerWidth * 0.2)); }
+  function need(){ return Math.max(56, Math.min(110, window.innerWidth * 0.16)); }
+  var hintKey = "";
   function showHint(dir, label, p, end){
+    if (end){ hideHint(); return; }   // at the first or last page the page only stretches a little: nothing slides in from the edge
     if (!hint){
       hint = document.createElement("div"); hint.setAttribute("aria-hidden", "true");
       hint.innerHTML = '<span class="ring"><svg viewBox="0 0 30 30"><circle class="track" cx="15" cy="15" r="12"/><circle class="fill" cx="15" cy="15" r="12" pathLength="1"/></svg><span class="arr"></span></span><span class="lbl"></span>';
+      hint.__fill = hint.querySelector(".fill");
       document.body.appendChild(hint);
     }
-    hint.className = "edge-swipe-hint " + (dir > 0 ? "is-next" : "is-prev") + (p >= 1 && !end ? " is-ready" : "") + (end ? " is-end" : "");
-    hint.querySelector(".arr").textContent = end ? "\u2022" : dir > 0 ? "\u203a" : "\u2039";
-    hint.querySelector(".lbl").textContent = end ? (dir > 0 ? "Last page" : "First page") : label;
-    hint.querySelector(".fill").style.strokeDashoffset = String(1 - Math.min(1, p));
+    var ready = p >= 1, key = dir + "|" + label + "|" + ready;
+    if (key !== hintKey){   // text and classes only when they change; the ring and the slide are the only per-frame writes
+      hintKey = key;
+      hint.className = "edge-swipe-hint " + (dir > 0 ? "is-next" : "is-prev") + (ready ? " is-ready" : "");
+      hint.querySelector(".arr").textContent = dir > 0 ? "\u203a" : "\u2039";
+      hint.querySelector(".lbl").textContent = label;
+    }
     var q = Math.min(1, p);
-    hint.style.opacity = String(0.3 + q * 0.7);
-    hint.style.transform = "translate3d(" + ((dir > 0 ? 1 : -1) * (1 - q) * 28) + "px,-50%,0) scale(" + (0.92 + q * 0.08) + ")";
+    hint.__fill.style.strokeDashoffset = (1 - q).toFixed(3);
+    hint.style.opacity = q < 0.12 ? "0" : String(Math.min(1, 0.25 + q * 0.75));
+    hint.style.transform = "translate3d(" + ((dir > 0 ? 1 : -1) * (1 - q) * 20).toFixed(1) + "px,-50%,0)";
   }
-  function hideHint(){ if (hint) hint.style.opacity = "0"; }
+  function hideHint(){ if (hint){ hint.style.opacity = "0"; hintKey = ""; } }
+  var frame = 0, pending = null;
+  function paintFrame(){
+    frame = 0; if (!s || !pending) return;
+    var d = pending; pending = null;
+    follow(d.dx, d.p); showHint(s.dir, s.label, d.p, !s.target);
+  }
   function follow(dx, p){
     // the page leans toward the finger, with resistance (and a lot more at the first / last page)
     var x = s.target ? dx * 0.32 : dx * 0.1, o = s.target ? 1 - Math.min(1, p) * 0.35 : 1;
@@ -10989,6 +11004,7 @@ html, body{ overscroll-behavior-x:none; }
   }
   function release(commit){
     var gesture = s; s = null; hideHint();
+    if (frame){ cancelAnimationFrame(frame); frame = 0; } pending = null;
     if (!gesture || !gesture.decided) return;
     gesture.movers.forEach(function(m){ m.classList.remove("is-swiping"); });
     if (commit){
@@ -11033,16 +11049,19 @@ html, body{ overscroll-behavior-x:none; }
     // a tiny tick when letting go would change page (only after the visitor has tapped the page: browsers refuse it before)
     if (s.target && p >= 1 && !s.buzzed){ s.buzzed = true; if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) try { navigator.vibrate(8); } catch(err){} }
     if (p < 1) s.buzzed = false;
-    follow(s.dir > 0 ? -Math.max(0, into) : Math.max(0, into), p);
-    showHint(s.dir, s.label, p, !s.target);
+    pending = { dx: s.dir > 0 ? -Math.max(0, into) : Math.max(0, into), p: p };
+    if (!frame) frame = requestAnimationFrame(paintFrame);   // many touch events per frame, one write
   }, { passive: true, capture: true });
   window.addEventListener("touchend", function(){
     if (!s) return;
     if (!s.decided){ s = null; return; }
-    var into = Math.abs(s.x) / (s.target ? 0.32 : 0.1), flick = (s.dir > 0 ? -s.v : s.v) > 0.45 && into > 40;
+    var into = Math.abs(s.x) / (s.target ? 0.32 : 0.1), flick = (s.dir > 0 ? -s.v : s.v) > 0.35 && into > 30;
     release(!!s.target && (into >= need() || flick));
   }, { passive: true, capture: true });
   window.addEventListener("touchcancel", function(){ release(false); }, { passive: true, capture: true });
   document.addEventListener("visibilitychange", function(){ if (document.hidden) release(false); });
+  // turning the device mid-swipe: drop the gesture so nothing is left half-moved
+  window.addEventListener("orientationchange", function(){ release(false); });
+  window.addEventListener("resize", function(){ if (s && s.decided) release(false); });
 })();
 </script>
