@@ -383,3 +383,6 @@
 .focus-pick i{ position:absolute; width:20px; height:20px; margin:-10px 0 0 -10px; border:2px solid #fff; border-radius:50%; box-shadow:0 0 0 2px rgba(0,0,0,.55), 0 0 14px var(--accent, #ff9438); pointer-events:none; }
 .focus-card{ width:132px; aspect-ratio:3 / 4; border-radius:12px; overflow:hidden; border:1px solid var(--line, rgba(255,255,255,.14)); flex:none; }
 .focus-card img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+.pf-badges{ position:absolute; top:8px; left:8px; display:flex; gap:4px; flex-wrap:wrap; pointer-events:none; }
+.pf-grid .pf-badges .badge{ position:static; }

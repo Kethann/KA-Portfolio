@@ -65,3 +65,19 @@ test('delete and archive from the portal show on the public store at once, and a
   assert.equal((await admin('POST', `/api/admin/products/${sold}/restore`)).status, 200);
   assert.ok((await admin('GET', '/api/admin/products')).json.products.some(p => p.slug === 'sold-kit'), 'restored as a draft');
 });
+
+test('a gallery image can be listed as a product from the gallery, once, and is found again by its tag', async () => {
+  const site = (await admin('GET', '/api/admin/site')).json;
+  const img = site.images[0];
+  const made = await admin('POST', `/api/admin/gallery/${img.slug}/sell`, { priceInr: 49900, priceUsd: 599, publish: true });
+  assert.equal(made.status, 200, JSON.stringify(made.json));
+  const p = made.json.product;
+  assert.equal(p.kind, 'artzz'); assert.equal(p.title, img.title); assert.equal(p.priceInr, 49900); assert.equal(p.sellable, true);
+  assert.ok(p.tags.includes(`from-gallery:${img.slug}`)); assert.equal(p.media.length, 1);
+  // with no file to hand over (the test site has no image files) it stays a draft instead of publishing something that cannot be delivered
+  if (!p.file) assert.equal(p.status, 'draft');
+  const again = await admin('POST', `/api/admin/gallery/${img.slug}/sell`, { priceInr: 100, priceUsd: 100 });
+  assert.equal(again.status, 409); assert.equal(again.json.code, 'exists');
+  assert.equal((await admin('POST', '/api/admin/gallery/nope/sell', {})).status, 404);
+  assert.equal((await app.call('POST', `/api/admin/gallery/${img.slug}/sell`, { body: {} })).status, 401);
+});

@@ -9,6 +9,7 @@ import { productDto } from '../handlers/store-public.js';
 import { audit } from './auth.js';
 import { getSettingWithRevision, setSetting } from '../core/settings.js';
 import { sendEmail, DEFAULT_TEMPLATES } from '../core/email.js';
+import { loadSiteDocument } from '../handlers/public.js';
 
 const IMAGE_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/avif': 'avif', 'image/gif': 'gif' };
 const FONT_TYPES = { 'font/woff2': 'woff2', 'font/woff': 'woff', 'font/ttf': 'ttf', 'font/otf': 'otf' };
@@ -444,6 +445,54 @@ export async function deleteRating(ctx){
   return productRatings({ ...ctx, params: { id: r.product_id } });
 }
 
+// ---- sell a gallery image as a product, from the gallery itself ------------------------------------------------
+// Creates an Artzz product from one image (its picture, title, description and tools), with the image as the file buyers
+// download, and tags it so the gallery editor can find it again. Hiding it from the gallery is a separate switch there.
+export async function sellImage(ctx){
+  const slug = String(ctx.params.slug || '');
+  if (!/^[a-zA-Z0-9_-]{1,100}$/.test(slug)) throw new HttpError(400, 'Unknown image.');
+  const b = await readJson(ctx.request, 4096);
+  const doc = await loadSiteDocument();
+  const img = (doc.images || []).find(i => i.slug === slug);
+  if (!img) throw new HttpError(404, 'That image is not in the gallery.');
+  const db = await getDb();
+  const tag = `from-gallery:${slug}`;
+  const already = await db.maybeOne('select id from products where exists (select 1 from json_each(products.tags) where value = $1)', [tag]);
+  if (already) throw new HttpError(409, 'This image is already in the store.', { code: 'exists', id: already.id });
+  const priceInr = money(b.priceInr, 'Price in India'), priceUsd = money(b.priceUsd, 'Price elsewhere');
+  // the picture buyers get: our own upload, or the full-size export that ships with the site
+  const storage = getStorage();
+  let bytes = null, ext = 'webp', contentType = 'image/webp';
+  try {
+    if (img.src){
+      const prefix = storage.publicUrl('media', 'x').slice(0, -1);
+      if (img.src.startsWith(prefix)){ bytes = await storage.get('media', img.src.slice(prefix.length)); ext = (/\.([a-z0-9]+)$/i.exec(img.src) || [])[1] || 'webp'; }
+    } else {
+      const w = img.full ? 'full' : Math.max(...(img.widths || [1600]));
+      const origin = (env('PUBLIC_SITE_URL') || new URL(ctx.request.url).origin).replace(/\/+$/, '');
+      const r = await fetch(`${origin}/images/${slug}-${w}.webp`);
+      if (r.ok) bytes = new Uint8Array(await r.arrayBuffer());
+    }
+  } catch { bytes = null; }
+  if (bytes) contentType = ext === 'png' ? 'image/png' : /^jpe?g$/i.test(ext) ? 'image/jpeg' : ext === 'avif' ? 'image/avif' : 'image/webp';
+  const lic = (await db.maybeOne(`select id from licenses where key = 'personal'`)) || (await db.maybeOne('select id from licenses order by key limit 1'));
+  const canPublish = b.publish === true && !!bytes && priceInr !== null && priceUsd !== null && !!lic;
+  const sort = (await db.one(`select coalesce(min(sort), 0) - 1 as s from products where kind = 'artzz'`)).s;
+  const mediaUrl = img.src || `/images/${slug}-${(img.widths || []).includes(1600) ? 1600 : Math.max(...(img.widths || [1080]))}.webp`;
+  const row = await db.one(`insert into products (kind, slug, title, summary, description, tags, tech_tags, status, sellable, is_free, price_inr, price_usd, license_id, max_downloads, link_ttl_hours, sort, published_at)
+    values ('artzz', $1, $2, '', $3, $4, $5, $6, 1, 0, $7, $8, $9, 5, 72, $10, ${canPublish ? "strftime('%Y-%m-%dT%H:%M:%fZ','now')" : 'null'}) returning id`,
+    [await uniqueSlug(db, slugify(slug)), img.title, (img.description || '').slice(0, 8000), [tag], (img.technologies || []).slice(0, 20), canPublish ? 'published' : 'draft', priceInr, priceUsd, lic ? lic.id : null, sort]);
+  await db.query('insert into product_media (product_id, url, alt, width, height, sort) values ($1,$2,$3,$4,$5,0)', [row.id, mediaUrl, img.title.slice(0, 200), img.width || null, img.height || null]);
+  if (bytes){
+    const name = `${slugify(img.title)}.${ext}`, path = `files/${randomToken(12)}/${name}`;
+    await storage.put('deliverables', path, bytes, contentType);
+    const sha = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(x => x.toString(16).padStart(2, '0')).join('');
+    await db.query('insert into product_files (product_id, storage_path, filename, bytes, sha256, is_current) values ($1,$2,$3,$4,$5,1)', [row.id, path, name, bytes.byteLength ?? bytes.length, sha]);
+  }
+  await audit(ctx, 'product_from_gallery', row.id, { slug });
+  return getProduct({ ...ctx, params: { id: row.id } });
+}
+
 // ---- the email a buyer gets after paying: an extra message, a subject and attachments, per product -------------
 const FILE_PATH = /^files\/[A-Za-z0-9_-]{16}\/[A-Za-z0-9._-]{1,100}$/;
 export const DELIVERY_LIMITS = { attachments: 5, each: 10 * MB, total: 15 * MB };
@@ -518,6 +567,7 @@ export function registerCatalog(route){
   route('GET', '/api/admin/products/:id/delivery', getDelivery, a);
   route('PUT', '/api/admin/products/:id/delivery', saveDelivery, a);
   route('POST', '/api/admin/products/:id/delivery/test', testDelivery, a);
+  route('POST', '/api/admin/gallery/:slug/sell', sellImage, a);
   route('GET', '/api/admin/products/:id/file', fileLink, a);
   route('GET', '/api/admin/categories', listCategories, a);
   route('POST', '/api/admin/categories/reorder', reorderCategories, a);

@@ -7,7 +7,8 @@ import { del, get, post, put, upload } from '../api';
 import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, SkeletonRows, Switch, useConfirm, useToast } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
-import { TagInput, Uploader, useSaveKey } from './common';
+import { MoneyInput, TagInput, Uploader, useSaveKey } from './common';
+import { useDesk } from '../shell/desk';
 import { discardSite, keepMineOverTheirs, loadSite, saveSite, thumb, updateSite, useSite } from './siteDoc';
 import { SKILL_ICONS, SKILL_LIMITS } from './siteDoc';
 import type { SkillsDraft } from './siteDoc';
@@ -325,6 +326,10 @@ function Portfolio(){
   useEffect(() => { if (!doc!.folders.includes(folder)) setFolder(doc!.folders[0] || ''); }, [doc, folder]);
   const [showArchived, setShowArchived] = useState(false);
   const [moving, setMoving] = useState<string | null>(null);
+  const inStore = useLoad<{ products: { id: string; tags: string[]; status: string }[] }>('/products?kind=artzz');
+  const listed = useMemo(() => new Set((inStore.data?.products || []).flatMap(p => p.tags.filter(t => t.startsWith('from-gallery:')).map(t => t.slice(13)))), [inStore.data]);
+  const setDownloads = (slugs: string[], on: boolean) => void updateSiteLive(d => ({ ...d, images: d.images.map(x => slugs.includes(x.slug) ? { ...x, downloadable: on } : x) }))
+    .then(live => toast.show(live ? (on ? 'Downloads allowed: live now' : 'Downloads turned off: live now') : 'Changed. Press Publish changes to put it live.', { tone: 'success' })).catch(toast.error);
   const images = useMemo(() => doc!.images.filter(i => i.cat === folder && !i.archived), [doc, folder]);
   const archivedImages = useMemo(() => doc!.images.filter(i => i.cat === folder && i.archived), [doc, folder]);
   const setArchived = (slug: string, on: boolean) => void updateSiteLive(d => ({ ...d, images: d.images.map(x => x.slug === slug ? (on ? { ...x, archived: true, hidden: true } : { ...x, archived: false, hidden: false }) : x) }))
@@ -381,8 +386,10 @@ function Portfolio(){
         <div className="row between">
           <div>{renaming !== null
             ? <input autoFocus aria-label="Folder name" value={renaming} maxLength={70} onChange={e => setRenaming(e.target.value)} onBlur={renameFolder} onKeyDown={e => { if (e.key === 'Enter') renameFolder(); if (e.key === 'Escape') setRenaming(null); }} />
-            : <h2 className="section-title">{folder || 'No folder'}</h2>}<p className="faint">{images.length} image{images.length === 1 ? '' : 's'}{images.some(i => i.hidden) ? ` (${images.filter(i => i.hidden).length} hidden)` : ''} · drag to reorder · the star picks the stack cover · the eye hides an image · the box archives it (kept here, off the site) · the grip moves it anywhere in the stack, or to another stack</p></div>
-          <div className="row"><button type="button" className="btn sm ghost" onClick={() => setRenaming(folder)}>Rename</button><button type="button" className="btn sm ghost" onClick={removeFolder}>Remove</button></div>
+            : <h2 className="section-title">{folder || 'No folder'}</h2>}<p className="faint">{images.length} image{images.length === 1 ? '' : 's'}{images.some(i => i.hidden) ? ` (${images.filter(i => i.hidden).length} hidden)` : ''} · drag to reorder · the star picks the stack cover · the eye hides an image · the box archives it (kept here, off the site) · the grip moves it · the arrow-down icon turns its download on or off · the editor can sell it in the store</p></div>
+          <div className="row"><button type="button" className="btn sm ghost" title="Let visitors download every image in this stack" onClick={() => setDownloads(images.map(x => x.slug), true)}>Allow all downloads</button>
+            <button type="button" className="btn sm ghost" title="Turn downloads off for every image in this stack" onClick={() => setDownloads(images.map(x => x.slug), false)}>No downloads</button>
+            <button type="button" className="btn sm ghost" onClick={() => setRenaming(folder)}>Rename</button><button type="button" className="btn sm ghost" onClick={removeFolder}>Remove</button></div>
         </div>
         <Uploader kind="image" accept="image/png,image/jpeg,image/webp,image/avif" label={`Add images to “${folder}”`} multiple onUploaded={uploaded}>PNG, JPG, WebP or AVIF, up to 10 MB. Large images are shown sharp on 4K screens.</Uploader>
         {!images.length ? <Empty icon="image" title="This folder is empty">Upload images above; they appear on the site after you publish.</Empty> : (
@@ -391,12 +398,14 @@ function Portfolio(){
               <li key={i.slug} draggable onDragStart={() => setDragSlug(i.slug)} onDragEnd={() => setDragSlug(null)} onDragOver={e => e.preventDefault()}
                 onDrop={() => { if (dragSlug && dragSlug !== i.slug) moveImage(dragSlug, i.slug); }} className={(dragSlug === i.slug ? 'dragging' : '') + (i.hidden ? ' is-hidden' : '')}>
                 <button type="button" className="pf-thumb" onClick={() => setEditing(i.slug)} aria-label={`Edit ${i.title}`}><img src={thumb(i)} alt="" loading="lazy" decoding="async" /></button>
-                {i.hidden && <Badge>Hidden</Badge>}
+                <span className="pf-badges">{i.hidden && <Badge>Hidden</Badge>}{i.downloadable === false && <Badge>No download</Badge>}{listed.has(i.slug) && <Badge tone="accent">In store</Badge>}</span>
                 <div className="pf-meta"><span className="truncate">{i.title}</span>
                   <button type="button" className="icon-btn sm" aria-pressed={!!i.hidden} aria-label={i.hidden ? 'Show on the site' : 'Hide from the site'} title={i.hidden ? 'Hidden: show on the site' : 'Hide from the site'}
                     onClick={() => void updateSiteLive(d => ({ ...d, images: d.images.map(x => x.slug === i.slug ? { ...x, hidden: !x.hidden } : x) })).then(live => toast.show(live ? (i.hidden ? 'Shown on the site now' : 'Hidden from the site now') : 'Changed. Press Publish changes to put it live.', { tone: 'success' })).catch(toast.error)}><Icon name={i.hidden ? 'eyeOff' : 'eye'} size={13} /></button>
                   <button type="button" className={'icon-btn sm' + (cover === i.slug ? ' star-on' : '')} aria-pressed={cover === i.slug} aria-label={cover === i.slug ? 'Stack cover' : 'Use as stack cover'} title="Stack cover"
                     onClick={() => updateSite(d => ({ ...d, stacks: { ...d.stacks, covers: { ...d.stacks.covers, [folder]: cover === i.slug ? '' : i.slug } } }))}><Icon name="star" size={13} /></button>
+                  <button type="button" className="icon-btn sm" aria-pressed={i.downloadable !== false} aria-label={i.downloadable === false ? 'Allow downloads of this image' : 'Turn off downloads of this image'} title={i.downloadable === false ? 'Downloads are off: click to allow' : 'Visitors can download it: click to turn off'}
+                    style={{ opacity: i.downloadable === false ? 0.45 : 1 }} onClick={() => setDownloads([i.slug], i.downloadable === false)}><Icon name="downloads" size={13} /></button>
                   <button type="button" className="icon-btn sm" aria-label={`Archive ${i.title}`} title="Archive: take it off the site, keep it here" onClick={() => setArchived(i.slug, true)}><Icon name="archive" size={13} /></button>
                   <button type="button" className="icon-btn sm" aria-label={`Move ${i.title}`} title="Move: to another place in this stack, or to another stack" onClick={() => setMoving(i.slug)}><Icon name="drag" size={13} /></button></div>
               </li>
@@ -458,6 +467,7 @@ function ImageEditor({ slug, onClose }: { slug: string; onClose: () => void }){
           <Switch checked={f.downloadable !== false} onChange={v => setF({ ...f, downloadable: v })} label="Visitors may download this image" />
         </div>
       </div>
+      <SellImage f={f} setF={setF} />
       <section className="stack" aria-label="Stack preview">
         <b>Stack preview</b>
         <p className="field-hint" style={{ margin: 0 }}>Click the picture to choose what stays in view on its card in the stack, and zoom in to crop closer. The card on the right shows the result.</p>
@@ -473,6 +483,50 @@ function ImageEditor({ slug, onClose }: { slug: string; onClose: () => void }){
       <Field label="Description"><textarea rows={4} value={f.description} onChange={e => setF({ ...f, description: e.target.value })} maxLength={4000} /></Field>
       <Field label="Tools"><TagInput label="Tools" value={f.technologies} onChange={v => setF({ ...f, technologies: v })} placeholder="Photoshop, Blender…" /></Field>
     </Modal>
+  );
+}
+
+// Sell a gallery image as a product without leaving the gallery; optionally take it off the gallery at the same time.
+function SellImage({ f, setF }: { f: SiteImage; setF: (v: SiteImage) => void }){
+  const toast = useToast();
+  const desk = useDesk();
+  const found = useLoad<{ products: { id: string; title: string; status: string; tags: string[] }[] }>('/products?kind=artzz');
+  const product = found.data?.products.find(p => p.tags.includes(`from-gallery:${f.slug}`));
+  const [inr, setInr] = useState<number | null>(null);
+  const [usd, setUsd] = useState<number | null>(null);
+  const [publish, setPublish] = useState(false);
+  const [hide, setHide] = useState(false);
+  const ready = inr !== null && usd !== null && inr > 0 && usd > 0;
+  const go = async () => {
+    try {
+      const r = await post<{ product: { id: string; status: string; file: unknown } }>(`/gallery/${encodeURIComponent(f.slug)}/sell`, { priceInr: inr, priceUsd: usd, publish });
+      if (hide){ await updateSiteLive(d => ({ ...d, images: d.images.map(x => x.slug === f.slug ? { ...x, hidden: true } : x) })); setF({ ...f, hidden: true }); }
+      toast.show(r.product.status === 'published' ? 'In the store and live' : r.product.file ? 'Added to the store as a draft. Publish it from Products.' : 'Added to the store as a draft. Upload its file in Products before publishing.', { tone: 'success' });
+      await found.reload();
+    } catch (e: any){
+      if (e.code === 'exists') await found.reload();
+      toast.error(e);
+    }
+  };
+  return (
+    <section className="stack card" aria-label="Sell this image">
+      <b>Sell this image</b>
+      {!found.data ? <p className="field-hint" style={{ margin: 0 }}>Checking the store…</p> : product ? (
+        <div className="row between" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <span>It is in the store <Badge>{product.status}</Badge></span>
+          <button type="button" className="btn sm" onClick={() => desk.open('products', product.id)}>Open the product</button>
+        </div>
+      ) : <>
+        <p className="field-hint" style={{ margin: 0 }}>Makes a product from this picture, and the picture is what buyers download. You set the price here; everything else can be changed later in Products.</p>
+        <div className="form-grid">
+          <Field label="Price in India"><MoneyInput currency="INR" label="INR price" value={inr} onChange={setInr} placeholder="499.00" /></Field>
+          <Field label="Price elsewhere"><MoneyInput currency="USD" label="USD price" value={usd} onChange={setUsd} placeholder="9.00" /></Field>
+        </div>
+        <Switch checked={publish} onChange={setPublish} label="Put it on sale right away (needs both prices)" disabled={!ready} />
+        <Switch checked={hide} onChange={setHide} label="Take it off the gallery (it stays in the store)" />
+        <div><AsyncButton className="btn primary" disabled={!ready && publish} onClick={go}>Add to the store</AsyncButton></div>
+      </>}
+    </section>
   );
 }
 
