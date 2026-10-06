@@ -69,6 +69,10 @@ function ToastItem({ t, onDone }: { t: Toast; onDone: () => void }){
 
 // ---- modal + confirm -----------------------------------------------------------------------------
 export function useFocusTrap(ref: React.RefObject<HTMLElement>, active: boolean, onEscape?: () => void){
+  // The latest Escape handler lives in a ref. Callers pass a new inline function on every render, and as an effect
+  // dependency it re-ran the trap after each keystroke: the cleanup gave focus back to the page and the setup then
+  // jumped to the first field, so typing kept leaving the field you were in.
+  const esc = useRef(onEscape); esc.current = onEscape;
   useEffect(() => {
     if (!active || !ref.current) return;
     const root = ref.current, before = document.activeElement as HTMLElement | null;
@@ -76,7 +80,7 @@ export function useFocusTrap(ref: React.RefObject<HTMLElement>, active: boolean,
     // keep focus React's autoFocus already placed inside; else a [data-autofocus] element; else the first control
     if (!root.contains(document.activeElement)) (root.querySelector<HTMLElement>('[data-autofocus]') || focusables()[0] || root).focus();
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && onEscape){ e.stopPropagation(); onEscape(); return; }
+      if (e.key === 'Escape' && esc.current){ e.stopPropagation(); esc.current(); return; }
       if (e.key !== 'Tab') return;
       const f = focusables(); if (!f.length) return;
       const first = f[0], last = f[f.length - 1];
@@ -85,7 +89,7 @@ export function useFocusTrap(ref: React.RefObject<HTMLElement>, active: boolean,
     };
     root.addEventListener('keydown', key);
     return () => { root.removeEventListener('keydown', key); if (before && document.contains(before)) before.focus(); };
-  }, [active, ref, onEscape]);
+  }, [active, ref]);
 }
 
 export function Modal({ title, children, onClose, footer, wide, labelledBy }: { title: string; children: ReactNode; onClose: () => void; footer?: ReactNode; wide?: boolean; labelledBy?: string }){
