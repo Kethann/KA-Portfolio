@@ -138,16 +138,22 @@
   .folder-btn{ width:auto; flex:none; white-space:nowrap; }
   .folder-nav > .row{ display:none; }
 }
-.pf-grid{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(min(150px, 100%), 1fr)); gap:var(--sp-3); }
-.pf-grid li{ display:grid; gap:4px; position:relative; }
+.pf-grid{ --pf-min:180px; list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(min(var(--pf-min), 100%), 1fr)); gap:var(--sp-4) var(--sp-3); align-items:start; }
+.pf-grid.size-s{ --pf-min:130px; } .pf-grid.size-l{ --pf-min:260px; }
+.pf-grid li{ display:grid; gap:6px; position:relative; min-width:0; padding:6px; border-radius:var(--r-md); background:var(--surface-2, rgba(255,255,255,.03)); border:1px solid var(--border, rgba(255,255,255,.08)); }
 .pf-grid li.dragging{ opacity:.4; }
 .pf-grid li.is-hidden .pf-thumb img{ opacity:.35; filter:grayscale(1); }
-.pf-grid .badge{ position:absolute; top:6px; left:6px; }
-.pf-thumb{ padding:0; border:0; border-radius:var(--r-sm); overflow:hidden; aspect-ratio:3/4; background:var(--surface-2); cursor:grab; }
-.pf-thumb img{ width:100%; height:100%; object-fit:cover; transition:transform var(--dur-3) var(--ease-out); }
+.pf-thumb{ display:block; width:100%; padding:0; border:0; border-radius:var(--r-sm); overflow:hidden; aspect-ratio:3/4; background:rgba(0,0,0,.35); cursor:grab; }
+.pf-thumb img{ display:block; width:100%; height:100%; object-fit:cover; transition:transform var(--dur-3) var(--ease-out); }
 .pf-thumb:hover img{ transform:scale(1.03); }
-.pf-meta{ display:flex; align-items:center; gap:4px; font-size:var(--fs-xs); }
-.pf-meta .truncate{ flex:1; }
+.pf-grid.fit-whole .pf-thumb{ aspect-ratio:1 / 1; }
+.pf-grid.fit-whole .pf-thumb img{ object-fit:contain; }
+.pf-grid.fit-whole .pf-thumb:hover img{ transform:none; }
+.pf-badges{ position:absolute; top:12px; left:12px; display:flex; gap:4px; flex-wrap:wrap; pointer-events:none; }
+.pf-grid .pf-badges .badge{ position:static; }
+/* the title on its own line, the buttons below it: nothing runs into the next tile */
+.pf-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:2px 4px; font-size:var(--fs-xs); min-width:0; }
+.pf-meta .truncate{ flex:1 1 100%; min-width:0; }
 .star-on{ color:var(--accent-text) !important; background:var(--accent-soft) !important; }
 .img-edit{ display:grid; grid-template-columns:minmax(0, 200px) 1fr; gap:var(--sp-4); align-items:start; }
 .img-edit img{ width:100%; border-radius:var(--r-sm); }
@@ -384,5 +390,3 @@
 .focus-card{ width:132px; aspect-ratio:3 / 4; border-radius:12px; overflow:hidden; border:1px solid var(--line, rgba(255,255,255,.14)); flex:none; }
 .focus-card img{ width:100%; height:100%; object-fit:cover; display:block; }
 
-.pf-badges{ position:absolute; top:8px; left:8px; display:flex; gap:4px; flex-wrap:wrap; pointer-events:none; }
-.pf-grid .pf-badges .badge{ position:static; }

@@ -2,9 +2,9 @@
 // and every email the site sends.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppProps } from './registry';
-import { useDraft, useLoad, useUnsavedGuard } from '../hooks';
+import { useDraft, useLoad, usePref, useUnsavedGuard } from '../hooks';
 import { del, get, post, put, upload } from '../api';
-import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, SkeletonRows, Switch, useConfirm, useToast } from '../ui';
+import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, Segmented, SkeletonRows, Switch, useConfirm, useToast } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
 import { MoneyInput, TagInput, Uploader, useSaveKey } from './common';
@@ -326,6 +326,8 @@ function Portfolio(){
   useEffect(() => { if (!doc!.folders.includes(folder)) setFolder(doc!.folders[0] || ''); }, [doc, folder]);
   const [showArchived, setShowArchived] = useState(false);
   const [moving, setMoving] = useState<string | null>(null);
+  const [size, setSize] = usePref<'s' | 'm' | 'l'>('portfolio.tileSize', 'm');       // how big each preview is
+  const [whole, setWhole] = usePref<boolean>('portfolio.tileWhole', false);       // show the whole picture (landscape ones too) instead of filling the tile
   const inStore = useLoad<{ products: { id: string; tags: string[]; status: string }[] }>('/products?kind=artzz');
   const listed = useMemo(() => new Set((inStore.data?.products || []).flatMap(p => p.tags.filter(t => t.startsWith('from-gallery:')).map(t => t.slice(13)))), [inStore.data]);
   const setDownloads = (slugs: string[], on: boolean) => void updateSiteLive(d => ({ ...d, images: d.images.map(x => slugs.includes(x.slug) ? { ...x, downloadable: on } : x) }))
@@ -392,12 +394,16 @@ function Portfolio(){
             <button type="button" className="btn sm ghost" onClick={() => setRenaming(folder)}>Rename</button><button type="button" className="btn sm ghost" onClick={removeFolder}>Remove</button></div>
         </div>
         <Uploader kind="image" accept="image/png,image/jpeg,image/webp,image/avif" label={`Add images to “${folder}”`} multiple onUploaded={uploaded}>PNG, JPG, WebP or AVIF, up to 10 MB. Large images are shown sharp on 4K screens.</Uploader>
+        {images.length > 0 && <div className="row" style={{ gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Segmented label="Preview size" value={size} onChange={setSize} options={[{ value: 's', label: 'Small' }, { value: 'm', label: 'Medium' }, { value: 'l', label: 'Large' }]} />
+          <Switch checked={whole} onChange={setWhole} label="Show each whole picture" />
+        </div>}
         {!images.length ? <Empty icon="image" title="This folder is empty">Upload images above; they appear on the site after you publish.</Empty> : (
-          <ul className="pf-grid">
+          <ul className={'pf-grid size-' + size + (whole ? ' fit-whole' : '')}>
             {images.map(i => (
               <li key={i.slug} draggable onDragStart={() => setDragSlug(i.slug)} onDragEnd={() => setDragSlug(null)} onDragOver={e => e.preventDefault()}
                 onDrop={() => { if (dragSlug && dragSlug !== i.slug) moveImage(dragSlug, i.slug); }} className={(dragSlug === i.slug ? 'dragging' : '') + (i.hidden ? ' is-hidden' : '')}>
-                <button type="button" className="pf-thumb" onClick={() => setEditing(i.slug)} aria-label={`Edit ${i.title}`}><img src={thumb(i)} alt="" loading="lazy" decoding="async" /></button>
+                <button type="button" className="pf-thumb" onClick={() => setEditing(i.slug)} aria-label={`Edit ${i.title}`}><img src={thumb(i)} alt="" loading="lazy" decoding="async" style={!whole && (i.focusX !== undefined || i.focusY !== undefined || i.zoom) ? { objectPosition: `${i.focusX ?? 50}% ${i.focusY ?? 50}%`, transformOrigin: `${i.focusX ?? 50}% ${i.focusY ?? 50}%`, ...(i.zoom && i.zoom > 1 ? { transform: `scale(${i.zoom})` } : {}) } : undefined} /></button>
                 <span className="pf-badges">{i.hidden && <Badge>Hidden</Badge>}{i.downloadable === false && <Badge>No download</Badge>}{listed.has(i.slug) && <Badge tone="accent">In store</Badge>}</span>
                 <div className="pf-meta"><span className="truncate">{i.title}</span>
                   <button type="button" className="icon-btn sm" aria-pressed={!!i.hidden} aria-label={i.hidden ? 'Show on the site' : 'Hide from the site'} title={i.hidden ? 'Hidden: show on the site' : 'Hide from the site'}
@@ -415,7 +421,7 @@ function Portfolio(){
         {archivedImages.length > 0 && <section className="card stack" aria-label="Archived images">
           <div className="row between"><b>Archived ({archivedImages.length})</b>
             <button type="button" className="btn sm ghost" aria-expanded={showArchived} onClick={() => setShowArchived(v => !v)}>{showArchived ? 'Hide list' : 'Show list'}</button></div>
-          {showArchived && <ul className="pf-grid">{archivedImages.map(i => (
+          {showArchived && <ul className={'pf-grid size-' + size + (whole ? ' fit-whole' : '')}>{archivedImages.map(i => (
             <li key={i.slug} className="is-hidden">
               <button type="button" className="pf-thumb" onClick={() => setEditing(i.slug)} aria-label={`Edit ${i.title}`}><img src={thumb(i)} alt="" loading="lazy" decoding="async" /></button>
               <Badge>Archived</Badge>
