@@ -12,7 +12,7 @@ import { discardSite, keepMineOverTheirs, loadSite, saveSite, thumb, updateSite,
 import { SKILL_ICONS, SKILL_LIMITS } from './siteDoc';
 import type { SkillsDraft } from './siteDoc';
 import type { SiteImage, StatItem, SkillCategory, SkillItem, AboutDraft, JourneyStep, ReelVideo } from './siteDoc';
-import { ABOUT_LIMITS, aboutDefaults } from './siteDoc';
+import { ABOUT_LIMITS, aboutDefaults, updateSiteLive } from './siteDoc';
 import { ago, dateTime } from '../format';
 import { SKILL_LOGO_LIST, skillLogoFor, type SkillLogo } from '../../../../shared/skill-logos.js';
 
@@ -388,7 +388,7 @@ function Portfolio(){
                 {i.hidden && <Badge>Hidden</Badge>}
                 <div className="pf-meta"><span className="truncate">{i.title}</span>
                   <button type="button" className="icon-btn sm" aria-pressed={!!i.hidden} aria-label={i.hidden ? 'Show on the site' : 'Hide from the site'} title={i.hidden ? 'Hidden: show on the site' : 'Hide from the site'}
-                    onClick={() => updateSite(d => ({ ...d, images: d.images.map(x => x.slug === i.slug ? { ...x, hidden: !x.hidden } : x) }))}><Icon name={i.hidden ? 'eyeOff' : 'eye'} size={13} /></button>
+                    onClick={() => void updateSiteLive(d => ({ ...d, images: d.images.map(x => x.slug === i.slug ? { ...x, hidden: !x.hidden } : x) })).then(live => toast.show(live ? (i.hidden ? 'Shown on the site now' : 'Hidden from the site now') : 'Changed. Press Publish changes to put it live.', { tone: 'success' })).catch(toast.error)}><Icon name={i.hidden ? 'eyeOff' : 'eye'} size={13} /></button>
                   <button type="button" className={'icon-btn sm' + (cover === i.slug ? ' star-on' : '')} aria-pressed={cover === i.slug} aria-label={cover === i.slug ? 'Stack cover' : 'Use as stack cover'} title="Stack cover"
                     onClick={() => updateSite(d => ({ ...d, stacks: { ...d.stacks, covers: { ...d.stacks.covers, [folder]: cover === i.slug ? '' : i.slug } } }))}><Icon name="star" size={13} /></button></div>
               </li>
@@ -405,6 +405,7 @@ function Portfolio(){
 function ImageEditor({ slug, onClose }: { slug: string; onClose: () => void }){
   const { doc } = useSite();
   const confirm = useConfirm();
+  const toast = useToast();
   const img = doc!.images.find(i => i.slug === slug);
   const [f, setF] = useState<SiteImage | null>(img ? { ...img } : null);
   const [start] = useState(() => JSON.stringify(img || null));
@@ -414,8 +415,10 @@ function ImageEditor({ slug, onClose }: { slug: string; onClose: () => void }){
   const apply = () => { updateSite(d => ({ ...d, images: d.images.map(i => i.slug === slug ? { ...f, id: f.slug } : i) })); onClose(); };
   return (
     <Modal wide title="Edit image" onClose={() => void close()} footer={<>
-      <button type="button" className="btn ghost" style={{ marginRight: 'auto', color: 'var(--danger)' }} onClick={async () => { if (await confirm({ title: `Remove “${f.title}” from the site?`, body: 'It disappears when you publish. The file stays in storage.', confirm: 'Remove', danger: true })){ updateSite(d => ({ ...d, images: d.images.filter(i => i.slug !== slug),
-        stacks: { ...d.stacks, covers: Object.fromEntries(Object.entries(d.stacks.covers).map(([k, v]) => [k, v === slug ? '' : v])) } })); onClose(); } }}><Icon name="trash" /> Remove</button>
+      <button type="button" className="btn ghost" style={{ marginRight: 'auto', color: 'var(--danger)' }} onClick={async () => { if (await confirm({ title: `Remove “${f.title}” from the site?`, body: 'It disappears from the site right away. The file stays in storage.', confirm: 'Remove', danger: true })){ onClose(); try {
+        const live = await updateSiteLive(d => ({ ...d, images: d.images.filter(i => i.slug !== slug),
+          stacks: { ...d.stacks, covers: Object.fromEntries(Object.entries(d.stacks.covers).map(([k, v]) => [k, v === slug ? '' : v])) } }));
+        toast.show(live ? 'Removed from the site now' : 'Removed. Press Publish changes to put it live.', { tone: 'success' }); } catch (e){ toast.error(e); } } }}><Icon name="trash" /> Remove</button>
       <button type="button" className="btn" onClick={() => void close()}>Cancel</button>
       <button type="button" className="btn primary" onClick={apply}>Done</button>
     </>}>

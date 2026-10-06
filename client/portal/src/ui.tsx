@@ -20,11 +20,19 @@ export function ToastProvider({ children }: { children: ReactNode }){
     setItems(x => [...x.slice(-3), { id, text, tone: o.tone || 'info', action: o.action, ms: o.ms ?? (o.tone === 'error' ? 7000 : 4000) }]);
   }, []);
   const error = useCallback((err: unknown) => show((err as any)?.message || String(err), { tone: 'error' }), [show]);
-  // Optimistic delete/archive: the change shows at once; the server call waits out the Undo window.
+  // Optimistic delete: it shows at once and the server call waits out the Undo window. If the tab is hidden or closed
+  // while it waits, the delete is sent right then, so a delete is never lost.
+  const pending = useRef(new Set<() => void>());
+  useEffect(() => {
+    const flush = () => { if (document.visibilityState === 'hidden') [...pending.current].forEach(f => f()); };
+    document.addEventListener('visibilitychange', flush); addEventListener('pagehide', flush);
+    return () => { document.removeEventListener('visibilitychange', flush); removeEventListener('pagehide', flush); };
+  }, []);
   const undoable = useCallback<ToastApi['undoable']>((text, commit, revert, ms = 5000) => {
-    let undone = false;
-    const timer = setTimeout(async () => { if (undone) return; try { await commit(); } catch (e){ revert(); error(e); } }, ms);
-    show(text, { ms, action: { label: 'Undo', run: () => { undone = true; clearTimeout(timer); revert(); } } });
+    let undone = false, sent = false, timer = 0;
+    const run = async () => { if (undone || sent) return; sent = true; clearTimeout(timer); pending.current.delete(run); try { await commit(); } catch (e){ revert(); error(e); } };
+    pending.current.add(run); timer = window.setTimeout(run, ms);
+    show(text, { ms, action: { label: 'Undo', run: () => { if (sent) return; undone = true; clearTimeout(timer); pending.current.delete(run); revert(); } } });
   }, [show, error]);
   const api = useMemo(() => ({ show, error, undoable }), [show, error, undoable]);
   return (

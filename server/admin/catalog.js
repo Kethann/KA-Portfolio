@@ -101,7 +101,8 @@ export async function listProducts(ctx){
   const kind = ctx.url.searchParams.get('kind');
   if (kind && kind !== 'artzz' && kind !== 'artifacts') throw new HttpError(400, 'Unknown section.');
   const db = await getDb();
-  const rows = await db.query(`${LIST_SELECT} where ($1 is null or p.kind = $1) and p.status <> 'archived' order by p.kind, p.sort, p.created_at desc`, [kind || null]);
+  const archived = ctx.url.searchParams.get('status') === 'archived';   // the Archived view: items hidden because they were sold, with Restore
+  const rows = await db.query(`${LIST_SELECT} where ($1 is null or p.kind = $1) and p.status ${archived ? '=' : '<>'} 'archived' order by p.kind, p.sort, p.created_at desc`, [kind || null]);
   return json({ products: rows.map(adminDto) });
 }
 

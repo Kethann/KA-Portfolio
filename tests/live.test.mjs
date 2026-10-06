@@ -43,3 +43,25 @@ test('a publish moves the live version and the next read has the new content', a
   assert.equal(stale.status, 409);
   assert.equal((await app.call('GET', '/api/live')).json.v, v1);
 });
+
+test('delete and archive from the portal show on the public store at once, and archived items can be listed and restored', async () => {
+  const cat = (await app.pg.query(`insert into categories (kind, name, slug) values ('artifacts', 'Kits', 'kits') returning id`)).rows[0];
+  const add = async (slug) => (await app.pg.query(`insert into products (kind, slug, title, status, category_id) values ('artifacts', $1, $1, 'published', $2) returning id`, [slug, cat.id])).rows[0].id;
+  const gone = await add('unsold-kit'), sold = await add('sold-kit');
+  await app.pg.query(`insert into orders (id, public_id, email, currency, subtotal, total, status) values ('o-live-1', 'KA-LIVE0001', 'b@example.com', 'INR', 100, 100, 'paid')`);
+  await app.pg.query(`insert into order_items (order_id, product_id, title, unit_price, total) values ('o-live-1', $1, 'sold-kit', 100, 100)`, [sold]);
+  const slugs = async () => (await app.call('GET', '/api/store/catalog')).json.products.map(p => p.slug);
+  assert.ok((await slugs()).includes('unsold-kit') && (await slugs()).includes('sold-kit'));
+  const v0 = (await app.call('GET', '/api/live')).json.v;
+  assert.equal((await admin('DELETE', `/api/admin/products/${gone}`)).status, 200);
+  assert.equal((await admin('DELETE', `/api/admin/products/${sold}`)).json.archived, true);
+  const after = await slugs();
+  assert.ok(!after.includes('unsold-kit') && !after.includes('sold-kit'), 'neither is on the store any more');
+  assert.ok((await app.call('GET', '/api/live')).json.v > v0, 'open pages are told');
+  assert.equal((await app.call('GET', '/api/store/product/sold-kit')).status, 404);
+  const normal = (await admin('GET', '/api/admin/products')).json.products.map(p => p.slug);
+  const archived = (await admin('GET', '/api/admin/products?status=archived')).json.products.map(p => p.slug);
+  assert.ok(!normal.includes('sold-kit') && archived.includes('sold-kit') && !archived.includes('unsold-kit'));
+  assert.equal((await admin('POST', `/api/admin/products/${sold}/restore`)).status, 200);
+  assert.ok((await admin('GET', '/api/admin/products')).json.products.some(p => p.slug === 'sold-kit'), 'restored as a draft');
+});

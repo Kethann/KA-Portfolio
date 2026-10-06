@@ -61,6 +61,15 @@ function withDefaults(d: SiteDoc): SiteDoc {
     skills: d.skills ? { enabled: d.skills.enabled !== false, title: d.skills.title || 'Skills', intro: d.skills.intro || '', categories: d.skills.categories || [] } : { enabled: true, title: 'Skills', intro: '', categories: [] }, about: d.about ? { ...aboutDefaults(), ...d.about, journey: { ...ABOUT_DEFAULT.journey, ...(d.about.journey || {}) }, reel: { ...ABOUT_DEFAULT.reel, ...(d.about.reel || {}) } } : aboutDefaults(), details: { ...d.details, customFonts: d.details?.customFonts || [] } };
 }
 export function updateSite(fn: (d: SiteDoc) => SiteDoc){ if (state.doc) emit({ doc: fn(state.doc) }); }
+// A hide or a removal goes live at once, so the site matches what the owner just did. If other edits are still unsaved the
+// draft keeps them apart (nothing half-finished is published by accident) and the caller says to press Publish.
+export async function updateSiteLive(fn: (d: SiteDoc) => SiteDoc): Promise<boolean>{
+  const clean = !!state.doc && norm(state.doc) === state.saved;
+  updateSite(fn);
+  if (!clean) return false;
+  await saveSite();
+  return true;
+}
 export function discardSite(){ if (state.saved) emit({ doc: { ...JSON.parse(state.saved), revision: state.doc!.revision } }); }
 let inFlight: Promise<void> | null = null;
 export function saveSite(): Promise<void>{

@@ -18,7 +18,7 @@ type Product = {
   licenseId: string | null; license: string | null; demoUrl: string; previewUrl: string; maxDownloads: number; linkTtlHours: number; refundAfterDownload: boolean;
   sort: number; media: Media[]; file: { id: string; filename: string; bytes: number; licenseVersion: number | null; createdAt: string } | null; sales: number; updatedAt: string; publishedAt: string | null;
 };
-type Kind = 'all' | 'artzz' | 'artifacts';
+type Kind = 'all' | 'artzz' | 'artifacts' | 'archived';
 
 export default function Products({ route, go, active, open }: AppProps){
   if (route === 'new') return <NewProduct go={go} />;
@@ -30,7 +30,7 @@ function List({ go }: { go: (r: string) => void }){
   const [kind, setKind] = usePref<Kind>('products.kind', 'all');
   const [view, setView] = usePref<'grid' | 'list'>('products.view', 'grid');
   const [q, setQ] = useState('');
-  const s = useLoad<{ products: Product[] }>(`/products${kind === 'all' ? '' : `?kind=${kind}`}`);
+  const s = useLoad<{ products: Product[] }>(`/products${kind === 'archived' ? '?status=archived' : kind === 'all' ? '' : `?kind=${kind}`}`);
   const toast = useToast();
   const [dragId, setDragId] = useState<string | null>(null);
   const items = useMemo(() => (s.data?.products || []).filter(p => !q || (p.title + ' ' + p.slug + ' ' + p.tags.join(' ')).toLowerCase().includes(q.toLowerCase())), [s.data, q]);
@@ -50,7 +50,7 @@ function List({ go }: { go: (r: string) => void }){
     <div className="app">
       <WinTools><button type="button" className="btn primary sm" onClick={() => go('new')}><Icon name="plus" /> New</button></WinTools>
       <div className="app-toolbar">
-        <Segmented label="Section" value={kind} onChange={setKind} options={[{ value: 'all', label: 'All' }, { value: 'artzz', label: 'Artzz' }, { value: 'artifacts', label: 'Artifacts' }]} />
+        <Segmented label="Section" value={kind} onChange={setKind} options={[{ value: 'all', label: 'All' }, { value: 'artzz', label: 'Artzz' }, { value: 'artifacts', label: 'Artifacts' }, { value: 'archived', label: 'Archived' }]} />
         <SearchBox value={q} onChange={setQ} placeholder="Search titles and tags" label="Search products" />
         <span className="grow" />
         <Segmented label="View" value={view} onChange={setView} options={[{ value: 'grid', label: <Icon name="grid" label="Grid" /> }, { value: 'list', label: <Icon name="list" label="List" /> }]} />
@@ -205,8 +205,8 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
   const remove = async () => {
     if (!(await confirm({ title: `Delete “${p.title}”?`, body: p.sales ? 'It has sales, so it will be archived (hidden, orders keep working). You can restore it later.' : 'This draft and its files will be removed.', confirm: p.sales ? 'Archive' : 'Delete', danger: true }))) return;
     if (p.sales){ await del(`/products/${id}`); toast.show('Archived', { action: { label: 'Undo', run: () => { void post(`/products/${id}/restore`).then(() => toast.show('Restored as a draft', { tone: 'success' })).catch(toast.error); } } }); go(''); return; }
-    go('');
-    toast.undoable(`Deleted “${p.title}”`, () => del(`/products/${id}`), () => go(id));
+    await del(`/products/${id}`);   // gone from the store at once; the confirmation above is the safeguard
+    toast.show(`Deleted “${p.title}”`, { tone: 'success' }); go('');
   };
 
   // Deliverable: optionally repackaged so LICENSE.txt travels inside the download.
@@ -243,7 +243,8 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
           title={p.title || 'Untitled'} meta={<><Badge tone={STATUS_TONE[saved.status]}>{saved.status}</Badge><span className="faint">{p.kind === 'artzz' ? 'Artzz' : 'Artifacts'} · /?product={saved.slug} · updated {ago(saved.updatedAt)}</span></>}>
           {saved.status === 'published' && <a className="btn sm ghost" href={`/?product=${encodeURIComponent(saved.slug)}`} target="_blank" rel="noopener"><Icon name="external" /> View</a>}
           <AsyncButton className="btn sm ghost" onClick={async () => { const r = await post<{ product: Product }>(`/products/${id}/duplicate`); toast.show('Duplicated as a draft', { tone: 'success' }); go(r.product.id); }}><Icon name="copy" /> Duplicate</AsyncButton>
-          <button type="button" className="btn sm ghost" onClick={() => remove().catch(toast.error)}><Icon name="trash" /> Delete</button>
+          {saved.status === 'archived' && <AsyncButton className="btn sm" onClick={async () => { const r = await post<{ product: Product }>(`/products/${id}/restore`); s.setData(r); setDraft(r.product); toast.show('Restored as a draft', { tone: 'success' }); }}>Restore</AsyncButton>}
+          <button type="button" className="btn sm ghost" onClick={() => remove().catch(toast.error)}><Icon name="trash" /> {p.sales ? 'Archive' : 'Delete'}</button>
         </DetailHeader>
 
         <div className="editor-grid">

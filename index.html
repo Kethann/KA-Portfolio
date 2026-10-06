@@ -1399,7 +1399,7 @@ html.ka-modal-open{ overflow:hidden; }
   <div class="shop-shell">
     <div class="gallery-head">
       <h2 id="tips-title" data-ka-editable="tipsTitle">Tips</h2>
-      <p id="tips-intro" data-ka-editable="tipsIntro">Short notes on design and development.</p>
+      <p id="tips-intro" data-ka-editable="tipsIntro">Practical notes on design and photography: how to start, what to consider, and how light changes a picture.</p>
     </div>
     <div class="shop-root" id="tips-root" aria-busy="true"><p class="shop-loading">Loading tips…</p></div>
   </div>
@@ -8739,7 +8739,7 @@ loadPortfolioFromAPI();
     }).catch(function(){ busy = false; });
   }
   check();
-  timer = setInterval(check, 15000);
+  timer = setInterval(check, 8000);
   document.addEventListener("visibilitychange", function(){ if (!document.hidden) check(); });
   window.addEventListener("focus", check);
   window.addEventListener("online", check);

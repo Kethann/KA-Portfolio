@@ -27,9 +27,10 @@ export async function api<T = any>(method: string, path: string, body?: unknown,
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (method !== 'GET' && csrf) headers['X-CSRF-Token'] = csrf;
+  const payload = body === undefined ? undefined : JSON.stringify(body);   // small writes may finish even if the tab closes right after
   let res: Response;
   try {
-    res = await fetch('/api/admin' + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: 'same-origin', signal: opts.signal, cache: 'no-store' });
+    res = await fetch('/api/admin' + path, { method, headers, body: payload, credentials: 'same-origin', signal: opts.signal, cache: 'no-store', keepalive: method !== 'GET' && !!payload && payload.length < 30000 });
   } catch (err){
     if ((err as Error).name === 'AbortError') throw err;
     throw new ApiError(navigator.onLine ? 'Couldn’t reach the server. Try again in a moment.' : 'You’re offline. Check your connection.', 0, 'network');

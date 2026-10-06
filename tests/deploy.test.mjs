@@ -79,8 +79,9 @@ test('server code never reads project files at runtime (a Worker has no file sys
 
 test('a Git build of the repo is a complete Pages site: both builds stage out/ with the router and its route list', () => {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  assert.match(pkg.scripts.build, /node scripts\/stage-pages\.mjs$/);
-  assert.match(pkg.scripts['build:cf'], /node scripts\/stage-pages\.mjs$/);
+  assert.match(pkg.scripts['build:assets'], /node scripts\/stage-pages\.mjs$/);   // the shared build ends by staging out/
+  assert.ok(pkg.scripts.build.startsWith("npm run build:assets"));
+  assert.ok(pkg.scripts["build:cf"].startsWith("npm run build:assets"));
   const stage = readFileSync(new URL('../scripts/stage-pages.mjs', import.meta.url), 'utf8');
   for (const f of ['_worker.js', '_routes.json']) assert.ok(stage.includes(`'${f}'`), `${f} is copied into out/`);
   assert.match(readFileSync(new URL('../.gitignore', import.meta.url), 'utf8'), /^\/out\/$/m);
