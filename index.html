@@ -6278,12 +6278,36 @@ function renderLightbox(){
   // Per-image download permission (creator panel toggle, Part A) -- default true for any project
   // that predates the flag (see server/creator.js's downloadable!==false upgrade rule).
   var lbDownload = document.getElementById("lb-download");
+  // Gallery downloads are saved as PNG or JPEG (the owner's choice in the portal), never WebP: the picture is fetched, redrawn and saved.
+  function kaDlFormat(){ var f = window.KA_DL_CONFIG && window.KA_DL_CONFIG.format === "jpeg" ? "jpeg" : "png"; return { fmt: f, ext: f === "jpeg" ? "jpg" : "png", mime: f === "jpeg" ? "image/jpeg" : "image/png" }; }
+  if (!lbDownload.__kaDl){
+    lbDownload.__kaDl = true;
+    lbDownload.addEventListener("click", function(e){
+      if (!window.createImageBitmap || !window.fetch) return;   // an old browser: the plain link downloads the original
+      e.preventDefault();
+      var url = lbDownload.href, f = kaDlFormat(), name = (lbDownload.dataset.slug || "image") + "." + f.ext;
+      fetch(url).then(function(r){ if (!r.ok) throw new Error("HTTP " + r.status); return r.blob(); })
+        .then(function(b){ return createImageBitmap(b); })
+        .then(function(bmp){
+          var c = document.createElement("canvas"); c.width = bmp.width; c.height = bmp.height; var x = c.getContext("2d");
+          if (f.fmt === "jpeg"){ x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); }
+          x.drawImage(bmp, 0, 0);
+          return new Promise(function(res, rej){ c.toBlob(function(o){ o ? res(o) : rej(new Error("encode")); }, f.mime, f.fmt === "jpeg" ? 0.95 : undefined); });
+        })
+        .then(function(out){
+          var a = document.createElement("a"); a.href = URL.createObjectURL(out); a.download = name; a.style.display = "none";
+          document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(a.href); }, 5000);
+        })
+        .catch(function(){ var a = document.createElement("a"); a.href = url; a.download = (lbDownload.dataset.slug || "image") + ".webp"; document.body.appendChild(a); a.click(); a.remove(); });
+    });
+  }
   if (p.downloadable === false){
     lbDownload.hidden = true;
   } else {
     lbDownload.hidden = false;
     lbDownload.href = IMG_BASE + p.slug + "-full.webp";
-    lbDownload.download = (p.slug || "image") + ".webp";
+    lbDownload.download = (p.slug || "image") + "." + kaDlFormat().ext;
+    lbDownload.dataset.slug = p.slug || "image";
   }
   window.__kaCurrentProject = p.title; // AI assistant roadmap hook -- see the widget script below
 }
@@ -8716,6 +8740,7 @@ function applySiteAppearance(data){
   }
   if (typeof window !== "undefined"){
     window.kaAutoFullscreen = !(data.visibility && data.visibility.autoFullscreen === false);
+    window.KA_DL_CONFIG = Object.assign(window.KA_DL_CONFIG || {}, { format: data.visibility && data.visibility.downloadFormat === "jpeg" ? "jpeg" : "png" });
     window.kaPassCard = data.passCard || null;   // the checkout pass design (Studio > Checkout pass)
     // load the pass's fonts now (the browser would only fetch a font when it is first drawn, so the signature would flash in the wrong font)
     try {

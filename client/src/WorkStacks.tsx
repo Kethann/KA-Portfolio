@@ -187,8 +187,17 @@ const DL_DEFAULTS={minMs:700,resetMs:2000,style:'fill'};
 type DlState='idle'|'busy'|'done'|'error';
 function dlConfig(){return {...DL_DEFAULTS,...((window as unknown as {KA_DL_CONFIG?:Partial<typeof DL_DEFAULTS>}).KA_DL_CONFIG||{})};}
 const easeInOut=(t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
-function fileName(p:Project,url:string){
-  const ext=(/\.(webp|png|jpe?g|avif)(\?|$)/i.exec(url)?.[1]||'webp').toLowerCase().replace('jpeg','jpg');
+/** Downloads are PNG or JPEG (the owner's choice in the portal), never WebP: the picture is fetched, redrawn on a canvas and saved. */
+function dlFormat():{fmt:'png'|'jpeg';ext:string;mime:string}{const f=(window as unknown as {KA_DL_CONFIG?:{format?:string}}).KA_DL_CONFIG?.format==='jpeg'?'jpeg':'png';return {fmt:f,ext:f==='jpeg'?'jpg':'png',mime:f==='jpeg'?'image/jpeg':'image/png'};}
+async function toFormat(blob:Blob):Promise<Blob>{
+  const f=dlFormat(),bmp=await createImageBitmap(blob);
+  const c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;const x=c.getContext('2d')!;
+  if(f.fmt==='jpeg'){x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);}
+  x.drawImage(bmp,0,0);bmp.close?.();
+  return new Promise((res,rej)=>c.toBlob(o=>o?res(o):rej(new Error('encode')),f.mime,f.fmt==='jpeg'?0.95:undefined));
+}
+function fileName(p:Project,url:string,ext0?:string){
+  const ext=ext0||(/\.(webp|png|jpe?g|avif)(\?|$)/i.exec(url)?.[1]||'webp').toLowerCase().replace('jpeg','jpg');
   const base=(p.title||p.slug||'image').trim().replace(/[^\w\- ]+/g,'').replace(/\s+/g,'-').slice(0,80)||'image';
   return `${base}.${ext}`;
 }
@@ -196,10 +205,16 @@ async function fetchFile(p:Project,onProgress:(v:number)=>void){
   const url=p.src||imageUrl(p,true),name=fileName(p,url);
   const res=await fetch(url);if(!res.ok)throw new RangeError('HTTP '+res.status);   // a real server error: not worth retrying as a link
   const total=Number(res.headers.get('content-length'))||0;
-  if(!res.body||!total){const blob=await res.blob();onProgress(1);return {blob,name};}
-  const reader=res.body.getReader(),chunks:Uint8Array[]=[];let got=0;
-  for(;;){const {done,value}=await reader.read();if(done)break;chunks.push(value);got+=value.length;onProgress(Math.min(1,got/total));}
-  return {blob:new Blob(chunks as BlobPart[],{type:res.headers.get('content-type')||''}),name};
+  let blob:Blob;
+  if(!res.body||!total){blob=await res.blob();onProgress(1);}
+  else{
+    const reader=res.body.getReader(),chunks:Uint8Array[]=[];let got=0;
+    for(;;){const {done,value}=await reader.read();if(done)break;chunks.push(value);got+=value.length;onProgress(Math.min(1,got/total));}
+    blob=new Blob(chunks as BlobPart[],{type:res.headers.get('content-type')||''});
+  }
+  // re-save as PNG/JPEG; if the browser cannot, the original file is still delivered rather than nothing
+  try{if(typeof createImageBitmap==='function')return {blob:await toFormat(blob),name:fileName(p,url,dlFormat().ext)};}catch{/* keep the original */}
+  return {blob,name};
 }
 function saveBlob(file:{blob:Blob;name:string}){
   const a=document.createElement('a');a.href=URL.createObjectURL(file.blob);a.download=file.name;a.style.display='none';

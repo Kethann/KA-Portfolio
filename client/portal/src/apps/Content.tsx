@@ -481,9 +481,26 @@ function ImageEditor({ slug, onClose }: { slug: string; onClose: () => void }){
   );
 }
 
+// The picture as a PNG or JPEG file (the format chosen for downloads), made in the browser from the full-size original.
+async function pictureFile(f: SiteImage, fmt: 'png' | 'jpeg'): Promise<File | null>{
+  try {
+    const url = f.src || `/images/${f.slug}-${f.full ? 'full' : Math.max(...(f.widths?.length ? f.widths : [1600]))}.webp`;
+    const res = await fetch(url); if (!res.ok) return null;
+    const bmp = await createImageBitmap(await res.blob());
+    const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+    const x = c.getContext('2d')!; if (fmt === 'jpeg'){ x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); }
+    x.drawImage(bmp, 0, 0);
+    const blob: Blob | null = await new Promise(r => c.toBlob(r, fmt === 'jpeg' ? 'image/jpeg' : 'image/png', fmt === 'jpeg' ? 0.95 : undefined));
+    if (!blob) return null;
+    const base = (f.title || f.slug).trim().replace(/[^\w\- ]+/g, '').replace(/\s+/g, '-').slice(0, 80) || 'image';
+    return new File([blob], `${base}.${fmt === 'jpeg' ? 'jpg' : 'png'}`, { type: blob.type });
+  } catch { return null; }
+}
+
 // Sell a gallery image as a product without leaving the gallery; optionally take it off the gallery at the same time.
 function SellImage({ f, setF }: { f: SiteImage; setF: (v: SiteImage) => void }){
   const toast = useToast();
+  const site = useSite();
   const desk = useDesk();
   const found = useLoad<{ products: { id: string; title: string; status: string; tags: string[] }[] }>('/products?kind=artzz');
   const product = found.data?.products.find(p => p.tags.includes(`from-gallery:${f.slug}`));
@@ -494,7 +511,10 @@ function SellImage({ f, setF }: { f: SiteImage; setF: (v: SiteImage) => void }){
   const ready = inr !== null && usd !== null && inr > 0 && usd > 0;
   const go = async () => {
     try {
-      const r = await post<{ product: { id: string; status: string; file: unknown } }>(`/gallery/${encodeURIComponent(f.slug)}/sell`, { priceInr: inr, priceUsd: usd, publish });
+      // buyers get a PNG or JPEG, never WebP: make it here and upload it as the product's file
+      const file = await pictureFile(f, site.doc?.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png');
+      const sig = file ? await upload(file, 'deliverable') : null;
+      const r = await post<{ product: { id: string; status: string; file: unknown } }>(`/gallery/${encodeURIComponent(f.slug)}/sell`, { priceInr: inr, priceUsd: usd, publish, ...(sig && file ? { path: sig.path, filename: file.name, bytes: file.size } : {}) });
       if (hide){ await updateSiteLive(d => ({ ...d, images: d.images.map(x => x.slug === f.slug ? { ...x, hidden: true } : x) })); setF({ ...f, hidden: true }); }
       toast.show(r.product.status === 'published' ? 'In the store and live' : r.product.file ? 'Added to the store as a draft. Publish it from Products.' : 'Added to the store as a draft. Upload its file in Products before publishing.', { tone: 'success' });
       await found.reload();

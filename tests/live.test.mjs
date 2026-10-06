@@ -81,3 +81,16 @@ test('a gallery image can be listed as a product from the gallery, once, and is 
   assert.equal((await admin('POST', '/api/admin/gallery/nope/sell', {})).status, 404);
   assert.equal((await app.call('POST', `/api/admin/gallery/${img.slug}/sell`, { body: {} })).status, 401);
 });
+
+test('selling a gallery image with a PNG/JPEG the portal already uploaded delivers that file and can publish at once', async () => {
+  const site = (await admin('GET', '/api/admin/site')).json;
+  await app.pg.query("insert into licenses (key, name) select 'personal', 'Personal' where not exists (select 1 from licenses where key = 'personal')");
+  const img = site.images[1];
+  const made = await admin('POST', `/api/admin/gallery/${img.slug}/sell`, { priceInr: 29900, priceUsd: 399, publish: true, path: 'files/abcdefghijklmnop/Picture.png', filename: 'Picture.png', bytes: 1234 });
+  assert.equal(made.status, 200, JSON.stringify(made.json));
+  assert.equal(made.json.product.status, 'published');
+  assert.equal(made.json.product.file.filename, 'Picture.png'); assert.equal(made.json.product.file.bytes, 1234);
+  const bad = await admin('POST', `/api/admin/gallery/${site.images[2].slug}/sell`, { priceInr: 100, priceUsd: 100, path: '../../etc/passwd', filename: 'x', bytes: 1 });
+  assert.equal(bad.status, 200, 'a path that is not an upload is ignored (the server falls back to finding the picture itself)');
+  assert.ok(!bad.json.product.file || bad.json.product.file.filename !== 'x');
+});

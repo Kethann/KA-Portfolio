@@ -176,3 +176,10 @@ test('Portfolio: looping is chosen per stack, for folders that exist', () => {
   assert.deepEqual(d.stacks.loops, { [a]: false, [b]: true });
   assert.equal(d.stacks.loop, true, 'the default for stacks without their own choice is unchanged');
 });
+
+test('Image downloads are PNG unless the owner chooses JPEG', () => {
+  const base = structuredClone(seed);
+  assert.equal(validateSiteDocument({ ...base }, seed, seed).visibility.downloadFormat, 'png');
+  assert.equal(validateSiteDocument({ ...base, visibility: { ...base.visibility, downloadFormat: 'jpeg' } }, seed, seed).visibility.downloadFormat, 'jpeg');
+  assert.equal(validateSiteDocument({ ...base, visibility: { ...base.visibility, downloadFormat: 'webp' } }, seed, seed).visibility.downloadFormat, 'png', 'WebP is never offered');
+});

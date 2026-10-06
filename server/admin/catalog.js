@@ -462,8 +462,10 @@ export async function sellImage(ctx){
   const priceInr = money(b.priceInr, 'Price in India'), priceUsd = money(b.priceUsd, 'Price elsewhere');
   // the picture buyers get: our own upload, or the full-size export that ships with the site
   const storage = getStorage();
+  // the portal can hand over the picture already saved as PNG or JPEG (uploaded first); otherwise the server finds the original itself
+  const given = typeof b.path === 'string' && FILE_PATH.test(b.path) ? { path: b.path, filename: str(b.filename, { name: 'File name', max: 160, required: true }).replace(/[^A-Za-z0-9._ -]+/g, '-'), bytes: int(b.bytes, { min: 1, max: MAX_FILE }) } : null;
   let bytes = null, ext = 'webp', contentType = 'image/webp';
-  try {
+  if (!given) try {
     if (img.src){
       const prefix = storage.publicUrl('media', 'x').slice(0, -1);
       if (img.src.startsWith(prefix)){ bytes = await storage.get('media', img.src.slice(prefix.length)); ext = (/\.([a-z0-9]+)$/i.exec(img.src) || [])[1] || 'webp'; }
@@ -476,14 +478,16 @@ export async function sellImage(ctx){
   } catch { bytes = null; }
   if (bytes) contentType = ext === 'png' ? 'image/png' : /^jpe?g$/i.test(ext) ? 'image/jpeg' : ext === 'avif' ? 'image/avif' : 'image/webp';
   const lic = (await db.maybeOne(`select id from licenses where key = 'personal'`)) || (await db.maybeOne('select id from licenses order by key limit 1'));
-  const canPublish = b.publish === true && !!bytes && priceInr !== null && priceUsd !== null && !!lic;
+  const canPublish = b.publish === true && (!!bytes || !!given) && priceInr !== null && priceUsd !== null && !!lic;
   const sort = (await db.one(`select coalesce(min(sort), 0) - 1 as s from products where kind = 'artzz'`)).s;
   const mediaUrl = img.src || `/images/${slug}-${(img.widths || []).includes(1600) ? 1600 : Math.max(...(img.widths || [1080]))}.webp`;
   const row = await db.one(`insert into products (kind, slug, title, summary, description, tags, tech_tags, status, sellable, is_free, price_inr, price_usd, license_id, max_downloads, link_ttl_hours, sort, published_at)
     values ('artzz', $1, $2, '', $3, $4, $5, $6, 1, 0, $7, $8, $9, 5, 72, $10, ${canPublish ? "strftime('%Y-%m-%dT%H:%M:%fZ','now')" : 'null'}) returning id`,
     [await uniqueSlug(db, slugify(slug)), img.title, (img.description || '').slice(0, 8000), [tag], (img.technologies || []).slice(0, 20), canPublish ? 'published' : 'draft', priceInr, priceUsd, lic ? lic.id : null, sort]);
   await db.query('insert into product_media (product_id, url, alt, width, height, sort) values ($1,$2,$3,$4,$5,0)', [row.id, mediaUrl, img.title.slice(0, 200), img.width || null, img.height || null]);
-  if (bytes){
+  if (given){
+    await db.query('insert into product_files (product_id, storage_path, filename, bytes, sha256, is_current) values ($1,$2,$3,$4,$5,1)', [row.id, given.path, given.filename, given.bytes, '']);
+  } else if (bytes){
     const name = `${slugify(img.title)}.${ext}`, path = `files/${randomToken(12)}/${name}`;
     await storage.put('deliverables', path, bytes, contentType);
     const sha = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(x => x.toString(16).padStart(2, '0')).join('');
