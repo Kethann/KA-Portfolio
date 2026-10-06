@@ -171,16 +171,17 @@ function AboutStats(){
     <section className="card stack" aria-labelledby="about-stats-h" style={{ marginTop: 'var(--sp-5)' }}>
       <div className="row between"><h3 id="about-stats-h">About numbers</h3>
         <Switch checked={st.enabled} onChange={v => updateSite(d => ({ ...d, stats: { ...d.stats, enabled: v } }))} label="Show on the About page" /></div>
-      <p className="field-hint" style={{ margin: 0 }}>The Projects total is calculated from the portfolio items. Other numbers count up when a visitor scrolls to them. Up to 6.</p>
+      <p className="field-hint" style={{ margin: 0 }}>The Projects number follows your portfolio items; switch that off under it to type your own. All numbers count up when a visitor scrolls to them. Up to 6.</p>
       {st.items.map((x, i) => (
-        (() => { const isProjects = /^projects?$/i.test(x.label.trim()); return (
+        (() => { const isProjects = /^projects?$/i.test(x.label.trim()) && x.auto !== false; const canAuto = /^projects?$/i.test(x.label.trim()); return (
         <div className="row" key={i} style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <Field label={i === 0 ? 'Label' : ''}><input aria-label={`Label ${i + 1}`} value={x.label} maxLength={40} placeholder="Projects" onChange={e => change(i, { label: e.target.value })} /></Field>
-          <Field label={i === 0 ? 'Number' : ''} hint={isProjects ? 'Auto-counted from portfolio items' : undefined}><input aria-label={`Number ${i + 1}`} type="number" min={0} max={1000000000} value={isProjects ? doc!.images.length : x.value} disabled={isProjects} onChange={e => change(i, { value: Math.max(0, Math.round(Number(e.target.value) || 0)) })} style={{ width: 120 }} /></Field>
+          <Field label={i === 0 ? 'Number' : ''} hint={isProjects ? 'Counted from the portfolio items' : undefined}><input aria-label={`Number ${i + 1}`} type="number" min={0} max={1000000000} value={isProjects ? doc!.images.length : x.value} disabled={isProjects} onChange={e => change(i, { value: Math.max(0, Math.round(Number(e.target.value) || 0)) })} style={{ width: 120 }} /></Field>
           <Field label={i === 0 ? 'After it' : ''}><input aria-label={`Suffix ${i + 1}`} value={isProjects ? '' : x.suffix} maxLength={4} placeholder="+" disabled={isProjects} onChange={e => change(i, { suffix: e.target.value })} style={{ width: 70 }} /></Field>
           <button type="button" className="icon-btn sm" title="Move up" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
           <button type="button" className="icon-btn sm" title="Move down" disabled={i === st.items.length - 1} onClick={() => move(i, 1)}>↓</button>
           <button type="button" className="icon-btn sm" title="Remove" onClick={() => setItems(st.items.filter((_, j) => j !== i))}><Icon name="trash" size={14} /></button>
+          {canAuto && <div style={{ flexBasis: '100%' }}><Switch checked={isProjects} onChange={v => change(i, v ? { auto: true } : { auto: false, value: doc!.images.length, suffix: x.suffix || '+' })} label="Count automatically from the portfolio items" /></div>}
         </div>
         ); })()
       ))}

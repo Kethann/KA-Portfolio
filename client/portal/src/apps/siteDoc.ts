@@ -27,7 +27,7 @@ export type AboutDraft = {
 };
 export { ABOUT_DEFAULT, ABOUT_LIMITS };
 export const aboutDefaults = (): AboutDraft => structuredClone(ABOUT_DEFAULT) as AboutDraft;
-export type StatItem = { label: string; value: number; suffix: string };
+export type StatItem = { label: string; value: number; suffix: string; auto?: boolean };   // auto: the Projects total follows the portfolio items (default); off = the number typed here
 export type StatsDraft = { enabled: boolean; items: StatItem[] };
 export const STATS_DEFAULTS: StatsDraft = { enabled: true, items: [{ label: 'Projects', value: 150, suffix: '+' }, { label: 'Delivered', value: 120, suffix: '+' }, { label: 'Happy clients', value: 60, suffix: '+' }, { label: 'Years', value: 6, suffix: '+' }] };
 // About > Skills (validated on the server; the server's SKILLS_DEFAULT fills a document saved before skills existed)

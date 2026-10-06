@@ -104,7 +104,9 @@ test('About numbers: defaults for older sites, up to 6, whole numbers, short suf
     { label: 'Projects', value: '42.6', suffix: '+++++' }, { label: '', value: 5 }, { label: 'Years', value: -3 },
     ...Array.from({ length: 8 }, (_, i) => ({ label: 'X' + i, value: i })) ] } }, seed, seed).stats;
   assert.equal(s.enabled, false);
-  assert.deepEqual(s.items[0], { label: 'Projects', value: 43, suffix: '++++' });
+  assert.deepEqual(s.items[0], { label: 'Projects', value: 43, suffix: '++++', auto: true }, 'the Projects number follows the portfolio unless switched off');
+  const own = validateSiteDocument({ ...base, stats: { enabled: true, items: [{ label: 'Projects', value: 200, suffix: '+', auto: false }] } }, seed, seed).stats;
+  assert.deepEqual(own.items[0], { label: 'Projects', value: 200, suffix: '+', auto: false }, 'a typed Projects number is kept');
   assert.equal(s.items.some(x => !x.label), false, 'empty labels dropped');
   assert.equal(s.items.find(x => x.label === 'Years').value, 0, 'never negative');
   assert.ok(s.items.length <= 6);

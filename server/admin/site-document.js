@@ -267,7 +267,7 @@ export function validateSiteDocument(input, current, seed){
   const st = input.stats && typeof input.stats === 'object' ? input.stats : null;
   const stats = st ? {
     enabled: st.enabled !== false,
-    items: (Array.isArray(st.items) ? st.items : []).slice(0, 6).map(x => ({ label: text(x && x.label, 40), value: num(x && x.value, 0, 1e9, 0), suffix: text(x && x.suffix, 4) })).filter(x => x.label),
+    items: (Array.isArray(st.items) ? st.items : []).slice(0, 6).map(x => ({ label: text(x && x.label, 40), value: num(x && x.value, 0, 1e9, 0), suffix: text(x && x.suffix, 4), auto: !(x && x.auto === false) })).filter(x => x.label),
   } : structuredClone(STATS_DEFAULT);
   const skills = validateSkills(input.skills);
   const about = validateAbout(input.about);

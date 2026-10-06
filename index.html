@@ -1483,33 +1483,54 @@ html.ka-modal-open{ overflow:hidden; }
   font-family:var(--font-mono, monospace); font-size:11px; letter-spacing:.24em; color:#ffd9b8;
   box-shadow:0 0 0 1px rgba(255,255,255,.03) inset, 0 8px 28px -12px rgba(255,148,56,.45); }
 .journey-since b{ font-size:20px; letter-spacing:.06em; font-weight:700; color:#fff; font-variant-numeric:tabular-nums; min-width:4ch; display:inline-block; }
-.journey-line{ list-style:none; margin:26px 0 0; padding:0; display:grid; grid-template-columns:repeat(var(--n, 5), minmax(0,1fr)); position:relative; }
-.journey-line::before, .journey-line::after{ content:""; position:absolute; top:6px; left:6px; right:0; height:2px; border-radius:2px; }
-.journey-line::before{ background:rgba(255,255,255,.12); }
-.journey-line::after{ background:linear-gradient(90deg, #ff9438, #ff7a3d 45%, #d6a4ff); transform:scaleX(0); transform-origin:left; transition:transform .9s cubic-bezier(.2,.8,.2,1) .05s; }
+.journey-line{ list-style:none; margin:30px 0 0; padding:0 26px 0 0; display:grid; grid-template-columns:repeat(var(--n, 5), minmax(0,1fr)); position:relative; }
+/* the track and its glowing fill; the line carries on past the last point and ends in an arrow, because the journey is not over */
+.journey-line::before, .journey-line::after{ content:""; position:absolute; top:6px; left:7px; right:8px; height:2px; border-radius:2px; }
+.journey-line::before{ background:linear-gradient(90deg, rgba(255,255,255,.18), rgba(255,255,255,.08) 72%, rgba(255,255,255,.04)); }
+.journey-line::after{ background:linear-gradient(90deg, #ff9438, #ff7a3d 42%, #d6a4ff); transform:scaleX(0); transform-origin:left;
+  box-shadow:0 0 12px rgba(255,148,56,.4); transition:transform 1.25s cubic-bezier(.22,.8,.2,1) .05s; }
 .about-journey.in .journey-line::after{ transform:scaleX(1); }
-.journey-line li{ position:relative; padding:26px 12px 0 0; }
-.journey-line li::before{ content:""; position:absolute; top:0; left:0; width:14px; height:14px; border-radius:50%; background:var(--ground, #050506);
-  border:2px solid var(--amber); transform:scale(0); transition:transform .3s var(--ease-snappy) calc(.06s + var(--i) * .1s), box-shadow .5s ease calc(.12s + var(--i) * .1s); }
-.about-journey.in .journey-line li::before{ transform:scale(1); box-shadow:0 0 14px 2px rgba(255,148,56,.5); }
-.journey-line li:last-child::before{ background:var(--amber); }
-.journey-line li::after{ content:""; position:absolute; top:0; left:0; width:14px; height:14px; border-radius:50%; border:2px solid var(--amber); opacity:0; pointer-events:none; }
-.about-journey.in .journey-line li::after{ animation:journeyPing .9s ease-out calc(.12s + var(--i) * .1s) 1 both; }
-@keyframes journeyPing{ 0%{ opacity:.8; transform:scale(1); } 100%{ opacity:0; transform:scale(2.6); } }
+.journey-line li{ position:relative; padding:28px 14px 0 0; }
+/* each point is a diamond that turns in as the line reaches it */
+.journey-line li::before{ content:""; position:absolute; top:1.5px; left:1.5px; width:11px; height:11px; border-radius:2px; box-sizing:border-box;
+  background:var(--ground, #050506); border:2px solid var(--amber); transform:rotate(-45deg) scale(0);
+  transition:transform .45s var(--ease-snappy) calc(.08s + var(--i) * .13s), box-shadow .6s ease calc(.16s + var(--i) * .13s), background .4s ease calc(.2s + var(--i) * .13s); }
+.about-journey.in .journey-line li::before{ transform:rotate(45deg) scale(1); box-shadow:0 0 12px 1px rgba(255,148,56,.55); }
+.journey-line li.now::before{ background:var(--amber); box-shadow:0 0 16px 3px rgba(255,148,56,.7); }
+.journey-line li::after{ content:""; position:absolute; top:1.5px; left:1.5px; width:11px; height:11px; border-radius:2px; box-sizing:border-box; border:2px solid var(--amber); opacity:0; pointer-events:none; transform:rotate(45deg); }
+.about-journey.in .journey-line li::after{ animation:journeyPing .9s ease-out calc(.2s + var(--i) * .13s) 1; }
+.about-journey.in .journey-line li.now::after{ animation:journeyPing 2.6s ease-out calc(.5s + var(--i) * .13s) infinite; }
+@keyframes journeyPing{ 0%{ opacity:.85; transform:rotate(45deg) scale(1); } 100%{ opacity:0; transform:rotate(45deg) scale(2.8); } }
+/* the arrow at the end of the line */
+.journey-line li.jend{ position:absolute; top:0; right:0; width:14px; height:14px; padding:0; pointer-events:none; opacity:0; transform:translateX(-18px);
+  transition:opacity .4s ease .95s, transform .7s cubic-bezier(.2,.8,.2,1) .95s; }
+.journey-line li.jend::after{ display:none; }
+.about-journey .journey-line li.jend::before, .about-journey.in .journey-line li.jend::before{ top:2.5px; left:0; width:9px; height:9px; border-radius:0; background:none; box-shadow:none;
+  border:0; border-top:2px solid #d6a4ff; border-right:2px solid #d6a4ff; transform:rotate(45deg); filter:drop-shadow(0 0 5px rgba(214,164,255,.65)); transition:none; }
+.about-journey.in .journey-line li.jend{ opacity:1; transform:none; animation:journeyArrow 2.2s ease-in-out 1.9s infinite; }
+@keyframes journeyArrow{ 0%,100%{ transform:translateX(0); opacity:1; } 50%{ transform:translateX(6px); opacity:.6; } }
 .journey-line strong{ display:block; font-size:.92rem; font-weight:600; color:var(--ink); letter-spacing:-.005em; margin-bottom:3px; }
 .journey-line span.jt{ display:block; font-size:.78rem; line-height:1.45; color:var(--ink-dim); }
+.journey-line li strong, .journey-line li span.jt{ transform:translateY(8px); transition:transform .6s cubic-bezier(.2,.8,.2,1), opacity .35s ease; }
+.journey-line li.on strong, .journey-line li.on span.jt{ transform:none; }
+.journey-line li.now strong{ color:#fff; }
 .journey-line li:not(.on) strong, .journey-line li:not(.on) span.jt{ opacity:0; }
 @media (max-width:760px){
-  .journey-line{ grid-template-columns:1fr; }
-  .journey-line::before, .journey-line::after{ top:7px; bottom:14px; left:6px; right:auto; width:2px; height:auto; }
-  .journey-line::after{ transform:scaleY(0); transform-origin:top; }
+  .journey-line{ grid-template-columns:1fr; padding:0 0 30px 0; }
+  .journey-line::before, .journey-line::after{ top:7px; bottom:8px; left:6px; right:auto; width:2px; height:auto; }
+  .journey-line::before{ background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.05)); }
+  .journey-line::after{ background:linear-gradient(180deg, #ff9438, #ff7a3d 42%, #d6a4ff); transform:scaleY(0); transform-origin:top; }
   .about-journey.in .journey-line::after{ transform:scaleY(1); }
-  .journey-line li{ padding:0 0 18px 30px; }
-  .journey-line li::before, .journey-line li::after{ top:3px; }
+  .journey-line li{ padding:0 0 18px 32px; }
+  .journey-line li::before, .journey-line li::after{ top:2px; left:1.5px; }
+  .journey-line li.jend{ top:auto; bottom:0; left:0; right:auto; padding:0; transform:translateY(-16px); }
+  .about-journey .journey-line li.jend::before, .about-journey.in .journey-line li.jend::before{ top:0; left:2.5px; transform:rotate(135deg); }
+  .about-journey.in .journey-line li.jend{ animation-name:journeyArrowDown; }
+  @keyframes journeyArrowDown{ 0%,100%{ transform:translateY(0); opacity:1; } 50%{ transform:translateY(6px); opacity:.6; } }
 }
 @media (prefers-reduced-motion: reduce){
-  .journey-line::after, .journey-line li::before{ transition:none; }
-  .about-journey.in .journey-line li::after{ animation:none; }
+  .journey-line::after, .journey-line li::before, .journey-line li.jend, .journey-line li strong, .journey-line li span.jt{ transition:none; }
+  .about-journey.in .journey-line li::after, .about-journey.in .journey-line li.jend{ animation:none; }
 }
 
 /* ---- About: promo cuts (a stack of random YouTube clips, with a small panel beside it) ---- */
@@ -1569,6 +1590,7 @@ html.ka-modal-open{ overflow:hidden; }
 }
 
 /* ---- skills: resume board (left) + floating logo field (right) ---- */
+#about-skills-block{ scroll-margin-top:92px; }
 #about-skills-block[hidden], .skills-filter[hidden], #skills-intro[hidden]{ display:none; }
 .skills-meta{ margin:-14px 0 22px; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-dim); }
 .skills-layout{ display:grid; grid-template-columns:minmax(0, 2.15fr) minmax(0, 1fr); gap:clamp(24px, 4vw, 56px); align-items:start; }
@@ -6649,7 +6671,7 @@ var sections = {
   tips: document.getElementById("section-tips")
 };
 var PAGE_SECTIONS = { about:["about", "portfolio"], contact:["contact"], gallery:["gallery"], store:["store"], tips:["tips"] };
-function navPage(name){ return name === "portfolio" ? "about" : name; }
+function navPage(name){ return name === "portfolio" || name === "skills" ? "about" : name; }
 function pageSections(page){
   return (PAGE_SECTIONS[page] || [page]).map(function(n){ return sections[n]; }).filter(Boolean);
 }
@@ -6808,7 +6830,8 @@ function switchSection(name, focusTarget){
   var page = navPage(name);
   var incoming = pageSections(page);
   if (!incoming.length) return;
-  var scrollTarget = sections[name] || incoming[0];
+  // "skills" is a place inside the About page (the menu's Portfolio item lands there)
+  var scrollTarget = (name === "skills" && document.getElementById("about-skills-block")) || sections[name] || incoming[0];
   if (page === activeSection){
     if (sectionSwitching){ pendingScroll = { el:scrollTarget, focus:focusTarget }; return; }
     scrollTarget.scrollIntoView?.({ behavior:reducedMotion ? "instant" : "smooth", block:"start" });
@@ -6930,7 +6953,7 @@ expandPanel.addEventListener("click", function(e){
   // not an item inside the menu that is about to be hidden.
   closeExpand(action !== "portfolio");
   if (action === "portfolio"){
-    switchSection("portfolio", true);
+    switchSection("skills", true);
   } else if (action === "upscaler"){
     if (window.kaOpenUpscaler) window.kaOpenUpscaler();
   } else if (action === "typography"){
@@ -7201,7 +7224,7 @@ window.addEventListener("ka-sequence-complete", function(){
           if (s) ghost(s, s.getAttribute("data-t") || "");
           if (t) ghost(t, t.getAttribute("data-t") || "");
         }
-        if (instant || calm) on(); else jTimers.push(setTimeout(on, 80 + i * 110));
+        if (instant || calm) on(); else jTimers.push(setTimeout(on, 220 + i * 130));
       });
     }
     function playJourney(){
@@ -7231,8 +7254,10 @@ window.addEventListener("ka-sequence-complete", function(){
         var li = h("li"); li.style.setProperty("--i", String(i));
         var t = h("strong", null, s.title); t.setAttribute("data-t", s.title);
         var d = h("span", "jt", s.text || ""); d.setAttribute("data-t", s.text || "");
+        if (i === cfg.steps.length - 1) li.classList.add("now");
         li.append(t, d); stepsEl.appendChild(li);
       });
+      var end = h("li", "jend"); end.setAttribute("aria-hidden", "true"); end.setAttribute("role", "presentation"); stepsEl.appendChild(end);   // the arrow: the journey carries on
       jTimers.forEach(clearTimeout); jTimers = [];
       jEl.classList.remove("in"); jPlayed = false;
       showYear();
@@ -8572,7 +8597,7 @@ function renderAboutStats(stats, projectCount){
   box.replaceChildren.apply(box, items.map(function(x){
     var tile = document.createElement("div"); tile.className = "about-stat"; tile.setAttribute("role", "listitem");
     var num = document.createElement("span"); num.className = "about-stat-num";
-    var isProjects = /^projects?$/i.test(String(x.label).trim());
+    var isProjects = /^projects?$/i.test(String(x.label).trim()) && x.auto !== false;   // auto: follow the portfolio items; switched off in the portal, the typed number is used
     var target = isProjects ? Math.max(0, Math.floor(Number(projectCount) || 0)) : Math.max(0, Math.round(Number(x.value) || 0));
     var suffix = isProjects ? "" : (x.suffix || "");
     var val = document.createElement("span"); val.textContent = "0"; val.dataset.target = String(target);
@@ -10428,8 +10453,8 @@ html{ font-size:calc(100% * var(--text-scale, 1) * var(--screen-scale, 1)); }
     wordSpan: 0.5,          // (unused now: kept for word-mode texts)
     letterSpan: 0.5,        // random reveal: how long (of the whole 0..1) each letter takes to unblur
     blurPx: 7,              // strength of the blur each letter starts from
-    inkSelector: ".gallery-head h2, #contact-title, #about-headline",
-    emergeSelector: ".gallery-head p, .fav-filter, #contact-intro, .about-caption, .about-bio-text",
+    inkSelector: ".gallery-head h2, #contact-title, #about-headline, #portfolio-title, #skills-title, #reel-h, #store-title, #tips-title",
+    emergeSelector: ".gallery-head p, .fav-filter, #contact-intro, .about-caption, .about-bio-text, #portfolio-intro, #skills-intro, #skills-meta, #reel-intro, #store-intro, #tips-intro",
     ghostLabelSelector: ".contact-form label",
     twoLineSelector: "#contact-intro",
     ghostBoxSelector: ".contact-form input:not(.hp-field), .contact-form textarea, .contact-form .contact-submit",
