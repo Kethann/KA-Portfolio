@@ -2,8 +2,8 @@
 import { Fragment, useMemo, useState } from 'react';
 import type { AppProps } from './registry';
 import { useDebounced, useLoad, usePref } from '../hooks';
-import { downloadFile, put } from '../api';
-import { AsyncButton, Badge, Chart, Empty, ErrorState, Modal, Segmented, SkeletonRows, VirtualTable, useToast, SearchBox } from '../ui';
+import { del, downloadFile, post, put } from '../api';
+import { AsyncButton, Badge, Chart, Empty, ErrorState, Modal, Segmented, SkeletonRows, VirtualTable, useConfirm, useToast, SearchBox } from '../ui';
 import type { Column } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
@@ -97,10 +97,21 @@ function Log(){
   const [bots, setBots] = useState<'exclude' | 'include' | 'only'>('exclude');
   const [open, setOpen] = useState<any>(null);
   const [markedOnly, setMarkedOnly] = useState(false);
+  const [view, setView] = usePref<'visits' | 'visitors'>('visitors.logView', 'visits');   // every visit, or one row per visitor
+  const [clearing, setClearing] = useState(false);
   const dq = useDebounced(q, 300);
-  const qs = new URLSearchParams({ limit: '1000', bots }); if (dq) qs.set('q', dq); if (markedOnly) qs.set('marked', '1');
+  const qs = new URLSearchParams({ limit: '1000', bots }); if (dq) qs.set('q', dq); if (markedOnly) qs.set('marked', '1'); if (view === 'visitors') qs.set('group', '1');
   const s = useLoad<{ rows: any[]; hasMore: boolean }>(`/visitors/log?${qs}`);
   const toast = useToast();
+  const confirm = useConfirm();
+  // the star: mark a visitor at once (the details window adds a label and a note), or take the mark off
+  const toggleMark = async (r: any) => {
+    try {
+      await put('/visitors/mark', { visitorId: r.visitor_id, marked: !r.mark, label: r.mark?.label || 'follow-up', note: r.mark?.note || '' });
+      toast.show(r.mark ? 'Mark removed' : 'Visitor marked. Open it to add a note.', { tone: 'success' }); await s.reload();
+    } catch (e){ toast.error(e); }
+  };
+  const afterDelete = async (msg: string) => { setOpen(null); toast.show(msg, { tone: 'success' }); await s.reload(); };
   const cols: Column<any>[] = [
     { key: 'when', label: 'When', width: '120px', render: r => <span title={dateTime(r.visited_at)}>{ago(r.visited_at)}</span> },
     { key: 'where', label: 'Where', width: '1.3fr', render: r => <span className="truncate" title={[r.city, r.region, r.postal, r.isp].filter(Boolean).join(' · ')}>{flag(r.country)} {r.city ? `${r.city}${r.region ? ', ' + r.region : ''}` : r.country || 'Unknown'}</span> },
@@ -108,25 +119,37 @@ function Log(){
     { key: 'page', label: 'Page', width: '1fr', hideBelow: 720, render: r => <span className="truncate">{r.path}</span> },
     { key: 'dev', label: 'Device', width: '1.2fr', hideBelow: 880, render: r => <span className="truncate" title={[r.device_vendor, r.device_model, r.device_type, r.browser, r.os].filter(Boolean).join(' · ')}>{[r.device_vendor, r.device_model].filter(Boolean).join(' ') || r.device_type || 'Unknown'} · {r.browser || 'browser'} · {r.os || 'system'}</span> },
     { key: 'time', label: 'Time', width: '70px', align: 'right', hideBelow: 560, render: r => dur(r.duration_ms) },
-    { key: 'bot', label: '', width: '64px', render: r => <span className="row" style={{ gap: 4 }}>{r.mark && <span title={`Marked: ${r.mark.label}${r.mark.note ? ' · ' + r.mark.note : ''}`} aria-label="Marked visitor" style={{ color: 'var(--accent, #ff9438)' }}>★</span>}{r.is_bot ? <Badge tone="warning">bot</Badge> : r.is_new ? <Badge tone="accent">new</Badge> : null}</span> }
+    ...(view === 'visitors' ? [{ key: 'count', label: 'Visits', width: '70px', align: 'right' as const, render: (r: any) => <span className="num" title={`First seen ${dateTime(r.first_seen)}`}>{r.visit_count}</span> }] : []),
+    { key: 'bot', label: '', width: '104px', render: r => <span className="row" style={{ gap: 4 }}>
+      <button type="button" className="icon-btn sm" aria-pressed={!!r.mark} aria-label={r.mark ? `Remove the mark (${r.mark.label})` : 'Mark this visitor'} title={r.mark ? `Marked: ${r.mark.label}${r.mark.note ? ' · ' + r.mark.note : ''}. Click to remove` : 'Mark this visitor'}
+        style={{ color: r.mark ? 'var(--accent, #ff9438)' : undefined }} onKeyDown={e => e.stopPropagation()} onClick={() => void toggleMark(r)}>{r.mark ? '★' : '☆'}</button>
+      {r.is_bot ? <Badge tone="warning">bot</Badge> : r.is_new ? <Badge tone="accent">new</Badge> : null}</span> }
   ];
   return (
     <div className="app" style={{ minHeight: 0, flex: 1 }}>
       <div className="app-toolbar">
         <SearchBox value={q} onChange={setQ} placeholder="IP, city, page, browser…" label="Search the visit log" />
+        <Segmented label="Show" value={view} onChange={setView} options={[{ value: 'visits', label: 'Visits' }, { value: 'visitors', label: 'Visitors' }]} />
         <button type="button" className={'btn sm' + (markedOnly ? ' primary' : ' ghost')} aria-pressed={markedOnly} onClick={() => setMarkedOnly(m => !m)}>★ Marked</button>
         <Segmented label="Bots" value={bots} onChange={setBots} options={[{ value: 'exclude', label: 'People' }, { value: 'include', label: 'All' }, { value: 'only', label: 'Bots' }]} />
         <span className="grow" />
         <AsyncButton className="btn sm" onClick={async () => { await downloadFile(`/visitors.csv?${qs}`, `visitors-${todayIST()}.csv`); toast.show('CSV downloaded', { tone: 'success' }); }}><Icon name="downloads" /> CSV</AsyncButton>
+        <button type="button" className="btn sm ghost" style={{ color: 'var(--danger)' }} onClick={() => setClearing(true)}><Icon name="trash" /> Clear…</button>
       </div>
       <div className="app-main fill">
         {s.error && !s.data ? <ErrorState message={s.error} retry={s.reload} /> : !s.data ? <SkeletonRows rows={10} /> : (
           <VirtualTable label="Visit log" rows={s.data.rows} columns={cols} rowKey={r => String(r.id)} onOpen={setOpen} empty={<Empty icon="visitors" title="No visits match" />}
-            footer={<span>{s.data.rows.length}{s.data.hasMore ? '+' : ''} visits · IP addresses are personal data: handle this list with care</span>} />
+            footer={<span>{s.data.rows.length}{s.data.hasMore ? '+' : ''} {view === 'visitors' ? 'visitors' : 'visits'} · IP addresses are personal data: handle this list with care</span>} />
         )}
       </div>
+      {clearing && <ClearVisits onClose={() => setClearing(false)} onDone={async (n) => { setClearing(false); toast.show(n ? `Cleared ${n} visit${n === 1 ? '' : 's'}` : 'Nothing matched, so nothing was removed', { tone: 'success' }); await s.reload(); }} />}
       {open && (
-        <Modal title="Visit details" onClose={() => setOpen(null)}>
+        <Modal title="Visit details" onClose={() => setOpen(null)} footer={<>
+          <AsyncButton className="btn ghost danger-text push-left" onClick={async () => {
+            if (!(await confirm({ title: 'Delete this visit?', body: 'Only this one page view is removed. The visitor’s other visits stay.', confirm: 'Delete visit', danger: true }))) return;
+            await del(`/visitors/visit/${open.id}`); await afterDelete('Visit deleted');
+          }}><Icon name="trash" /> Delete this visit</AsyncButton>
+          <button type="button" className="btn" onClick={() => setOpen(null)}>Close</button></>}>
           <dl className="kv">
             {[['Time', dateTime(open.visited_at)], ['Last seen', dateTime(open.last_seen_at)], ['Time on page', dur(open.duration_ms)], ['Page', open.path], ['Came from', open.referrer || 'Direct'],
               ['IP', open.ip], ['Location', [open.city, open.region, open.postal, open.country].filter(Boolean).join(', ') || 'Unknown'], ['Location source', open.geo_provider || 'platform / IP estimate'],
@@ -134,15 +157,16 @@ function Log(){
               ['Device', [open.device_type, open.device_vendor, open.device_model].filter(Boolean).join(' · ')], ['System', `${open.os || '—'} ${open.os_version || ''}`], ['Browser', `${open.browser || '—'} ${open.browser_version || ''}`],
               ['Screen', open.screen_w ? `${open.screen_w} × ${open.screen_h}` : '—'], ['Visitor', `${open.visitor_id}${open.is_new ? ' (first visit)' : ''}`], ['Bot', open.is_bot ? 'yes' : 'no']].map(([k, v]) => <Fragment key={k}><dt>{k}</dt><dd className={k === 'IP' || k === 'Visitor' ? 'mono' : ''}>{v}</dd></Fragment>)}
           </dl>
-          <VisitorHistory visitorId={open.visitor_id} onChanged={s.reload} />
+          <VisitorHistory visitorId={open.visitor_id} onChanged={s.reload} onDeleted={n => afterDelete(`Deleted ${n} visit${n === 1 ? '' : 's'} from this visitor`)} />
           {open.latitude != null && open.longitude != null && <section className="card stack" aria-label="Location map">
             <div className="row between"><b>{open.location_source === 'browser-consent' ? 'Visitor-shared location' : 'Approximate IP area'}</b>
               {open.location_accuracy && <Badge tone={open.location_source === 'browser-consent' ? 'success' : 'neutral'}>{open.location_accuracy >= 1000 ? `about ${(open.location_accuracy / 1000).toFixed(1)} km accuracy` : `about ${open.location_accuracy} m accuracy`}</Badge>}</div>
             <iframe title="Map showing approximate visitor location" loading="lazy" referrerPolicy="no-referrer" style={{ width: '100%', height: 260, border: 0, borderRadius: 12 }}
               src={`https://www.openstreetmap.org/export/embed.html?marker=${open.latitude}%2C${open.longitude}&layer=mapnik`} />
-            <p className="field-hint" style={{ margin: 0 }}><a href={`https://www.openstreetmap.org/?mlat=${open.latitude}&mlon=${open.longitude}#map=15/${open.latitude}/${open.longitude}`} target="_blank" rel="noopener noreferrer">Open map ?</a>
-              {open.location_source === 'browser-consent' ? ' � shared by the visitor after a location permission prompt; coordinates are rounded.' : ' � estimated from the visitor�s internet connection; it may be inaccurate and cannot identify a street address.'}</p>
-          </section>}          <details><summary className="faint">Raw user agent</summary><code className="mono" style={{ fontSize: 12, wordBreak: 'break-all' }}>{open.user_agent}</code></details>
+            <p className="field-hint" style={{ margin: 0 }}><a href={`https://www.openstreetmap.org/?mlat=${open.latitude}&mlon=${open.longitude}#map=15/${open.latitude}/${open.longitude}`} target="_blank" rel="noopener noreferrer">Open the map</a>
+              {open.location_source === 'browser-consent' ? ' · shared by the visitor after a location permission prompt; the coordinates are rounded.' : ' · estimated from the visitor’s internet connection; it may be inaccurate and cannot identify a street address.'}</p>
+          </section>}
+          <details><summary className="faint">Raw user agent</summary><code className="mono" style={{ fontSize: 12, wordBreak: 'break-all' }}>{open.user_agent}</code></details>
         </Modal>
       )}
     </div>
@@ -151,9 +175,10 @@ function Log(){
 
 // One visitor's earlier visits (same device), an engagement score, and a mark with a label and a note so they can be found again.
 const LABELS: [string, string][] = [['follow-up', 'Follow up'], ['interested', 'Interested'], ['client', 'Client'], ['ignore', 'Ignore']];
-function VisitorHistory({ visitorId, onChanged }: { visitorId: string; onChanged: () => void }){
+function VisitorHistory({ visitorId, onChanged, onDeleted }: { visitorId: string; onChanged: () => void; onDeleted: (n: number) => void }){
   const h = useLoad<any>(`/visitors/history?v=${encodeURIComponent(visitorId)}`);
   const toast = useToast();
+  const confirm = useConfirm();
   const [label, setLabel] = useState('follow-up');
   const [note, setNote] = useState('');
   const [seen, setSeen] = useState<string | null>(null);
@@ -175,6 +200,10 @@ function VisitorHistory({ visitorId, onChanged }: { visitorId: string; onChanged
           <input aria-label="Note about this visitor" value={note} maxLength={300} placeholder="Note (optional)" onChange={e => setNote(e.target.value)} style={{ flex: '1 1 200px', minWidth: 140 }} />
           <AsyncButton className="btn sm primary" onClick={() => save(true)}>{d.mark ? 'Update mark' : '★ Mark visitor'}</AsyncButton>
           {d.mark && <AsyncButton className="btn sm ghost" onClick={() => save(false)}>Remove mark</AsyncButton>}
+          <AsyncButton className="btn sm ghost danger-text push-right" onClick={async () => {
+            if (!(await confirm({ title: 'Delete this visitor’s whole history?', body: `All ${d.total} visit${d.total === 1 ? '' : 's'} from this device are removed for good${d.mark ? ', and the mark with them' : ''}.`, confirm: 'Delete history', danger: true }))) return;
+            const r = await del<{ removed: number }>(`/visitors/visitor?v=${encodeURIComponent(visitorId)}`); onDeleted(r.removed);
+          }}><Icon name="trash" /> Delete history</AsyncButton>
         </div>
         <ul className="list" style={{ maxHeight: 220, overflow: 'auto', margin: 0 }}>
           {d.visits.map((v: any) => (
@@ -189,5 +218,29 @@ function VisitorHistory({ visitorId, onChanged }: { visitorId: string; onChanged
         {d.total > d.visits.length && <p className="field-hint" style={{ margin: 0 }}>Showing the latest {d.visits.length} of {d.total} visits.</p>}
       </>}
     </section>
+  );
+}
+
+// Clear history in bulk: older than some days, bots only, or everything. Marked visitors can be kept.
+function ClearVisits({ onClose, onDone }: { onClose: () => void; onDone: (removed: number) => void }){
+  const confirm = useConfirm();
+  const toast = useToast();
+  const [scope, setScope] = useState<'older' | 'bots' | 'all'>('older');
+  const [days, setDays] = useState('90');
+  const [keep, setKeep] = useState(true);
+  const go = async () => {
+    const what = scope === 'older' ? `Visits older than ${days} days` : scope === 'bots' ? 'All bot visits' : 'The whole visit history';
+    if (!(await confirm({ title: `${what} will be deleted for good`, body: keep ? 'Visitors you marked with a star are kept.' : 'Marked visitors are deleted too, along with their marks.', confirm: 'Delete', danger: true }))) return;
+    try { const r = await post<{ removed: number }>('/visitors/clear', { scope, days: Number(days), keepMarked: keep }); onDone(r.removed); } catch (e){ toast.error(e); }
+  };
+  return (
+    <Modal title="Clear visitor history" onClose={onClose} footer={<><button type="button" className="btn ghost" onClick={onClose}>Cancel</button><AsyncButton className="btn danger" onClick={go}><Icon name="trash" /> Delete</AsyncButton></>}>
+      <div className="stack">
+        <p className="field-hint" style={{ margin: 0 }}>Deleting is permanent. Older visits are also removed automatically after the retention period in Settings.</p>
+        <Segmented label="What to clear" value={scope} onChange={setScope} options={[{ value: 'older', label: 'Older than…' }, { value: 'bots', label: 'Bots only' }, { value: 'all', label: 'Everything' }]} />
+        {scope === 'older' && <label className="row" style={{ gap: 8 }}>Older than <select aria-label="Days" value={days} onChange={e => setDays(e.target.value)} style={{ width: 'auto' }}>{['7', '30', '90', '180', '365'].map(d => <option key={d} value={d}>{d} days</option>)}</select></label>}
+        <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={keep} onChange={e => setKeep(e.target.checked)} /> Keep visitors I marked with a star</label>
+      </div>
+    </Modal>
   );
 }

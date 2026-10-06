@@ -71,9 +71,16 @@ export async function log(ctx){
     where = (w ? w + ' and ' : 'where ') + `visitor_id in (select value from json_each($${qargs.length}))`;
   }
   const db = await getDb();
-  const rows = await db.query(`select id, visited_at, last_seen_at, session_id, visitor_id, is_new, path, referrer, duration_ms, ip, country, region, city, timezone, language,
-    device_type, device_vendor, device_model, os, os_version, browser, browser_version, screen_w, screen_h, is_bot, user_agent, postal, latitude, longitude, isp, continent, location_accuracy, location_source,
-    (select provider from ip_geo_cache c where c.ip = visits.ip) as geo_provider from visits ${where} order by visited_at desc limit ${limit + 1} offset ${offset}`, qargs);
+  const cols = `id, visited_at, last_seen_at, session_id, visitor_id, is_new, path, referrer, duration_ms, ip, country, region, city, timezone, language,
+    device_type, device_vendor, device_model, os, os_version, browser, browser_version, screen_w, screen_h, is_bot, user_agent, postal, latitude, longitude, isp, continent, location_accuracy, location_source`;
+  // group=1: one row per visitor (their latest visit) with how many visits and when they first came
+  const grouped = ctx.url.searchParams.get('group') === '1';
+  const rows = grouped
+    ? await db.query(`select ${cols}, visit_count, first_seen, (select provider from ip_geo_cache c where c.ip = g.ip) as geo_provider from (
+        select ${cols}, count(*) over (partition by visitor_id) as visit_count, min(visited_at) over (partition by visitor_id) as first_seen,
+          row_number() over (partition by visitor_id order by visited_at desc, id desc) as rn from visits ${where}) g
+        where rn = 1 order by visited_at desc limit ${limit + 1} offset ${offset}`, qargs)
+    : await db.query(`select ${cols}, (select provider from ip_geo_cache c where c.ip = visits.ip) as geo_provider from visits ${where} order by visited_at desc, id desc limit ${limit + 1} offset ${offset}`, qargs);
   return json({ rows: rows.slice(0, limit).map(r => ({ ...r, mark: marks[r.visitor_id] || null })), hasMore: rows.length > limit });
 }
 export async function logCsv(ctx){
@@ -91,22 +98,25 @@ const MARK_LABELS = ['follow-up', 'interested', 'client', 'ignore'];
 async function readMarks(){ const { value, revision } = await getSettingWithRevision('visitorMarks'); return { marks: value && typeof value === 'object' ? value : {}, revision }; }
 
 // Everything this device (visitor id) has done: first and last visit, every visit, pages, places and an engagement score from 0 to 100.
+// The totals count every visit; the list shows the latest 300.
 export async function history(ctx){
   const v = ctx.url.searchParams.get('v') || '';
   if (!VISITOR_ID.test(v)) throw new HttpError(400, 'Choose a visit first.');
   const db = await getDb();
-  const rows = await db.query(`select id, visited_at, last_seen_at, session_id, path, referrer, duration_ms, ip, country, region, city, device_type, browser, os, is_new, is_bot
-    from visits where visitor_id = $1 order by visited_at desc limit 300`, [v]);
-  const total = (await db.one('select count(*) as n from visits where visitor_id = $1', [v])).n;
-  const sessions = new Set(rows.map(r => r.session_id)).size;
-  const pages = new Map(); let ms = 0; const places = new Set(), ips = new Set();
-  for (const r of rows){ pages.set(r.path, (pages.get(r.path) || 0) + 1); ms += Number(r.duration_ms) || 0; if (r.city || r.country) places.add([r.city, r.country].filter(Boolean).join(', ')); if (r.ip) ips.add(r.ip); }
-  const minutes = ms / 60000;
+  const [rows, tot, pageRows, placeRows, ipRows] = await Promise.all([
+    db.query(`select id, visited_at, last_seen_at, session_id, path, referrer, duration_ms, ip, country, region, city, device_type, browser, os, is_new, is_bot
+      from visits where visitor_id = $1 order by visited_at desc, id desc limit 300`, [v]),
+    db.one(`select count(*) as total, count(distinct session_id) as sessions, count(distinct path) as pages, coalesce(sum(duration_ms), 0) as ms, min(visited_at) as first_seen, max(visited_at) as last_seen from visits where visitor_id = $1`, [v]),
+    db.query(`select path, count(*) as n from visits where visitor_id = $1 group by path order by n desc, path limit 8`, [v]),
+    db.query(`select distinct city, country from visits where visitor_id = $1 and (city is not null or country is not null) limit 6`, [v]),
+    db.query(`select distinct ip from visits where visitor_id = $1 and ip is not null limit 6`, [v])
+  ]);
+  const minutes = (Number(tot.ms) || 0) / 60000;
   // engagement: returning matters most, then pages seen, then time spent
-  const score = Math.min(100, Math.round(Math.min(40, (sessions - 1) * 12) + Math.min(30, pages.size * 5) + Math.min(30, minutes * 3)));
+  const score = tot.total ? Math.min(100, Math.round(Math.min(40, (tot.sessions - 1) * 12) + Math.min(30, tot.pages * 5) + Math.min(30, minutes * 3))) : 0;
   const { marks } = await readMarks();
-  return json({ visitor: v, total, sessions, firstSeen: rows.length ? rows[rows.length - 1].visited_at : null, lastSeen: rows.length ? rows[0].visited_at : null, minutes: Math.round(minutes * 10) / 10,
-    score, pages: [...pages.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([path, n]) => ({ path, n })), places: [...places].slice(0, 6), ips: [...ips].slice(0, 6), visits: rows, mark: marks[v] || null });
+  return json({ visitor: v, total: tot.total, sessions: tot.sessions, firstSeen: tot.first_seen, lastSeen: tot.last_seen, minutes: Math.round(minutes * 10) / 10,
+    score, pages: pageRows.map(r => ({ path: r.path, n: r.n })), places: placeRows.map(r => [r.city, r.country].filter(Boolean).join(', ')), ips: ipRows.map(r => r.ip), visits: rows, mark: marks[v] || null });
 }
 
 // Mark (or un-mark) a visitor so they can be found again: a label and a short note.
@@ -128,6 +138,51 @@ export async function markVisitor(ctx){
   return json({ ok: true, mark: next[v] || null });
 }
 
+// ---- deleting history -----------------------------------------------------------------------------------------
+// One visit, one visitor (every visit from that device, and their mark), or a bulk clear. Deleting is permanent.
+export async function deleteVisit(ctx){
+  const id = Number(ctx.params.id);
+  if (!Number.isInteger(id) || id < 1) throw new HttpError(400, 'Unknown visit.');
+  const db = await getDb();
+  const removed = (await db.query('delete from visits where id = $1 returning 1', [id])).length;
+  if (removed) await audit(ctx, 'visit_deleted', String(id));
+  return json({ ok: true, removed });
+}
+export async function deleteVisitor(ctx){
+  const v = ctx.url.searchParams.get('v') || '';
+  if (!VISITOR_ID.test(v)) throw new HttpError(400, 'Unknown visitor.');
+  const db = await getDb();
+  const removed = (await db.query('delete from visits where visitor_id = $1 returning 1', [v])).length;
+  const { marks, revision } = await readMarks();
+  if (marks[v]){ const next = { ...marks }; delete next[v]; await setSetting('visitorMarks', next, revision || 0); }
+  await audit(ctx, 'visitor_history_deleted', v, { removed });
+  return json({ ok: true, removed });
+}
+// scope: 'older' (days), 'bots' or 'all'. Marked visitors can be kept.
+export async function clearVisits(ctx){
+  const b = await readJson(ctx.request, 2048);
+  const scope = ['older', 'bots', 'all'].includes(b.scope) ? b.scope : null;
+  if (!scope) throw new HttpError(400, 'Choose what to clear.');
+  const keepMarked = b.keepMarked !== false;
+  const where = [], args = [];
+  if (scope === 'older'){
+    const days = Number(b.days);
+    if (!Number.isInteger(days) || days < 1 || days > 3650) throw new HttpError(400, 'Choose between 1 and 3650 days.');
+    args.push(days); where.push(`visited_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-' || $${args.length} || ' days')`);
+  } else if (scope === 'bots') where.push('is_bot');
+  const { marks, revision } = await readMarks();
+  const markedIds = Object.keys(marks);
+  if (keepMarked && markedIds.length){ args.push(JSON.stringify(markedIds)); where.push(`visitor_id not in (select value from json_each($${args.length}))`); }
+  const db = await getDb();
+  const removed = (await db.query(`delete from visits ${where.length ? 'where ' + where.join(' and ') : ''} returning 1`, args)).length;
+  if (scope === 'all'){
+    await db.query('delete from ip_geo_cache');   // the cached IP lookups are personal data too
+    if (!keepMarked && markedIds.length) await setSetting('visitorMarks', {}, revision || 0);
+  }
+  await audit(ctx, 'visits_cleared', scope, { removed, keepMarked, days: b.days || null });
+  return json({ ok: true, removed });
+}
+
 export function registerVisitors(route){
   const a = { access: 'admin' };
   route('GET', '/api/admin/visitors', summary, a);
@@ -135,5 +190,8 @@ export function registerVisitors(route){
   route('GET', '/api/admin/visitors/log', log, a);
   route('GET', '/api/admin/visitors/history', history, a);
   route('PUT', '/api/admin/visitors/mark', markVisitor, a);
+  route('DELETE', '/api/admin/visitors/visit/:id', deleteVisit, a);
+  route('DELETE', '/api/admin/visitors/visitor', deleteVisitor, a);
+  route('POST', '/api/admin/visitors/clear', clearVisits, a);
   route('GET', '/api/admin/visitors.csv', logCsv, a);
 }

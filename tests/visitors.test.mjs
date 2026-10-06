@@ -123,3 +123,37 @@ test('portal: one visitor\'s history and score, marking a visitor, and the marke
   assert.equal((await app.call('GET', '/api/admin/visitors/log?marked=1&bots=include', { headers, ip: '198.51.100.98' })).json.rows.length, 0, 'un-marked');
   assert.equal((await app.call('GET', `/api/admin/visitors/history?v=${id.v}`, { ip: '198.51.100.98' })).status, 401, 'admin only');
 });
+
+test('portal: group by visitor, delete one visit or one visitor, and clear history while keeping marked visitors', async () => {
+  const login = await app.call('POST', '/api/admin/login', { body: { email: 'owner@example.com', password: 'a long owner passphrase' }, ip: '198.51.100.97' });
+  const headers = { cookie: login.headers.get('set-cookie').split(';')[0], 'x-csrf-token': login.json.csrf };
+  const call = (m, u, body) => app.call(m, u, { headers, ip: '198.51.100.97', body });
+  await app.pg.query('delete from visits');
+  const a = ids(), b = ids(), c = ids();
+  for (const [who, ip] of [[a, '198.51.100.71'], [b, '198.51.100.72'], [c, '198.51.100.73']]) {
+    await beacon({ t: 'view', ...who, p: '/', n: true }, { ip, country: 'IN' });
+    await beacon({ t: 'view', ...who, p: '/?page=tips' }, { ip, country: 'IN' });
+  }
+  const grouped = (await call('GET', '/api/admin/visitors/log?group=1&bots=include')).json.rows;
+  assert.equal(grouped.length, 3, 'one row per visitor');
+  assert.ok(grouped.every(r => r.visit_count === 2 && r.first_seen));
+  // one visit
+  const one = (await call('GET', `/api/admin/visitors/history?v=${a.v}`)).json.visits[0];
+  assert.equal((await call('DELETE', `/api/admin/visitors/visit/${one.id}`)).json.removed, 1);
+  assert.equal((await call('GET', `/api/admin/visitors/history?v=${a.v}`)).json.total, 1);
+  assert.equal((await call('DELETE', '/api/admin/visitors/visit/abc')).status, 400);
+  // mark b, then clear everything except marked visitors
+  await call('PUT', '/api/admin/visitors/mark', { visitorId: b.v, marked: true, label: 'client', note: '' });
+  assert.equal((await call('POST', '/api/admin/visitors/clear', { scope: 'nonsense' })).status, 400);
+  assert.equal((await call('POST', '/api/admin/visitors/clear', { scope: 'older', days: 0 })).status, 400);
+  assert.equal((await call('POST', '/api/admin/visitors/clear', { scope: 'older', days: 30 })).json.removed, 0, 'nothing is older than 30 days yet');
+  const cleared = await call('POST', '/api/admin/visitors/clear', { scope: 'all', keepMarked: true });
+  assert.equal(cleared.json.removed, 3, 'a (1 left) and c (2) are gone');
+  assert.equal((await call('GET', `/api/admin/visitors/history?v=${b.v}`)).json.total, 2, 'the marked visitor stays');
+  assert.equal((await call('GET', `/api/admin/visitors/history?v=${c.v}`)).json.total, 0);
+  // one visitor, including the mark
+  assert.equal((await call('DELETE', `/api/admin/visitors/visitor?v=${b.v}`)).json.removed, 2);
+  assert.equal((await call('GET', `/api/admin/visitors/history?v=${b.v}`)).json.mark, null, 'the mark goes with the history');
+  assert.equal((await call('DELETE', '/api/admin/visitors/visitor?v=x')).status, 400);
+  assert.equal((await app.call('POST', '/api/admin/visitors/clear', { body: { scope: 'all' }, ip: '198.51.100.97' })).status, 401, 'admin only');
+});
