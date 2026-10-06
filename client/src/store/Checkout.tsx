@@ -162,6 +162,17 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
     } else if (s.phase === 'failed') buzz([60, 50, 60]);
   }, [s.phase, reduced]);
 
+  // After the PAID stamp lands, the card turns over once to show the license QR on its back, holds a moment, then turns back.
+  // Touching the card yourself cancels it, so it never fights the buyer.
+  const touched = useRef(false);
+  useEffect(() => {
+    if (s.phase !== 'success' || !s.success?.license || reduced) return;
+    touched.current = false;
+    const t1 = window.setTimeout(() => { if (!touched.current) setFlipped(true); }, 1500);
+    const t2 = window.setTimeout(() => { if (!touched.current) setFlipped(false); }, 4900);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [s.phase, s.success?.license, reduced]);
+
   const quote = s.quote;
   const applyCode = async () => {
     const c = code.trim().toUpperCase();
@@ -272,7 +283,7 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
     <div className="kco-body">
       <section className="kco-visual" aria-label="Order">
         <PassCard product={product} currency={quote?.currency || currency} amount={amount} free={!!quote?.free} email={email} orderId={s.order?.orderId || s.success?.orderId || null}
-          phase={s.phase} method={s.success?.method || null} flipped={flipped} onFlip={() => setFlipped(f => !f)} reduced={reduced} cardRef={cardRef}
+          phase={s.phase} method={s.success?.method || null} flipped={flipped} onFlip={() => { touched.current = true; setFlipped(f => !f); }} reduced={reduced} cardRef={cardRef}
           holder={holder} license={s.success?.license || null} />
         {!stage && <Summary quote={quote} reduced={reduced} />}
         {stage && <div className="kco-status" aria-live="polite">
@@ -284,6 +295,7 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
             <span className="kco-check" aria-hidden="true"><svg viewBox="0 0 24 24" width="34" height="34"><path d="M5 12.5l4.2 4.2L19 7" /></svg></span>
             <h3 ref={statusRef} tabIndex={-1}>{s.success.free ? 'It’s yours!' : 'Payment successful'}</h3>
             <p>{s.success.free ? 'Free download' : formatPrice(s.success.total, s.success.currency)} · Order <strong>{s.success.orderId}</strong></p>
+            {s.success.license && <p className="kco-note kco-qr-hint">Your license QR is on the back of the card. Tap the card to flip it.</p>}
             <p className="kco-note">{s.success.emailed
               ? <>A download link{s.success.free ? '' : ' and your receipt'} {s.success.free ? 'was' : 'were'} sent to <strong>{email.trim()}</strong>.</>
               : <>Your download link{s.success.free ? '' : ' and receipt'} will be emailed to <strong>{email.trim()}</strong> shortly. Use “Download now” to get it right away.</>}</p>

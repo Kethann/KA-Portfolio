@@ -412,3 +412,18 @@ input.invalid,textarea.invalid{ border-color:var(--danger) !important; box-shado
 select{ color-scheme:dark; }
 select option, select optgroup{ background:#1b1620; color:#f1ece6; }
 select option:checked, select option:hover{ background:#ff9438; color:#1a0f05; }
+
+/* a phone (or small tablet) on its side: the chrome shrinks so the app keeps most of the screen */
+@media (max-height:520px){
+  :root{ --menubar-h:28px; --titlebar-h:34px; --dock-icon:36px; --control-h:34px; }
+  .desktop.compact .desk-area{ margin-bottom:calc(46px + env(safe-area-inset-bottom)); }
+  .desktop.compact .win-bar{ flex-wrap:nowrap; padding-top:0; padding-bottom:0; }
+  .desktop.compact .win-bar-end{ order:initial; width:auto; padding-bottom:0; }
+  .desktop.compact .win-title{ padding-right:0; }
+  .dock-wrap.compact .dock{ padding:3px 8px calc(3px + env(safe-area-inset-bottom)); }
+  .dock-wrap.compact .dock-item{ width:48px; }
+  .dock-wrap.compact .dock-item button{ min-height:38px; padding:0; }
+  .dock-wrap.compact .tile{ width:30px; }
+  .dock-wrap.compact .dock-label{ display:none; }
+  body.is-compact .toasts{ bottom:60px; }
+}

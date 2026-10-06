@@ -65,7 +65,7 @@ function Desktop({ session, onSignedOut }: { session: Session; onSignedOut: () =
 }
 function DesktopInner({ session, onSignedOut, areaRef }: { session: Session; onSignedOut: () => void; areaRef: React.RefObject<HTMLDivElement> }){
   const desk = useDesk();
-  const compact = useMedia('(max-width: 760px), (max-height: 520px) and (pointer: coarse)');
+  const compact = useMedia('(max-width: 900px), (max-height: 520px) and (pointer: coarse)')   // phones, tablets held upright, and a phone on its side;
   const { menubar, overlays, pulse } = useChrome({ email: session.email, onSignedOut });
   const visible = desk.wins.filter(w => !w.min);
   useEffect(() => { document.body.classList.toggle('is-compact', compact); }, [compact]);
