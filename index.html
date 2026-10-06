@@ -1487,8 +1487,11 @@ html.ka-modal-open{ overflow:hidden; }
 /* the track and its glowing fill; the line carries on past the last point and ends in an arrow, because the journey is not over */
 .journey-line::before, .journey-line::after{ content:""; position:absolute; top:6px; left:7px; right:8px; height:2px; border-radius:2px; }
 .journey-line::before{ background:linear-gradient(90deg, rgba(255,255,255,.18), rgba(255,255,255,.08) 72%, rgba(255,255,255,.04)); }
-.journey-line::after{ background:linear-gradient(90deg, #ff9438, #ff7a3d 42%, #d6a4ff); transform:scaleX(0); transform-origin:left;
-  box-shadow:0 0 12px rgba(255,148,56,.4); transition:transform 1.25s cubic-bezier(.22,.8,.2,1) .05s; }
+.journey-line::after{ background:linear-gradient(90deg, #ff9438, #ff6a3d 18%, #ffb86b 36%, #d6a4ff 58%, #7fd4ff 76%, #d6a4ff 90%, #ff9438);
+  background-size:220% 100%; transform:scaleX(0); transform-origin:left; box-shadow:0 0 12px rgba(255,148,56,.45), 0 0 26px rgba(214,164,255,.18);
+  transition:transform 1.25s cubic-bezier(.22,.8,.2,1) .05s; }
+.about-journey.in .journey-line::after{ animation:journeyFlow 5.5s linear 1.3s infinite; }
+@keyframes journeyFlow{ from{ background-position:0 0; } to{ background-position:-220% 0; } }
 .about-journey.in .journey-line::after{ transform:scaleX(1); }
 .journey-line li{ position:relative; padding:28px 14px 0 0; }
 /* each point is a diamond that turns in as the line reaches it */
@@ -1501,14 +1504,23 @@ html.ka-modal-open{ overflow:hidden; }
 .about-journey.in .journey-line li::after{ animation:journeyPing .9s ease-out calc(.2s + var(--i) * .13s) 1; }
 .about-journey.in .journey-line li.now::after{ animation:journeyPing 2.6s ease-out calc(.5s + var(--i) * .13s) infinite; }
 @keyframes journeyPing{ 0%{ opacity:.85; transform:rotate(45deg) scale(1); } 100%{ opacity:0; transform:rotate(45deg) scale(2.8); } }
-/* the arrow at the end of the line */
-.journey-line li.jend{ position:absolute; top:0; right:0; width:14px; height:14px; padding:0; pointer-events:none; opacity:0; transform:translateX(-18px);
+/* a bright comet that keeps travelling along the line, and a beat that runs through the diamonds one after another */
+.journey-line li.jpulse{ position:absolute; left:7px; right:8px; top:4px; height:6px; padding:0; pointer-events:none; opacity:0; transition:opacity .5s ease 1.2s;
+  background:radial-gradient(closest-side, rgba(255,255,255,.95), rgba(255,214,170,.55) 45%, rgba(255,148,56,0) 100%) -90px 50% / 90px 6px no-repeat; }
+.journey-line li.jpulse::before, .journey-line li.jpulse::after{ display:none; }
+.about-journey.in .journey-line li.jpulse{ opacity:1; animation:journeyComet 4.8s cubic-bezier(.4,0,.3,1) 1.6s infinite; }
+@keyframes journeyComet{ 0%{ background-position:-90px 50%; } 78%,100%{ background-position:calc(100% + 90px) 50%; } }
+.about-journey.in .journey-line li::before{ animation:journeyBeat 4.8s ease-in-out calc(1.6s + var(--i) * .86s) infinite; }
+@keyframes journeyBeat{ 0%,22%,100%{ box-shadow:0 0 12px 1px rgba(255,148,56,.55); } 8%{ box-shadow:0 0 22px 5px rgba(255,200,140,.95); } }
+/* the arrow at the end of the line: three chevrons that light up one after the other */
+.journey-line li.jend{ position:absolute; top:0; right:-6px; width:30px; height:14px; padding:0; pointer-events:none; opacity:0; transform:translateX(-18px);
   transition:opacity .4s ease .95s, transform .7s cubic-bezier(.2,.8,.2,1) .95s; }
-.journey-line li.jend::after{ display:none; }
-.about-journey .journey-line li.jend::before, .about-journey.in .journey-line li.jend::before{ top:2.5px; left:0; width:9px; height:9px; border-radius:0; background:none; box-shadow:none;
-  border:0; border-top:2px solid #d6a4ff; border-right:2px solid #d6a4ff; transform:rotate(45deg); filter:drop-shadow(0 0 5px rgba(214,164,255,.65)); transition:none; }
-.about-journey.in .journey-line li.jend{ opacity:1; transform:none; animation:journeyArrow 2.2s ease-in-out 1.9s infinite; }
-@keyframes journeyArrow{ 0%,100%{ transform:translateX(0); opacity:1; } 50%{ transform:translateX(6px); opacity:.6; } }
+.journey-line li.jend::before, .journey-line li.jend::after, .about-journey .journey-line li.jend::before, .about-journey.in .journey-line li.jend::before{ display:none; animation:none; }
+.journey-line li.jend i{ position:absolute; top:2.5px; left:calc(var(--k) * 7px); width:9px; height:9px; border-top:2px solid #d6a4ff; border-right:2px solid #d6a4ff; transform:rotate(45deg);
+  opacity:.22; filter:drop-shadow(0 0 5px rgba(214,164,255,.7)); }
+.about-journey.in .journey-line li.jend{ opacity:1; transform:none; }
+.about-journey.in .journey-line li.jend i{ animation:journeyChev 1.7s ease-in-out calc(1.8s + var(--k) * .22s) infinite; }
+@keyframes journeyChev{ 0%,100%{ opacity:.22; } 35%{ opacity:1; } }
 .journey-line strong{ display:block; font-size:.92rem; font-weight:600; color:var(--ink); letter-spacing:-.005em; margin-bottom:3px; }
 .journey-line span.jt{ display:block; font-size:.78rem; line-height:1.45; color:var(--ink-dim); }
 .journey-line li strong, .journey-line li span.jt{ transform:translateY(8px); transition:transform .6s cubic-bezier(.2,.8,.2,1), opacity .35s ease; }
@@ -1523,14 +1535,20 @@ html.ka-modal-open{ overflow:hidden; }
   .about-journey.in .journey-line::after{ transform:scaleY(1); }
   .journey-line li{ padding:0 0 18px 32px; }
   .journey-line li::before, .journey-line li::after{ top:2px; left:1.5px; }
-  .journey-line li.jend{ top:auto; bottom:0; left:0; right:auto; padding:0; transform:translateY(-16px); }
-  .about-journey .journey-line li.jend::before, .about-journey.in .journey-line li.jend::before{ top:0; left:2.5px; transform:rotate(135deg); }
-  .about-journey.in .journey-line li.jend{ animation-name:journeyArrowDown; }
-  @keyframes journeyArrowDown{ 0%,100%{ transform:translateY(0); opacity:1; } 50%{ transform:translateY(6px); opacity:.6; } }
+  .journey-line li.jend{ top:auto; bottom:-6px; left:0; right:auto; width:14px; height:30px; transform:translateY(-18px); }
+  .journey-line li.jend i{ top:calc(var(--k) * 7px); left:2.5px; transform:rotate(135deg); }
+  .journey-line li.jpulse{ left:5px; right:auto; width:6px; top:7px; bottom:8px; height:auto;
+    background:radial-gradient(closest-side, rgba(255,255,255,.95), rgba(255,214,170,.55) 45%, rgba(255,148,56,0) 100%) 50% -90px / 6px 90px no-repeat; }
+  .about-journey.in .journey-line li.jpulse{ animation-name:journeyCometDown; }
+  @keyframes journeyCometDown{ 0%{ background-position:50% -90px; } 78%,100%{ background-position:50% calc(100% + 90px); } }
+  .journey-line::after{ background-size:100% 220%; background-image:linear-gradient(180deg, #ff9438, #ff6a3d 18%, #ffb86b 36%, #d6a4ff 58%, #7fd4ff 76%, #d6a4ff 90%, #ff9438); }
+  .about-journey.in .journey-line::after{ animation-name:journeyFlowDown; }
+  @keyframes journeyFlowDown{ from{ background-position:0 0; } to{ background-position:0 -220%; } }
 }
 @media (prefers-reduced-motion: reduce){
   .journey-line::after, .journey-line li::before, .journey-line li.jend, .journey-line li strong, .journey-line li span.jt{ transition:none; }
-  .about-journey.in .journey-line li::after, .about-journey.in .journey-line li.jend{ animation:none; }
+  .about-journey.in .journey-line li::after, .about-journey.in .journey-line li::before, .about-journey.in .journey-line li.jend i, .about-journey.in .journey-line li.jpulse, .about-journey.in .journey-line::after{ animation:none; }
+  .journey-line li.jend i{ opacity:1; } .journey-line li.jpulse{ display:none; }
 }
 
 /* ---- About: promo cuts (a stack of random YouTube clips, with a small panel beside it) ---- */
@@ -7257,7 +7275,10 @@ window.addEventListener("ka-sequence-complete", function(){
         if (i === cfg.steps.length - 1) li.classList.add("now");
         li.append(t, d); stepsEl.appendChild(li);
       });
-      var end = h("li", "jend"); end.setAttribute("aria-hidden", "true"); end.setAttribute("role", "presentation"); stepsEl.appendChild(end);   // the arrow: the journey carries on
+      var comet = h("li", "jpulse"); comet.setAttribute("aria-hidden", "true"); comet.setAttribute("role", "presentation"); stepsEl.appendChild(comet);   // a light that keeps travelling the line
+      var end = h("li", "jend"); end.setAttribute("aria-hidden", "true"); end.setAttribute("role", "presentation");   // the arrow: the journey carries on
+      for (var k = 0; k < 3; k++){ var ch = h("i"); ch.style.setProperty("--k", String(k)); end.appendChild(ch); }
+      stepsEl.appendChild(end);
       jTimers.forEach(clearTimeout); jTimers = [];
       jEl.classList.remove("in"); jPlayed = false;
       showYear();
