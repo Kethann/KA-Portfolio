@@ -168,3 +168,11 @@ test('Portfolio: switching archive and framing off really clears them from the s
   const x = again.images.find(i => i.slug === slug);
   assert.equal(x.archived, undefined); assert.equal(x.hidden, false); assert.equal(x.focusX, undefined); assert.equal(x.zoom, undefined);
 });
+
+test('Portfolio: looping is chosen per stack, for folders that exist', () => {
+  const base = structuredClone(seed);
+  const [a, b] = base.folders;
+  const d = validateSiteDocument({ ...base, stacks: { loop: true, loops: { [a]: false, [b]: true, 'No such folder': false, [base.folders[2]]: 'yes' }, covers: {} } }, seed, seed);
+  assert.deepEqual(d.stacks.loops, { [a]: false, [b]: true });
+  assert.equal(d.stacks.loop, true, 'the default for stacks without their own choice is unchanged');
+});

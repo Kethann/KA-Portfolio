@@ -2,7 +2,7 @@ import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'rea
 import type {CSSProperties,KeyboardEvent as ReactKeyboardEvent,MouseEvent as ReactMouseEvent,PointerEvent as ReactPointerEvent} from 'react';
 import {imageUrl,type Project} from './types';
 
-export type StacksSettings={loop?:boolean;covers?:Record<string,string>};
+export type StacksSettings={loop?:boolean;loops?:Record<string,boolean>;covers?:Record<string,string>};
 export type WorkStacksProps={folders:string[];images:Project[];stacks?:StacksSettings;/** 'pinned' shows only pinned images (Portfolio ALL / PINNED chips). */filter?:'all'|'pinned';pinned?:string[];onPin?:(slug:string,on:boolean)=>void;/** Distinguishes panels (Portfolio, About) so each plays its own entrance once. */id?:string};
 type Stack={name:string;items:Project[];cover:Project};
 
@@ -741,7 +741,7 @@ export function WorkStacks({folders,images,stacks:settings,id='work',filter='all
   if(!stacks.length)return <p className="ws-empty" role="status">{filter==='pinned'?'Nothing pinned yet. Open any image and tap the pin to keep it here.':'No work to show yet.'}</p>;
   return <section className="work-stacks" aria-label="Work" ref={rootRef}>
     {current
-      ?<Coverflow key={current.name} stack={current} loop={settings?.loop!==false} reduced={reduced} canHover={canHover} onClose={close} pins={pinSet} onPin={onPin} startSlug={startSlug}/>
+      ?<Coverflow key={current.name} stack={current} loop={settings?.loops?.[current.name]??(settings?.loop!==false)} reduced={reduced} canHover={canHover} onClose={close} pins={pinSet} onPin={onPin} startSlug={startSlug}/>
       :<StackGrid id={id} stacks={stacks} reduced={reduced} onOpen={(name,el)=>{opener.current=el;setOpen(name);}}/>}
   </section>;
 }

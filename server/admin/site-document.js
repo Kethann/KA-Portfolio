@@ -234,7 +234,11 @@ export function validateSiteDocument(input, current, seed){
       images.push({ ...plain, ...common });
     }
   }
-  const stacks = { loop: input.stacks?.loop !== false, covers: {} };
+  // loop: the default for every stack; loops: a stack's own choice (true or false), kept only for folders that exist
+  const stacks = { loop: input.stacks?.loop !== false, loops: {}, covers: {} };
+  if (input.stacks?.loops && typeof input.stacks.loops === 'object'){
+    for (const [folder, v] of Object.entries(input.stacks.loops)) if (folders.includes(folder) && typeof v === 'boolean') stacks.loops[folder] = v;
+  }
   if (input.stacks?.covers && typeof input.stacks.covers === 'object'){
     for (const [folder, slug] of Object.entries(input.stacks.covers)) if (folders.includes(folder) && images.some(i => i.slug === slug && i.cat === folder)) stacks.covers[folder] = slug;
   }

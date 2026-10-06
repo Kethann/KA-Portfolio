@@ -348,7 +348,7 @@ function Portfolio(){
     if (!name || name === folder) return;
     if (doc!.folders.includes(name)) return toast.show('That folder already exists.', { tone: 'error' });
     updateSite(d => ({ ...d, folders: d.folders.map(f => f === folder ? name : f), images: d.images.map(i => i.cat === folder ? { ...i, cat: name } : i),
-      stacks: { ...d.stacks, covers: Object.fromEntries(Object.entries(d.stacks.covers).map(([k, v]) => [k === folder ? name : k, v])) } }));
+      stacks: { ...d.stacks, covers: Object.fromEntries(Object.entries(d.stacks.covers).map(([k, v]) => [k === folder ? name : k, v])), loops: Object.fromEntries(Object.entries(d.stacks.loops || {}).map(([k, v]) => [k === folder ? name : k, v])) } }));
     setFolder(name);
   };
   const removeFolder = async () => {
@@ -414,7 +414,8 @@ function Portfolio(){
                 <button type="button" className="btn sm primary" onClick={() => setArchived(i.slug, false)}>Republish</button></div>
             </li>))}</ul>}
         </section>}
-        <Switch checked={doc!.stacks.loop} onChange={v => updateSite(d => ({ ...d, stacks: { ...d.stacks, loop: v } }))} label="Work stacks loop around (coverflow)" />
+        <Switch checked={doc!.stacks.loops?.[folder] ?? doc!.stacks.loop} onChange={v => updateSite(d => ({ ...d, stacks: { ...d.stacks, loops: { ...(d.stacks.loops || {}), [folder]: v } } }))} label={`“${folder}” loops around (coverflow)`} />
+        <p className="field-hint" style={{ margin: 0 }}>This choice belongs to this stack only; every other stack keeps its own.</p>
       </div>
       {editing && <ImageEditor slug={editing} onClose={() => setEditing(null)} />}
       {moving && <MoveImage slug={moving} onClose={() => setMoving(null)} />}
