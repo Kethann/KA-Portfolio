@@ -85,10 +85,6 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
                 <Segmented label="Download format" value={d.visibility.downloadFormat === 'jpeg' ? 'jpeg' : 'png'} onChange={v => updateSite(x => ({ ...x, visibility: { ...x.visibility, downloadFormat: v } }))} options={[{ value: 'png', label: 'PNG (lossless)' }, { value: 'jpeg', label: 'JPEG (smaller)' }]} />
                 <p className="field-hint">Every gallery image visitors download is saved in this format, never WebP.</p>
               </div>
-              <div className="stack"><div className="eyebrow">Full screen</div>
-                <Switch checked={d.visibility.autoFullscreen !== false} onChange={v => updateSite(x => ({ ...x, visibility: { ...x.visibility, autoFullscreen: v } }))} label="Go full screen on a visitor’s first tap or click" />
-                <p className="field-hint">Browsers only allow full screen after the visitor interacts, so it starts on their first tap, click or key press. If they leave full screen it isn’t forced again during that visit. iPhone Safari never allows it: there the ☰ menu offers Add to Home Screen instead.</p>
-              </div>
             </>}
 
             {section === 'social' && <Social doc={d} />}

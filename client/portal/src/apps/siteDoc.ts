@@ -55,7 +55,7 @@ export async function loadSite(force = false){
   } catch (e: any){ emit({ error: e.message, loading: false }); }
 }
 function withDefaults(d: SiteDoc): SiteDoc {
-  return { ...d, notice: d.notice || { enabled: false, text: '', tone: 'info' }, visibility: { navGallery: d.visibility?.navGallery ?? true, navAbout: d.visibility?.navAbout ?? true, autoFullscreen: d.visibility?.autoFullscreen ?? true, downloadFormat: d.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png' },
+  return { ...d, notice: d.notice || { enabled: false, text: '', tone: 'info' }, visibility: { navGallery: d.visibility?.navGallery ?? true, navAbout: d.visibility?.navAbout ?? true, autoFullscreen: d.visibility?.autoFullscreen ?? false, downloadFormat: d.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png' },
     stacks: d.stacks || { loop: true, covers: {} }, layoutOverrides: d.layoutOverrides || { mobile: {}, tablet: {}, desktop: {} }, branding: d.branding || { enabled: false, logoUrl: '' },
     elementStyles: d.elementStyles || {}, socialLinks: d.socialLinks || [], passCard: { ...PASS_DRAFT_DEFAULTS, ...(d.passCard || {}) }, stats: d.stats ? { enabled: d.stats.enabled !== false, items: d.stats.items || [] } : STATS_DEFAULTS,
     skills: d.skills ? { enabled: d.skills.enabled !== false, title: d.skills.title || 'Skills', intro: d.skills.intro || '', categories: d.skills.categories || [] } : { enabled: true, title: 'Skills', intro: '', categories: [] }, about: d.about ? { ...aboutDefaults(), ...d.about, journey: { ...ABOUT_DEFAULT.journey, ...(d.about.journey || {}) }, reel: { ...ABOUT_DEFAULT.reel, ...(d.about.reel || {}) } } : aboutDefaults(), details: { ...d.details, customFonts: d.details?.customFonts || [] } };

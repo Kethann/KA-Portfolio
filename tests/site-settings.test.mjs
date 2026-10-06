@@ -9,14 +9,12 @@ setEnvSource({ KA_DATA_DIR: mkdtempSync(join(tmpdir(), 'ka-site-')) });   // the
 import { validateSiteDocument } from '../server/admin/site-document.js';
 const seed = JSON.parse(readFileSync(new URL('../server/portfolio-seed.json', import.meta.url), 'utf8'));
 
-test('visibility.autoFullscreen: on unless explicitly switched off; other nav switches unaffected', () => {
+test('visibility.autoFullscreen: off unless explicitly on (the site no longer goes full screen on a first tap); other nav switches unaffected', () => {
   const base = structuredClone(seed); delete base.visibility;
-  const on = validateSiteDocument({ ...base }, seed, seed);
-  assert.equal(on.visibility.autoFullscreen, true, 'older saved sites (no setting yet) get it on');
-  const off = validateSiteDocument({ ...base, visibility: { autoFullscreen: false } }, seed, seed);
-  assert.equal(off.visibility.autoFullscreen, false);
-  assert.equal(off.visibility.navGallery, true); assert.equal(off.visibility.navAbout, true);
-  assert.equal(validateSiteDocument({ ...base, visibility: { autoFullscreen: 'no' } }, seed, seed).visibility.autoFullscreen, true, 'only a real false turns it off');
+  const d = validateSiteDocument({ ...base }, seed, seed);
+  assert.equal(d.visibility.autoFullscreen, false);
+  assert.equal(d.visibility.navGallery, true); assert.equal(d.visibility.navAbout, true);
+  assert.equal(validateSiteDocument({ ...base, visibility: { autoFullscreen: 'yes' } }, seed, seed).visibility.autoFullscreen, false);
 });
 
 test('passCard: defaults for older sites, values kept in range, fonts and logo checked', () => {

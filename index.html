@@ -7050,33 +7050,7 @@ window.kaFullscreen = (function(){
   document.addEventListener("fullscreenchange", sync);
   document.addEventListener("webkitfullscreenchange", sync);
   sync();
-  // Open in full screen: browsers only allow it from a user gesture, so it happens on the visitor's
-  // first tap, click or key press (that gesture still does its normal job). If they leave full
-  // screen, it isn't forced again this visit. Never inside the portal's live preview (an iframe),
-  // never where it can't work (iPhone Safari), and switchable in Studio (window.kaAutoFullscreen).
-  (function(){
-    if (window.top !== window.self || /[?&]preview=1\b/.test(location.search)) return;
-    var declined = false, tries = 0, entered = false;
-    try { declined = sessionStorage.getItem("ka-fs-declined") === "1"; } catch(e){}
-    function onGesture(e){
-      if (declined || tries >= 2 || window.kaAutoFullscreen === false || active() || !supported()) return;
-      if (e.type === "keydown" && (e.key === "Escape" || e.key === "Tab" || e.key === "F11" || e.metaKey || e.ctrlKey || e.altKey)) return;
-      tries++;
-      try {
-        var r = request();
-        entered = true;
-        if (r && r.catch) r.catch(function(){ entered = false; });
-      } catch(err){ entered = false; }
-    }
-    // pointerup/touchend (touch) and mousedown/keydown (mouse, keyboard) are the gestures browsers accept
-    ["pointerup", "touchend", "mousedown", "keydown"].forEach(function(ev){ document.addEventListener(ev, onGesture, { capture: true, passive: true }); });
-    function onChange(){
-      if (active()) return;
-      if (entered){ declined = true; try { sessionStorage.setItem("ka-fs-declined", "1"); } catch(e){} }
-    }
-    document.addEventListener("fullscreenchange", onChange);
-    document.addEventListener("webkitfullscreenchange", onChange);
-  })();
+  // (There is no automatic full screen on a first tap any more: it made the page jump and flicker. Full screen is only the menu's "Full screen" item.)
   return { toggle: toggle, active: active, supported: supported };
 })();
 // Store and Tips share one lazily loaded bundle (dist/assets/store.js). It starts downloading as
@@ -8739,7 +8713,6 @@ function applySiteAppearance(data){
     noticeEl.hidden = true;
   }
   if (typeof window !== "undefined"){
-    window.kaAutoFullscreen = !(data.visibility && data.visibility.autoFullscreen === false);
     window.KA_DL_CONFIG = Object.assign(window.KA_DL_CONFIG || {}, { format: data.visibility && data.visibility.downloadFormat === "jpeg" ? "jpeg" : "png" });
     window.kaPassCard = data.passCard || null;   // the checkout pass design (Studio > Checkout pass)
     // load the pass's fonts now (the browser would only fetch a font when it is first drawn, so the signature would flash in the wrong font)
