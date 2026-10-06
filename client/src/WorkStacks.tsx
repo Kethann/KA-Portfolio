@@ -53,7 +53,9 @@ function StackImg({p,min,alt,eager}:{p:Project;min:number;alt:string;eager?:bool
   useLayoutEffect(()=>{const i=ref.current;if(i&&i.complete&&i.naturalWidth)setState('ok');},[src]);
   if(state==='failed')return <span className="img-fallback" aria-hidden={alt?undefined:true}>{alt||p.title}</span>;
   const onError=()=>{const full=p.src?'':`/images/${p.slug}-full.webp`;if(full&&src!==full)setSrc(full);else setState('failed');};
-  return <img ref={ref} src={src} alt={alt} className={state==='ok'?'is-in':''} loading={eager?'eager':'lazy'} decoding="async" draggable={false}
+  const fx=p.focusX??50,fy=p.focusY??50,zm=p.zoom??1;
+  const frame:CSSProperties|undefined=(fx!==50||fy!==50||zm!==1)?{objectPosition:`${fx}% ${fy}%`,transformOrigin:`${fx}% ${fy}%`,...(zm>1?{transform:`scale(${zm})`}:{})}:undefined;
+  return <img ref={ref} src={src} alt={alt} style={frame} className={state==='ok'?'is-in':''} loading={eager?'eager':'lazy'} decoding="async" draggable={false}
     {...(eager?{fetchpriority:'high'}:{}) as object} onLoad={()=>setState('ok')} onError={onError}/>;
 }
 function useMedia(query:string){

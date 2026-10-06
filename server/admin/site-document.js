@@ -214,7 +214,12 @@ export function validateSiteDocument(input, current, seed){
     if (link && !httpUrl(link)) throw bad('Project links must start with https:// or http://.');
     if (image.technologies !== undefined && (!Array.isArray(image.technologies) || image.technologies.length > 20)) throw bad('Use up to 20 technology labels.');
     const technologies = (image.technologies || []).map(v => text(v, 60)).filter(Boolean);
-    const common = { id: slug, slug, title, cat, description, technologies, link, downloadable: image.downloadable !== false, hidden: image.hidden === true };
+    // how the picture sits on its stack card: the point that stays in view (0-100 each way) and a zoom; only stored when it differs from centred
+    const clamp = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
+    const fx = clamp(image.focusX, 0, 100, 50), fy = clamp(image.focusY, 0, 100, 50), zm = clamp(image.zoom, 1, 3, 1);
+    const framing = fx !== 50 || fy !== 50 || zm !== 1 ? { focusX: Math.round(fx * 10) / 10, focusY: Math.round(fy * 10) / 10, zoom: Math.round(zm * 100) / 100 } : {};
+    const archived = image.archived === true;   // archived = taken off the site but kept here to republish; it is hidden too
+    const common = { id: slug, slug, title, cat, description, technologies, link, downloadable: image.downloadable !== false, hidden: image.hidden === true || archived, ...(archived ? { archived: true } : {}), ...framing };
     const w = Number(image.width), h = Number(image.height);
     const dims = Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0 && w <= 20000 && h <= 20000 ? { width: Math.round(w), height: Math.round(h) } : {};
     if (image.src){
@@ -225,7 +230,8 @@ export function validateSiteDocument(input, current, seed){
     } else {
       const original = originals.get(slug);
       if (!original) throw bad('Unknown original image: ' + slug);
-      images.push({ ...original, ...common });
+      const { archived: _a, focusX: _x, focusY: _y, zoom: _z, ...plain } = original;   // the stored flags must not leak back once they are switched off
+      images.push({ ...plain, ...common });
     }
   }
   const stacks = { loop: input.stacks?.loop !== false, covers: {} };

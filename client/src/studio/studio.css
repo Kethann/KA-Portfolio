@@ -187,3 +187,8 @@ legend{ padding:0 0 6px; font:600 11px ui-monospace, monospace; letter-spacing:.
 @media (prefers-reduced-motion: reduce){
   .panel, .confirm-card, .toast, .toolbar-wrap{ animation:none !important; transition:opacity .15s ease !important; }
 }
+
+/* dropdown lists: dark with light text, the chosen option in the accent, so nothing is grey on grey */
+select{ color-scheme:dark; }
+select option, select optgroup{ background:#1b1620; color:#f1ece6; }
+select option:checked, select option:hover{ background:#ff9438; color:#1a0f05; }

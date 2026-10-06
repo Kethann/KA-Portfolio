@@ -6,7 +6,7 @@ import { get, put } from '../api';
 import { PASS_DEFAULTS, type PassSettings } from '../../../src/store/checkout/PassCard';
 import { ABOUT_DEFAULT, ABOUT_LIMITS } from '../../../../shared/about-default.js';
 
-export type SiteImage = { id: string; slug: string; title: string; cat: string; description: string; technologies: string[]; link: string; downloadable?: boolean; hidden?: boolean; src?: string; widths: number[]; full: number; width?: number; height?: number };
+export type SiteImage = { id: string; slug: string; title: string; cat: string; description: string; technologies: string[]; link: string; downloadable?: boolean; hidden?: boolean; archived?: boolean; focusX?: number; focusY?: number; zoom?: number; src?: string; widths: number[]; full: number; width?: number; height?: number };
 export type SiteDoc = {
   revision: number; details: Record<string, any> & { customFonts: { family: string; url: string }[] }; folders: string[]; images: SiteImage[];
   notice: { enabled: boolean; text: string; tone: 'info' | 'warning' }; visibility: { navGallery: boolean; navAbout: boolean; autoFullscreen?: boolean };

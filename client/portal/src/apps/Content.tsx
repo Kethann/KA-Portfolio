@@ -323,7 +323,12 @@ function Portfolio(){
   const [newFolder, setNewFolder] = useState('');
   const [dragSlug, setDragSlug] = useState<string | null>(null);
   useEffect(() => { if (!doc!.folders.includes(folder)) setFolder(doc!.folders[0] || ''); }, [doc, folder]);
-  const images = useMemo(() => doc!.images.filter(i => i.cat === folder), [doc, folder]);
+  const [showArchived, setShowArchived] = useState(false);
+  const [moving, setMoving] = useState<string | null>(null);
+  const images = useMemo(() => doc!.images.filter(i => i.cat === folder && !i.archived), [doc, folder]);
+  const archivedImages = useMemo(() => doc!.images.filter(i => i.cat === folder && i.archived), [doc, folder]);
+  const setArchived = (slug: string, on: boolean) => void updateSiteLive(d => ({ ...d, images: d.images.map(x => x.slug === slug ? (on ? { ...x, archived: true, hidden: true } : { ...x, archived: false, hidden: false }) : x) }))
+    .then(live => toast.show(live ? (on ? 'Archived: off the site now' : 'Republished: back on the site now') : (on ? 'Archived. Press Publish changes to put it live.' : 'Republished. Press Publish changes to put it live.'), { tone: 'success' })).catch(toast.error);
   const cover = doc!.stacks.covers[folder];
   const moveImage = (slug: string, toSlug: string) => updateSite(d => {
     const list = [...d.images], from = list.findIndex(i => i.slug === slug), to = list.findIndex(i => i.slug === toSlug);
@@ -376,7 +381,7 @@ function Portfolio(){
         <div className="row between">
           <div>{renaming !== null
             ? <input autoFocus aria-label="Folder name" value={renaming} maxLength={70} onChange={e => setRenaming(e.target.value)} onBlur={renameFolder} onKeyDown={e => { if (e.key === 'Enter') renameFolder(); if (e.key === 'Escape') setRenaming(null); }} />
-            : <h2 className="section-title">{folder || 'No folder'}</h2>}<p className="faint">{images.length} image{images.length === 1 ? '' : 's'}{images.some(i => i.hidden) ? ` (${images.filter(i => i.hidden).length} hidden)` : ''} · drag to reorder · the star picks the stack cover · the eye hides an image from the site</p></div>
+            : <h2 className="section-title">{folder || 'No folder'}</h2>}<p className="faint">{images.length} image{images.length === 1 ? '' : 's'}{images.some(i => i.hidden) ? ` (${images.filter(i => i.hidden).length} hidden)` : ''} · drag to reorder · the star picks the stack cover · the eye hides an image · the box archives it (kept here, off the site) · the grip moves it anywhere in the stack, or to another stack</p></div>
           <div className="row"><button type="button" className="btn sm ghost" onClick={() => setRenaming(folder)}>Rename</button><button type="button" className="btn sm ghost" onClick={removeFolder}>Remove</button></div>
         </div>
         <Uploader kind="image" accept="image/png,image/jpeg,image/webp,image/avif" label={`Add images to “${folder}”`} multiple onUploaded={uploaded}>PNG, JPG, WebP or AVIF, up to 10 MB. Large images are shown sharp on 4K screens.</Uploader>
@@ -391,14 +396,28 @@ function Portfolio(){
                   <button type="button" className="icon-btn sm" aria-pressed={!!i.hidden} aria-label={i.hidden ? 'Show on the site' : 'Hide from the site'} title={i.hidden ? 'Hidden: show on the site' : 'Hide from the site'}
                     onClick={() => void updateSiteLive(d => ({ ...d, images: d.images.map(x => x.slug === i.slug ? { ...x, hidden: !x.hidden } : x) })).then(live => toast.show(live ? (i.hidden ? 'Shown on the site now' : 'Hidden from the site now') : 'Changed. Press Publish changes to put it live.', { tone: 'success' })).catch(toast.error)}><Icon name={i.hidden ? 'eyeOff' : 'eye'} size={13} /></button>
                   <button type="button" className={'icon-btn sm' + (cover === i.slug ? ' star-on' : '')} aria-pressed={cover === i.slug} aria-label={cover === i.slug ? 'Stack cover' : 'Use as stack cover'} title="Stack cover"
-                    onClick={() => updateSite(d => ({ ...d, stacks: { ...d.stacks, covers: { ...d.stacks.covers, [folder]: cover === i.slug ? '' : i.slug } } }))}><Icon name="star" size={13} /></button></div>
+                    onClick={() => updateSite(d => ({ ...d, stacks: { ...d.stacks, covers: { ...d.stacks.covers, [folder]: cover === i.slug ? '' : i.slug } } }))}><Icon name="star" size={13} /></button>
+                  <button type="button" className="icon-btn sm" aria-label={`Archive ${i.title}`} title="Archive: take it off the site, keep it here" onClick={() => setArchived(i.slug, true)}><Icon name="archive" size={13} /></button>
+                  <button type="button" className="icon-btn sm" aria-label={`Move ${i.title}`} title="Move: to another place in this stack, or to another stack" onClick={() => setMoving(i.slug)}><Icon name="drag" size={13} /></button></div>
               </li>
             ))}
           </ul>
         )}
+        {archivedImages.length > 0 && <section className="card stack" aria-label="Archived images">
+          <div className="row between"><b>Archived ({archivedImages.length})</b>
+            <button type="button" className="btn sm ghost" aria-expanded={showArchived} onClick={() => setShowArchived(v => !v)}>{showArchived ? 'Hide list' : 'Show list'}</button></div>
+          {showArchived && <ul className="pf-grid">{archivedImages.map(i => (
+            <li key={i.slug} className="is-hidden">
+              <button type="button" className="pf-thumb" onClick={() => setEditing(i.slug)} aria-label={`Edit ${i.title}`}><img src={thumb(i)} alt="" loading="lazy" decoding="async" /></button>
+              <Badge>Archived</Badge>
+              <div className="pf-meta"><span className="truncate">{i.title}</span>
+                <button type="button" className="btn sm primary" onClick={() => setArchived(i.slug, false)}>Republish</button></div>
+            </li>))}</ul>}
+        </section>}
         <Switch checked={doc!.stacks.loop} onChange={v => updateSite(d => ({ ...d, stacks: { ...d.stacks, loop: v } }))} label="Work stacks loop around (coverflow)" />
       </div>
       {editing && <ImageEditor slug={editing} onClose={() => setEditing(null)} />}
+      {moving && <MoveImage slug={moving} onClose={() => setMoving(null)} />}
     </div>
   );
 }
@@ -420,6 +439,11 @@ function ImageEditor({ slug, onClose }: { slug: string; onClose: () => void }){
         const live = await updateSiteLive(d => ({ ...d, images: d.images.filter(i => i.slug !== slug),
           stacks: { ...d.stacks, covers: Object.fromEntries(Object.entries(d.stacks.covers).map(([k, v]) => [k, v === slug ? '' : v])) } }));
         toast.show(live ? 'Removed from the site now' : 'Removed. Press Publish changes to put it live.', { tone: 'success' }); } catch (e){ toast.error(e); } } }}><Icon name="trash" /> Remove</button>
+      <AsyncButton className="btn ghost" onClick={async () => {
+        const on = !f.archived; onClose();
+        try { const live = await updateSiteLive(d => ({ ...d, images: d.images.map(i => i.slug === slug ? (on ? { ...f, id: f.slug, archived: true, hidden: true } : { ...f, id: f.slug, archived: false, hidden: false }) : i) }));
+          toast.show(live ? (on ? 'Archived: off the site now' : 'Republished: back on the site now') : (on ? 'Archived. Press Publish changes to put it live.' : 'Republished. Press Publish changes to put it live.'), { tone: 'success' }); } catch (e){ toast.error(e); }
+      }}><Icon name="archive" /> {f.archived ? 'Republish' : 'Archive'}</AsyncButton>
       <button type="button" className="btn" onClick={() => void close()}>Cancel</button>
       <button type="button" className="btn primary" onClick={apply}>Done</button>
     </>}>
@@ -429,13 +453,88 @@ function ImageEditor({ slug, onClose }: { slug: string; onClose: () => void }){
           <Field label="Title"><input value={f.title} onChange={e => setF({ ...f, title: e.target.value })} maxLength={160} /></Field>
           <Field label="Folder"><select value={f.cat} onChange={e => setF({ ...f, cat: e.target.value })}>{doc!.folders.map(x => <option key={x}>{x}</option>)}</select></Field>
           <Field label="Link" hint="Optional, e.g. Behance"><input type="url" value={f.link} onChange={e => setF({ ...f, link: e.target.value })} placeholder="https://" /></Field>
-          <Switch checked={!f.hidden} onChange={v => setF({ ...f, hidden: !v })} label="Show on the site" />
+          {f.archived ? <p className="field-hint" style={{ margin: 0 }}>Archived: kept here, not on the site. Use Republish to bring it back.</p> : <Switch checked={!f.hidden} onChange={v => setF({ ...f, hidden: !v })} label="Show on the site" />}
           <Switch checked={f.downloadable !== false} onChange={v => setF({ ...f, downloadable: v })} label="Visitors may download this image" />
         </div>
       </div>
+      <section className="stack" aria-label="Stack preview">
+        <b>Stack preview</b>
+        <p className="field-hint" style={{ margin: 0 }}>Click the picture to choose what stays in view on its card in the stack, and zoom in to crop closer. The card on the right shows the result.</p>
+        <div className="focus-row">
+          <FocusPicker f={f} setF={setF} />
+          <div className="focus-card" aria-hidden="true"><img src={thumb(f, 480)} alt="" style={{ objectPosition: `${f.focusX ?? 50}% ${f.focusY ?? 50}%`, transformOrigin: `${f.focusX ?? 50}% ${f.focusY ?? 50}%`, transform: `scale(${f.zoom ?? 1})` }} /></div>
+          <div className="stack" style={{ flex: '1 1 160px', minWidth: 140 }}>
+            <Field label={`Zoom ${(f.zoom ?? 1).toFixed(1)}×`}><input type="range" min={1} max={3} step={0.1} value={f.zoom ?? 1} aria-label="Zoom" onChange={e => setF({ ...f, zoom: Number(e.target.value) })} /></Field>
+            <button type="button" className="btn sm ghost" disabled={(f.focusX ?? 50) === 50 && (f.focusY ?? 50) === 50 && (f.zoom ?? 1) === 1} onClick={() => setF({ ...f, focusX: undefined, focusY: undefined, zoom: undefined })}>Centre and reset</button>
+          </div>
+        </div>
+      </section>
       <Field label="Description"><textarea rows={4} value={f.description} onChange={e => setF({ ...f, description: e.target.value })} maxLength={4000} /></Field>
       <Field label="Tools"><TagInput label="Tools" value={f.technologies} onChange={v => setF({ ...f, technologies: v })} placeholder="Photoshop, Blender…" /></Field>
     </Modal>
+  );
+}
+
+// Move one image to any position in its stack, or into another stack: first / earlier / later / last buttons, or type the place.
+function MoveImage({ slug, onClose }: { slug: string; onClose: () => void }){
+  const { doc } = useSite();
+  const toast = useToast();
+  const img = doc!.images.find(i => i.slug === slug);
+  const [folder, setFolder] = useState(img?.cat || '');
+  const inFolder = (f: string) => doc!.images.filter(i => i.cat === f && !i.archived && i.slug !== slug);
+  const here = img && !img.archived ? doc!.images.filter(i => i.cat === img.cat && !i.archived).findIndex(i => i.slug === slug) + 1 : 0;
+  const [pos, setPos] = useState(here || inFolder(img?.cat || '').length + 1);
+  if (!img) return null;
+  const max = inFolder(folder).length + 1;   // the image itself is counted once in its own stack
+  const p = Math.min(max, Math.max(1, pos));
+  const apply = async () => {
+    onClose();
+    try {
+      const live = await updateSiteLive(d => {
+        const me = d.images.find(i => i.slug === slug); if (!me) return d;
+        const rest = d.images.filter(i => i.slug !== slug), peers = rest.filter(i => i.cat === folder && !i.archived);
+        const idx = p - 1 < peers.length ? rest.indexOf(peers[p - 1]) : peers.length ? rest.indexOf(peers[peers.length - 1]) + 1 : rest.length;
+        rest.splice(idx, 0, { ...me, cat: folder });
+        const covers = { ...d.stacks.covers }; if (folder !== me.cat && covers[me.cat] === slug) covers[me.cat] = '';
+        return { ...d, images: rest, stacks: { ...d.stacks, covers } };
+      });
+      toast.show(live ? `Moved to place ${p} in “${folder}”: live now` : `Moved to place ${p} in “${folder}”. Press Publish changes to put it live.`, { tone: 'success' });
+    } catch (e){ toast.error(e); }
+  };
+  const changed = folder !== img.cat || p !== here;
+  return (
+    <Modal title={`Move “${img.title}”`} onClose={onClose} footer={<><button type="button" className="btn ghost" onClick={onClose}>Cancel</button><AsyncButton className="btn primary" disabled={!changed} onClick={apply}>Move</AsyncButton></>}>
+      <div className="stack">
+        <Field label="Stack"><select value={folder} onChange={e => { setFolder(e.target.value); setPos(inFolder(e.target.value).length + 1); }}>{doc!.folders.map(f => <option key={f} value={f}>{f}</option>)}</select></Field>
+        <Field label={`Place in the stack (1 to ${max})`} hint={folder === img.cat ? `Now at ${here}` : 'Another stack: choose where it goes'}>
+          <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            <button type="button" className="btn sm" disabled={p <= 1} onClick={() => setPos(1)}>First</button>
+            <button type="button" className="btn sm" disabled={p <= 1} onClick={() => setPos(p - 1)}>Earlier</button>
+            <input type="number" min={1} max={max} value={p} aria-label="Place in the stack" onChange={e => setPos(Math.round(Number(e.target.value) || 1))} style={{ width: 80 }} />
+            <button type="button" className="btn sm" disabled={p >= max} onClick={() => setPos(p + 1)}>Later</button>
+            <button type="button" className="btn sm" disabled={p >= max} onClick={() => setPos(max)}>Last</button>
+          </span></Field>
+      </div>
+    </Modal>
+  );
+}
+
+// Click or drag on the picture to pick the point that stays in view on its stack card.
+function FocusPicker({ f, setF }: { f: SiteImage; setF: (v: SiteImage) => void }){
+  const ref = useRef<HTMLDivElement>(null);
+  const at = (e: React.PointerEvent) => {
+    const r = ref.current!.getBoundingClientRect();
+    setF({ ...f, focusX: Math.round(Math.min(100, Math.max(0, (e.clientX - r.left) / r.width * 100)) * 10) / 10, focusY: Math.round(Math.min(100, Math.max(0, (e.clientY - r.top) / r.height * 100)) * 10) / 10 });
+  };
+  return (
+    <div ref={ref} className="focus-pick" role="slider" tabIndex={0} aria-label="Point that stays in view" aria-valuetext={`${Math.round(f.focusX ?? 50)} percent across, ${Math.round(f.focusY ?? 50)} percent down`}
+      onPointerDown={e => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); at(e); }} onPointerMove={e => { if (e.buttons) at(e); }}
+      onKeyDown={e => { const s = e.shiftKey ? 10 : 2, x = f.focusX ?? 50, y = f.focusY ?? 50;
+        const d: Record<string, [number, number]> = { ArrowLeft: [-s, 0], ArrowRight: [s, 0], ArrowUp: [0, -s], ArrowDown: [0, s] };
+        if (d[e.key]){ e.preventDefault(); setF({ ...f, focusX: Math.min(100, Math.max(0, x + d[e.key][0])), focusY: Math.min(100, Math.max(0, y + d[e.key][1])) }); } }}>
+      <img src={thumb(f, 768)} alt="" draggable={false} />
+      <i style={{ left: `${f.focusX ?? 50}%`, top: `${f.focusY ?? 50}%` }} />
+    </div>
   );
 }
 

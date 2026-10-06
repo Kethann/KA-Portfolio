@@ -407,3 +407,8 @@ input.invalid,textarea.invalid{ border-color:var(--danger) !important; box-shado
    none of them can escape to the window body and stretch it: that caused a second scrollbar and a
    long empty space below the content. */
 .app-main, .studio-body, .modal-body, .msg-detail, .msg-scroll, .chat-thread, .folder-nav, .md-preview, .check-list, .palette-list, .split > *{ position:relative; }
+
+/* dropdown lists: dark with light text, the chosen option in the accent, so nothing is grey on grey */
+select{ color-scheme:dark; }
+select option, select optgroup{ background:#1b1620; color:#f1ece6; }
+select option:checked, select option:hover{ background:#ff9438; color:#1a0f05; }

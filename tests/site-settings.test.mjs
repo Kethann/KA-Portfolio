@@ -145,3 +145,26 @@ test('hidden gallery images: kept by the validator, left out of what visitors ge
   assert.equal(pub.images.length, doc.images.length - 1); assert.ok(!pub.images.some(i => i.slug === first.slug)); assert.equal(pub.stacks.covers[first.cat], undefined);
   assert.equal(visibleSite({ images: [{ slug: 'a' }] }).images.length, 1, 'nothing hidden: unchanged');
 });
+
+test('Portfolio: an archived image is also hidden and keeps its stack framing; a centred image stores no framing', () => {
+  const base = structuredClone(seed);
+  const pick = base.images[0].slug;
+  const doc = validateSiteDocument({ ...base, images: base.images.map(i => i.slug === pick ? { ...i, archived: true, focusX: 30.04, focusY: 70, zoom: 1.5 } : i.slug === base.images[1].slug ? { ...i, focusX: 50, focusY: 50, zoom: 1 } : i) }, seed, seed);
+  const a = doc.images.find(i => i.slug === pick);
+  assert.equal(a.archived, true); assert.equal(a.hidden, true, 'archived implies hidden, so every public path leaves it out');
+  assert.deepEqual([a.focusX, a.focusY, a.zoom], [30, 70, 1.5]);
+  const centred = doc.images.find(i => i.slug === base.images[1].slug);
+  assert.equal(centred.focusX, undefined); assert.equal(centred.zoom, undefined); assert.equal(centred.archived, undefined);
+  const back = validateSiteDocument({ ...base, images: doc.images.map(i => i.slug === pick ? { ...i, archived: false, hidden: false } : i) }, seed, seed);
+  assert.equal(back.images.find(i => i.slug === pick).hidden, false, 'republished');
+  assert.equal(back.images.find(i => i.slug === pick).archived, undefined);
+});
+
+test('Portfolio: switching archive and framing off really clears them from the stored image', () => {
+  const base = structuredClone(seed);
+  const slug = base.images[0].slug;
+  const first = validateSiteDocument({ ...base, images: base.images.map(i => i.slug === slug ? { ...i, archived: true, focusX: 10, zoom: 2 } : i) }, seed, seed);
+  const again = validateSiteDocument({ ...first, images: first.images.map(i => i.slug === slug ? { ...i, archived: false, hidden: false, focusX: 50, focusY: 50, zoom: 1 } : i) }, seed, first);
+  const x = again.images.find(i => i.slug === slug);
+  assert.equal(x.archived, undefined); assert.equal(x.hidden, false); assert.equal(x.focusX, undefined); assert.equal(x.zoom, undefined);
+});
