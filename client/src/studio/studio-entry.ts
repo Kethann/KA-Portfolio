@@ -78,6 +78,7 @@ class Studio {
     document.documentElement.classList.add('ka-studio-open');
     if (!session.world.w){ session.world = { w: window.innerWidth, h: window.innerHeight }; }
     this.buildToolbar();
+    this.layoutForScreen();
     this.bindInput();
     this.resize();
     this.applyToolbarState();
@@ -426,6 +427,24 @@ class Studio {
     this.updateToolButtons(); this.updateHistoryButtons();
   }
 
+  // ---- phone layout: the same buttons are moved (never copied) into a top bar, a Save corner and a swipe strip, and back on a larger screen ----
+  layoutForScreen(){
+    const mq = window.matchMedia('(max-width:700px), (max-width:1100px) and (pointer:coarse), (max-height:500px) and (pointer:coarse)');
+    const moves: [string, string][] = [
+      ['[data-act="undo"]', '.tb-history'], ['[data-act="redo"]', '.tb-history'], ['[data-act="hide-tools"]', '.tb-hide'], ['[data-act="export"]', '.savebar'],
+      ['[data-act="replay"]', '.rare'], ['[data-act="fullscreen"]', '.rare'], ['[data-act="clear"]', '.rare'], ['[data-act="help"]', '.rare']
+    ];
+    const nodes = moves.map(([sel, dest]) => { const el = this.$(sel), mark = document.createComment('slot'); el.before(mark); return { el, mark, dest }; });
+    const apply = () => {
+      for (const n of nodes){ if (mq.matches) this.$(n.dest).appendChild(n.el); else n.mark.after(n.el); }
+      this.$('.studio').classList.toggle('is-compact', mq.matches);
+      this.closePanels();
+    };
+    apply();
+    mq.addEventListener('change', apply);
+    this.cleanups.push(() => mq.removeEventListener('change', apply));
+  }
+
   // ---- toolbar ----
   buildToolbar(){
     const r = this.root;
@@ -679,6 +698,7 @@ const TEMPLATE = `
 </div>
 <button type="button" class="corner close" data-act="close" aria-label="Close studio (Escape)">${icon(I.close)}</button>
 <button type="button" class="show-tools" data-act="show-tools" hidden aria-label="Show tools (H)">${icon(I.tools)}<span>Tools</span></button>
+<div class="topbar"><div class="tb-history" role="group" aria-label="History"></div><div class="tb-hide"></div></div>
 <div class="toolbar-wrap">
   <div class="panel" data-panel="brushes" hidden role="menu" aria-label="Brushes"><div class="brush-grid"></div></div>
   <div class="panel" data-panel="effects" hidden aria-label="Brush and trail settings">
@@ -738,6 +758,7 @@ const TEMPLATE = `
     <label class="row"><span>Font</span><select name="font"></select></label>
     ${range('fontPx', 'Text size', 16, 220, 2)}
   </div>
+  <div class="savebar"></div>
   <div class="toolbar" role="toolbar" aria-label="Studio tools">
     <div class="group">
       <button type="button" data-act="brush-menu" aria-haspopup="menu" aria-expanded="false" aria-pressed="true" title="Brushes (1–0)">${icon(I.pen)}<span class="label">Round pen</span></button>
@@ -756,19 +777,20 @@ const TEMPLATE = `
     <div class="group">
       <button type="button" data-act="undo" aria-label="Undo (Ctrl Z)" title="Undo (Ctrl Z)">${icon(I.undo)}</button>
       <button type="button" data-act="redo" aria-label="Redo (Ctrl Shift Z)" title="Redo (Ctrl Shift Z)">${icon(I.redo)}</button>
-      <button type="button" data-act="replay" aria-pressed="false" aria-label="Replay (R)" title="Replay (R)">${icon(I.replay)}</button>
+      <button type="button" data-act="replay" aria-pressed="false" aria-label="Replay (R)" title="Replay (R)">${icon(I.replay)}<span class="lbl">Replay</span></button>
     </div>
     <div class="group">
       <button type="button" data-act="effects" aria-haspopup="true" aria-expanded="false" aria-label="Brush and trail settings" title="Effects">${icon(I.effects)}</button>
       <button type="button" data-act="background" aria-haspopup="true" aria-expanded="false" aria-label="Background" title="Background">${icon(I.bg)}</button>
-      <button type="button" data-act="export" aria-haspopup="true" aria-expanded="false" aria-label="Export" title="Export">${icon(I.export)}</button>
+      <button type="button" data-act="export" aria-haspopup="true" aria-expanded="false" aria-label="Save or export" title="Export">${icon(I.export)}<span class="lbl">Save</span></button>
     </div>
     <div class="group">
-      <button type="button" data-act="fullscreen" aria-pressed="false" aria-label="Fullscreen (F)" title="Fullscreen (F)">${icon(I.full)}</button>
-      <button type="button" data-act="hide-tools" aria-label="Hide tools (H)" title="Hide tools (H)">${icon(I.hide)}</button>
-      <button type="button" data-act="clear" aria-label="Clear canvas (Delete)" title="Clear (Delete)">${icon(I.clear)}</button>
-      <button type="button" data-act="help" aria-haspopup="true" aria-expanded="false" aria-label="Keyboard shortcuts (?)" title="Shortcuts (?)">${icon(I.help)}</button>
+      <button type="button" data-act="fullscreen" aria-pressed="false" aria-label="Fullscreen (F)" title="Fullscreen (F)">${icon(I.full)}<span class="lbl">Fullscreen</span></button>
+      <button type="button" data-act="hide-tools" aria-label="Hide tools (H)" title="Hide tools (H)">${icon(I.hide)}<span class="lbl">Hide</span></button>
+      <button type="button" data-act="clear" aria-label="Clear canvas (Delete)" title="Clear (Delete)">${icon(I.clear)}<span class="lbl">Clear</span></button>
+      <button type="button" data-act="help" aria-haspopup="true" aria-expanded="false" aria-label="Keyboard shortcuts (?)" title="Shortcuts (?)">${icon(I.help)}<span class="lbl">Help</span></button>
     </div>
+    <div class="group rare" aria-label="More tools"></div>
   </div>
 </div>
 <div class="progress" hidden role="status"><span class="progress-label"></span><b><i></i></b></div>

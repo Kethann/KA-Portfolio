@@ -50,14 +50,15 @@ button, input, select{ font:inherit; color:inherit; }
 .toolbar::-webkit-scrollbar{ display:none; }
 .group{ display:flex; align-items:center; gap:2px; padding:0 4px; }
 .group + .group{ border-left:1px solid var(--line); }
-.toolbar button{
+:is(.toolbar, .topbar, .savebar) button{
   display:inline-flex; align-items:center; gap:8px; min-width:var(--t); height:var(--t); padding:0 12px; justify-content:center; flex:none;
   border:0; border-radius:999px; background:transparent; cursor:pointer; color:var(--dim); transition:color .2s ease, background .2s ease;
 }
-.toolbar button:hover{ color:var(--ink); background:rgba(255,255,255,.06); }
-.toolbar button[aria-pressed="true"], .toolbar button[aria-expanded="true"]{ color:#fffaf5; background:var(--accent-glass); box-shadow:inset 0 0 0 1px rgba(255,170,120,.5); }
-.toolbar button:disabled{ opacity:.35; cursor:default; background:transparent; }
-.toolbar button .label{ white-space:nowrap; font-size:.95em; }
+:is(.toolbar, .topbar, .savebar) button:hover{ color:var(--ink); background:rgba(255,255,255,.06); }
+:is(.toolbar, .topbar, .savebar) button[aria-pressed="true"], :is(.toolbar, .topbar, .savebar) button[aria-expanded="true"]{ color:#fffaf5; background:var(--accent-glass); box-shadow:inset 0 0 0 1px rgba(255,170,120,.5); }
+:is(.toolbar, .topbar, .savebar) button:disabled{ opacity:.35; cursor:default; background:transparent; }
+:is(.toolbar, .topbar, .savebar) button .label{ white-space:nowrap; font-size:.95em; }
+.lbl, .topbar, .savebar, .rare{ display:none; }
 .swatch{ position:relative; width:var(--t); height:var(--t); display:grid; place-items:center; cursor:pointer; flex:none; }
 .color-dot{ width:26px; height:26px; border-radius:50%; box-shadow:0 0 0 2px rgba(255,255,255,.8), 0 0 0 4px rgba(0,0,0,.4); }
 .swatch input, .swatch2 input{ position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
@@ -127,17 +128,42 @@ legend{ padding:0 0 6px; font:600 11px ui-monospace, monospace; letter-spacing:.
   padding:10px 16px; border-radius:14px; background:rgba(22,18,26,.94); border:1px solid var(--line2); opacity:0; pointer-events:none; transition:opacity .25s ease, transform .3s var(--ease); text-align:center; }
 .toast.show{ opacity:1; transform:translate(-50%, 0); }
 
-/* ---- small screens: toolbar scrolls sideways, panels become bottom sheets ---- */
-@media (max-width:700px){
-  .toolbar-wrap{ left:12px; right:12px; transform:none; width:auto; max-width:none; bottom:max(10px, env(safe-area-inset-bottom)); }
-  .studio.tools-hidden .toolbar-wrap{ transform:translateY(24px); }
-  .toolbar{ border-radius:22px; justify-content:flex-start; width:100%; }
-  .toolbar button .label{ display:none; }
-  .size-label input{ width:84px; }
-  .grad-toggle span{ display:none; }
-  .panel, .text-options{ width:100%; max-height:52vh; }
-  .brush-grid{ grid-template-columns:repeat(2, 1fr); }
-}
+/* ---- phones and tablets (the studio gets .is-compact): undo and redo on top, the main tools and colour at the bottom, Save bottom right,
+   the rare buttons on a strip you swipe, and one button at the top to hide or show everything ---- */
+.is-compact .topbar{ display:block; position:absolute; z-index:10; inset:max(14px, env(safe-area-inset-top)) 0 auto 0; height:var(--t); pointer-events:none; }
+.is-compact .topbar > *{ pointer-events:auto; display:flex; align-items:center; background:var(--glass); border:1px solid var(--line2); border-radius:999px; height:var(--t);
+  backdrop-filter:blur(14px) saturate(140%); -webkit-backdrop-filter:blur(14px) saturate(140%); box-shadow:inset 0 1px 0 rgba(255,255,255,.14), 0 10px 30px rgba(0,0,0,.4); }
+.is-compact .topbar:not(:has(button)){ display:none; }
+.is-compact .tb-history{ position:absolute; left:max(12px, env(safe-area-inset-left)); padding:0 2px; }
+.is-compact .tb-hide{ position:absolute; left:50%; transform:translateX(-50%); }
+.is-compact .tb-hide:not(:has(button)){ display:none; }
+.is-compact .lbl{ display:inline; white-space:nowrap; font-size:.95em; }
+.studio.is-compact.tools-hidden .tb-history, .studio.is-compact.tools-hidden .tb-hide{ display:none; }
+.is-compact .show-tools{ top:max(14px, env(safe-area-inset-top)); bottom:auto; }
+.is-compact .toolbar-wrap{ left:10px; right:10px; margin-inline:auto; transform:none; width:auto; max-width:640px; bottom:max(10px, env(safe-area-inset-bottom)); gap:8px; align-items:stretch; }
+.studio.is-compact.tools-hidden .toolbar-wrap{ transform:translateY(24px); }
+.is-compact .savebar{ display:flex; justify-content:flex-end; }
+.is-compact .savebar:not(:has(button)){ display:none; }
+.is-compact .savebar button{ height:var(--t); padding:0 20px 0 16px; gap:8px; border-radius:999px; background:var(--accent-glass); color:#fffaf5; font-weight:600;
+  border:1px solid rgba(255,170,120,.6); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); box-shadow:0 12px 34px rgba(0,0,0,.5); }
+.is-compact .toolbar{ display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); gap:6px 2px; width:100%; max-width:none; padding:6px; border-radius:22px; overflow:visible; }
+.is-compact .toolbar .group{ display:contents; border:0; padding:0; }
+.is-compact .toolbar .colors{ display:flex; order:2; grid-column:1 / span 2; align-items:center; gap:2px; border:0; }
+.is-compact .toolbar .size{ display:flex; order:2; grid-column:3 / span 4; align-items:center; }
+.is-compact .toolbar .size-label{ flex:1; padding:0 8px 0 4px; }
+.is-compact .toolbar .size-label input{ flex:1; width:auto; min-width:0; }
+.is-compact .toolbar > .group > button{ order:3; width:100%; min-width:0; padding:0; }
+.is-compact .toolbar .grad-toggle{ padding:0 4px; }
+.is-compact .toolbar .grad-toggle span{ display:inline; font-size:12px; }
+.is-compact .toolbar > .group > button .label{ display:none; }
+.is-compact .toolbar .rare{ display:flex; order:1; grid-column:1 / -1; gap:2px; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch;
+  padding-bottom:6px; border-bottom:1px solid var(--line); border-radius:0; }
+.is-compact .toolbar .rare::-webkit-scrollbar{ display:none; }
+.is-compact .toolbar .rare:not(:has(button)){ display:none; }
+.is-compact .toolbar .rare button{ width:auto; padding:0 14px; flex:none; }
+.is-compact .panel, .is-compact .text-options{ width:100%; max-height:46vh; }
+.is-compact .brush-grid{ grid-template-columns:repeat(2, 1fr); }
+.is-compact .corner{ top:max(14px, env(safe-area-inset-top)); }
 @media (prefers-reduced-motion: reduce){
   .panel, .confirm-card, .toast, .toolbar-wrap{ animation:none !important; transition:opacity .15s ease !important; }
 }

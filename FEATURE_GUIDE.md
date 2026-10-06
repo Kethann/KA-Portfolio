@@ -2532,3 +2532,9 @@ Only one file was created by this task: `FEATURE_GUIDE.md` (shown as untracked, 
 - **Product viewer (Artifacts):** on screens 900 px and wider the description sits beside the screenshots. Products with both laptop and phone screenshots get a Desktop view / Mobile view switch; the description stays the same in both.
 - **Delivery email (Portal > Products > a for-sale item > Delivery email):** after payment the buyer is emailed the secure download link and license automatically. Per product you can set a subject, an extra message and up to 5 attached files (10 MB each, 15 MB total, uploaded privately). "Save and send me a test" mails you a sample. Empty fields send the standard professional text.
 - **Routes:** `GET/PUT /api/admin/products/:id/delivery`, `POST /api/admin/products/:id/delivery/test`. **Setting:** `deliveryEmails`. The default `order_delivery` text was rewritten; an owner override in Content > Emails still wins.
+
+## Update: phones
+
+- **Skills logos (home/about):** the floating logos keep animating while you scroll. Phones fire a resize event when the address bar slides, which used to restart the field; now only a real change of width does.
+- **Typography studio on phones (screens up to 700 px wide, and landscape phones):** undo and redo sit top left, a Hide button top centre (it hides everything; one tap on Tools brings it back), close top right. At the bottom: Save (always bottom right), a strip with the rare buttons (Replay, Fullscreen, Clear, Help) that you swipe, then colour, gradient and size, then the main tools (brush, eraser, text, trail, effects, background). On larger screens the toolbar is unchanged.
+- **Portal:** deletes and hides are sent at once; Products has an Archived view with Restore; Visitors can group by visitor, star, delete a visit or visitor, and clear history.

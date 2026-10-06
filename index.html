@@ -7744,10 +7744,15 @@ window.addEventListener("ka-sequence-complete", function(){
     }, { rootMargin: "240px 0px" }).observe(skillsBlockEl);
   } else { fieldVisible = true; }
   document.addEventListener("visibilitychange", function(){ if (document.hidden) stopSkillField(); else startSkillField(); });
-  var fieldResize = 0;
-  window.addEventListener("resize", function(){ clearTimeout(fieldResize); fieldResize = setTimeout(function(){ if (fieldOn) restartSkillField(); }, 250); });
+  var fieldResize = 0, fieldW = window.innerWidth;
+  // Phones fire "resize" while you scroll (the address bar slides away and back, and only the height changes). That must never
+  // restart the field, or every logo would vanish and begin again on each scroll. Only a real change of width does.
+  window.addEventListener("resize", function(){
+    if (Math.abs(window.innerWidth - fieldW) < 48) return;
+    clearTimeout(fieldResize); fieldResize = setTimeout(function(){ fieldW = window.innerWidth; if (fieldOn) restartSkillField(); }, 250);
+  });
   // turning a phone or tablet: start the field again for the new shape, and put the spotlight card away
-  window.addEventListener("orientationchange", function(){ hideSpot(); clearTimeout(fieldResize); fieldResize = setTimeout(function(){ if (fieldOn) restartSkillField(); }, 400); });
+  window.addEventListener("orientationchange", function(){ hideSpot(); clearTimeout(fieldResize); fieldResize = setTimeout(function(){ fieldW = window.innerWidth; if (fieldOn) restartSkillField(); }, 400); });
 
   // ---- spotlight: the hovered / focused / tapped skill comes forward in the field
   function showSpot(li){
@@ -10864,10 +10869,18 @@ html, body{ overscroll-behavior-x:none; }
     }
     return false;
   }
-  // true when the touch starts on something that needs its own sideways movement
-  function ownsSwipe(t, dir){
-    for (var n = t; n && n !== document.body && n.nodeType === 1; n = n.parentElement){
-      if (n.matches("input, textarea, select, [contenteditable=''], [contenteditable='true'], #site-nav, [data-no-page-swipe]")) return true;
+  // true when the touch starts on something that needs its own sideways movement: text fields, rows that scroll sideways,
+  // and every picture area (the coverflows and image stacks of the gallery and portfolio, the poster viewer and the
+  // store's viewer), where a sideways drag must browse the pictures and never turn the page.
+  var OWN = "input, textarea, select, [contenteditable=''], [contenteditable='true'], #site-nav, [data-no-page-swipe], " +
+    ".coverflow-section, #gallery-coverflow, #portfolio-coverflow, #folder-shelf, .folder-card, .cf-card, #lightbox, .kas-lb, .kas-lightbox";
+  function ownsSwipe(ev, dir){
+    var path = ev.composedPath ? ev.composedPath() : [];
+    if (!path.length){ for (var q = ev.target; q; q = q.parentNode) path.push(q); }
+    for (var i = 0; i < path.length; i++){
+      var n = path[i];
+      if (!n || n.nodeType !== 1 || n === document.body || n === document.documentElement) continue;
+      if (n.matches(OWN)) return true;
       if (n.scrollWidth > n.clientWidth + 2){
         var ox = getComputedStyle(n).overflowX;
         if (ox === "auto" || ox === "scroll"){
@@ -10926,7 +10939,7 @@ html, body{ overscroll-behavior-x:none; }
     var t = e.touches[0], w = window.innerWidth, z = zone(), dir = 0;
     if (t.clientX <= z) dir = -1; else if (t.clientX >= w - z) dir = 1;
     // the finger moves away from its edge (leftwards from the right side), so a row under it would scroll toward dir
-    if (!dir || ownsSwipe(e.target, dir)) return;
+    if (!dir || ownsSwipe(e, dir)) return;
     var list = pages(), cur = list.findIndex(function(b){ return b.getAttribute("aria-current") === "page"; });
     if (cur < 0) return;
     var target = list[cur + dir] || null;
