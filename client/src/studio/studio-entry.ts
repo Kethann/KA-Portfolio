@@ -8,16 +8,29 @@ import {
   type Background, type BrushId, type Item, type Settings, type Stroke, type TextItem
 } from './engine';
 
+import { EffectController, type Composition } from './effects/controller';
+import { TYPING } from './effects/typing';
+import { DECORATIONS } from './effects/decorations';
+import { PALETTES } from './effects/palettes';
+import { newSeed } from './effects/rng';
+
 export interface StudioOptions { returnFocus?: HTMLElement | null }
+const fxState: Composition = { text: 'Bloom where\nyou are planted', font: "'Playfair Display', serif", typing: 'typewriter', decoration: 'floral', caret: 'bar', palette: 'rose-noir', seed: newSeed(), speed: 1, density: 0.6, params: { typo: true } };
 
 const FONTS: { family: string; label: string; kind: 'hand' | 'display' }[] = [
   { family: "'Caveat', cursive", label: 'Caveat', kind: 'hand' }, { family: "'Dancing Script', cursive", label: 'Dancing Script', kind: 'hand' },
   { family: "'Permanent Marker', cursive", label: 'Permanent Marker', kind: 'hand' }, { family: "'Pacifico', cursive", label: 'Pacifico', kind: 'hand' },
   { family: "'Shadows Into Light', cursive", label: 'Shadows Into Light', kind: 'hand' }, { family: "'Kalam', cursive", label: 'Kalam', kind: 'hand' },
   { family: "'Bebas Neue', sans-serif", label: 'Bebas Neue', kind: 'display' }, { family: "'Abril Fatface', serif", label: 'Abril Fatface', kind: 'display' },
-  { family: "'Fraunces', serif", label: 'Fraunces', kind: 'display' }, { family: "'Space Grotesk', sans-serif", label: 'Space Grotesk', kind: 'display' }
+  { family: "'Fraunces', serif", label: 'Fraunces', kind: 'display' }, { family: "'Space Grotesk', sans-serif", label: 'Space Grotesk', kind: 'display' },
+  { family: "'Great Vibes', cursive", label: 'Great Vibes', kind: 'hand' }, { family: "'Sacramento', cursive", label: 'Sacramento', kind: 'hand' },
+  { family: "'Satisfy', cursive", label: 'Satisfy', kind: 'hand' }, { family: "'Amatic SC', cursive", label: 'Amatic SC', kind: 'hand' },
+  { family: "'Playfair Display', serif", label: 'Playfair Display', kind: 'display' }, { family: "'Cinzel', serif", label: 'Cinzel', kind: 'display' },
+  { family: "'Anton', sans-serif", label: 'Anton', kind: 'display' }, { family: "'Lobster', cursive", label: 'Lobster', kind: 'display' },
+  { family: "'Righteous', sans-serif", label: 'Righteous', kind: 'display' }, { family: "'Bungee', sans-serif", label: 'Bungee', kind: 'display' },
+  { family: "'Monoton', sans-serif", label: 'Monoton', kind: 'display' }, { family: "'Orbitron', sans-serif", label: 'Orbitron', kind: 'display' }
 ];
-const FONT_CSS = 'https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=Dancing+Script:wght@600&family=Permanent+Marker&family=Pacifico&family=Shadows+Into+Light&family=Kalam:wght@400&family=Bebas+Neue&family=Abril+Fatface&display=swap';
+const FONT_CSS = 'https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=Dancing+Script:wght@600&family=Permanent+Marker&family=Pacifico&family=Shadows+Into+Light&family=Kalam:wght@400&family=Bebas+Neue&family=Abril+Fatface&family=Fraunces:opsz,wght@9..144,300..900&family=Space+Grotesk:wght@400;700&family=Great+Vibes&family=Sacramento&family=Satisfy&family=Amatic+SC:wght@700&family=Playfair+Display:wght@700&family=Cinzel:wght@700&family=Anton&family=Lobster&family=Righteous&family=Bungee&family=Monoton&family=Orbitron:wght@700&display=swap';
 
 // ---- session (kept while the page is open) -----------------------------------------------------
 type Entry = { type: 'add'; item: Item } | { type: 'clear'; items: Item[] };
@@ -449,7 +462,7 @@ class Studio {
     const mq = window.matchMedia('(max-width:700px), (max-width:1100px) and (pointer:coarse), (max-height:500px) and (pointer:coarse)');
     const moves: [string, string][] = [
       ['[data-act="undo"]', '.tb-history'], ['[data-act="redo"]', '.tb-history'], ['[data-act="hide-tools"]', '.tb-hide'], ['[data-act="export"]', '.savebar'],
-      ['[data-act="replay"]', '.rare'], ['[data-act="fullscreen"]', '.rare'], ['[data-act="clear"]', '.rare'], ['[data-act="help"]', '.rare']
+      ['[data-act="fx"]', '.rare'], ['[data-act="replay"]', '.rare'], ['[data-act="fullscreen"]', '.rare'], ['[data-act="clear"]', '.rare'], ['[data-act="help"]', '.rare']
     ];
     const nodes = moves.map(([sel, dest]) => { const el = this.$(sel), mark = document.createComment('slot'); el.before(mark); return { el, mark, dest }; });
     const apply = () => {
@@ -472,6 +485,14 @@ class Studio {
       btn.innerHTML = `<canvas width="120" height="44" aria-hidden="true"></canvas><span>${b.name}</span><kbd>${(i + 1) % 10}</kbd>`;
       brushGrid.appendChild(btn);
     }
+    const fxFont = this.$('select[name="fxFont"]') as HTMLSelectElement;
+    for (const f of FONTS){ const o = document.createElement('option'); o.value = f.family; o.textContent = `${f.label}${f.kind === 'hand' ? ' (handwriting)' : ''}`; fxFont.appendChild(o); }
+    fxFont.value = fxState.font; (this.$('textarea[name="fxText"]') as HTMLTextAreaElement).value = fxState.text;
+    const cardHtml = (kind: string, e: { id: string; name: string; description: string; duration: number }) =>
+      `<button type="button" class="fx-card" data-act="fx-${kind}" data-v="${e.id}" aria-pressed="false"><b>${e.name}</b><span>${e.description}</span>${e.duration ? `<small>${e.duration.toFixed(1)} s</small>` : ''}</button>`;
+    this.$('.fx-typing').innerHTML = TYPING.map(e => cardHtml('typing', e)).join('');
+    this.$('.fx-decos').innerHTML = DECORATIONS.map(e => cardHtml('deco', e)).join('');
+    this.$('.fx-pals').innerHTML = PALETTES.map(p => `<button type="button" class="fx-pal" data-act="fx-pal" data-v="${p.id}" aria-pressed="false" title="${p.name}"><i style="background:${p.bg}"></i><i style="background:${p.accent1}"></i><i style="background:${p.accent2}"></i><span>${p.name}</span></button>`).join('');
     const fontSel = this.$('select[name="font"]') as HTMLSelectElement;
     for (const f of FONTS){ const o = document.createElement('option'); o.value = f.family; o.textContent = `${f.label}${f.kind === 'hand' ? ' (handwriting)' : ''}`; fontSel.appendChild(o); }
     const blendSel = this.$('select[name="blend"]') as HTMLSelectElement;
@@ -495,6 +516,14 @@ class Studio {
         case 'effects': this.togglePanel('effects', t); break;
         case 'background': this.togglePanel('backgrounds', t); break;
         case 'export': this.togglePanel('export', t); break;
+        case 'fx': this.toggleFx(t); break;
+        case 'fx-typing': fxState.typing = t.dataset.v || 'typewriter'; this.fxCompose(); break;
+        case 'fx-deco': fxState.decoration = t.dataset.v || 'none'; this.fxCompose(); break;
+        case 'fx-pal': fxState.palette = t.dataset.v || 'rose-noir'; this.fxCompose(); break;
+        case 'fx-regen': fxState.seed = newSeed(); this.fxCompose(); break;
+        case 'fx-replay': this.fx?.replay(); break;
+        case 'fx-close': this.closeFx(); break;
+        case 'fx-download': void this.exportFx(); break;
         case 'undo': this.undoAct(); break;
         case 'redo': this.redoAct(); break;
         case 'replay': this.replay ? this.endReplay() : this.startReplay(); break;
@@ -548,7 +577,8 @@ class Studio {
     this.$('.color-dot').style.background = s.gradient ? `linear-gradient(135deg, ${s.color}, ${s.color2})` : s.color;
   }
   fmt(name: string, v: number){
-    if (name === 'opacity' || name === 'smoothing') return Math.round(v * 100) + '%';
+    if (name === 'opacity' || name === 'smoothing' || name === 'fxDensity') return Math.round(v * 100) + '%';
+    if (name === 'fxSpeed') return v.toFixed(1) + '×';
     if (name === 'lifetime') return v <= 0 ? 'Permanent' : `${v.toFixed(1)} s`;
     if (name === 'flow' || name === 'wobble') return v.toFixed(1) + '×';
     return String(Math.round(v));
@@ -568,6 +598,15 @@ class Studio {
       case 'hover': session.hoverDraw = el.checked; break;
       case 'font': session.font = el.value; break; case 'fontPx': session.fontPx = num; break;
       case 'bgcolor': this.setBackground('solid', el.value); return;
+      case 'fxText': fxState.text = el.value.slice(0, 120); clearTimeout(this.fxTimer); this.fxTimer = window.setTimeout(() => this.fxCompose(), 350); return;
+      case 'fxFont': fxState.font = el.value; this.fxCompose(); return;
+      case 'fxCaret': fxState.caret = el.value as Composition['caret']; this.fxCompose(); return;
+      case 'fxTypo': fxState.params = { ...fxState.params, typo: el.checked }; this.fxCompose(); return;
+      case 'fxSpeed': case 'fxDensity': {
+        if (name === 'fxSpeed') fxState.speed = num; else fxState.density = num;
+        const out = this.root.querySelector(`output[for="${name}"]`); if (out) out.textContent = this.fmt(name, num);
+        clearTimeout(this.fxTimer); this.fxTimer = window.setTimeout(() => this.fxCompose(), 300); return;
+      }
       case 'bga': case 'bgb': case 'bgangle': this.setBackground('gradient'); return;
       default: return;
     }
@@ -610,6 +649,77 @@ class Studio {
     this.renderBackground();
   }
   openPanel: string | null = null;
+  // ---- Text effects: a composer on top of the studio's text (typing + decoration + palette), exported as a still
+  fx: EffectController | null = null; fxOn = false; fxTimer = 0;
+  fxCompose(){ if (!this.fx) return; void this.fx.compose({ ...fxState }); this.fxSync(); }
+  fxSync(){
+    const r = this.root;
+    r.querySelectorAll<HTMLElement>('[data-act="fx-typing"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === fxState.typing)));
+    r.querySelectorAll<HTMLElement>('[data-act="fx-deco"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === fxState.decoration)));
+    r.querySelectorAll<HTMLElement>('[data-act="fx-pal"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === fxState.palette)));
+    const seed = r.querySelector('.fx-seed'); if (seed) seed.textContent = String(fxState.seed);
+    r.querySelectorAll<HTMLElement>('.fx-caret-row').forEach(n => { n.hidden = fxState.typing !== 'typewriter'; });   // caret and typo only apply to the typewriter
+  }
+  toggleFx(trigger: HTMLElement){
+    const stage = this.$('.fx-stage');
+    if (this.fxOn && this.openPanel === 'fx'){ this.closePanels(); return; }
+    this.fxOn = true; stage.hidden = false;
+    this.togglePanel('fx', trigger);
+    if (!this.fx) this.fx = new EffectController(stage);
+    this.fxLayout();
+  }
+  /** the stage takes the space the panel leaves: beside it on wide screens, above it on phones */
+  fxLayout(){
+    const stage = this.$('.fx-stage'), panel = this.$('.panel[data-panel="fx"]'), wrap = this.$('.toolbar-wrap');
+    const compact = this.$('.studio').classList.contains('is-compact');
+    stage.style.right = ''; stage.style.bottom = ''; stage.style.top = '';
+    if (panel.hidden) return;
+    if (compact){
+      const wr = wrap.getBoundingClientRect(), tb = this.$('.topbar').getBoundingClientRect();
+      if (tb.height) stage.style.top = Math.round(tb.bottom + 6) + 'px';   // below undo / Hide / close
+      panel.style.setProperty('--fxb', Math.max(0, window.innerHeight - wr.top + 8) + 'px');
+      requestAnimationFrame(() => { const pr = panel.getBoundingClientRect(); stage.style.bottom = Math.max(0, window.innerHeight - pr.top + 4) + 'px'; this.fxCompose(); });
+    } else {
+      stage.style.right = (panel.getBoundingClientRect().width + 32) + 'px';
+      this.fxCompose();
+    }
+  }
+  closeFx(){ this.fxOn = false; this.fx?.stop(); this.$('.fx-stage').hidden = true; this.closePanels(); }
+  /** a full-resolution still of the composed piece: PNG (with or without background) or SVG */
+  async exportFx(){
+    const ctrl = this.fx; if (!ctrl || !ctrl.tl) return;
+    const fmt = (this.$('[name="fxFormat"]') as HTMLSelectElement).value, size = (this.$('[name="fxSize"]') as HTMLSelectElement).value;
+    const tl = ctrl.tl, playing = !tl.paused();
+    tl.pause(); tl.seek(ctrl.built);
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const stage = ctrl.stage, sr = stage.getBoundingClientRect(), pal = PALETTES.find(p => p.id === fxState.palette) || PALETTES[0];
+    const font = getComputedStyle(ctrl.textEl).font;
+    const chars = Array.from(ctrl.textEl.querySelectorAll<HTMLElement>('.fx-char')).map(c => ({ ch: c.textContent || '', r: c.getBoundingClientRect() }));
+    const svgText = new XMLSerializer().serializeToString(ctrl.svg);
+    try {
+      if (fmt === 'svg'){
+        const fam = font.replace(/^.*?\d+px\s*/, '').replace(/"/g, "'"), px = parseFloat(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] || '64');
+        const m = document.createElement('canvas').getContext('2d')!; m.font = font;
+        const texts = chars.map(c => `<text x="${(c.r.left - sr.left).toFixed(1)}" y="${(c.r.top - sr.top + (m.measureText(c.ch).fontBoundingBoxAscent || px * 0.8)).toFixed(1)}">${c.ch.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>`).join('');
+        const doc = `<svg xmlns="http://www.w3.org/2000/svg" width="${sr.width}" height="${sr.height}" viewBox="0 0 ${sr.width} ${sr.height}"><style>@import url('${FONT_CSS.replace(/&/g, '&amp;')}');</style><rect width="100%" height="100%" fill="${pal.bg}"/>${svgText.replace(/^<svg[^>]*>|<\/svg>$/g, '')}<g font-family="${fam}" font-size="${px}" fill="${pal.text}">${texts}</g></svg>`;
+        this.download(new Blob([doc], { type: 'image/svg+xml' }), `ka-text-effect-${stamp()}.svg`);
+      } else {
+        const scale = size === '4k' ? 3840 / sr.width : size === '2x' ? 2 : Math.max(1, window.devicePixelRatio || 1);
+        const c = document.createElement('canvas'); c.width = Math.round(sr.width * scale); c.height = Math.round(sr.height * scale);
+        const x = c.getContext('2d')!; x.scale(scale, scale);
+        if (fmt !== 'png-t'){ x.fillStyle = pal.bg; x.fillRect(0, 0, sr.width, sr.height); }
+        const img = new Image(); const url = URL.createObjectURL(new Blob([svgText.replace('<svg', `<svg width="${sr.width}" height="${sr.height}"`)], { type: 'image/svg+xml' }));
+        await new Promise<void>(res => { img.onload = () => res(); img.onerror = () => res(); img.src = url; });
+        try { x.drawImage(img, 0, 0, sr.width, sr.height); } catch { /* no decorations to draw */ }
+        URL.revokeObjectURL(url);
+        x.font = font; x.textBaseline = 'alphabetic'; x.fillStyle = pal.text;
+        for (const ch of chars) x.fillText(ch.ch, ch.r.left - sr.left, ch.r.top - sr.top + (x.measureText(ch.ch).fontBoundingBoxAscent || ch.r.height * 0.8));
+        const blob: Blob | null = await new Promise(r => c.toBlob(r, 'image/png'));
+        if (blob) this.download(blob, `ka-text-effect-${stamp()}-${c.width}x${c.height}.png`);
+      }
+      this.toast('Downloaded');
+    } finally { if (playing) tl.play(); }
+  }
   togglePanel(name: string, trigger: HTMLElement){
     const was = this.openPanel === name;
     this.closePanels();
@@ -619,9 +729,11 @@ class Studio {
     const first = p.querySelector<HTMLElement>('button, input, select'); first?.focus();
   }
   closePanels(){
+    const wasFx = this.openPanel === 'fx';
     this.root.querySelectorAll<HTMLElement>('.panel').forEach(p => { p.hidden = true; });
     this.root.querySelectorAll<HTMLElement>('[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     this.openPanel = null;
+    if (wasFx && this.fxOn) this.fxLayout();   // the panel went away: the words take the whole stage again
   }
   runExport(){
     const fmt = (this.root.querySelector('[name="xformat"]:checked') as HTMLInputElement).value;
@@ -645,8 +757,13 @@ class Studio {
     if (e.key === 'Escape'){
       if (!this.$('.confirm').hidden){ this.$('[data-confirm="cancel"]').click(); e.preventDefault(); return; }
       if (this.openPanel){ this.closePanels(); e.preventDefault(); return; }
+      if (this.fxOn){ this.closeFx(); e.preventDefault(); return; }
       if (this.replay){ this.endReplay(); e.preventDefault(); return; }
       e.preventDefault(); this.close(); return;
+    }
+    if (this.fxOn && !typing && !mod && !e.altKey){
+      if (e.key === ' '){ e.preventDefault(); this.fx?.replay(); return; }
+      if (e.key.toLowerCase() === 'r'){ e.preventDefault(); fxState.seed = newSeed(); this.fxCompose(); return; }
     }
     if (mod && e.key.toLowerCase() === 'z'){ e.preventDefault(); e.shiftKey ? this.redoAct() : this.undoAct(); return; }
     if (mod && e.key.toLowerCase() === 'y'){ e.preventDefault(); this.redoAct(); return; }
@@ -669,6 +786,7 @@ class Studio {
     e.preventDefault();
   }
   close(){
+    this.fx?.destroy(); this.fx = null;
     this.commitText();
     this.stopLoop(); this.endReplayQuiet();
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -700,6 +818,7 @@ const I = {
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.6 2.6 0 0 1 5 1c0 2-2.5 2.2-2.5 4"/><path d="M12 17.5h.01"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   tools: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  textfx: '<path d="M4 18 8.5 6h1L14 18M5.6 14h6.8"/><path d="M17.5 4.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/><path d="M17 13c1 2 2.6 3.6 4.5 4.5"/>',
   trail: '<circle cx="17.5" cy="6.5" r="2.5"/><path d="M15.5 8.5 4 20M12.5 6.5 5 14M17.5 11.5 10 19"/>'
 };
 const icon = (p: string) => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${p}</svg>`;
@@ -708,6 +827,7 @@ const range = (name: string, label: string, min: number, max: number, step: numb
 const check = (name: string, label: string) => `<label class="row check"><input type="checkbox" name="${name}"><span>${label}</span></label>`;
 
 const TEMPLATE = `
+<div class="fx-stage" hidden></div>
 <div class="stage" data-tool="brush">
   <canvas class="bg" aria-hidden="true"></canvas>
   <canvas class="ink" aria-hidden="true"></canvas>
@@ -716,6 +836,32 @@ const TEMPLATE = `
 <button type="button" class="corner close" data-act="close" aria-label="Close studio (Escape)">${icon(I.close)}</button>
 <button type="button" class="show-tools" data-act="show-tools" hidden aria-label="Show tools (H)">${icon(I.tools)}<span>Tools</span></button>
 <div class="topbar"><div class="tb-history" role="group" aria-label="History"></div><div class="tb-hide"></div></div>
+  <div class="panel fx-panel fx-dock" data-panel="fx" hidden aria-label="Text effects">
+    <div class="fx-grid">
+      <label class="fx-field fx-wide"><span>Text</span><textarea name="fxText" rows="2" maxlength="120"></textarea></label>
+      <label class="fx-field"><span>Font</span><select name="fxFont"></select></label>
+      <label class="fx-field fx-caret-row"><span>Caret</span><select name="fxCaret"><option value="bar">Bar</option><option value="block">Block</option><option value="underscore">Underscore</option><option value="nib">Pen nib</option><option value="none">None</option></select></label>
+    </div>
+    <h3 class="fx-h">Typing</h3><div class="fx-cards fx-typing"></div>
+    <label class="row check fx-caret-row"><input type="checkbox" name="fxTypo" checked><span>Make a typo and backspace it</span></label>
+    <h3 class="fx-h">Decoration</h3><div class="fx-cards fx-decos"></div>
+    <h3 class="fx-h">Palette</h3><div class="fx-pals"></div>
+    <div class="cols fx-sliders">
+      <label class="row"><span>Speed</span><input type="range" name="fxSpeed" min="0.5" max="2" step="0.1" value="1"><output for="fxSpeed">1.0×</output></label>
+      <label class="row"><span>Density</span><input type="range" name="fxDensity" min="0" max="1" step="0.05" value="0.6"><output for="fxDensity">60%</output></label>
+    </div>
+    <div class="fx-actions">
+      <span class="fx-seedbox">Seed <b class="fx-seed"></b></span>
+      <button type="button" class="fx-btn" data-act="fx-regen">Regenerate (R)</button>
+      <button type="button" class="fx-btn" data-act="fx-replay">Replay (Space)</button>
+      <button type="button" class="fx-btn" data-act="fx-close">Close effects</button>
+    </div>
+    <div class="fx-actions fx-export">
+      <select name="fxFormat" aria-label="Download format"><option value="png">PNG</option><option value="png-t">PNG, transparent</option><option value="svg">SVG (vector)</option></select>
+      <select name="fxSize" aria-label="Resolution"><option value="screen">Screen (sharp)</option><option value="2x">2×</option><option value="4k" selected>4K (3840 px wide)</option></select>
+      <button type="button" class="primary" data-act="fx-download">Download</button>
+    </div>
+  </div>
 <div class="toolbar-wrap">
   <div class="panel" data-panel="brushes" hidden role="menu" aria-label="Brushes"><div class="brush-grid"></div></div>
   <div class="panel" data-panel="effects" hidden aria-label="Brush and trail settings">
@@ -799,6 +945,7 @@ const TEMPLATE = `
     <div class="group">
       <button type="button" data-act="effects" aria-haspopup="true" aria-expanded="false" aria-label="Brush and trail settings" title="Effects">${icon(I.effects)}</button>
       <button type="button" data-act="background" aria-haspopup="true" aria-expanded="false" aria-label="Background" title="Background">${icon(I.bg)}</button>
+      <button type="button" data-act="fx" aria-haspopup="true" aria-expanded="false" aria-label="Text effects" title="Text effects">${icon(I.textfx)}<span class="lbl">Text effects</span></button>
       <button type="button" data-act="export" aria-haspopup="true" aria-expanded="false" aria-label="Save or export" title="Export">${icon(I.export)}<span class="lbl">Save</span></button>
     </div>
     <div class="group">
