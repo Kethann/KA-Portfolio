@@ -81,7 +81,7 @@ export function MarkdownField({ value, onChange, label, rows = 12, hint }: { val
 
 // Drop zone + file picker that uploads straight to storage with progress.
 export function Uploader({ kind, accept, onUploaded, label, multiple = false, children, prepare }: {
-  kind: 'image' | 'font' | 'deliverable'; accept: string; label: string; multiple?: boolean; children?: ReactNode;
+  kind: 'image' | 'font' | 'deliverable' | 'audio'; accept: string; label: string; multiple?: boolean; children?: ReactNode;
   prepare?: (file: File) => Promise<File>;   // e.g. repackage with LICENSE.txt before it leaves the browser
   onUploaded: (r: { path: string; publicUrl: string | null; file: File; width?: number; height?: number }) => Promise<void> | void;
 }){

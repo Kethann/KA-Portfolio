@@ -82,7 +82,7 @@ test('carousel leaves vertical scrolling native and cancels horizontal gestures 
   const source=ts.createSourceFile('stacks.tsx',code,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX),functions=new Map();
   function visit(node){if(ts.isFunctionDeclaration(node)&&node.name)functions.set(node.name.text,node.getText(source));ts.forEachChild(node,visit);}visit(source);
   const s={pointerId:-1,pos:0,vel:0,target:0,dragging:false,moved:false,cw:200};
-  const context=vm.createContext({st:{current:s},startY:{current:0},cfg:{current:{loop:false,n:5,canHover:false}},performance:{now:()=>10},unit:()=>100,
+  const context=vm.createContext({st:{current:s},startY:{current:0},travel:{current:0},cfg:{current:{loop:false,n:5,canHover:false}},performance:{now:()=>10},unit:()=>100,
     stageRef:{current:{setPointerCapture(){},releasePointerCapture(){},classList:{add(){},remove(){}}}},clamp:(v,lo,hi)=>Math.min(hi,Math.max(lo,v)),clampTarget:v=>v,report(){},kick(){}});
   for(const name of ['down','move','cancel'])vm.runInContext(ts.transpileModule(functions.get(name),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,context);
   const event={pointerId:1,pointerType:'touch',isPrimary:true,clientX:100,clientY:100};

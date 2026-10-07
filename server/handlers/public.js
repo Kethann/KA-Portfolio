@@ -1,4 +1,5 @@
 // Public site endpoints: config, portfolio document, contact form, notify-me list.
+import { SOUND_DEFAULTS } from '../../shared/sounds.js';
 import { json, readJson, HttpError } from '../core/http.js';
 import { env } from '../core/env.js';
 import { getDb } from '../core/db.js';
@@ -51,7 +52,7 @@ export async function publicConfig(ctx){
 // JSON file; seeded from server/portfolio-seed.json the first time.
 export async function loadSiteDocument(){
   const { value, revision } = await getSettingWithRevision('site');
-  if (value) return { ...value, stats: value.stats || STATS_DEFAULT, skills: value.skills || SKILLS_DEFAULT, about: value.about || ABOUT_DEFAULT, revision };   // sites saved before About numbers / Skills existed
+  if (value) return { ...value, stats: value.stats || STATS_DEFAULT, skills: value.skills || SKILLS_DEFAULT, about: value.about || ABOUT_DEFAULT, sounds: value.sounds || SOUND_DEFAULTS, revision };   // sites saved before About numbers / Skills existed
   const initial = { ...seed };
   delete initial.revision;
   const rev = await setSetting('site', initial, 0);

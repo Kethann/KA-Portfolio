@@ -1,7 +1,11 @@
 // The site's UI sounds: one registry shared by the site (what plays when), the Creator Portal (the Sounds panel)
-// and the server (what a saved sound setting may contain). Every built-in sound is a CC0 file by Kenney
-// (kenney.nl), taken from soundcn (soundcn.xyz) and processed by scripts/process-sounds.sh into
-// /sounds/ui/<name>.webm (Opus) + .mp3. Volumes are deliberately low: sound is a quiet layer, never a feature.
+// and the server (what a saved sound setting may contain).
+// Two kinds of sound:
+//  - "synth:<name>": generated in the browser (client/src/lib/sound/synth.ts): soft air, glints, taps and chimes,
+//    no download at all. These are the defaults: they sit quietly under the site.
+//  - <name>: a CC0 file by Kenney (kenney.nl) from soundcn (soundcn.xyz), processed by scripts/process-sounds.sh into
+//    /sounds/ui/<name>.webm (Opus) + .mp3. Offered as the alternative for each moment, and in the full library.
+// Volumes are deliberately low: sound is a quiet layer, never a feature.
 
 export const SOUND_CATEGORIES = [
   { id: 'ui', label: 'Navigation & interface', volume: 0.6 },
@@ -11,11 +15,13 @@ export const SOUND_CATEGORIES = [
   { id: 'feedback', label: 'Success & error', volume: 0.6 },
   { id: 'studio', label: 'Typography studio', volume: 0.5 },
   { id: 'particles', label: 'Particles', volume: 0.45 },
-  { id: 'ambient', label: 'Ambient & intro bed', volume: 0.35 },
+  { id: 'ambient', label: 'Intro & ambient', volume: 0.45 },
 ];
 
-/** the built-in library: every file in /sounds/ui (all CC0, Kenney via soundcn) */
-export const SOUND_LIBRARY = [
+/** generated sounds (no files) */
+export const SOUND_SYNTHS = ['synth:air', 'synth:swish', 'synth:drift', 'synth:gather', 'synth:assemble', 'synth:shimmer', 'synth:tap', 'synth:tick', 'synth:chime', 'synth:low'];
+/** the built-in files: every one in /sounds/ui (all CC0, Kenney via soundcn) */
+export const SOUND_FILES = [
   'impact-glass-light-001', 'impact-glass-light-002', 'impact-glass-light-003', 'click-soft', 'select-001', 'tick-001', 'hover-tick',
   'open-001', 'open-002', 'close-001', 'close-002', 'maximize-008', 'minimize-007', 'minimize-008',
   'card-slide-2', 'card-slide-4', 'card-fan-1', 'book-flip-2', 'book-flip-3', 'book-open', 'book-close',
@@ -24,51 +30,66 @@ export const SOUND_LIBRARY = [
   'confirmation-002', 'confirmation-003', 'two-tone-1', 'two-tone-2', 'success-chime', 'three-tone-1', 'jingles-steel-09',
   'error-002', 'error-006', 'error-008', 'scratch-001', 'scratch-003',
 ];
+export const SOUND_LIBRARY = [...SOUND_SYNTHS, ...SOUND_FILES];
 
 const E = (id, label, category, file, alt, volume, extra = {}) => ({ id, label, category, file, alt, volume, gap: 60, jitter: 0, on: true, ...extra });
-/** every moment that can make a sound. file / alt: two fitting choices from the library; volume 0-1 (before the
- *  category and master volume); gap: the least time between two plays (ms); jitter: random pitch spread (0-0.5) */
+/** every moment that can make a sound. file / alt: two fitting choices; volume 0-1 (before the category and master
+ *  volume); gap: the least time between two plays (ms); jitter: random pitch spread (0-0.5) */
 export const SOUND_EVENTS = [
-  E('nav.select', 'Nav: choose a page', 'ui', 'impact-glass-light-002', 'click-soft', 0.32),
-  E('nav.tick', 'Nav: liquid drag / conveyor tick', 'ui', 'tick-001', 'hover-tick', 0.2, { gap: 60, jitter: 0.06 }),
-  E('nav.menu-open', 'Menu opens', 'ui', 'open-002', 'maximize-008', 0.28),
-  E('nav.menu-close', 'Menu closes', 'ui', 'close-002', 'minimize-008', 0.25),
-  E('page.change', 'Page changes (tap or swipe)', 'ui', 'card-slide-4', 'book-flip-3', 0.18, { gap: 320 }),
-  E('sound.on', 'Sound switched on', 'ui', 'switch-on', 'toggle-002', 0.3),
+  E('nav.select', 'Nav: choose a page', 'ui', 'synth:tap', 'impact-glass-light-002', 0.3),
+  E('nav.tick', 'Nav: liquid drag / conveyor tick', 'ui', 'synth:tick', 'tick-001', 0.16, { gap: 60, jitter: 0.06 }),
+  E('nav.menu-open', 'Menu opens', 'ui', 'synth:swish', 'open-002', 0.22),
+  E('nav.menu-close', 'Menu closes', 'ui', 'synth:swish', 'close-002', 0.16, { jitter: 0.1 }),
+  E('page.change', 'Page changes (tap or swipe)', 'ui', 'synth:air', 'card-slide-4', 0.22, { gap: 320, jitter: 0.05 }),
+  E('ui.open', 'A window or viewer opens', 'ui', 'synth:air', 'open-001', 0.18, { gap: 250 }),
+  E('ui.close', 'A window or viewer closes', 'ui', 'synth:swish', 'close-001', 0.15, { gap: 250 }),
+  E('ui.click', 'Any other button (very quiet)', 'ui', 'synth:tick', 'click-soft', 0.1, { gap: 70 }),
+  E('ui.share', 'Share menu / link copied', 'ui', 'synth:tap', 'pluck-002', 0.22, { gap: 150 }),
+  E('sound.on', 'Sound switched on', 'ui', 'synth:chime', 'switch-on', 0.18),
 
-  E('stack.open', 'Folder / stack opens', 'gallery', 'book-open', 'card-fan-1', 0.32, { gap: 200 }),
-  E('stack.close', 'Folder / stack closes', 'gallery', 'book-close', 'card-slide-2', 0.28, { gap: 200 }),
-  E('gallery.swipe', 'Poster gallery: next / previous', 'gallery', 'book-flip-3', 'card-slide-4', 0.18, { gap: 90, jitter: 0.08 }),
-  E('gallery.view', 'Click to view (full image)', 'gallery', 'maximize-008', 'open-001', 0.26, { gap: 200 }),
-  E('gallery.back', 'Back from the full image', 'gallery', 'minimize-008', 'close-001', 0.22, { gap: 200 }),
+  E('stack.open', 'Folder / stack opens', 'gallery', 'synth:air', 'book-open', 0.26, { gap: 200 }),
+  E('stack.close', 'Folder / stack closes', 'gallery', 'synth:swish', 'book-close', 0.2, { gap: 200 }),
+  E('gallery.swipe', 'Poster gallery: next / previous', 'gallery', 'synth:swish', 'book-flip-3', 0.13, { gap: 90, jitter: 0.12 }),
+  E('gallery.view', 'Click to view (full image)', 'gallery', 'synth:air', 'maximize-008', 0.2, { gap: 200 }),
+  E('gallery.back', 'Back from the full image', 'gallery', 'synth:swish', 'minimize-008', 0.16, { gap: 200 }),
+  E('gallery.pin', 'Pin / unpin an image', 'gallery', 'synth:tap', 'drop-002', 0.22, { gap: 150 }),
 
-  E('panda.open', 'Panda: chat opens', 'assistant', 'notification-pop', 'pluck-002', 0.26, { gap: 300 }),
-  E('panda.close', 'Panda: chat closes', 'assistant', 'minimize-007', 'close-001', 0.2, { gap: 300 }),
-  E('panda.send', 'Panda: message sent', 'assistant', 'pluck-001', 'drop-002', 0.26),
-  E('panda.reply', 'Panda: reply received', 'assistant', 'question-002', 'pluck-002', 0.22, { gap: 400 }),
-  E('panda.idle', 'Panda: idle chirp (rare, very quiet)', 'assistant', 'pluck-002', 'question-003', 0.08, { gap: 45000 }),
+  E('panda.open', 'Panda: chat opens', 'assistant', 'notification-pop', 'synth:air', 0.22, { gap: 300 }),
+  E('panda.close', 'Panda: chat closes', 'assistant', 'synth:swish', 'minimize-007', 0.16, { gap: 300 }),
+  E('panda.send', 'Panda: message sent', 'assistant', 'pluck-001', 'synth:tap', 0.22),
+  E('panda.reply', 'Panda: reply received', 'assistant', 'synth:shimmer', 'question-002', 0.2, { gap: 400 }),
+  E('panda.idle', 'Panda: idle chirp (rare, very quiet)', 'assistant', 'synth:shimmer', 'pluck-002', 0.06, { gap: 45000 }),
 
-  E('store.tab', 'Store: Artzz / Artifacts', 'store', 'toggle-002', 'switch-001', 0.28),
-  E('store.filter', 'Store: filters, sort, currency', 'store', 'click-soft', 'select-001', 0.25),
-  E('store.buy', 'Store: Buy (opens checkout)', 'store', 'handle-coins-2', 'coin-collect', 0.26, { gap: 400 }),
-  E('store.coupon', 'Store: coupon applied', 'store', 'confirmation-003', 'two-tone-1', 0.3, { gap: 400 }),
-  E('store.paid', 'Store: payment successful', 'feedback', 'success-chime', 'jingles-steel-09', 0.34, { gap: 1000 }),
-  E('store.failed', 'Store: payment failed / code rejected', 'feedback', 'error-006', 'error-002', 0.26, { gap: 600 }),
+  E('store.tab', 'Store: Artzz / Artifacts', 'store', 'synth:tap', 'toggle-002', 0.26),
+  E('store.filter', 'Store: filters, sort, currency', 'store', 'synth:tick', 'click-soft', 0.18),
+  E('store.view', 'Store: open an item / next image', 'store', 'synth:air', 'card-slide-4', 0.18, { gap: 150 }),
+  E('store.buy', 'Store: Buy (opens checkout)', 'store', 'synth:tap', 'handle-coins-2', 0.26, { gap: 400 }),
+  E('store.coupon', 'Store: coupon applied', 'store', 'confirmation-003', 'synth:chime', 0.26, { gap: 400 }),
+  E('store.paid', 'Store: payment successful', 'feedback', 'synth:chime', 'success-chime', 0.3, { gap: 1000 }),
+  E('store.failed', 'Store: payment failed / code rejected', 'feedback', 'synth:low', 'error-006', 0.24, { gap: 600 }),
 
-  E('studio.theme', 'Studio: pick a theme / option', 'studio', 'impact-glass-light-003', 'click-soft', 0.2, { gap: 90 }),
-  E('studio.export', 'Studio: export / download done', 'studio', 'confirmation-002', 'two-tone-2', 0.3, { gap: 600 }),
-  E('studio.trail', 'Studio: faint pencil while drawing', 'studio', 'scratch-003', 'scratch-001', 0.05, { gap: 75, jitter: 0.25, on: false }),
+  E('tips.open', 'Tips: open an article', 'ui', 'synth:air', 'book-open', 0.2, { gap: 250 }),
 
-  E('contact.sent', 'Contact form sent', 'feedback', 'three-tone-1', 'success-chime', 0.3, { gap: 1000 }),
-  E('contact.error', 'Contact form error', 'feedback', 'error-002', 'error-008', 0.24, { gap: 600 }),
+  E('studio.open', 'Studio: opens / closes', 'studio', 'synth:air', 'open-002', 0.22, { gap: 300 }),
+  E('studio.tool', 'Studio: tools and panels', 'studio', 'synth:tick', 'click-soft', 0.14, { gap: 60 }),
+  E('studio.theme', 'Studio: pick a theme / option', 'studio', 'synth:tap', 'impact-glass-light-003', 0.18, { gap: 90 }),
+  E('studio.export', 'Studio: export / download done', 'studio', 'synth:chime', 'confirmation-002', 0.26, { gap: 600 }),
+  E('studio.trail', 'Studio: faint pencil while drawing', 'studio', 'scratch-003', 'synth:swish', 0.05, { gap: 75, jitter: 0.25, on: false }),
 
-  E('particles.spark', 'Particles: sparkle as they fly', 'particles', 'impact-glass-light-001', 'pluck-001', 0.06, { gap: 150, jitter: 0.45 }),
-  E('intro.bed', 'Intro sound bed (upload your own)', 'ambient', '', '', 0.25, { gap: 5000, on: false }),
+  E('contact.sent', 'Contact form sent', 'feedback', 'synth:chime', 'three-tone-1', 0.28, { gap: 1000 }),
+  E('contact.error', 'Contact form error', 'feedback', 'synth:low', 'error-002', 0.22, { gap: 600 }),
+
+  E('particles.spark', 'Particles: glint as they fly', 'particles', 'synth:shimmer', 'impact-glass-light-001', 0.05, { gap: 150, jitter: 0.35 }),
+
+  E('intro.air', 'Intro: air moving while the shards fly', 'ambient', 'synth:drift', '', 0.16, { gap: 8000 }),
+  E('intro.gather', 'Intro: particles gathering', 'ambient', 'synth:gather', 'synth:shimmer', 0.12, { gap: 4000 }),
+  E('intro.assemble', 'Intro: KA assembled', 'ambient', 'synth:assemble', 'synth:chime', 0.15, { gap: 8000 }),
+  E('intro.bed', 'Intro: your own sound bed (upload)', 'ambient', '', '', 0.25, { gap: 5000, on: false }),
 ];
 export const SOUND_EVENT_IDS = SOUND_EVENTS.map(e => e.id);
 
 /** the settings a fresh site starts with (sound is off for visitors until they switch it on) */
 export const SOUND_DEFAULTS = { defaultOn: false, master: 0.7, categories: {}, events: {} };
 
-/** where a library sound lives */
+/** where a library file lives */
 export const librarySrc = (name, ext) => `/sounds/ui/${name}.${ext}`;

@@ -53,6 +53,7 @@ const P: Record<string, string> = {
   list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
   calendar: 'M4 5h16v16H4zM4 10h16M9 3v4M15 3v4',
   play: 'M7 4l13 8-13 8z',
+  sounds: 'M4 9.5h3.5L12 5.5v13l-4.5-4H4zM15.5 9a4.2 4.2 0 0 1 0 6M18 6.6a7.6 7.6 0 0 1 0 10.8',
   pause: 'M7 4h4v16H7zM13 4h4v16h-4z',
   info: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v6M12 7.5h.01',
   alert: 'M12 3 2 20h20zM12 10v4M12 17h.01',

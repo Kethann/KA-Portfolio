@@ -391,3 +391,16 @@
 .pan-pad button:nth-child(1){ grid-area:up; } .pan-pad button:nth-child(2){ grid-area:left; } .pan-pad button:nth-child(3){ grid-area:mid; }
 .pan-pad button:nth-child(4){ grid-area:right; } .pan-pad button:nth-child(5){ grid-area:down; }
 
+
+/* ---- Sounds app ---- */
+.sound-list{ display:flex; flex-direction:column; gap:8px; }
+.sound-row{ display:flex; flex-direction:column; gap:10px; padding:12px 14px; border-radius:12px; border:1px solid var(--line, rgba(255,255,255,.1)); }
+.sound-main{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.sound-name{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+.sound-controls{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.sound-controls select{ min-width:200px; flex:1 1 200px; max-width:320px; }
+.sound-vol{ display:inline-flex; align-items:center; gap:8px; flex:1 1 160px; min-width:150px; }
+.sound-vol input{ flex:1; min-width:90px; }
+.sound-controls .dropzone{ flex:0 1 auto; min-height:0; padding:0; border:0; background:none; }
+.sound-controls .dz-btn{ padding:6px 10px; min-height:0; }
+.sound-controls .dz-btn .faint{ display:none; }

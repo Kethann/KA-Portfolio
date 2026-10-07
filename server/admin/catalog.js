@@ -13,6 +13,7 @@ import { loadSiteDocument } from '../handlers/public.js';
 
 const IMAGE_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/avif': 'avif', 'image/gif': 'gif' };
 const FONT_TYPES = { 'font/woff2': 'woff2', 'font/woff': 'woff', 'font/ttf': 'ttf', 'font/otf': 'otf' };
+const AUDIO_TYPES = { 'audio/mpeg': 'mp3', 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/wav': 'wav', 'audio/mp4': 'm4a' };
 const MB = 1024 * 1024;
 // Size limits: none of our own for images and buyer files — R2's maximum object size (5 TiB) is the only one.
 // Up to SINGLE_UPLOAD a file goes up in one request; bigger files go up in PART_SIZE chunks (a Worker accepts
@@ -46,6 +47,7 @@ export async function signUpload(ctx){
   // the file's own extension is more reliable than the type a browser reports (fonts often arrive as application/x-font-ttf or empty)
   const ext = String(body.filename || '').toLowerCase().split('.').pop();
   if (kind === 'font'){ const byExt = Object.entries(FONT_TYPES).find(([, e]) => e === ext); if (byExt) type = byExt[0]; }
+  if (kind === 'audio'){ const byExt = Object.entries(AUDIO_TYPES).find(([, e]) => e === ext); if (byExt) type = byExt[0]; }
   if (kind === 'image'){ const byExt = Object.entries(IMAGE_TYPES).find(([, e]) => e === ext || (ext === 'jpeg' && e === 'jpg')); if (byExt) type = byExt[0]; }
   const bytes = int(body.bytes, { name: 'File size', min: 1, max: MAX_FILE });
   const name = str(body.filename, { name: 'File name', max: 160, required: true }).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+/, '').slice(-100) || 'file';
@@ -57,6 +59,10 @@ export async function signUpload(ctx){
     if (!FONT_TYPES[type]) throw new HttpError(400, 'Upload a WOFF2, WOFF, TTF or OTF font.');
     if (bytes > 50 * MB) throw new HttpError(400, 'Fonts can be up to 50 MB.');
     bucket = 'media'; path = `fonts/${randomToken(9)}.${FONT_TYPES[type]}`;
+  } else if (kind === 'audio'){
+    if (!AUDIO_TYPES[type]) throw new HttpError(400, 'Upload an MP3, WebM, OGG, WAV or M4A sound.');
+    if (bytes > 5 * MB) throw new HttpError(400, 'Sounds can be up to 5 MB (UI sounds are usually under 30 KB).');
+    bucket = 'media'; path = `sounds/${randomToken(9)}.${AUDIO_TYPES[type]}`;
   } else if (kind === 'deliverable'){
     bucket = 'deliverables'; path = `files/${randomToken(12)}/${name}`;
   } else throw new HttpError(400, 'Unknown upload type.');

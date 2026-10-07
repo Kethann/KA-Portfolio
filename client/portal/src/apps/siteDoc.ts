@@ -1,6 +1,8 @@
 // One shared draft of the site document for the Studio and Content apps: edits in either window
 // show up in both, and one Save commits everything (the server checks the revision, so another
 // device's newer save is never overwritten silently).
+import { SOUND_DEFAULTS } from '../../../../shared/sounds.js';
+import type { SoundSettings } from '../../../../shared/sounds.js';
 import { useSyncExternalStore } from 'react';
 import { get, put } from '../api';
 import { PASS_DEFAULTS, type PassSettings } from '../../../src/store/checkout/PassCard';
@@ -14,6 +16,7 @@ export type SiteDoc = {
   branding: { enabled: boolean; logoUrl: string }; elementStyles: Record<string, any>; socialLinks: { label: string; url: string; icon: string }[];
   passCard: PassDraft;
   stats: StatsDraft;
+  sounds?: SoundSettings;
   skills: SkillsDraft;
   about: AboutDraft;
 };
@@ -58,6 +61,7 @@ function withDefaults(d: SiteDoc): SiteDoc {
   return { ...d, notice: d.notice || { enabled: false, text: '', tone: 'info' }, visibility: { navGallery: d.visibility?.navGallery ?? true, navAbout: d.visibility?.navAbout ?? true, autoFullscreen: d.visibility?.autoFullscreen ?? false, downloadFormat: d.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png' },
     stacks: d.stacks || { loop: true, covers: {} }, layoutOverrides: d.layoutOverrides || { mobile: {}, tablet: {}, desktop: {} }, branding: d.branding || { enabled: false, logoUrl: '' },
     elementStyles: d.elementStyles || {}, socialLinks: d.socialLinks || [], passCard: { ...PASS_DRAFT_DEFAULTS, ...(d.passCard || {}) }, stats: d.stats ? { enabled: d.stats.enabled !== false, items: d.stats.items || [] } : STATS_DEFAULTS,
+    sounds: d.sounds ? { ...SOUND_DEFAULTS, ...d.sounds, categories: { ...(d.sounds.categories || {}) }, events: { ...(d.sounds.events || {}) } } : structuredClone(SOUND_DEFAULTS),
     skills: d.skills ? { enabled: d.skills.enabled !== false, title: d.skills.title || 'Skills', intro: d.skills.intro || '', categories: d.skills.categories || [] } : { enabled: true, title: 'Skills', intro: '', categories: [] }, about: d.about ? { ...aboutDefaults(), ...d.about, journey: { ...ABOUT_DEFAULT.journey, ...(d.about.journey || {}) }, reel: { ...ABOUT_DEFAULT.reel, ...(d.about.reel || {}) } } : aboutDefaults(), details: { ...d.details, customFonts: d.details?.customFonts || [] } };
 }
 export function updateSite(fn: (d: SiteDoc) => SiteDoc){ if (state.doc) emit({ doc: fn(state.doc) }); }

@@ -6,6 +6,8 @@ export interface SoundEventSetting { on?: boolean; volume?: number; file?: strin
 export interface SoundSettings { defaultOn: boolean; master: number; categories: Partial<Record<SoundCategory, number>>; events: Record<string, SoundEventSetting> }
 export const SOUND_CATEGORIES: { id: SoundCategory; label: string; volume: number }[];
 export const SOUND_LIBRARY: string[];
+export const SOUND_SYNTHS: string[];
+export const SOUND_FILES: string[];
 export const SOUND_EVENTS: SoundEvent[];
 export const SOUND_EVENT_IDS: string[];
 export const SOUND_DEFAULTS: SoundSettings;

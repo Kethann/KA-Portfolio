@@ -22,7 +22,7 @@ validateEnv();
 const TYPES = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8',
   '.json':'application/json', '.webmanifest':'application/manifest+json', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.webp':'image/webp', '.avif':'image/avif', '.svg':'image/svg+xml',
   '.gif':'image/gif', '.ico':'image/x-icon', '.woff2':'font/woff2', '.woff':'font/woff', '.ttf':'font/ttf', '.otf':'font/otf', '.glb':'model/gltf-binary',
-  '.mp4':'video/mp4', '.webm':'video/webm', '.txt':'text/plain; charset=utf-8', '.zip':'application/zip', '.pdf':'application/pdf', '.gz':'application/gzip' };
+  '.mp4':'video/mp4', '.webm':'video/webm', '.mp3':'audio/mpeg', '.ogg':'audio/ogg', '.wav':'audio/wav', '.m4a':'audio/mp4', '.txt':'text/plain; charset=utf-8', '.zip':'application/zip', '.pdf':'application/pdf', '.gz':'application/gzip' };
 const SECURITY = { 'X-Content-Type-Options':'nosniff', 'Referrer-Policy':'strict-origin-when-cross-origin', 'X-Frame-Options':'SAMEORIGIN' };
 
 export async function createDevServer({ port = Number(env('PORT', 9878)), host = env('HOST', '127.0.0.1'), dataDir = env('KA_DATA_DIR', resolve(root, '.data')) } = {}){
@@ -135,7 +135,7 @@ export async function createDevServer({ port = Number(env('PORT', 9878)), host =
         if (await sendFile(res, resolve(root, 'index.html'), 'no-cache')) return;
       }
       for (const [prefix, base, cache] of [['/dist/assets/', resolve(root, 'dist/assets'), 'no-cache'], ['/assets/', resolve(root, 'dist/assets'), 'no-cache'],
-        ['/images/', resolve(root, 'images'), 'public, max-age=86400, stale-while-revalidate=604800'], ['/portal/', resolve(root, 'dist/portal'), 'no-store']]){
+        ['/images/', resolve(root, 'images'), 'public, max-age=86400, stale-while-revalidate=604800'], ['/sounds/', resolve(root, 'dist/sounds'), 'public, max-age=86400'], ['/portal/', resolve(root, 'dist/portal'), 'no-store']]){
         if (path.startsWith(prefix)){
           let rel = path.slice(prefix.length) || 'index.html';
           if (prefix === '/portal/' && !extname(rel)) rel = 'index.html';     // single-page app

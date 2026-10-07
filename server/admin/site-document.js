@@ -8,6 +8,7 @@ import { SKILL_LOGOS } from '../../shared/skill-logos.js';
 import { ABOUT_DEFAULT, ABOUT_LIMITS } from '../../shared/about-default.js';
 
 import { FONT_NAMES } from '../../shared/fonts.js';
+import { SOUND_EVENT_IDS, SOUND_CATEGORIES, SOUND_LIBRARY, SOUND_DEFAULTS } from '../../shared/sounds.js';
 
 export const FONT_CHOICES = FONT_NAMES;   // the shared library (studio, portal, homepage) + system-ui
 export const SOCIAL_ICONS = ['behance', 'instagram', 'x', 'linkedin', 'youtube', 'website', 'email'];
@@ -285,10 +286,36 @@ export function validateSiteDocument(input, current, seed){
   } : structuredClone(STATS_DEFAULT);
   const skills = validateSkills(input.skills);
   const about = validateAbout(input.about);
-  return { typeV2: true, details, folders, images, notice, visibility, stacks, layoutOverrides, branding, elementStyles, socialLinks, passCard, stats, skills, about };
+  const sounds = validateSounds(input.sounds);
+  return { typeV2: true, details, folders, images, notice, visibility, stacks, layoutOverrides, branding, elementStyles, socialLinks, passCard, stats, skills, about, sounds };
 }
 
 // About > story. Missing (a document saved before the story was editable) means the defaults; bad values are refused.
+// UI sounds (Creator Portal > Sounds): on by default for visitors or not, master and category volumes, and per event
+// on/off, volume and the file (a built-in library sound by name, or an audio file uploaded to our own media bucket).
+const ownMedia = (u) => { try { return isOwnMediaUrl(u); } catch { return false; } };   // a URL that can't be checked is refused
+export function validateSounds(input){
+  const s = input && typeof input === 'object' ? input : {};
+  const vol = (v, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(1, Math.max(0, Math.round(n * 100) / 100)) : d; };
+  const out = { defaultOn: s.defaultOn === true, master: vol(s.master, SOUND_DEFAULTS.master), categories: {}, events: {} };
+  const cats = s.categories && typeof s.categories === 'object' ? s.categories : {};
+  for (const c of SOUND_CATEGORIES) if (cats[c.id] !== undefined) out.categories[c.id] = vol(cats[c.id], c.volume);
+  const evs = s.events && typeof s.events === 'object' ? s.events : {};
+  for (const id of SOUND_EVENT_IDS){
+    const e = evs[id]; if (!e || typeof e !== 'object') continue;
+    const clean = {};
+    if (typeof e.on === 'boolean') clean.on = e.on;
+    if (e.volume !== undefined) clean.volume = vol(e.volume, 0.3);
+    if (typeof e.file === 'string' && e.file){
+      if (SOUND_LIBRARY.includes(e.file)) clean.file = e.file;
+      else if (/\.(mp3|webm|ogg|wav|m4a)$/i.test(e.file) && ownMedia(e.file)) clean.file = e.file;
+      else throw bad(`The sound for “${id}” must be one from the library or a file you uploaded.`);
+    }
+    if (Object.keys(clean).length) out.events[id] = clean;
+  }
+  return out;
+}
+
 export function validateAbout(input){
   const D = ABOUT_DEFAULT;
   if (!input || typeof input !== 'object') return structuredClone(D);

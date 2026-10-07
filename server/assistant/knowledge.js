@@ -72,15 +72,19 @@ export async function retrieve(question, { includeProducts = true } = {}){
   const seen = new Set(), chunks = [];
   for (const h of [...hits, ...basics]){ const k = h.title + '|' + h.content.slice(0, 60); if (!seen.has(k)){ seen.add(k); chunks.push(h); } }
 
-  const siteAll = await getSetting('site');
+  const [siteAll, tips, legal, productsRows] = await Promise.all([
+    getSetting('site'),
+    db.query(`select title, slug, excerpt from tips where status = 'published' order by published_at desc limit 15`),
+    db.query(`select slug, title from legal_pages where published`),
+    includeProducts
+      ? db.query(`select p.*, l.name as license_name, l.summary as license_summary from products p left join licenses l on l.id = p.license_id
+          where p.status = 'published' order by p.kind, p.sort limit 40`)
+      : Promise.resolve([])
+  ]);
   const site = siteAll && Array.isArray(siteAll.images) ? { ...siteAll, images: siteAll.images.filter(i => i.hidden !== true) } : siteAll;   // hidden pieces are not talked about
-  const tips = await db.query(`select title, slug, excerpt from tips where status = 'published' order by published_at desc limit 15`);
-  const legal = await db.query(`select slug, title from legal_pages where published`);
   let products = [];
-  if (includeProducts){
-    const rows = await db.query(`select p.*, l.name as license_name, l.summary as license_summary from products p left join licenses l on l.id = p.license_id
-      where p.status = 'published' order by p.kind, p.sort limit 40`);
-    products = rows.map(p => {
+  if (includeProducts && Array.isArray(productsRows)){
+    products = productsRows.map(p => {
       const price = (cur) => { const pr = priceFor(p, cur); return pr.free ? 'free' : pr.available ? `${formatMoney(pr.amount, cur)}${pr.onSale ? ` (sale, normally ${formatMoney(pr.compareAt, cur)})` : ''}` : null; };
       const inr = price('INR'), usd = price('USD');
       return `- ${p.title} [${p.kind === 'artzz' ? 'Artzz gallery' : 'Artifacts download'}] ${p.sellable ? `price: ${inr || 'n/a'} in India, ${usd || 'n/a'} elsewhere` : 'view only, not for sale'}${p.license_name ? `; license: ${p.license_name}${p.license_summary ? ` (${p.license_summary})` : ''}` : ''}; link: /?product=${p.slug}${p.summary ? `; about: ${p.summary.slice(0, 200)}` : ''}`;

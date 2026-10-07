@@ -61,7 +61,7 @@ export const del = <T = any>(path: string) => api<T>('DELETE', path);
 // Uploads go straight to storage with a signed URL; the file never passes through our API. Small files go up in one
 // request; big ones (the server says `chunked`) in parts, 3 at a time, each retried, so any size works.
 type UploadSig = { bucket: string; path: string; uploadUrl: string; method?: string; publicUrl: string | null; chunked?: boolean; partSize?: number };
-export async function upload(file: File, kind: 'image' | 'font' | 'deliverable', onProgress?: (p: number) => void){
+export async function upload(file: File, kind: 'image' | 'font' | 'deliverable' | 'audio', onProgress?: (p: number) => void){
   // browsers report fonts as application/x-font-ttf, application/font-woff or nothing at all: for images and fonts the file's extension decides
   const type = (kind !== 'deliverable' && guessType(file.name)) || file.type || guessType(file.name);
   const sig = await post<UploadSig>('/uploads', { kind, contentType: type, bytes: file.size, filename: file.name });

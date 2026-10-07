@@ -6,6 +6,7 @@
 //  - files are fetched only when first needed (small UI sounds are warmed up in idle time after unlocking).
 import { SOUND_EVENTS, SOUND_CATEGORIES, SOUND_DEFAULTS, librarySrc } from '../../../../shared/sounds.js';
 import type { SoundSettings, SoundEvent } from '../../../../shared/sounds.js';
+import { synthBuffer } from './synth';
 
 const KEY = 'ka-sound';   // { on: boolean | null, volume: 0-1 }
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -85,6 +86,10 @@ export class SoundEngine {
   }
   /** a decoded file (library names fall back from WebM to MP3 if a browser can't decode Opus) */
   private buffer(file: string): Promise<AudioBuffer | null> {
+    if (file.startsWith('synth:')){   // generated in the browser: no download
+      const hit = this.buffers.get(file); if (hit) return hit;
+      const p = Promise.resolve(this.ctx ? synthBuffer(this.ctx, file) : null); this.buffers.set(file, p); return p;
+    }
     const key = this.urlFor(file); const hit = this.buffers.get(key); if (hit) return hit;
     const library = !(/^(https?:)?\/\//.test(file) || file.startsWith('/'));
     const p = this.decode(key).catch(() => {
@@ -122,7 +127,7 @@ export class SoundEngine {
   private emit(file: string, gain: number, rate: number){
     const ctx = this.ctx, out = this.out; if (!ctx || !out) return;
     void this.buffer(file).then(buf => {
-      if (!buf){ this.element(file, gain); return; }
+      if (!buf){ if (!file.startsWith('synth:')) this.element(file, gain); return; }
       const src = ctx.createBufferSource(); src.buffer = buf; src.playbackRate.value = Math.max(0.5, Math.min(2.5, rate));
       const g = ctx.createGain(); g.gain.value = Math.min(1, gain);
       src.connect(g).connect(out); src.start();
