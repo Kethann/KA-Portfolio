@@ -404,3 +404,8 @@
 .sound-controls .dropzone{ flex:0 1 auto; min-height:0; padding:0; border:0; background:none; }
 .sound-controls .dz-btn{ padding:6px 10px; min-height:0; }
 .sound-controls .dz-btn .faint{ display:none; }
+
+/* Studio > Intro */
+.intro-versions{ display:flex; flex-direction:column; gap:8px; }
+.intro-version{ display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:12px; border:1px solid var(--line, rgba(255,255,255,.1)); cursor:pointer; }
+.intro-version:has(input:checked){ border-color:rgba(255,170,120,.6); background:rgba(255,148,56,.06); }

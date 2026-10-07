@@ -82,6 +82,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 let introDone = false, assembling = false;
 window.addEventListener('ka-intro-phase', e => { if ((e as CustomEvent<string>).detail === 'assembling'){ assembling = true; engine.play('intro.gather'); } });
 window.addEventListener('ka-sequence-complete', () => { if (!introDone){ introDone = true; engine.play('intro.assemble'); } });
+engine.onChange(() => { if (engine.enabled && !introDone && assembling) engine.play('intro.gather'); });
 window.addEventListener('pointerdown', () => { if (!introDone) setTimeout(() => { engine.play(assembling ? 'intro.gather' : 'intro.air'); }, 60); }, { capture: true, once: true, passive: true });
 // windows and viewers: the studio, dialogs (upscaler, Demix Pro, full-screen guide), the store's checkout
 new MutationObserver(list => {

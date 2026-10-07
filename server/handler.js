@@ -49,6 +49,7 @@ registerUsage(route);
 // ---- public site
 route('GET', '/api/public-config', pub.publicConfig);
 route('GET', '/api/portfolio', pub.portfolio);
+route('GET', '/api/intro', pub.intro);
 route('GET', '/api/live', pub.liveVersion);
 route('POST', '/api/contact', pub.contact);
 route('POST', '/api/notify', pub.notify);

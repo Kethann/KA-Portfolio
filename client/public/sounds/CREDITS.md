@@ -61,6 +61,8 @@ Written for this site (client/src/lib/sound/synth.ts); no third-party audio invo
 
 | Name | What it is |
 |---|---|
+| synth:glass | a clear crystal tink with a faint sparkle (taps) |
+| synth:frost | a tiny icy crackle (ticks, small controls) |
 | synth:air | a soft breath of moving air |
 | synth:swish | a shorter, lighter air movement |
 | synth:drift | a slow wash of air with a faint glimmer (intro) |

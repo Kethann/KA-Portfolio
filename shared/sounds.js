@@ -19,7 +19,7 @@ export const SOUND_CATEGORIES = [
 ];
 
 /** generated sounds (no files) */
-export const SOUND_SYNTHS = ['synth:air', 'synth:swish', 'synth:drift', 'synth:gather', 'synth:assemble', 'synth:shimmer', 'synth:tap', 'synth:tick', 'synth:chime', 'synth:low'];
+export const SOUND_SYNTHS = ['synth:glass', 'synth:frost', 'synth:air', 'synth:swish', 'synth:drift', 'synth:gather', 'synth:assemble', 'synth:shimmer', 'synth:tap', 'synth:tick', 'synth:chime', 'synth:low'];
 /** the built-in files: every one in /sounds/ui (all CC0, Kenney via soundcn) */
 export const SOUND_FILES = [
   'impact-glass-light-001', 'impact-glass-light-002', 'impact-glass-light-003', 'click-soft', 'select-001', 'tick-001', 'hover-tick',
@@ -36,23 +36,23 @@ const E = (id, label, category, file, alt, volume, extra = {}) => ({ id, label, 
 /** every moment that can make a sound. file / alt: two fitting choices; volume 0-1 (before the category and master
  *  volume); gap: the least time between two plays (ms); jitter: random pitch spread (0-0.5) */
 export const SOUND_EVENTS = [
-  E('nav.select', 'Nav: choose a page', 'ui', 'synth:tap', 'impact-glass-light-002', 0.3),
-  E('nav.tick', 'Nav: liquid drag / conveyor tick', 'ui', 'synth:tick', 'tick-001', 0.16, { gap: 60, jitter: 0.06 }),
+  E('nav.select', 'Nav: choose a page', 'ui', 'synth:glass', 'impact-glass-light-002', 0.3),
+  E('nav.tick', 'Nav: liquid drag / conveyor tick', 'ui', 'synth:frost', 'tick-001', 0.16, { gap: 60, jitter: 0.08 }),
   E('nav.menu-open', 'Menu opens', 'ui', 'synth:swish', 'open-002', 0.22),
   E('nav.menu-close', 'Menu closes', 'ui', 'synth:swish', 'close-002', 0.16, { jitter: 0.1 }),
   E('page.change', 'Page changes (tap or swipe)', 'ui', 'synth:air', 'card-slide-4', 0.22, { gap: 320, jitter: 0.05 }),
   E('ui.open', 'A window or viewer opens', 'ui', 'synth:air', 'open-001', 0.18, { gap: 250 }),
   E('ui.close', 'A window or viewer closes', 'ui', 'synth:swish', 'close-001', 0.15, { gap: 250 }),
-  E('ui.click', 'Any other button (very quiet)', 'ui', 'synth:tick', 'click-soft', 0.1, { gap: 70 }),
-  E('ui.share', 'Share menu / link copied', 'ui', 'synth:tap', 'pluck-002', 0.22, { gap: 150 }),
-  E('sound.on', 'Sound switched on', 'ui', 'synth:chime', 'switch-on', 0.18),
+  E('ui.click', 'Any other button / touch (very quiet)', 'ui', 'synth:frost', 'click-soft', 0.12, { gap: 70, jitter: 0.06 }),
+  E('ui.share', 'Share menu / link copied', 'ui', 'synth:glass', 'pluck-002', 0.22, { gap: 150 }),
+  E('sound.on', 'Sound switched on (the KA assembled sound)', 'ui', 'synth:assemble', 'synth:chime', 0.2, { gap: 1500 }),
 
   E('stack.open', 'Folder / stack opens', 'gallery', 'synth:air', 'book-open', 0.26, { gap: 200 }),
   E('stack.close', 'Folder / stack closes', 'gallery', 'synth:swish', 'book-close', 0.2, { gap: 200 }),
   E('gallery.swipe', 'Poster gallery: next / previous', 'gallery', 'synth:swish', 'book-flip-3', 0.13, { gap: 90, jitter: 0.12 }),
   E('gallery.view', 'Click to view (full image)', 'gallery', 'synth:air', 'maximize-008', 0.2, { gap: 200 }),
   E('gallery.back', 'Back from the full image', 'gallery', 'synth:swish', 'minimize-008', 0.16, { gap: 200 }),
-  E('gallery.pin', 'Pin / unpin an image', 'gallery', 'synth:tap', 'drop-002', 0.22, { gap: 150 }),
+  E('gallery.pin', 'Pin / unpin an image', 'gallery', 'synth:glass', 'drop-002', 0.22, { gap: 150 }),
 
   E('panda.open', 'Panda: chat opens', 'assistant', 'notification-pop', 'synth:air', 0.22, { gap: 300 }),
   E('panda.close', 'Panda: chat closes', 'assistant', 'synth:swish', 'minimize-007', 0.16, { gap: 300 }),
@@ -60,10 +60,10 @@ export const SOUND_EVENTS = [
   E('panda.reply', 'Panda: reply received', 'assistant', 'synth:shimmer', 'question-002', 0.2, { gap: 400 }),
   E('panda.idle', 'Panda: idle chirp (rare, very quiet)', 'assistant', 'synth:shimmer', 'pluck-002', 0.06, { gap: 45000 }),
 
-  E('store.tab', 'Store: Artzz / Artifacts', 'store', 'synth:tap', 'toggle-002', 0.26),
-  E('store.filter', 'Store: filters, sort, currency', 'store', 'synth:tick', 'click-soft', 0.18),
+  E('store.tab', 'Store: Artzz / Artifacts', 'store', 'synth:glass', 'toggle-002', 0.26),
+  E('store.filter', 'Store: filters, sort, currency', 'store', 'synth:frost', 'click-soft', 0.18),
   E('store.view', 'Store: open an item / next image', 'store', 'synth:air', 'card-slide-4', 0.18, { gap: 150 }),
-  E('store.buy', 'Store: Buy (opens checkout)', 'store', 'synth:tap', 'handle-coins-2', 0.26, { gap: 400 }),
+  E('store.buy', 'Store: Buy (opens checkout)', 'store', 'synth:glass', 'handle-coins-2', 0.26, { gap: 400 }),
   E('store.coupon', 'Store: coupon applied', 'store', 'confirmation-003', 'synth:chime', 0.26, { gap: 400 }),
   E('store.paid', 'Store: payment successful', 'feedback', 'synth:chime', 'success-chime', 0.3, { gap: 1000 }),
   E('store.failed', 'Store: payment failed / code rejected', 'feedback', 'synth:low', 'error-006', 0.24, { gap: 600 }),
@@ -71,8 +71,8 @@ export const SOUND_EVENTS = [
   E('tips.open', 'Tips: open an article', 'ui', 'synth:air', 'book-open', 0.2, { gap: 250 }),
 
   E('studio.open', 'Studio: opens / closes', 'studio', 'synth:air', 'open-002', 0.22, { gap: 300 }),
-  E('studio.tool', 'Studio: tools and panels', 'studio', 'synth:tick', 'click-soft', 0.14, { gap: 60 }),
-  E('studio.theme', 'Studio: pick a theme / option', 'studio', 'synth:tap', 'impact-glass-light-003', 0.18, { gap: 90 }),
+  E('studio.tool', 'Studio: tools and panels', 'studio', 'synth:frost', 'click-soft', 0.14, { gap: 60 }),
+  E('studio.theme', 'Studio: pick a theme / option', 'studio', 'synth:glass', 'impact-glass-light-003', 0.18, { gap: 90 }),
   E('studio.export', 'Studio: export / download done', 'studio', 'synth:chime', 'confirmation-002', 0.26, { gap: 600 }),
   E('studio.trail', 'Studio: faint pencil while drawing', 'studio', 'scratch-003', 'synth:swish', 0.05, { gap: 75, jitter: 0.25, on: false }),
 

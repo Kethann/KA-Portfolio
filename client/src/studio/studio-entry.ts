@@ -539,7 +539,7 @@ class Studio {
   layoutForScreen(){
     const mq = window.matchMedia('(max-width:700px), (max-width:1100px) and (pointer:coarse), (max-height:500px) and (pointer:coarse)');
     const moves: [string, string][] = [
-      ['[data-act="undo"]', '.tb-history'], ['[data-act="redo"]', '.tb-history'], ['[data-act="hide-tools"]', '.tb-hide'], ['[data-act="export"]', '.savebar'],
+      ['[data-act="undo"]', '.tb-history'], ['[data-act="redo"]', '.tb-history'], ['[data-act="hide-tools"]', '.tb-hide'], ['.site-menu-wrap', '.tb-hide'], ['[data-act="export"]', '.savebar'],
       ['[data-act="fx"]', '.rare'], ['[data-act="replay"]', '.rare'], ['[data-act="fullscreen"]', '.rare'], ['[data-act="clear"]', '.rare'], ['[data-act="help"]', '.rare']
     ];
     const nodes = moves.map(([sel, dest]) => { const el = this.$(sel), mark = document.createComment('slot'); el.before(mark); return { el, mark, dest }; });
@@ -597,6 +597,11 @@ class Studio {
     this.syncControls();
     this.drawBrushPreviews();
 
+    // a tap anywhere outside the ☰ page menu closes it
+    this.on(r, 'pointerdown', ((e: Event) => {
+      const sm = r.querySelector<HTMLElement>('.site-menu');
+      if (sm && !sm.hidden && !e.composedPath().some(n => n instanceof Element && n.classList.contains('site-menu-wrap'))){ sm.hidden = true; r.querySelector('[data-act="site-menu"]')?.setAttribute('aria-expanded', 'false'); }
+    }) as EventListener);
     this.on(r, 'click', ((e: Event) => {
       const t = (e.target as HTMLElement).closest('[data-act],[data-brush],[data-bg]') as HTMLElement | null;
       if (!t) return;
@@ -636,6 +641,17 @@ class Studio {
         case 'replay-preview': this.closePanels(); if (this.replay) this.endReplay(); this.startReplay(); break;
         case 'clear': this.clearAct(); break;
         case 'fullscreen': this.toggleFullscreen(); break;
+        case 'site-menu': {
+          const m = this.$('.site-menu'), open = m.hidden; m.hidden = !open; t.setAttribute('aria-expanded', String(open));
+          if (open) m.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+          break;
+        }
+        case 'go-page': {
+          const page = t.dataset.v || 'about';
+          this.close();
+          (window as unknown as { kaGoTo?: (p: string) => void }).kaGoTo?.(page);
+          break;
+        }
         case 'hide-tools': session.toolbarHidden = true; this.closePanels(); this.applyToolbarState(); this.$('[data-act="show-tools"]').focus(); break;
         case 'show-tools': session.toolbarHidden = false; this.applyToolbarState(); this.$('[data-act="brush-menu"]').focus(); break;
         case 'help': this.togglePanel('help', t); break;
@@ -1021,6 +1037,7 @@ const I = {
   clear: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.6 2.6 0 0 1 5 1c0 2-2.5 2.2-2.5 4"/><path d="M12 17.5h.01"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   tools: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   textfx: '<path d="M4 18 8.5 6h1L14 18M5.6 14h6.8"/><path d="M17.5 4.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/><path d="M17 13c1 2 2.6 3.6 4.5 4.5"/>',
   trail: '<circle cx="17.5" cy="6.5" r="2.5"/><path d="M15.5 8.5 4 20M12.5 6.5 5 14M17.5 11.5 10 19"/>'
@@ -1038,6 +1055,7 @@ const TEMPLATE = `
   <canvas class="live" role="img" aria-label="Drawing canvas. Draw with a mouse, finger or pen."></canvas>
 </div>
 <button type="button" class="corner close" data-act="close" aria-label="Close studio (Escape)">${icon(I.close)}</button>
+<div class="site-menu-wrap"><button type="button" class="corner site-menu-btn" data-act="site-menu" aria-haspopup="menu" aria-expanded="false" aria-label="Go to another page" title="Pages">${icon(I.menu)}</button><div class="site-menu" role="menu" aria-label="Pages" hidden><button type="button" role="menuitem" data-act="go-page" data-v="contact">Contact</button><button type="button" role="menuitem" data-act="go-page" data-v="about">About</button><button type="button" role="menuitem" data-act="go-page" data-v="portfolio">Portfolio</button><button type="button" role="menuitem" data-act="go-page" data-v="store">Store</button><button type="button" role="menuitem" data-act="go-page" data-v="tips">Tips</button></div></div>
 <button type="button" class="show-tools" data-act="show-tools" hidden aria-label="Show tools (H)">${icon(I.tools)}<span>Tools</span></button>
 <div class="topbar"><div class="tb-history" role="group" aria-label="History"></div><div class="tb-hide"></div></div>
   <div class="panel fx-panel fx-dock" data-panel="fx" hidden aria-label="Text effects">

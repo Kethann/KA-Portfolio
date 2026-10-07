@@ -6,7 +6,9 @@
 //   gather   tiny glints rising out of air (the intro's particles gathering)
 //   assemble a warm low swell with a clear glass tone settling on top (KA assembled)
 //   shimmer  one faint glint (particles)
-//   tap      a soft round tap (nav, buttons)
+//   glass    a clear crystal "tink" with a faint sparkle after it (taps, nav: made for the frozen-glass look)
+//   frost    a tiny icy crackle (ticks, small controls)
+//   tap      a soft round tap
 //   tick     a tiny, dry tick (dragging the nav)
 //   chime    two gentle notes rising (success)
 //   low      two soft low notes falling (errors)
@@ -66,6 +68,22 @@ const GENS: Record<string, Gen> = {
     return fade(normalise(out, 0.6), sr, 20);
   },
   shimmer: (sr, r) => { const out = new Float32Array(Math.floor(sr * 0.32)); const f = 2600 + r() * 600; tone(out, sr, 0, f, 0.5, 14, { partials: [[1, 1], [1.5, 0.35], [2.01, 0.2]] }); return fade(normalise(out, 0.45), sr, 3); },
+  glass: (sr, r) => {
+    const out = new Float32Array(Math.floor(sr * 0.55)), f = 2150 + r() * 120;
+    // a struck glass: inharmonic partials, the high ones dying fastest, and a hair of noise at the strike
+    const parts: [number, number, number][] = [[1, 1, 11], [2.32, 0.42, 17], [4.25, 0.2, 26], [6.63, 0.08, 38]];
+    for (const [m, a, d] of parts) tone(out, sr, 0, f * m, a * 0.5, d, { attack: 0.0012 });
+    tone(out, sr, 0.034, f * 1.5, 0.12, 22, { attack: 0.001, partials: [[1, 1], [2.32, 0.3]] });   // the faint sparkle after it
+    for (let i = 0; i < Math.floor(sr * 0.0015); i++) out[i] += (r() * 2 - 1) * 0.18 * (1 - i / (sr * 0.0015));
+    return fade(normalise(out, 0.5), sr, 2);
+  },
+  frost: (sr, r) => {
+    const out = new Float32Array(Math.floor(sr * 0.13));
+    tone(out, sr, 0, 3900 + r() * 300, 0.25, 48, { attack: 0.0008 });
+    const ice = airNoise(sr, 0.07, r, () => 7200, 0.6, u => Math.exp(-u * 7));
+    for (let k = 0; k < 6; k++){ const at = Math.floor((k * 0.009 + r() * 0.004) * sr), len = Math.floor(sr * 0.006); for (let i = 0; i < len && at + i < ice.length; i++) out[at + i] += ice[at + i] * (1 - i / len) * 0.9; }
+    return fade(normalise(out, 0.38), sr, 1);
+  },
   tap: (sr) => { const out = new Float32Array(Math.floor(sr * 0.12)); tone(out, sr, 0, 760, 0.6, 38, { attack: 0.002, glide: 26, partials: [[1, 1], [2, 0.12]] }); return fade(normalise(out, 0.55), sr, 2); },
   tick: (sr, r) => { const out = new Float32Array(Math.floor(sr * 0.035)); tone(out, sr, 0, 2100, 0.5, 140, { attack: 0.0008 }); for (let i = 0; i < 90 && i < out.length; i++) out[i] += (r() * 2 - 1) * 0.08 * (1 - i / 90); return fade(normalise(out, 0.4), sr, 1); },
   chime: (sr) => { const out = new Float32Array(Math.floor(sr * 1.3)); tone(out, sr, 0, 1318.5, 0.32, 3.6, { partials: [[1, 1], [2, 0.08], [3, 0.03]] }); tone(out, sr, 0.13, 1975.5, 0.28, 3.4, { partials: [[1, 1], [2, 0.06]] }); return fade(normalise(out, 0.5), sr, 8); },

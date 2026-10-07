@@ -15,6 +15,7 @@ import { Uploader, useSaveKey } from './common';
 import { SiteSaveBar } from './Content';
 import { loadSite, saveSite, thumb, updateSite, useSite, PASS_DRAFT_DEFAULTS } from './siteDoc';
 import type { SiteDoc, PassDraft } from './siteDoc';
+import { INTRO_VERSIONS, introVersion } from '../../../../shared/intros.js';
 import { FONT_GROUPS, FONT_LIBRARY, FONT_NAMES, fontStack, googleFontsUrl } from '../../../../shared/fonts.js';
 
 const FONTS = FONT_NAMES;
@@ -24,9 +25,9 @@ const ICONS = ['behance', 'instagram', 'x', 'linkedin', 'youtube', 'website', 'e
 const ANIMS = ['', 'fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'scale-in', 'pop'];
 const DEVICES = { desktop: { w: 1440, h: 900, label: 'Desktop' }, tablet: { w: 820, h: 1180, label: 'Tablet' }, mobile: { w: 390, h: 844, label: 'Phone' } } as const;
 type Device = keyof typeof DEVICES;
-type Section = 'identity' | 'type' | 'notice' | 'social' | 'elements' | 'arrange' | 'pass';
+type Section = 'identity' | 'type' | 'notice' | 'social' | 'elements' | 'arrange' | 'pass' | 'intro';
 
-const SECTIONS: Section[] = ['identity', 'type', 'notice', 'social', 'elements', 'arrange', 'pass'];
+const SECTIONS: Section[] = ['identity', 'type', 'notice', 'social', 'elements', 'arrange', 'pass', 'intro'];
 export default function Studio({ active, route, only }: AppProps & { only?: Section }){
   const site = useSite();
   const toast = useToast();
@@ -47,7 +48,7 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
       <div className="studio">
         <div className="studio-panel">
           {!only && <div className="studio-nav" role="tablist" aria-label="Studio sections">
-            {([['identity', 'Colour'], ['type', 'Type'], ['notice', 'Banner & nav'], ['social', 'Links'], ['elements', 'Elements'], ['arrange', 'Arrange'], ['pass', 'Checkout pass']] as [Section, string][]).map(([k, l]) => (
+            {([['identity', 'Colour'], ['type', 'Type'], ['notice', 'Banner & nav'], ['social', 'Links'], ['elements', 'Elements'], ['arrange', 'Arrange'], ['pass', 'Checkout pass'], ['intro', 'Intro']] as [Section, string][]).map(([k, l]) => (
               <button key={k} type="button" role="tab" aria-selected={section === k} className={section === k ? 'on' : ''} onClick={() => setSection(k)}>{l}</button>
             ))}
           </div>}
@@ -73,6 +74,8 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
               <Field label={`Text size · ${Math.round((d.details.textScale ?? 1) * 100)}%`}><input type="range" min={0.85} max={1.2} step={0.01} value={d.details.textScale ?? 1} onChange={e => det('textScale', Number(e.target.value))} /></Field>
               <CustomFonts doc={d} />
             </>}
+
+            {section === 'intro' && <IntroVersions doc={d} />}
 
             {section === 'notice' && <>
               <Switch checked={d.notice.enabled} onChange={v => updateSite(x => ({ ...x, notice: { ...x.notice, enabled: v } }))} label="Show a banner at the top of the site" />
@@ -416,4 +419,24 @@ function PassPreview({ doc }: { doc: SiteDoc }){
         license={paid ? { code: SAMPLE_CODE, url: `${location.origin}/license/${SAMPLE_CODE}` } : null} /></div>, target)}
     </div>
   );
+}
+
+// Studio > Intro: which homepage intro runs. V1 (the KA crystal) is locked: it can always be chosen again, never edited.
+function IntroVersions({ doc }: { doc: SiteDoc }){
+  const current = introVersion((doc as SiteDoc & { intro?: { version?: string } }).intro?.version);
+  const pick = (id: string) => updateSite(x => ({ ...x, intro: { version: id } } as SiteDoc));
+  return <div className="stack">
+    <p className="field-hint" style={{ margin: 0 }}>The intro that plays when someone opens the homepage. Choose a version and press Publish changes; you can switch back to any version at any time. Version 1 is locked: it stays exactly as it is, so it is always there to return to.</p>
+    <ul className="list intro-versions" role="radiogroup" aria-label="Homepage intro">
+      {INTRO_VERSIONS.map(v => <li key={v.id}>
+        <label className="intro-version">
+          <input type="radio" name="intro-version" checked={current === v.id} onChange={() => pick(v.id)} />
+          <span className="grow"><b>{v.label} · {v.name}</b><span className="faint" style={{ display: 'block', fontSize: 12.5, marginTop: 2 }}>{v.description}</span></span>
+          {v.locked && <Badge tone="info">Locked</Badge>}
+          {current === v.id && <Badge tone="success">Active</Badge>}
+        </label>
+      </li>)}
+    </ul>
+    {INTRO_VERSIONS.length < 2 && <p className="field-hint" style={{ margin: 0 }}>New intro versions appear here as soon as they are added to the site; Version 1 stays available alongside them.</p>}
+  </div>;
 }

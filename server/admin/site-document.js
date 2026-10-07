@@ -8,6 +8,7 @@ import { SKILL_LOGOS } from '../../shared/skill-logos.js';
 import { ABOUT_DEFAULT, ABOUT_LIMITS } from '../../shared/about-default.js';
 
 import { FONT_NAMES } from '../../shared/fonts.js';
+import { introVersion } from '../../shared/intros.js';
 import { SOUND_EVENT_IDS, SOUND_CATEGORIES, SOUND_LIBRARY, SOUND_DEFAULTS } from '../../shared/sounds.js';
 
 export const FONT_CHOICES = FONT_NAMES;   // the shared library (studio, portal, homepage) + system-ui
@@ -287,7 +288,8 @@ export function validateSiteDocument(input, current, seed){
   const skills = validateSkills(input.skills);
   const about = validateAbout(input.about);
   const sounds = validateSounds(input.sounds);
-  return { typeV2: true, details, folders, images, notice, visibility, stacks, layoutOverrides, branding, elementStyles, socialLinks, passCard, stats, skills, about, sounds };
+  const intro = { version: introVersion(input.intro?.version) };   // which homepage intro runs (Studio > Intro)
+  return { typeV2: true, details, folders, images, notice, visibility, stacks, layoutOverrides, branding, elementStyles, socialLinks, passCard, stats, skills, about, sounds, intro };
 }
 
 // About > story. Missing (a document saved before the story was editable) means the defaults; bad values are refused.

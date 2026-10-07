@@ -1339,7 +1339,7 @@ html.ka-modal-open{ overflow:hidden; }
           <span>Sound</span>
           <span class="sound-switch" aria-hidden="true"><i></i></span>
         </button>
-        <label class="expand-sound-vol"><span>Volume</span><input type="range" id="sound-volume" min="0" max="1" step="0.05" value="0.8" aria-label="Sound volume"><output id="sound-volume-out">80%</output></label>
+        <label class="expand-sound-vol"><span>Volume</span><input type="range" id="sound-volume" min="0" max="1" step="0.01" value="0.05" aria-label="Sound volume"><output id="sound-volume-out">5%</output></label>
       </div>
     </div>
   </div>
@@ -2523,7 +2523,10 @@ window.addEventListener('pageshow',syncBackground);
 syncBackground();
 })();
 </script>
-<script>
+<!-- KA logo intro, VERSION 1 (LOCKED). Never edit this script: tests/intro-lock.test.mjs checks its fingerprint.
+     New intro ideas become a new version (its own script block marked data-intro="v2", type text/plain, listed in shared/intros.js);
+     the owner picks the version in the portal (Studio > Intro) and the Pages router switches it on. -->
+<script data-intro="v1">
 (function(){
 "use strict";
 
@@ -7016,6 +7019,8 @@ function switchSection(name, focusTarget){
   }, outMs);
 }
 
+// other bundles (the Typography studio's page menu) jump to a page this way
+window.kaGoTo = function(name){ if (name === "portfolio") switchSection("skills", true); else if (sections[name] || PAGE_SECTIONS[name]) switchSection(name, true); };
 function navGo(name){
   if (name === "typography"){ movePill(); openTypographyStudio(); return; }
   switchSection(name);

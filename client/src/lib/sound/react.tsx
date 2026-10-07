@@ -17,6 +17,6 @@ export function useSound(name: string){
 export function useSoundState(){
   const engine = useEngine();
   const enabled = useSyncExternalStore(cb => engine.onChange(cb), () => engine.enabled, () => false);
-  const volume = useSyncExternalStore(cb => engine.onChange(cb), () => engine.user.volume, () => 0.8);
+  const volume = useSyncExternalStore(cb => engine.onChange(cb), () => engine.user.volume, () => 0.05);
   return { enabled, volume, setEnabled: (on: boolean) => engine.setEnabled(on), setVolume: (v: number) => engine.setVolume(v), engine };
 }

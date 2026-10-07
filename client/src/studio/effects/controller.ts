@@ -134,7 +134,9 @@ export class EffectController {
     const typing = TYPING.find(t => t.id === c.typing) || TYPING[0];
     const deco = DECORATIONS.find(d => d.id === c.decoration) || DECORATIONS[0];
     const raw = c.text.trim() || 'Your words here', text = c.textCase === 'upper' ? raw.toUpperCase() : raw;
-    this.camAmp = flat2d ? 0 : c.camera === 'dramatic' ? 9 : c.camera === 'drift' ? 4 : 0;
+    // touch screens: no slow drift (on a phone it reads as the UI shaking); 'dramatic' stays, but gentle
+    const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    this.camAmp = flat2d ? 0 : c.camera === 'dramatic' ? (touch ? 3 : 9) : c.camera === 'drift' ? (touch ? 0 : 4) : 0;
     this.flat(true);
     if (!this.camAmp){ this.scene.canvas.style.transform = this.scene.gl.style.transform = ''; }
     const px = this.fit(c.font, text, c.tracking || 0);
