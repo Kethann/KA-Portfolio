@@ -5373,9 +5373,13 @@ function buildShardGlow(){
     for(let y=0;y<tile;y++)for(let x=0;x<tile;x++){
       const n=y*tile+x,k=n*4,a=original[k+3]/255;
       let edge=0,contrast=0;
-      if(x>0&&y>0&&x<tile-1&&y<tile-1){for(const d of offsets){
-        edge=Math.max(edge,a-original[(n+d)*4+3]/255);contrast=Math.max(contrast,Math.abs(luminance[n]-luminance[n+d]));
-      }}
+      if(x>0&&y>0&&x<tile-1&&y<tile-1){
+        const ln=luminance[n];
+        let d=n-1;edge=Math.max(edge,a-original[d*4+3]/255);contrast=Math.max(contrast,Math.abs(ln-luminance[d]));
+        d=n+1;edge=Math.max(edge,a-original[d*4+3]/255);contrast=Math.max(contrast,Math.abs(ln-luminance[d]));
+        d=n-tile;edge=Math.max(edge,a-original[d*4+3]/255);contrast=Math.max(contrast,Math.abs(ln-luminance[d]));
+        d=n+tile;edge=Math.max(edge,a-original[d*4+3]/255);contrast=Math.max(contrast,Math.abs(ln-luminance[d]));
+      }
       // Crack lips and bright facets emit; dark interiors retain their original contrast.
       const energy=a*Math.min(1,edge*.85+contrast*.5+Math.pow(luminance[n],2.4)*.38);
       pixels.data[k]=pixels.data[k+1]=pixels.data[k+2]=255;pixels.data[k+3]=Math.round(energy*255);
@@ -8670,6 +8674,7 @@ function applyElementStyles(styles){
     el.style.color = style.color || "";
     el.style.fontWeight = style.weight ? String(style.weight) : "";
     el.style.textAlign = style.align || "";
+    el.style.textIndent = typeof style.indent === "number" && style.indent > 0 ? style.indent + "em" : "";
     el.style.letterSpacing = typeof style.spacing === "number" ? style.spacing + "em" : "";
     el.style.lineHeight = typeof style.lineHeight === "number" ? String(style.lineHeight) : "";
   });
@@ -9158,6 +9163,28 @@ document.addEventListener("DOMContentLoaded", function(){
     if (el) el.addEventListener("pointerdown", kaPreviewPointerDown);
   });
 });
+// The selection box is position:fixed, so it has to follow its element while the preview scrolls or resizes, and it
+// goes away when you tap anywhere that is not a selectable element (or press Escape).
+(function(){
+  var queued = false;
+  function follow(){
+    queued = false;
+    if (!kaPreviewEditMode || !kaPreviewSelectedEl) return;
+    if (!kaPreviewSelectedEl.isConnected) kaPreviewShowOutline(null); else kaPreviewShowOutline(kaPreviewSelectedEl);
+  }
+  function queue(){ if (!queued && kaPreviewSelectedEl){ queued = true; requestAnimationFrame(follow); } }
+  window.addEventListener("scroll", queue, { passive: true });
+  window.addEventListener("resize", queue, { passive: true });
+  document.addEventListener("pointerdown", function(e){
+    if (!kaPreviewEditMode || !kaPreviewSelectedEl) return;
+    var t = e.target;
+    if (t === kaPreviewHandle || t === kaPreviewWidthHandle) return;
+    for (var n = t; n && n !== document; n = n.parentNode){ if (n.id && PREVIEW_DRAGGABLE_IDS.indexOf(n.id) !== -1) return; }
+    kaPreviewShowOutline(null);
+    try { window.parent.postMessage({ type: "ka-preview-deselected" }, window.location.origin); } catch(err){}
+  }, true);
+  document.addEventListener("keydown", function(e){ if (e.key === "Escape" && kaPreviewEditMode && kaPreviewSelectedEl) kaPreviewShowOutline(null); });
+})();
 window.addEventListener("message", function(e){
   if (window.parent === window || e.source !== window.parent || e.origin !== window.location.origin) return;
   var msg = e.data;

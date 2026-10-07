@@ -197,6 +197,8 @@ export function validateSiteDocument(input, current, seed){
       const weight = Number(style.weight), spacing = Number(style.spacing), lh = Number(style.lineHeight);
       if (TEXT_WEIGHTS.includes(weight)) clean.weight = weight;
       if (TEXT_ALIGNS.includes(style.align)) clean.align = style.align;
+      const indent = Number(style.indent);
+      if (style.indent !== undefined && style.indent !== '' && Number.isFinite(indent)) clean.indent = Math.min(6, Math.max(0, Math.round(indent * 10) / 10));   // first-line indent, in em
       if (style.spacing !== undefined && style.spacing !== '' && Number.isFinite(spacing)) clean.spacing = Math.min(0.4, Math.max(-0.1, Math.round(spacing * 100) / 100));
       if (style.lineHeight !== undefined && style.lineHeight !== '' && Number.isFinite(lh)) clean.lineHeight = Math.min(2.6, Math.max(0.9, Math.round(lh * 100) / 100));
       if (style.animation && typeof style.animation === 'object' && ANIM_PRESETS.includes(style.animation.preset)){
