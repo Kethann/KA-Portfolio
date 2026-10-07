@@ -53,6 +53,10 @@ export const SKILLS_DEFAULT = {
       sk('Adobe Firefly', 'Ff', '#FF4F3F', 4, 'Concept frames, textures and extensions'),
       sk('Generative Fill', 'Gf', '#31A8FF', 4, 'Extending and repairing plates inside Photoshop'),
       sk('AI-assisted upscaling', 'Up', '#FFD166', 3, 'Print-size masters from small sources') ] },
+    { name: 'AI tools', icon: 'ai', items: [
+      sk('Claude', 'Cl', '#D97757', 4, 'Writing, research and reasoning'), sk('Claude Code', 'CC', '#D97757', 4, 'Agentic coding in the terminal and editor'),
+      sk('Codex', 'Cx', '#FFFFFF', 3, 'OpenAI coding agent'), sk('Antigravity', 'Ag', '#4285F4', 3, 'Agent-first development platform'),
+      sk('GitHub Copilot', 'Co', '#FFFFFF', 3, 'AI pair programming in the editor') ] },
     { name: 'Arts', icon: 'arts', items: [
       sk('Movie posters', 'Po', '#FF9438', 5, 'Theatrical key art from first look to release'),
       sk('Typography', 'Ty', '#E8AA82', 5, 'Custom title logos and lettering'),
@@ -65,24 +69,24 @@ export const SKILLS_DEFAULT = {
     { name: 'Frontend', icon: 'frontend', items: [
       sk('React', 'Re', '#61DAFB', 4, 'Components, hooks and state'), sk('Three.js', '3D', '#FFFFFF', 4, 'WebGL scenes and shaders'),
       sk('GSAP', 'Gs', '#88CE02', 4, 'Timeline animation'), sk('Vite', 'Vi', '#646CFF', 4, 'Builds and dev tooling'),
-      sk('Tailwind CSS', 'Tw', '#38BDF8', 3, 'Utility-first styling') ] },
+      sk('Tailwind CSS', 'Tw', '#38BDF8', 3, 'Utility-first styling'), sk('Streamlit', 'St', '#FF4B4B', 3, 'Python data apps and dashboards') ] },
     { name: 'Backend', icon: 'backend', items: [
       sk('Node.js', 'No', '#5FA04E', 4, 'APIs, jobs and servers'), sk('Cloudflare Workers', 'Cf', '#F38020', 3, 'Edge functions and R2 storage'),
-      sk('Vercel', 'Vc', '#EDEBE8', 3, 'Serverless deploys') ] },
+      sk('Vercel', 'Vc', '#EDEBE8', 3, 'Serverless deploys'),
+      sk('Render', 'Rn', '#FFFFFF', 3, 'Web services, workers and deploys'), sk('Netlify', 'Nf', '#00C7B7', 3, 'Static sites, previews and functions') ] },
     { name: 'Database', icon: 'database', items: [
-      sk('PostgreSQL', 'Pg', '#4169E1', 3, ''), sk('SQLite', 'Sq', '#0F80CC', 3, ''), sk('Cloudflare D1', 'D1', '#F38020', 3, ''),
+      sk('PostgreSQL', 'Pg', '#4169E1', 3, ''), sk('SQLite', 'Sq', '#0F80CC', 3, ''), sk('Cloudflare D1', 'D1', '#F38020', 3, ''), sk('Cloudflare R2', 'R2', '#F38020', 3, 'Object storage for images and downloads'),
       sk('Supabase', 'Sb', '#3ECF8E', 3, ''), sk('Firebase', 'Fb', '#FFCA28', 3, '') ] },
     { name: 'APIs', icon: 'apis', items: [
       sk('REST APIs', 'API', '#8B8BFF', 4, 'Designing and consuming JSON APIs'), sk('Razorpay', 'Rp', '#3395FF', 4, 'Payments, webhooks and refunds'),
       sk('AI APIs', 'AI', '#D97757', 4, 'Gemini and Claude assistants'), sk('Webhooks', 'Wh', '#C73A63', 3, 'Signed event delivery'),
-      sk('Email (SMTP)', '@', '#9AA3AF', 3, 'Receipts, alerts and auto-replies') ] },
+      sk('Email (SMTP)', '@', '#9AA3AF', 3, 'Receipts, alerts and auto-replies'), sk('ipstack', 'IP', '#38BDF8', 3, 'IP geolocation for visitor insights') ] },
     { name: 'DevOps & tools', icon: 'tools', items: [
       sk('Docker', 'Dk', '#2496ED', 3, 'Containers, images and compose setups'), sk('Kubernetes', 'K8', '#326CE5', 2, 'Deployments, services and scaling'),
       sk('CI/CD pipelines', 'CI', '#22C55E', 3, 'Automated build, test and deploy'), sk('Linux', 'Lx', '#FCC624', 3, 'Shell, servers and administration'),
       sk('Networking', 'Nw', '#38BDF8', 3, 'TCP/IP, DNS, HTTP and routing'), sk('Git', 'Gt', '#F05032', 4, 'Version control, branching and merges'),
       sk('GitHub', 'GH', '#E6EDF3', 4, 'Repositories, pull requests and Actions'),
-      sk('Cloudflared', 'Cf', '#F38020', 3, 'Secure tunnels from local servers to the web'), sk('Render', 'Rn', '#FFFFFF', 3, 'Web services, workers and deploys'),
-      sk('Netlify', 'Nf', '#00C7B7', 3, 'Static sites, previews and functions') ] },
+      sk('Cloudflared', 'Cf', '#F38020', 3, 'Secure tunnels from local servers to the web') ] },
     { name: 'Robotics', icon: 'tools', items: [
       sk('ROS', 'ROS', '#8FA8CC', 3, 'Robot Operating System nodes, topics and tooling'),
       sk('RViz', 'RV', '#5FB3E4', 3, 'Visualising robot models, sensors and maps in 3D'),
@@ -91,7 +95,11 @@ export const SKILLS_DEFAULT = {
       sk('Vision-based navigation models', 'Vn', '#FFB347', 3, 'Camera-driven models that guide a robot') ] },
     { name: 'Data & ML', icon: 'ai', items: [
       sk('Power BI', 'BI', '#F2C811', 3, 'Dashboards and reports from live data'),
-      sk('Model training', 'Mt', '#C792FF', 3, 'Training and evaluating machine-learning models') ] }
+      sk('Model training', 'Mt', '#C792FF', 3, 'Training and evaluating machine-learning models'),
+      sk('NumPy', 'Np', '#4DABCF', 3, 'Arrays and numerical computing'), sk('pandas', 'Pd', '#E70488', 3, 'Tables, cleaning and analysis'),
+      sk('Matplotlib', 'Mp', '#4C9BE8', 3, 'Charts and plots'), sk('OpenCV', 'Cv', '#5C3EE8', 3, 'Computer vision and image processing'),
+      sk('scikit-learn', 'Sk', '#F7931E', 3, 'Classic machine learning'), sk('TensorFlow', 'Tf', '#FF6F00', 3, 'Neural networks and training'),
+      sk('PyTorch', 'Pt', '#EE4C2C', 3, 'Deep learning models'), sk('Flask', 'Fl', '#FFFFFF', 3, 'Lightweight Python web APIs') ] }
   ]
 };
 export const SKILL_LIMITS = { categories: 14, items: 24 };
@@ -119,11 +127,23 @@ function httpUrl(u){ try { return ['https:', 'http:'].includes(new URL(u).protoc
 // `current` is the stored document, `seed` the shipped one: an image without its own upload must be
 // one of the site's exported originals (known widths), found in either.
 /** skills added to sites that already have their own list (once each, by name; see handlers/public.js) */
-export const SKILLS_ADDITIONS = { id: 'skills-2026-10c', categories: [
-  { name: 'Design', icon: 'design', items: SKILLS_DEFAULT.categories.find(c => c.name === 'Design').items.filter(i => i.name === 'Blender') },
-  SKILLS_DEFAULT.categories.find(c => c.name === 'DevOps & tools'),
-  { ...SKILLS_DEFAULT.categories.find(c => c.name === 'Robotics'), items: SKILLS_DEFAULT.categories.find(c => c.name === 'Robotics').items.filter(i => i.name === 'RViz') },
-] };
+export const SKILLS_ADDITIONS = { id: 'skills-2026-10g',
+  categories: [
+    { name: 'Design', icon: 'design', items: SKILLS_DEFAULT.categories.find(c => c.name === 'Design').items.filter(i => i.name === 'Blender') },
+    SKILLS_DEFAULT.categories.find(c => c.name === 'DevOps & tools'),
+    { name: 'Backend', icon: 'backend', items: SKILLS_DEFAULT.categories.find(c => c.name === 'Backend').items.filter(i => ['Render', 'Netlify'].includes(i.name)) },
+    SKILLS_DEFAULT.categories.find(c => c.name === 'AI tools'),
+    { name: 'APIs', icon: 'apis', items: SKILLS_DEFAULT.categories.find(c => c.name === 'APIs').items.filter(i => i.name === 'ipstack') },
+    // on an existing site the libraries get their own category (they are added only where none of them exists yet)
+    { name: 'Python libraries', icon: 'languages', items: SKILLS_DEFAULT.categories.find(c => c.name === 'Data & ML').items.filter(i => ['NumPy', 'pandas', 'Matplotlib', 'OpenCV', 'scikit-learn', 'TensorFlow', 'PyTorch', 'Flask'].includes(i.name)) },
+    { name: 'Frontend', icon: 'frontend', items: SKILLS_DEFAULT.categories.find(c => c.name === 'Frontend').items.filter(i => i.name === 'Streamlit') },
+    { name: 'Database', icon: 'database', items: SKILLS_DEFAULT.categories.find(c => c.name === 'Database').items.filter(i => i.name === 'Cloudflare R2') },
+    { ...SKILLS_DEFAULT.categories.find(c => c.name === 'Robotics'), items: SKILLS_DEFAULT.categories.find(c => c.name === 'Robotics').items.filter(i => ['ROS', 'RViz'].includes(i.name)) },
+  ],
+  // skills that belong in another category (moved, keeping the owner's edits), and names that lead their category
+  moves: [{ names: ['Render', 'Netlify'], to: 'Backend' }],
+  first: [{ category: 'Robotics', names: ['ROS', 'RViz'] }],
+};
 
 export function validateSiteDocument(input, current, seed){
   if (!input || typeof input !== 'object') throw bad('Send the whole portfolio document.');

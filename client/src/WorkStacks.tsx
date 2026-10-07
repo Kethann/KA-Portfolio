@@ -557,8 +557,8 @@ function Coverflow({stack,loop,reduced,canHover,onClose,pins,onPin,startSlug}:{s
   const clampTarget=(t:number)=>cfg.current.loop?t:clamp(t,0,cfg.current.n-1);
   // each picture passing ticks softly: quicker spins tick faster and a little higher, and get softer (never harsh)
   const lastTick=useRef(0);
-  const tickSound=()=>{const now=performance.now(),dt=Math.max(16,now-(lastTick.current||now-400));lastTick.current=now;const speed=1000/dt;
-    sfx('gallery.swipe',{rate:0.94+Math.min(speed,24)*0.018,volume:speed>7?Math.max(0.3,1-(speed-7)*0.045):1});};
+  const tickSound=()=>{const now=performance.now(),dt=Math.max(16,now-(lastTick.current||now-400));if(dt<85)return;lastTick.current=now;const speed=1000/dt;   // at most ~12 a second, so ticks never fuse into a hum
+    sfx('gallery.swipe',{rate:0.94+Math.min(speed,12)*0.02+(Math.random()-0.5)*0.06,volume:speed>6?Math.max(0.4,1-(speed-6)*0.08):1});};
   const report=()=>{const a=mod(Math.round(st.current.target),cfg.current.n);if(a!==activeRef.current){activeRef.current=a;setActive(a);tickSound();}};
 
   const layout=useCallback(()=>{

@@ -1733,10 +1733,13 @@ html.ka-modal-open{ overflow:hidden; }
 .skills-free.is-static .skill-float{ will-change:auto; }
 .skill-logo.is-mark{ background:radial-gradient(120% 90% at 30% 10%, rgba(255,255,255,.1), transparent 55%), #17130f;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 0 1px rgba(255,255,255,.07), 0 6px 18px -8px var(--c); }
-.skill-logo.is-mark svg{ width:56%; height:56%; display:block; }
-.skill-logo.is-tile{ background:var(--tb); color:var(--tf); box-shadow:inset 0 0 0 .14em var(--tf), 0 6px 18px -8px var(--tf); }
-.skill-logo.is-tile .t{ font-size:1.5em; font-weight:700; letter-spacing:-.03em; line-height:1; }
-.skill-logo.has-img{ background:radial-gradient(120% 90% at 30% 15%, rgba(255,255,255,.18), transparent 55%), #15110f; padding:14%; box-sizing:border-box; }
+.skill-logo.is-mark svg{ width:58%; height:58%; display:block; }
+/* every logo reads the same size: brand marks, line icons, Adobe tiles and uploads share one tile, one border and one inner size */
+.skill-logo.is-glyph svg{ width:64%; height:64%; }
+.skill-logo.is-glyph svg path{ stroke-width:2; }
+.skill-logo.is-tile{ background:var(--tb); color:var(--tf); box-shadow:inset 0 0 0 1px rgba(255,255,255,.07), inset 0 0 0 .09em color-mix(in srgb, var(--tf) 70%, transparent), 0 6px 18px -8px var(--tf); }
+.skill-logo.is-tile .t{ font-size:1.18em; font-weight:700; letter-spacing:-.03em; line-height:1; }
+.skill-logo.has-img{ background:radial-gradient(120% 90% at 30% 15%, rgba(255,255,255,.18), transparent 55%), #15110f; padding:21%; box-sizing:border-box; }
 .skill-logo.has-img img{ width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; }
 
 /* small screens: the spotlight is a card below the menu bar (it is moved to <body> by script, so it is always in view) */
@@ -1753,6 +1756,8 @@ html.ka-modal-open{ overflow:hidden; }
 
 /* grid items default to min-width:auto, which would let a long row (the chips on phones) widen the whole column */
 .skills-main{ min-width:0; }
+/* the category chips use the full width (one or two rows instead of three, no empty side); the board and the spotlight field share the row below */
+@media (min-width:901px){ .skills-layout{ row-gap:0; } .skills-main{ display:contents; } .skills-filter{ grid-column:1 / -1; } .skills-board{ grid-column:1; min-width:0; } .skills-field{ grid-column:2; grid-row:2; } }
 @media (max-width:900px){
   .skills-layout{ grid-template-columns:minmax(0, 1fr); gap:8px; }
   .skills-field{ display:none; }
@@ -7641,7 +7646,7 @@ window.addEventListener("ka-sequence-complete", function(){
     var v = document.createElementNS(ns, "svg"), p = document.createElementNS(ns, "path");
     v.setAttribute("viewBox", "0 0 24 24"); v.setAttribute("aria-hidden", "true"); v.setAttribute("focusable", "false");
     p.setAttribute("d", d.p);
-    s.classList.add("is-mark");
+    s.classList.add("is-mark"); if (d.k === "g") s.classList.add("is-glyph");
     if (d.k === "b"){ s.style.setProperty("--c", d.c); p.setAttribute("fill", d.c); }
     else if (d.k === "f"){
       s.style.setProperty("--c", d.g[1]);

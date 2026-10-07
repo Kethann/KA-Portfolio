@@ -64,7 +64,7 @@ const GENS: Record<string, Gen> = {
   },
   assemble: (sr) => {   // a warm low swell with a clear bell on top, settling (no noise)
     const dur = 2.4, out = new Float32Array(Math.floor(sr * dur));
-    tone(out, sr, 0, 110, 0.45, 1.3, { attack: 0.35, partials: [[1, 1], [1.5, 0.3], [2, 0.15]] });
+    tone(out, sr, 0, 440, 0.22, 1.6, { attack: 0.3, partials: [[1, 1], [1.5, 0.25]] });   // a warm, mid swell (no low rumble)
     tone(out, sr, 0.18, 880, 0.2, 2.2, { attack: 0.02, partials: [[1, 1], [2, 0.1], [3, 0.03]] });
     tone(out, sr, 0.26, 1318.5, 0.14, 2.6, { attack: 0.02, partials: [[1, 1], [2, 0.06]] });
     tone(out, sr, 0.34, 1760, 0.08, 3, { attack: 0.02 });
@@ -90,9 +90,9 @@ const GENS: Record<string, Gen> = {
   },
   pad: (sr) => {   // a slow, warm chord with a gentle shimmer: the intro while the shards fly
     const dur = 3.6, n = Math.floor(sr * dur), out = new Float32Array(n);
-    const notes = [220, 329.6, 440, 554.4];
+    const notes = [440, 554.4, 659.3, 880];   // a bright, open chord: nothing low, no wobble (those read as an engine hum)
     notes.forEach((f, k) => { let ph = 0; for (let i = 0; i < n; i++){ const t = i / sr, u = t / dur, env = Math.sin(Math.PI * Math.min(1, u)) ** 1.5;
-      ph += TAU * f * (1 + 0.003 * Math.sin(TAU * (4.5 + k * 0.4) * t)) / sr; out[i] += Math.sin(ph) * env * (0.32 - k * 0.05); } });
+      ph += TAU * f / sr; out[i] += Math.sin(ph) * env * (0.3 - k * 0.05); } });
     return fade(normalise(out, 0.4), sr, 40);
   },
   shimmer: (sr, r) => { const out = new Float32Array(Math.floor(sr * 0.32)); const f = 2600 + r() * 600; tone(out, sr, 0, f, 0.5, 14, { partials: [[1, 1], [1.5, 0.35], [2.01, 0.2]] }); return fade(normalise(out, 0.45), sr, 3); },

@@ -58,6 +58,19 @@ export async function publicConfig(ctx){
 export function addSkills(value, add = SKILLS_ADDITIONS){
   if (!value || !add?.categories?.length || value.skillsAdded === add.id || !value.skills || !Array.isArray(value.skills.categories)) return null;
   let categories = value.skills.categories, changed = false;
+  const low = (x) => String(x || '').toLowerCase();
+  // 1. moves: a skill in the wrong category goes to the right one (as the owner left it)
+  for (const mv of add.moves || []){
+    const to = categories.findIndex(c => low(c.name) === low(mv.to)); if (to < 0) continue;
+    for (const name of mv.names){
+      const from = categories.findIndex((c, k) => k !== to && (c.items || []).some(i => low(i.name) === low(name)));
+      if (from < 0 || (categories[to].items || []).some(i => low(i.name) === low(name))) continue;
+      const item = categories[from].items.find(i => low(i.name) === low(name));
+      categories = categories.map((c, k) => k === from ? { ...c, items: c.items.filter(i => i !== item) } : k === to ? { ...c, items: [...c.items, item].slice(0, 24) } : c);
+      changed = true;
+    }
+  }
+  // 2. additions: only what is missing anywhere
   for (const cat of add.categories){
     if (!cat) continue;
     const have = new Set(categories.flatMap(c => Array.isArray(c.items) ? c.items : []).map(i => String(i?.name || '').toLowerCase()));
@@ -68,7 +81,14 @@ export function addSkills(value, add = SKILLS_ADDITIONS){
       : categories.length < 14 ? [...categories, { ...cat, items: missing }] : categories;
     changed = true;
   }
-  if (!changed) return null;   // nothing missing: no write
+  // 3. order: these names lead their category
+  for (const o of add.first || []){
+    const at = categories.findIndex(c => low(c.name) === low(o.category)); if (at < 0) continue;
+    const items = categories[at].items || [], lead = o.names.map(n => items.find(i => low(i.name) === low(n))).filter(Boolean);
+    const next = [...lead, ...items.filter(i => !lead.includes(i))];
+    if (next.some((x, k) => x !== items[k])){ categories = categories.map((c, k) => k === at ? { ...c, items: next } : c); changed = true; }
+  }
+  if (!changed) return null;   // nothing to do: no write
   return { ...value, skills: { ...value.skills, categories }, skillsAdded: add.id };
 }
 async function withSkillAdditions(value, revision){

@@ -49,7 +49,7 @@ export const SOUND_EVENTS = [
 
   E('stack.open', 'Folder / stack opens', 'gallery', 'synth:bloom', 'book-open', 0.26, { gap: 200 }),
   E('stack.close', 'Folder / stack closes', 'gallery', 'synth:fold', 'book-close', 0.2, { gap: 200 }),
-  E('gallery.swipe', 'Poster gallery: each picture passing (follows the spin speed)', 'gallery', 'synth:flick', 'synth:glide', 0.16, { gap: 28, jitter: 0.04 }),
+  E('gallery.swipe', 'Poster gallery: each picture passing (follows the spin speed)', 'gallery', 'synth:flick', 'synth:glide', 0.16, { gap: 85, jitter: 0.07 }),   // never faster than ~12 a second: fast ticks blur into a motor-like hum
   E('stack.roll', 'Stack: roll the pictures (swipe a stack)', 'gallery', 'synth:glide', 'card-slide-4', 0.16, { gap: 120 }),
   E('gallery.view', 'Click to view (full image)', 'gallery', 'synth:bloom', 'maximize-008', 0.2, { gap: 200 }),
   E('gallery.back', 'Back from the full image', 'gallery', 'synth:fold', 'minimize-008', 0.16, { gap: 200 }),
@@ -82,7 +82,7 @@ export const SOUND_EVENTS = [
 
   E('particles.spark', 'Particles: glint as they fly', 'particles', 'synth:shimmer', 'impact-glass-light-001', 0.05, { gap: 150, jitter: 0.35 }),
 
-  E('intro.air', 'Intro: a warm chord while the shards fly', 'ambient', 'synth:pad', '', 0.16, { gap: 8000 }),
+  E('intro.air', 'Intro: a warm chord while the shards fly (off: a held chord can sound like a hum)', 'ambient', 'synth:pad', '', 0.12, { gap: 8000, on: false }),
   E('intro.gather', 'Intro: particles gathering', 'ambient', 'synth:gather', 'synth:shimmer', 0.12, { gap: 4000 }),
   E('intro.assemble', 'Intro: KA assembled', 'ambient', 'synth:assemble', 'synth:chime', 0.15, { gap: 8000 }),
   E('intro.bed', 'Intro: your own sound bed (upload)', 'ambient', '', '', 0.25, { gap: 5000, on: false }),
