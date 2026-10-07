@@ -76,7 +76,7 @@ function grow(tl: Timeline, ctx: EffectContext, c: CharInfo, at: number){
     const fr = between(r, 0.25, 0.75), pt = stem.getPointAtLength(fr * len), pt2 = stem.getPointAtLength(Math.min(len, fr * len + 2));
     const ta = Math.atan2(pt2.y - pt.y, pt2.x - pt.x) + (k % 2 ? 0.9 : -0.9);
     const ls = between(r, 10, 17) * scale, leaf = el('g', {});
-    leaf.append(el('path', { d: leafPath({ x: pt.x, y: pt.y }, ta, ls), fill: p.accent2, 'fill-opacity': 0.92, stroke: p.stroke, 'stroke-width': f(0.8 * scale), 'stroke-linejoin': 'round' }),
+    leaf.append(el('path', { d: leafPath({ x: pt.x, y: pt.y }, ta, ls), fill: 'url(#fxgA2)', 'fill-opacity': 0.92, stroke: p.stroke, 'stroke-width': f(0.8 * scale), 'stroke-linejoin': 'round' }),
       el('path', { d: `M${f(pt.x)} ${f(pt.y)} L${f(pt.x + Math.cos(ta) * ls * 0.85)} ${f(pt.y + Math.sin(ta) * ls * 0.85)}`, stroke: p.stroke, 'stroke-width': f(0.6 * scale), 'stroke-opacity': 0.55, fill: 'none' }));
     g.appendChild(leaf);
     tl.fromTo(leaf, { scale: 0, svgOrigin: `${f(pt.x)} ${f(pt.y)}` }, { scale: 1, svgOrigin: `${f(pt.x)} ${f(pt.y)}`, duration: 0.42, ease: 'back.out(2.4)' }, at + growDur * fr);
@@ -84,7 +84,7 @@ function grow(tl: Timeline, ctx: EffectContext, c: CharInfo, at: number){
   // the bloom at the tip: layers open one after another, a little turn as they unfold
   const kind = Math.floor(r() * 4), bs = between(r, 13, 21) * scale, bl = bloom(kind, E, bs, r, p), O = `${f(E.x)} ${f(E.y)}`;
   bl.layers.forEach((ly, i) => {
-    const n = el('path', { d: ly.d, fill: ly.fill, 'fill-opacity': ly.op, stroke: p.stroke, 'stroke-width': f(0.7 * scale), 'stroke-linejoin': 'round' }); g.appendChild(n);
+    const n = el('path', { d: ly.d, fill: ly.fill === p.accent1 ? 'url(#fxgA1)' : ly.fill === p.glow ? 'url(#fxgGlow)' : ly.fill, 'fill-opacity': Math.min(1, ly.op + 0.05), stroke: p.stroke, 'stroke-width': f(0.7 * scale), 'stroke-linejoin': 'round' }); g.appendChild(n);
     tl.fromTo(n, { scale: 0, rotate: -40, svgOrigin: O }, { scale: 1, rotate: 0, svgOrigin: O, duration: 0.65, ease: 'back.out(1.8)' }, at + growDur * 0.85 + i * 0.12);
   });
   const heart = el('circle', { cx: f(E.x), cy: f(E.y), r: f(bs * (kind === 2 ? 0.26 : 0.16)), fill: kind === 2 ? p.accent1 : p.glow, stroke: p.stroke, 'stroke-width': f(0.6 * scale) });
@@ -101,7 +101,7 @@ export const floral: Effect = {
   id: 'floral', name: 'Floral garden', description: 'Vines grow from the letters, leaves pop and flowers bloom at the tips.', duration: 3.2,
   params: [],
   init(ctx){
-    group = el('g', { class: 'fx-floral' }) as SVGGElement;
+    group = el('g', deco.flat ? { class: 'fx-floral' } : { class: 'fx-floral', filter: 'url(#fxShade)' }) as SVGGElement;
     ctx.svg.appendChild(group);
     let last = 0;
     const picked = new Set<number>();

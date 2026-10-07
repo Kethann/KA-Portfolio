@@ -351,3 +351,30 @@ div.kas-lb-img{ width:min(80vw, 600px); aspect-ratio:4/5; }
 .kas-art-row .kas-price{ flex-wrap:nowrap; min-width:0; gap:6px; }
 .kas-art-row .kas-badge{ display:none; }
 .kas-art-row .kas-buy{ flex:none; }
+
+/* ---- the compact filter bar ---- */
+.kas-filterbar{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; padding:6px; border-radius:24px; margin:0 0 var(--kas-gap);
+  background:var(--kas-surface); border:1px solid var(--kas-line); backdrop-filter:var(--kas-blur); -webkit-backdrop-filter:var(--kas-blur); }
+.kas-fb-group{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; flex:1 1 auto; min-width:0; }
+.kas-filterbar .kas-chips{ margin:0; gap:6px; flex-wrap:wrap; }
+.kas-filterbar .kas-chip{ min-height:36px; padding:0 12px; gap:6px; }
+.kas-filterbar .kas-chip-count{ min-width:20px; height:18px; font-size:10.5px; }
+.kas-fb-sep{ width:1px; height:22px; margin:0 4px; background:var(--kas-line-2); flex:none; }
+.kas-fb-end{ display:flex; align-items:center; gap:8px; margin-left:auto; flex:none; }
+.kas-filterbar .kas-sort{ margin-left:0; }
+.kas-filterbar .kas-sort select{ min-height:36px; }
+.kas-filterbar .kas-currency{ padding:3px; }
+.kas-filterbar .kas-cur-btn{ min-height:30px; min-width:56px; }
+/* phones: filters become one swipeable row; sort and currency share the row under it */
+@media (max-width:640px){
+  .kas-filterbar{ border-radius:20px; }
+  .kas-fb-group{ flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch; width:100%; flex-basis:100%; }
+  .kas-fb-group::-webkit-scrollbar{ display:none; }
+  .kas-fb-group .kas-chips{ flex-wrap:nowrap; }
+  .kas-fb-group .kas-chip, .kas-fb-group > *{ flex:none; }
+  .kas-fb-end{ width:100%; margin-left:0; justify-content:space-between; }
+  .kas-filterbar .kas-sort select{ max-width:52vw; }
+}
+@media (pointer:coarse){ .kas-filterbar .kas-chip, .kas-filterbar .kas-sort select{ min-height:40px; } }
+/* small screens: a slimmer switch, so it fits beside the page title */
+@media (max-width:520px){ .kas-seg{ min-width:0; } .kas-seg-btn{ padding:0 14px; letter-spacing:.06em; } }

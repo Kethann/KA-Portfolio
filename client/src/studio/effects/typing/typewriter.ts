@@ -22,7 +22,7 @@ export const typewriter: Effect = {
         wrong.className = 'fx-typo'; wrong.setAttribute('aria-hidden', 'true');
         wrong.textContent = 'qwertyuiopasdfghjklzxcvbnm'[Math.floor(r() * 26)];
         Object.assign(wrong.style, { left: c.rect.left - sr.left + 'px', top: c.rect.top - sr.top + 'px', opacity: '0', font: getComputedStyle(ctx.textEl).font });
-        ctx.stage.appendChild(wrong);
+        (ctx.stage.querySelector('.fx-cam') || ctx.stage).appendChild(wrong);
         tl.set(wrong, { opacity: 1 }, t);
         if (caret) tl.set(caret, { x: c.rect.right - sr.left }, t);
         t += between(r, 0.28, 0.42) / sp;

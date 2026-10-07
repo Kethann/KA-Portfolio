@@ -306,3 +306,23 @@ fieldset .primary{ align-self:flex-start; }
 .guide h3{ margin:12px 0 6px; font:600 11px ui-monospace, monospace; letter-spacing:.12em; text-transform:uppercase; color:#ffc795; }
 .studio.is-compact:has(.fx-panel:not([hidden])) .savebar{ visibility:hidden; }
 .fx-ink{ position:absolute; inset:0; width:100%; height:100%; z-index:2; pointer-events:none; }
+/* the fountain pen that writes (Real handwriting): its tip is the element's origin */
+.fx-pen.is-nib{ width:0; height:0; margin:0; background:none; box-shadow:none; border-radius:0; transform-origin:0 0; will-change:transform; }
+.fx-pen.is-nib svg{ position:absolute; left:-4px; top:-12px; overflow:visible; }
+
+/* the camera layer: the words, decorations, caret and pen turn together in 3D */
+.fx-cam{ position:absolute; inset:0; display:grid; place-items:center; z-index:1; transform-origin:50% 50%; will-change:transform; }
+.fx-scene{ transform-origin:50% 50%; }
+.fx-scene[hidden]{ display:none; }
+/* a 3D material letter: the rendered object sits in the letter's own box, so every animation still moves it */
+.fx-char.has-mat{ position:relative; }
+.fx-mat{ position:absolute; pointer-events:none; max-width:none; }
+.fx-3d[hidden]{ display:none; }
+
+/* 2D / 3D look switch, top of the effects panel */
+.fx-look{ display:flex; align-items:center; gap:6px; padding:4px 4px 4px 12px; border-radius:999px; background:rgba(255,255,255,.04); border:1px solid var(--line); }
+.fx-look > span{ font:600 11px ui-monospace, monospace; letter-spacing:.12em; text-transform:uppercase; color:#ffc795; margin-right:4px; }
+.fx-look-b{ min-height:34px; min-width:52px; padding:0 14px; border-radius:999px; cursor:pointer; background:transparent; border:1px solid transparent; color:var(--dim); font:600 13px/1 inherit; }
+.fx-look-b[aria-pressed="true"]{ background:var(--accent-glass, rgba(255,148,56,.18)); border-color:rgba(255,170,120,.6); color:var(--ink); }
+.fx-look-hint{ margin-left:auto; padding-right:10px; color:var(--faint); font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.studio[data-device="phone"] .fx-look-b, .studio[data-device="tablet"] .fx-look-b{ min-height:40px; }

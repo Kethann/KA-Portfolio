@@ -3,6 +3,7 @@
 // Heavy static parts (camouflage, rock strata, parchment) are painted once into an offscreen canvas in init().
 // Colours come from the palette, so every scene can be recoloured; intensity sets how much is going on.
 import { seeded } from './rng';
+import { ShaderPainter, fragmentFor } from './shaders';
 import type { Palette } from './types';
 
 export interface SceneState { w: number; h: number; pal: Palette; intensity: number; seed: number; r: () => number; d: Record<string, any> }
@@ -290,6 +291,11 @@ export const SCENES: Scene[] = [
     x.fillStyle = rgba(s.pal.accent1, 0.85); const by = s.h - 26;
     for (let i = 0; i < s.w; i += 8) x.fillRect(i, by + ((i / 8) % 2 ? 0 : 4), 8, 26);
   } },
+  { id: 'aurora', name: 'Aurora', group: 'Nature', draw(x, s, t){ fill(x, s, s.pal.bg); glowAt(x, s.w * (0.3 + Math.sin(t * 0.13) * 0.08), s.h * 0.35, Math.max(s.w, s.h) * 0.55, s.pal.accent1, 0.25); glowAt(x, s.w * 0.7, s.h * 0.7, Math.max(s.w, s.h) * 0.5, s.pal.accent2, 0.2); } },
+  { id: 'clouds', name: 'Sunset clouds', group: 'Nature', draw(x, s, t){ fill(x, s, s.pal.bg); glowAt(x, s.w * (0.3 + Math.sin(t * 0.13) * 0.08), s.h * 0.35, Math.max(s.w, s.h) * 0.55, s.pal.accent1, 0.25); glowAt(x, s.w * 0.7, s.h * 0.7, Math.max(s.w, s.h) * 0.5, s.pal.accent2, 0.2); } },
+  { id: 'lava', name: 'Molten lava', group: 'Elements', draw(x, s, t){ fill(x, s, s.pal.bg); glowAt(x, s.w * (0.3 + Math.sin(t * 0.13) * 0.08), s.h * 0.35, Math.max(s.w, s.h) * 0.55, s.pal.accent1, 0.25); glowAt(x, s.w * 0.7, s.h * 0.7, Math.max(s.w, s.h) * 0.5, s.pal.accent2, 0.2); } },
+  { id: 'smoke', name: 'Coloured smoke', group: 'Simple', draw(x, s, t){ fill(x, s, s.pal.bg); glowAt(x, s.w * (0.3 + Math.sin(t * 0.13) * 0.08), s.h * 0.35, Math.max(s.w, s.h) * 0.55, s.pal.accent1, 0.25); glowAt(x, s.w * 0.7, s.h * 0.7, Math.max(s.w, s.h) * 0.5, s.pal.accent2, 0.2); } },
+  { id: 'golddust', name: 'Gold dust', group: 'Celebration', draw(x, s, t){ fill(x, s, s.pal.bg); glowAt(x, s.w * (0.3 + Math.sin(t * 0.13) * 0.08), s.h * 0.35, Math.max(s.w, s.h) * 0.55, s.pal.accent1, 0.25); glowAt(x, s.w * 0.7, s.h * 0.7, Math.max(s.w, s.h) * 0.5, s.pal.accent2, 0.2); } }
 ];
 
 function heart(x: CanvasRenderingContext2D, k: number){ x.beginPath(); x.moveTo(0, k * 0.35); x.bezierCurveTo(-k * 1.1, -k * 0.4, -k * 0.45, -k * 1.1, 0, -k * 0.45); x.bezierCurveTo(k * 0.45, -k * 1.1, k * 1.1, -k * 0.4, 0, k * 0.35); x.closePath(); }
@@ -299,34 +305,71 @@ function drawBone(x: CanvasRenderingContext2D, cx: number, cy: number, len: numb
   x.restore();
 }
 
-/** the scene's layer: one canvas behind the words, animated while the stage is open */
+const rgb = (h: string) => { const n = parseInt(h.replace('#', '').slice(0, 6), 16); return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; };
+const colsOf = (p: Palette) => ({ bg: rgb(p.bg), text: rgb(p.text), a1: rgb(p.accent1), a2: rgb(p.accent2), glow: rgb(p.glow) });
+let exportPainter: ShaderPainter | null = null;
+
+/** the scene's layer, behind the words: realistic scenes run on the GPU (shaders.ts), the rest (and every scene on
+ *  a device without WebGL) on a 2D canvas. The GPU resolution adapts: if frames get slow it renders a little smaller
+ *  (backgrounds are soft, so it can't be seen) and creeps back up when there is headroom. */
 export class SceneRunner {
-  canvas: HTMLCanvasElement; private x: CanvasRenderingContext2D; scene: Scene = SCENES[0]; state: SceneState | null = null;
+  canvas: HTMLCanvasElement; gl: HTMLCanvasElement; private x: CanvasRenderingContext2D; scene: Scene = SCENES[0]; state: SceneState | null = null;
   speed = 1; private raf = 0; private t0 = performance.now(); private key = ''; reduced = false;
-  constructor(host: HTMLElement){ this.canvas = document.createElement('canvas'); this.canvas.className = 'fx-scene'; this.canvas.setAttribute('aria-hidden', 'true'); host.prepend(this.canvas); this.x = this.canvas.getContext('2d')!; }
+  flat = false;   // the 2D look: always the drawn (canvas) version of a scene
+  private painter: ShaderPainter | null = null; private useGL = false; private quality = 1; private last = 0; private slow = 0;
+  constructor(host: HTMLElement){
+    this.canvas = document.createElement('canvas'); this.canvas.className = 'fx-scene'; this.canvas.setAttribute('aria-hidden', 'true');
+    this.gl = document.createElement('canvas'); this.gl.className = 'fx-scene fx-scene-gl'; this.gl.setAttribute('aria-hidden', 'true'); this.gl.hidden = true;
+    host.prepend(this.canvas, this.gl); this.x = this.canvas.getContext('2d')!;
+    this.gl.addEventListener('webglcontextlost', e => { e.preventDefault(); this.painter = null; this.useGL = false; this.gl.hidden = true; this.canvas.hidden = false; this.key = ''; });
+    const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    this.quality = coarse ? 0.7 : 1;   // phones and tablets start a little lighter
+  }
+  private gpu(){ if (!this.painter){ try { this.painter = new ShaderPainter(this.gl); } catch { this.painter = null; } } return this.painter && this.painter.gl ? this.painter : null; }
   set(id: string, pal: Palette, intensity: number, speed: number, seed: number){
     const r = this.canvas.parentElement!.getBoundingClientRect(), w = Math.max(1, r.width), h = Math.max(1, r.height);
     this.scene = SCENES.find(s => s.id === id) || SCENES[0]; this.speed = speed;
-    const key = [this.scene.id, pal.bg, pal.text, pal.accent1, pal.accent2, pal.glow, Math.round(w), Math.round(h), seed, intensity.toFixed(2)].join('|');
+    this.useGL = !this.flat && !!fragmentFor(this.scene.id) && !!this.gpu()?.supports(this.scene.id);
+    this.gl.hidden = !this.useGL; this.canvas.hidden = this.useGL;
+    const key = [this.scene.id, this.useGL, pal.bg, pal.text, pal.accent1, pal.accent2, pal.glow, Math.round(w), Math.round(h), seed, intensity.toFixed(2)].join('|');
     if (key !== this.key){
       this.key = key;
       const dpr = Math.min(2, window.devicePixelRatio || 1); this.canvas.width = Math.round(w * dpr); this.canvas.height = Math.round(h * dpr);
       this.state = { w, h, pal, intensity, seed, r: seeded(seed ^ 0x5eed), d: {} };
-      this.scene.init?.(this.state);
+      if (!this.useGL){ this.scene.init?.(this.state); this.state.d.inited2d = true; }
+      else this.state.d.glReady = true;
     } else if (this.state) this.state.intensity = intensity;
     this.start();
   }
   /** the scene's clock in seconds (scaled by its speed) */
   time(){ return ((performance.now() - this.t0) / 1000) * this.speed; }
-  /** draws a frame of the current scene into any context sized in CSS pixels (exports use it) */
-  paint(x: CanvasRenderingContext2D, t = this.time()){ if (this.state) this.scene.draw(x, this.state, t); }
-  private frame = () => {
-    this.raf = 0; if (!this.state || document.hidden) return;
-    const dpr = this.canvas.width / this.state.w; this.x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.paint(this.x);
+  /** draws a frame of the current scene into any context sized in CSS pixels (exports use it, at any resolution) */
+  paint(x: CanvasRenderingContext2D, t = this.time()){
+    const st = this.state; if (!st) return;
+    if (this.useGL && fragmentFor(this.scene.id)){
+      const k = Math.max(1, x.getTransform().a);
+      exportPainter = exportPainter || new ShaderPainter(document.createElement('canvas'), true);
+      if (exportPainter.gl && exportPainter.draw(this.scene.id, Math.round(st.w * k), Math.round(st.h * k), t, st.intensity, st.seed, colsOf(st.pal))){ x.drawImage(exportPainter.canvas, 0, 0, st.w, st.h); return; }
+    }
+    if (!st.d.inited2d){ st.d.inited2d = true; this.scene.init?.(st); }
+    this.scene.draw(x, st, t);
+  }
+  private frame = (now: number) => {
+    this.raf = 0; const st = this.state; if (!st || document.hidden) return;
+    if (this.useGL && this.painter){
+      // adapt the resolution to how fast frames actually arrive
+      if (this.last){ const dt = now - this.last; if (dt > 26){ if (++this.slow > 20 && this.quality > 0.45){ this.quality = Math.max(0.45, this.quality - 0.1); this.slow = 0; } } else { this.slow = Math.max(0, this.slow - 1); if (dt < 18 && this.quality < 1) this.quality = Math.min(1, this.quality + 0.002); } }
+      this.last = now;
+      const dpr = Math.min(1.5, window.devicePixelRatio || 1) * this.quality;
+      this.painter.draw(this.scene.id, Math.max(2, Math.round(st.w * dpr)), Math.max(2, Math.round(st.h * dpr)), this.time(), st.intensity, st.seed, colsOf(st.pal));
+    } else {
+      if (!st.d.inited2d){ st.d.inited2d = true; if (st.d.glReady) this.scene.init?.(st); }
+      const dpr = this.canvas.width / st.w; this.x.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.scene.draw(this.x, st, this.time());
+    }
     if (!this.reduced && this.scene.id !== 'plain') this.raf = requestAnimationFrame(this.frame);
   };
-  start(){ if (!this.raf) this.raf = requestAnimationFrame(this.frame); }
+  start(){ if (!this.raf){ this.last = 0; this.raf = requestAnimationFrame(this.frame); } }
   stop(){ cancelAnimationFrame(this.raf); this.raf = 0; }
-  destroy(){ this.stop(); this.canvas.remove(); }
+  destroy(){ this.stop(); this.canvas.remove(); this.gl.remove(); this.painter?.gl?.getExtension('WEBGL_lose_context')?.loseContext(); this.painter = null; }
 }

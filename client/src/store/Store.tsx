@@ -8,11 +8,11 @@ type Tab = 'artzz' | 'artifacts';
 const TABS: { id: Tab; label: string }[] = [{ id: 'artzz', label: 'Artzz' }, { id: 'artifacts', label: 'Artifacts' }];
 const TAB_KEY = 'ka-store-tab';
 
-export interface StoreProps { onBuy(product: Product, currency: Currency, opener?: HTMLElement | null): void; onResend(opener?: HTMLElement | null): void; initialProduct?: string | null }
+export interface StoreProps { onBuy(product: Product, currency: Currency, opener?: HTMLElement | null): void; onResend(opener?: HTMLElement | null): void; initialProduct?: string | null; tabsTarget?: HTMLElement | null }
 
 function savedTab(): Tab { try { const t = sessionStorage.getItem(TAB_KEY); return t === 'artifacts' ? 'artifacts' : 'artzz'; } catch { return 'artzz'; } }
 
-export function Store({ onBuy, onResend, initialProduct }: StoreProps){
+export function Store({ onBuy, onResend, initialProduct, tabsTarget }: StoreProps){
   const [tab, setTab] = useState<Tab>(savedTab);
   const [data, setData] = useState<{ products: Product[]; categories: Category[] } | null>(null);
   const [error, setError] = useState('');
@@ -74,14 +74,12 @@ export function Store({ onBuy, onResend, initialProduct }: StoreProps){
   }, [data, wanted, byKind]);
 
   return <div className="kas-store">
-    <div className="kas-bar">
-      <SegmentedTabs value={tab} onChange={changeTab} />
-      <CurrencySwitch value={currency} onChange={(c) => setCurrency(c)} international={intl} />
-    </div>
+    {tabsTarget ? createPortal(<SegmentedTabs value={tab} onChange={changeTab} />, tabsTarget) : <div className="kas-bar"><SegmentedTabs value={tab} onChange={changeTab} /></div>}
     {error ? <div className="kas-state" role="alert"><p>{error}</p><button type="button" className="kas-btn" onClick={load}>Try again</button></div>
       : !data ? <SkeletonGrid kind={tab} />
       : TABS.map(t => <section key={t.id} id={`kas-panel-${t.id}`} role="tabpanel" aria-labelledby={`kas-tab-${t.id}`} hidden={tab !== t.id} className="kas-panel">
           <Panel kind={t.id} products={byKind[t.id]} categories={data.categories.filter(c => c.kind === t.id)} currency={currency}
+            currencySwitch={<CurrencySwitch value={currency} onChange={(c) => setCurrency(c)} international={intl} />}
             onOpen={(items, index, mediaIndex = 0, opener = null) => setLightbox({ items, index, mediaIndex, opener })} onBuy={onBuy} />
         </section>)}
     <p className="kas-resend">Bought something before? <button type="button" className="kas-link" onClick={(e) => onResend(e.currentTarget)}>Email me my download links</button></p>
@@ -150,8 +148,8 @@ function Chips({ options, value, onChange, label }: { options: { id: string; nam
   </div>;
 }
 
-function Panel({ kind, products, categories, currency, onOpen, onBuy }: {
-  kind: Tab; products: Product[]; categories: Category[]; currency: Currency;
+function Panel({ kind, products, categories, currency, currencySwitch, onOpen, onBuy }: {
+  kind: Tab; products: Product[]; categories: Category[]; currency: Currency; currencySwitch?: React.ReactNode;
   onOpen(items: Product[], index: number, mediaIndex?: number, opener?: HTMLElement | null): void; onBuy(p: Product, c: Currency, opener?: HTMLElement | null): void;
 }){
   const [cat, setCat] = useState('');
@@ -192,19 +190,12 @@ function Panel({ kind, products, categories, currency, onOpen, onBuy }: {
     : <ul className="kas-card-grid" aria-label={label}>{items.map(p => { const i = flat.indexOf(p); return <ArtifactCard key={p.id} product={p} currency={currency} onOpen={(m, el) => onOpen(flat, i, m, el)} onBuy={onBuy} />; })}</ul>;
   const section = kind === 'artzz' ? 'Artzz' : 'Artifacts';
   return <>
-    <div className="kas-tools">
-      <Chips options={priceOptions} value={price} onChange={v => setPrice(v as PriceFilter)} label={`${section}: price`} />
-      <label className="kas-sort"><span>Sort</span>
-        <select value={sort} onChange={e => setSort(e.target.value as Sort)}>
-          <option value="featured">Featured</option>
-          <option value="price-asc">Price: low to high</option>
-          <option value="price-desc">Price: high to low</option>
-          {hasPopular && <option value="popular">Most downloaded</option>}
-          {hasRating && <option value="rating">Top rated</option>}
-        </select>
-      </label>
-    </div>
-    {kind === 'artifacts' && used.some(c => /business|commerce|e-commerce|enterprise|saas|application|app|software|platform|tool|health|medical|care|wellness|finance|financial|fintech|banking|payment/i.test(c.name)) && <div className="kas-chips" role="group" aria-label="Project types">{[
+    {/* one compact bar: price, project types and categories on the left (one swipeable row on phones), sort and currency on the right */}
+    <div className="kas-filterbar" role="group" aria-label={`${section} filters`}>
+      <div className="kas-fb-group">
+        <Chips options={priceOptions} value={price} onChange={v => setPrice(v as PriceFilter)} label={`${section}: price`} />
+        {catOptions.length > 1 && priceOptions.length > 1 && <span className="kas-fb-sep" aria-hidden="true" />}
+        {kind === 'artifacts' && used.some(c => /business|commerce|e-commerce|enterprise|saas|application|app|software|platform|tool|health|medical|care|wellness|finance|financial|fintech|banking|payment/i.test(c.name)) && <div className="kas-chips" role="group" aria-label="Project types">{[
       { label: 'Business', terms: /business|commerce|e-commerce|enterprise|saas/i },
       { label: 'Applications', terms: /application|app|software|platform|tool/i },
       { label: 'Healthcare', terms: /health|medical|care|wellness/i },
@@ -213,7 +204,21 @@ function Panel({ kind, products, categories, currency, onOpen, onBuy }: {
       const category = used.find(c => type.terms.test(c.name));
       return <button key={type.label} type="button" className="kas-chip" aria-pressed={cat === category?.slug} onClick={() => setCat(cat === category?.slug ? '' : category!.slug)}>{type.label}</button>;
     })}</div>}
-    <Chips options={catOptions} value={cat} onChange={setCat} label={`${section} categories`} />
+        <Chips options={catOptions} value={cat} onChange={setCat} label={`${section} categories`} />
+      </div>
+      <div className="kas-fb-end">
+        <label className="kas-sort"><span className="kas-sr">Sort</span>
+          <select value={sort} onChange={e => setSort(e.target.value as Sort)} aria-label="Sort">
+            <option value="featured">Featured</option>
+            <option value="price-asc">Price: low to high</option>
+            <option value="price-desc">Price: high to low</option>
+            {hasPopular && <option value="popular">Most downloaded</option>}
+            {hasRating && <option value="rating">Top rated</option>}
+          </select>
+        </label>
+        {currencySwitch}
+      </div>
+    </div>
     {!shown.length ? <div className="kas-state"><p>Nothing matches these filters.</p>
         <button type="button" className="kas-btn" onClick={() => { setCat(''); setPrice('all'); }}>Show everything</button></div>
       : groups ? groups.map(g => <section key={g.slug || 'more'} className="kas-group" aria-label={g.name}>

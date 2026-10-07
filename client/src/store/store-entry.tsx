@@ -33,16 +33,27 @@ function shadowHost(container: HTMLElement){
   return { host, target };
 }
 
+/** a small shadow root (with the store's styles) for the Artzz / Artifacts switch beside the page title */
+function tabsHost(){
+  const slot = document.getElementById('store-tabs'); if (!slot) return null;
+  const shadow = slot.shadowRoot || slot.attachShadow({ mode: 'open' });
+  const style = document.createElement('style'); style.textContent = storeCss;
+  const target = document.createElement('div');
+  shadow.replaceChildren(style, target);
+  return target;
+}
+
 export function mountStore(container: HTMLElement, options: { initialProduct?: string | null } = {}){
   const { host, target } = shadowHost(container);
+  const tabsTarget = tabsHost();
   const root: Root = createRoot(target);
   root.render(<>
-    <Store initialProduct={options.initialProduct}
+    <Store initialProduct={options.initialProduct} tabsTarget={tabsTarget}
       onBuy={(product, currency, opener) => requestCheckout?.({ mode: 'buy', product, currency, opener })}
       onResend={(opener) => requestCheckout?.({ mode: 'resend', opener })} />
     <CheckoutHost />
   </>);
-  return { dispose(){ root.unmount(); host.remove(); } };
+  return { dispose(){ root.unmount(); host.remove(); tabsTarget?.remove(); } };
 }
 
 export function mountTips(container: HTMLElement, options: { initialTip?: string | null } = {}){

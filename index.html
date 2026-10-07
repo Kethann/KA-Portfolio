@@ -1275,6 +1275,11 @@ html.ka-modal-open{ overflow:hidden; }
 /* ---- Store / Tips pages: shell around the lazily mounted bundle ---- */
 .shop-shell{ max-width:1400px; margin:0 auto; padding:120px 0 96px; min-height:80vh; box-sizing:border-box; }
 .shop-shell > .gallery-head{ margin-bottom:clamp(20px, 3vw, 36px); }
+/* the Store title and the Artzz / Artifacts switch share a row; the switch follows the title's width (and wraps under it when narrow) */
+.store-title-row{ display:flex; flex-wrap:wrap; align-items:center; gap:10px clamp(16px, 2.4vw, 32px); max-width:100%; }
+.store-title-row h2{ margin:0; }
+.store-tabs{ flex:0 0 auto; min-height:48px; }
+
 .shop-root{ padding:0 clamp(16px, 5vw, 64px); min-height:40vh; }
 .shop-loading{ margin:0; padding:48px 0; text-align:center; color:var(--ink-dim); }
 @media (min-width:1900px){ .shop-shell{ max-width:1720px; } }
@@ -1389,7 +1394,7 @@ html.ka-modal-open{ overflow:hidden; }
 <section class="site-section" id="section-store" data-section="store" hidden>
   <div class="shop-shell">
     <div class="gallery-head">
-      <h2 id="store-title" data-ka-editable="storeTitle">Store</h2>
+      <div class="store-title-row"><h2 id="store-title" data-ka-editable="storeTitle">Store</h2><div class="store-tabs" id="store-tabs"></div></div>
       <p id="store-intro" data-ka-editable="storeIntro">Artwork, designs and the tools I build.</p>
     </div>
     <div class="shop-root" id="store-root" aria-busy="true"><p class="shop-loading">Loading the store…</p></div>
@@ -6602,10 +6607,33 @@ var workPanels = [
   { id: 'work', el: portfolioCoverflowEl, handle: null, loading: false },
   { id: 'about', el: document.getElementById('about-work-stacks'), handle: null, loading: false }
 ];
+// About > Featured Work and the Portfolio never share a stack, and never show the same picture twice.
+// Featured stacks are the ones marked in the portal; until some are marked, Devara Campaign and Selected Designs
+// (or the first two stacks) are featured and everything else belongs to the Portfolio.
+var KA_FEATURED_DEFAULT = ["Devara Campaign", "Selected Designs"];
+function kaFeatured(data){
+  var all = CATEGORIES.slice();
+  var feat = ((data.stacks && data.stacks.featured) || []).filter(function(f){ return all.indexOf(f) !== -1; });
+  if (!feat.length) feat = KA_FEATURED_DEFAULT.filter(function(f){ return all.indexOf(f) !== -1; });
+  if (!feat.length) feat = all.slice(0, Math.min(2, Math.max(0, all.length - 1)));
+  return feat;
+}
 function kaPanelFolders(id, data){
-  var all = CATEGORIES.slice(), feat = ((data.stacks && data.stacks.featured) || []).filter(function(f){ return all.indexOf(f) !== -1; });
-  if (!feat.length) return all;
+  var all = CATEGORIES.slice(), feat = kaFeatured(data);
   return id === 'about' ? feat : all.filter(function(f){ return feat.indexOf(f) === -1; });
+}
+// the pictures each panel may show: Featured first; a picture already featured (the same file filed under two
+// categories) is left out of the Portfolio, and no picture repeats inside a panel either
+function kaPanelImages(id, data){
+  var feat = kaFeatured(data), rest = CATEGORIES.filter(function(f){ return feat.indexOf(f) === -1; });
+  var key = function(p){ return p.src || p.slug; }, seen = {};
+  var take = function(folders){
+    var out = [];
+    folders.forEach(function(f){ POSTERS.forEach(function(p){ if (p.cat !== f) return; var k = key(p); if (seen[k]) return; seen[k] = 1; out.push(p); }); });
+    return out;
+  };
+  var featured = take(feat), others = take(rest);
+  return id === 'about' ? featured : others;
 }
 function workStacksProps(id){
   var data = window.__kaLastPortfolioData || {};
@@ -6613,7 +6641,7 @@ function workStacksProps(id){
   try { pinned = POSTERS.filter(function(p){ return isPinned(p.slug); }).map(function(p){ return p.slug; }); } catch (e) {}
   return {
     // About > Featured Work shows the featured stacks; the Portfolio shows the rest, so no stack appears twice
-    id: id, folders: kaPanelFolders(id, data), images: POSTERS, stacks: data.stacks || { loop: true, covers: {} },
+    id: id, folders: kaPanelFolders(id, data), images: kaPanelImages(id, data), stacks: data.stacks || { loop: true, covers: {} },
     filter: id === 'work' ? favFilter : 'all',          // the ALL / PINNED chips filter the Portfolio panel only
     pinned: pinned, onPin: function(slug, on){ setPinned(slug, on); }   // setPinned fires ka-pins-changed, which re-renders
   };

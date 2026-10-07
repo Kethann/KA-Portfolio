@@ -89,7 +89,7 @@ const flare = whole('flare', 'Lens flare', 'A cinematic flare sweeps across the 
 const flames = perLetter('flames', 'Flames & embers', 'Flames lick up from the letters and embers float away.', 0.6, (tl, ctx, g, c, at) => {
   const r = ctx.rng, p = ctx.palette, u = unit(c), top = topOf(c), H = between(r, 22, 40) * u, W = between(r, 9, 15) * u;
   const fl = (h: number, w: number, col: string, op: number) => svgEl('path', { d: `M${f(top.x)} ${f(top.y + 2)} C${f(top.x - w)} ${f(top.y - h * 0.25)} ${f(top.x - w * 0.3)} ${f(top.y - h * 0.6)} ${f(top.x + w * 0.1)} ${f(top.y - h)} C${f(top.x + w * 0.2)} ${f(top.y - h * 0.55)} ${f(top.x + w)} ${f(top.y - h * 0.35)} ${f(top.x)} ${f(top.y + 2)}Z`, fill: col, opacity: op });
-  const outer = fl(H, W, p.accent1, 0.85), inner = fl(H * 0.6, W * 0.55, p.glow, 0.95);
+  const outer = fl(H, W, 'url(#fxgFlame)', 0.95), inner = fl(H * 0.6, W * 0.55, 'url(#fxgGlow)', 0.9);
   g.append(outer, inner);
   const o = `${f(top.x)} ${f(top.y)}`;
   tl.fromTo([outer, inner], { scaleY: 0, scaleX: 0.4, svgOrigin: o }, { scaleY: 1, scaleX: 1, svgOrigin: o, duration: 0.35 / S(ctx), ease: 'power2.out' }, at);
@@ -212,7 +212,7 @@ const laurel = whole('laurel', 'Laurel wreath', 'Laurel branches grow around the
       for (const s of [-1, 1]){
         const la = Math.atan2(Math.sin(q.a) * 0.55, Math.cos(q.a)) + Math.PI / 2 * side + s * 0.6, L = 14 + r() * 6, x2 = q.x + Math.cos(la) * L, y2 = q.y + Math.sin(la) * L;
         const nx = -Math.sin(la) * L * 0.3, ny = Math.cos(la) * L * 0.3;
-        const leaf = svgEl('path', { d: `M${f(q.x)} ${f(q.y)} Q${f((q.x + x2) / 2 + nx)} ${f((q.y + y2) / 2 + ny)} ${f(x2)} ${f(y2)} Q${f((q.x + x2) / 2 - nx)} ${f((q.y + y2) / 2 - ny)} ${f(q.x)} ${f(q.y)}Z`, fill: p.accent2, stroke: p.stroke, 'stroke-width': 0.6, opacity: 0.95 });
+        const leaf = svgEl('path', { d: `M${f(q.x)} ${f(q.y)} Q${f((q.x + x2) / 2 + nx)} ${f((q.y + y2) / 2 + ny)} ${f(x2)} ${f(y2)} Q${f((q.x + x2) / 2 - nx)} ${f((q.y + y2) / 2 - ny)} ${f(q.x)} ${f(q.y)}Z`, fill: 'url(#fxgA2)', stroke: p.stroke, 'stroke-width': 0.6, opacity: 0.95 });
         g.appendChild(leaf);
         tl.fromTo(leaf, { scale: 0, svgOrigin: `${f(q.x)} ${f(q.y)}` }, { scale: 1, svgOrigin: `${f(q.x)} ${f(q.y)}`, duration: 0.35, ease: 'back.out(2)' }, at + (i / 12) * 1.2 / S(ctx));
       }
@@ -278,8 +278,8 @@ const hud = (() => {
 const bones = perLetter('bones', 'Bones', 'Little bones tumble down and settle around the letters.', 0.4, (tl, ctx, g, c, at) => {
   const r = ctx.rng, p = ctx.palette, u = unit(c), b = baseOf(c), L = between(r, 18, 30) * u, w = 4 * u, y = b.y + between(r, 6, 22) * u, x = b.x + (r() - 0.5) * 30 * u, a = (r() - 0.5) * 70;
   const bone = svgEl('g', {});
-  bone.append(svgEl('rect', { x: f(-L / 2), y: f(-w / 2), width: f(L), height: f(w), rx: f(w / 2), fill: p.text }));
-  for (const sx of [-1, 1]) for (const sy of [-1, 1]) bone.appendChild(svgEl('circle', { cx: f(sx * L / 2), cy: f(sy * w * 0.55), r: f(w * 0.7), fill: p.text }));
+  bone.append(svgEl('rect', { x: f(-L / 2), y: f(-w / 2), width: f(L), height: f(w), rx: f(w / 2), fill: 'url(#fxgText)' }));
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) bone.appendChild(svgEl('circle', { cx: f(sx * L / 2), cy: f(sy * w * 0.55), r: f(w * 0.7), fill: 'url(#fxgText)' }));
   g.appendChild(bone);
   tl.fromTo(bone, { x, y: y - 160 * u, rotate: a - 200, opacity: 0 }, { x, y, rotate: a, opacity: 0.9, duration: 0.7 / S(ctx), ease: 'bounce.out' }, at);
   return at + 0.7 / S(ctx);
@@ -299,7 +299,7 @@ const confetti = whole('confetti', 'Confetti burst', 'A burst of confetti once t
 
 const hearts = perLetter('hearts', 'Floating hearts', 'Hearts rise from the letters and fade like a sigh.', 0.5, (tl, ctx, g, c, at) => {
   const r = ctx.rng, p = ctx.palette, u = unit(c), o = topOf(c), k = between(r, 6, 11) * u;
-  const h = svgEl('path', { d: heartPath(o.x, o.y, k), fill: r() < 0.5 ? p.accent1 : p.glow }); g.appendChild(h);
+  const h = svgEl('path', { d: heartPath(o.x, o.y, k), fill: r() < 0.5 ? 'url(#fxgA1)' : 'url(#fxgGlow)' }); g.appendChild(h);
   tl.fromTo(h, { scale: 0, y: 0, opacity: 1, svgOrigin: `${f(o.x)} ${f(o.y)}` }, { scale: 1, svgOrigin: `${f(o.x)} ${f(o.y)}`, duration: 0.35, ease: 'back.out(3)' }, at);
   tl.to(h, { y: -between(r, 50, 100) * u, x: (r() - 0.5) * 30, opacity: 0, duration: 1.6 / S(ctx), ease: 'sine.in' }, at + 0.6);
   return at + 0.4;

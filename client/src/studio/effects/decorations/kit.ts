@@ -7,7 +7,27 @@ export const svgEl = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Recor
   const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, String(attrs[k])); return n as SVGElementTagNameMap[K];
 };
 /** a layer for one decoration, removed again by its reset */
-export const layer = (ctx: EffectContext, cls: string) => { const g = svgEl('g', { class: cls }); ctx.svg.appendChild(g); return g; };
+const LIT = ['sparkles', 'constellation', 'flare', 'flames', 'frost', 'ripples', 'lightning', 'ecg', 'hud'];
+export const layer = (ctx: EffectContext, cls: string) => {
+  const g = svgEl('g', { class: cls });
+  // solid things cast a soft shadow on the background; light things bloom
+  if (!deco.flat) g.setAttribute('filter', LIT.some(k => cls.endsWith(k)) ? 'url(#fxGlowF)' : 'url(#fxShade)');
+  ctx.svg.appendChild(g); return g;
+};
+const shadeC = (h: string, k: number) => { const n = parseInt(h.replace('#', '').slice(0, 6), 16); const f = (v: number) => Math.round(Math.max(0, Math.min(255, k > 0 ? v + (255 - v) * k : v * (1 + k)))).toString(16).padStart(2, '0'); return '#' + f((n >> 16) & 255) + f((n >> 8) & 255) + f(n & 255); };
+/** gradients and filters every decoration can use, in the palette's colours (gives petals, leaves and flames volume) */
+export function decoDefs(svg: SVGSVGElement, p: { accent1: string; accent2: string; glow: string; text: string }){
+  const d = svgEl('defs', {});
+  const shade = deco.flat ? (h: string) => h : shadeC;
+  d.innerHTML = `<filter id="fxShade" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="1.2" dy="2.6" stdDeviation="2" flood-color="#000" flood-opacity=".42"/></filter>
+<filter id="fxGlowF" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<radialGradient id="fxgA1" cx="50%" cy="42%" r="62%"><stop offset="0" stop-color="${shade(p.accent1, 0.45)}"/><stop offset=".55" stop-color="${p.accent1}"/><stop offset="1" stop-color="${shade(p.accent1, -0.45)}"/></radialGradient>
+<linearGradient id="fxgA2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${shade(p.accent2, 0.35)}"/><stop offset=".5" stop-color="${p.accent2}"/><stop offset="1" stop-color="${shade(p.accent2, -0.5)}"/></linearGradient>
+<radialGradient id="fxgGlow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="${p.glow}"/><stop offset="1" stop-color="${shade(p.glow, -0.3)}"/></radialGradient>
+<radialGradient id="fxgText" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="${shade(p.text, 0.5)}"/><stop offset=".6" stop-color="${p.text}"/><stop offset="1" stop-color="${shade(p.text, -0.35)}"/></radialGradient>
+<linearGradient id="fxgFlame" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${p.accent1}"/><stop offset=".45" stop-color="#ffab1f"/><stop offset=".8" stop-color="${p.glow}"/><stop offset="1" stop-color="${p.glow}" stop-opacity="0"/></linearGradient>`;
+  svg.appendChild(d);
+}
 export const clear = (ctx: EffectContext, cls: string) => ctx.svg.querySelectorAll('.' + cls).forEach(n => n.remove());
 
 /** a share of the letters (never spaces): first and last always, the rest by seeded chance; density scales it */
@@ -27,7 +47,7 @@ export function textBox(ctx: EffectContext){
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, sw: sr.width, sh: sr.height };
 }
 /** the user's decoration size (set by the controller before each build) */
-export const deco = { scale: 1 };
+export const deco = { scale: 1, flat: false };   // flat: the 2D look (no shading, no shadows)
 /** size factor from the letter height, so decorations scale with the words (times the chosen size) */
 export const unit = (c: CharInfo) => Math.max(0.45, c.rect.height / 90) * deco.scale;
 export const topOf = (c: CharInfo): Point => c.anchors.top.length ? c.anchors.top[Math.floor(c.anchors.top.length / 2)] : { x: c.anchors.center.x, y: c.anchors.center.y - c.rect.height * 0.4 };

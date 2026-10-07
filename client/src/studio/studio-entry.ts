@@ -13,7 +13,8 @@ import { EffectController, fillStops, type Composition } from './effects/control
 import { SCENES } from './effects/scenes';
 import { baselineIn } from './effects/typing/handwriting';
 import { FINISHES, paintFinish } from './effects/finish';
-import { THEMES, THEME_GROUPS, FILLS } from './effects/themes';
+import { THEMES, THEME_GROUPS } from './effects/themes';
+import { MATERIALS, LEGACY_FILL } from './effects/materials';
 import type { Palette } from './effects/types';
 import { TYPING } from './effects/typing';
 import { DECORATIONS } from './effects/decorations';
@@ -22,7 +23,7 @@ import { newSeed } from './effects/rng';
 
 export interface StudioOptions { returnFocus?: HTMLElement | null }
 const fxState: Composition & { theme: string } = { theme: 'garden', text: 'Bloom where\nyou are planted', font: "'Playfair Display', serif", typing: 'typewriter', decoration: 'floral', caret: 'bar', palette: 'rose-noir', seed: newSeed(), speed: 1, density: 0.6, params: { typo: true },
-  scene: 'glow', sceneIntensity: 0.6, sceneSpeed: 1, finish: 'none', finishAmount: 0.6, fill: 'solid', glow: 0, textCase: 'as-typed', tracking: 0, decoSize: 1, colors: {} };
+  scene: 'glow', sceneIntensity: 0.6, sceneSpeed: 1, finish: 'none', finishAmount: 0.6, fill: 'solid', glow: 0, textCase: 'as-typed', tracking: 0, decoSize: 1, colors: {}, depth: 0.6, light: 225, camera: 'drift', look: '2d' };
 let fxTextEdited = false;   // once you type your own words, themes stop replacing them with their sample
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 /** a random, always-readable palette from OKLCH: one hue family, dark or light, with two accents a third apart */
@@ -583,7 +584,6 @@ class Studio {
     for (const g of [...new Set(SCENES.map(x => x.group))]){ const og = document.createElement('optgroup'); og.label = g; for (const sc of SCENES.filter(x => x.group === g)){ const o = document.createElement('option'); o.value = sc.id; o.textContent = sc.name; og.appendChild(o); } sceneSel.appendChild(og); }
     const finSel = this.$('select[name="fxFinish"]') as HTMLSelectElement;
     for (const fi of FINISHES){ const o = document.createElement('option'); o.value = fi.id; o.textContent = fi.name; finSel.appendChild(o); }
-    void FILLS;
     this.$('.fx-pals').innerHTML = PALETTES.map(p => `<button type="button" class="fx-pal" data-act="fx-pal" data-v="${p.id}" aria-pressed="false" title="${p.name}"><i style="background:${p.bg}"></i><i style="background:${p.accent1}"></i><i style="background:${p.accent2}"></i><span>${p.name}</span></button>`).join('');
     const fontSel = this.$('select[name="font"]') as HTMLSelectElement;
     fontOptions(fontSel);
@@ -620,6 +620,7 @@ class Studio {
           break;
         }
         case 'fx-sec': { const sec = t.closest('.fx-sec') as HTMLElement; const open = t.getAttribute('aria-expanded') !== 'true'; t.setAttribute('aria-expanded', String(open)); sec.classList.toggle('is-shut', !open); break; }
+        case 'fx-look': fxState.look = t.dataset.v === '2d' ? '2d' : '3d'; this.fxCompose(); break;
         case 'fx-randpal': fxState.colors = randomPalette(); this.fxCompose(); break;
         case 'fx-resetcol': fxState.colors = {}; this.fxCompose(); break;
         case 'fx-regen': fxState.seed = newSeed(); this.fxCompose(); break;
@@ -683,6 +684,8 @@ class Studio {
   fmt(name: string, v: number){
     if (name === 'opacity' || name === 'smoothing' || name === 'fxDensity' || name === 'fxGlow' || name === 'fxDecoSize' || name === 'fxSceneI' || name === 'fxFinishA') return Math.round(v * 100) + '%';
     if (name === 'fxSceneS') return v.toFixed(1) + '×';
+    if (name === 'fxDepth') return Math.round(v * 100) + '%';
+    if (name === 'fxLight') return Math.round(v) + '°';
     if (name === 'fxTracking') return v.toFixed(2) + ' em';
     if (name === 'fxSpeed') return v.toFixed(1) + '×';
     if (name === 'lifetime') return v <= 0 ? 'Permanent' : `${v.toFixed(1)} s`;
@@ -710,6 +713,12 @@ class Studio {
       case 'fxText': fxTextEdited = true; fxState.text = el.value.slice(0, 120); clearTimeout(this.fxTimer); this.fxTimer = window.setTimeout(() => this.fxCompose(), 350); return;
       case 'fxFont': fxState.font = el.value; this.fxCompose(); return;
       case 'fxFill': fxState.fill = el.value; this.fxCompose(); return;
+      case 'fxCamera': fxState.camera = el.value as Composition['camera']; this.fxCompose(); return;
+      case 'fxDepth': case 'fxLight': {
+        if (name === 'fxDepth') fxState.depth = num; else fxState.light = num;
+        const out = this.root.querySelector(`output[for="${name}"]`); if (out) out.textContent = this.fmt(name, num);
+        clearTimeout(this.fxTimer); this.fxTimer = window.setTimeout(() => this.fxCompose(), 350); return;
+      }
       case 'fxCase': fxState.textCase = el.value as Composition['textCase']; this.fxCompose(); return;
       case 'fxScene': fxState.scene = el.value; this.fxLive(); return;
       case 'fxFinish': fxState.finish = el.value; this.fxLive(); return;
@@ -788,7 +797,8 @@ class Studio {
   applyTheme(id: string){
     const t = THEMES.find(x => x.id === id); if (!t) return;
     Object.assign(fxState, { theme: t.id, font: fontStack(t.font), typing: t.typing, decoration: t.decoration, palette: t.palette, scene: t.scene, finish: t.finish,
-      fill: t.fill || 'solid', glow: t.glow ?? 0, textCase: t.textCase || 'as-typed', tracking: t.tracking ?? 0, speed: t.speed ?? 1, density: t.density ?? 0.6,
+      fill: t.fill || 'solid', glow: t.glow ?? 0, depth: t.depth ?? 0.6, light: t.light ?? 225, camera: t.camera || 'drift',
+      look: t.look || (t.fill && t.fill !== 'solid' && t.fill !== 'gradient' && t.fill !== 'outline' ? '3d' : '2d'), textCase: t.textCase || 'as-typed', tracking: t.tracking ?? 0, speed: t.speed ?? 1, density: t.density ?? 0.6,
       sceneIntensity: t.sceneIntensity ?? 0.6, caret: t.caret || 'bar', colors: {}, decoSize: 1, sceneSpeed: 1, finishAmount: 0.6 });
     if (!fxTextEdited) fxState.text = t.sample;
     this.fxSyncInputs(); this.fxCompose();
@@ -797,19 +807,22 @@ class Studio {
   fxSyncInputs(){
     const r = this.root, set = (n: string, v: string | number | boolean) => { const el = r.querySelector<HTMLInputElement>(`[name="${n}"]`); if (!el) return; if (el.type === 'checkbox') el.checked = !!v; else el.value = String(v);
       const out = r.querySelector(`output[for="${n}"]`); if (out && typeof v === 'number') out.textContent = this.fmt(n, v); };
-    set('fxText', fxState.text); set('fxFont', fxState.font); set('fxFill', fxState.fill || 'solid'); set('fxCase', fxState.textCase || 'as-typed'); set('fxCaret', fxState.caret);
+    set('fxText', fxState.text); set('fxFont', fxState.font); set('fxFill', LEGACY_FILL[fxState.fill || 'solid'] || fxState.fill || 'solid');
+    set('fxDepth', fxState.depth ?? 0.6); set('fxLight', fxState.light ?? 225); set('fxCamera', fxState.camera || 'drift'); set('fxCase', fxState.textCase || 'as-typed'); set('fxCaret', fxState.caret);
     set('fxTracking', fxState.tracking ?? 0); set('fxGlow', fxState.glow ?? 0); set('fxSpeed', fxState.speed); set('fxDensity', fxState.density); set('fxDecoSize', fxState.decoSize ?? 1);
     set('fxScene', fxState.scene || 'plain'); set('fxFinish', fxState.finish || 'none'); set('fxSceneI', fxState.sceneIntensity ?? 0.6); set('fxSceneS', fxState.sceneSpeed ?? 1); set('fxFinishA', fxState.finishAmount ?? 0.6);
   }
   fxSync(){
     const r = this.root;
     r.querySelectorAll<HTMLElement>('[data-act="fx-theme"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === fxState.theme)));
+    r.querySelectorAll<HTMLElement>('[data-act="fx-look"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === (fxState.look || '3d'))));
+    const lh = r.querySelector('.fx-look-hint'); if (lh) lh.textContent = fxState.look === '2d' ? 'Flat illustration, crisp and light' : 'Lit materials, depth, real light';
     const base = PALETTES.find(p => p.id === fxState.palette) || PALETTES[0], pal = { ...base, ...fxState.colors };
     for (const k of ['bg', 'text', 'accent1', 'accent2', 'glow'] as const){ const el = r.querySelector<HTMLInputElement>(`[name="fxC_${k}"]`); if (el) el.value = pal[k]; }
     const ty = TYPING.find(x => x.id === fxState.typing), de = DECORATIONS.find(x => x.id === fxState.decoration), th = THEMES.find(x => x.id === fxState.theme);
     const d1 = r.querySelector('[data-desc="typing"]'), d2 = r.querySelector('[data-desc="deco"]'); if (d1) d1.textContent = ty?.description || ''; if (d2) d2.textContent = de?.description || '';
     const sum = (k: string, v: string) => { const n = r.querySelector(`[data-sum="${k}"]`); if (n) n.textContent = v; };
-    sum('themes', th?.name || ''); sum('text', (FONTS.find(f => f.family === fxState.font)?.label || '') + (fxState.fill && fxState.fill !== 'solid' ? ' · ' + (FILLS.find(f => f.id === fxState.fill)?.name || '') : ''));
+    sum('themes', th?.name || ''); sum('text', (FONTS.find(f => f.family === fxState.font)?.label || '') + (fxState.fill && fxState.fill !== 'solid' ? ' · ' + (MATERIALS.find(f => f.id === (LEGACY_FILL[fxState.fill!] || fxState.fill))?.name || '') : ''));
     sum('motion', ty?.name || ''); sum('deco', de?.name || ''); sum('scene', (SCENES.find(x => x.id === fxState.scene)?.name || '') + ' · ' + (FINISHES.find(x => x.id === fxState.finish)?.name || ''));
     sum('color', Object.keys(fxState.colors || {}).length ? 'Custom' : base.name);
     r.querySelectorAll<HTMLElement>('[data-act="fx-typing"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === fxState.typing)));
@@ -817,6 +830,7 @@ class Studio {
     r.querySelectorAll<HTMLElement>('[data-act="fx-pal"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === fxState.palette)));
     const seed = r.querySelector('.fx-seed'); if (seed) seed.textContent = String(fxState.seed);
     r.querySelectorAll<HTMLElement>('.fx-caret-row').forEach(n => { n.hidden = fxState.typing !== 'typewriter'; });   // caret and typo only apply to the typewriter
+    const m3 = MATERIALS.find(m => m.id === (LEGACY_FILL[fxState.fill || 'solid'] || fxState.fill))?.shaded; r.querySelectorAll<HTMLElement>('.fx-3d').forEach(n => { n.hidden = !m3; });
   }
   /** how many sections start open: everything on a laptop, the first two on a tablet, only Themes on a phone */
   fxSections(){
@@ -854,11 +868,11 @@ class Studio {
     const ctrl = this.fx; if (!ctrl || !ctrl.tl) return;
     const fmt = (this.$('[name="fxFormat"]') as HTMLSelectElement).value, size = (this.$('[name="fxSize"]') as HTMLSelectElement).value;
     const tl = ctrl.tl, playing = !tl.paused();
-    tl.pause(); tl.seek(ctrl.built, false);
+    tl.pause(); tl.seek(ctrl.built, false); ctrl.flat(true);
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     const stage = ctrl.stage, sr = stage.getBoundingClientRect(), pal = ctrl.palette || PALETTES[0];
     const font = getComputedStyle(ctrl.textEl).font, ls = getComputedStyle(ctrl.textEl).letterSpacing;
-    const chars = Array.from(ctrl.textEl.querySelectorAll<HTMLElement>('.fx-char')).map(c => ({ ch: c.dataset.ch || c.textContent || '', r: c.getBoundingClientRect() }));
+    const chars = Array.from(ctrl.textEl.querySelectorAll<HTMLElement>('.fx-char')).map(c => ({ ch: c.dataset.ch || c.textContent || '', r: c.getBoundingClientRect(), art: c.querySelector<HTMLCanvasElement>('canvas.fx-mat') }));
     const svgText = new XMLSerializer().serializeToString(ctrl.svg);
     const fill = fxState.fill || 'solid', stops = fillStops(fill, pal), glow = fill === 'outline-glow' ? Math.max(0.6, fxState.glow ?? 0) : (fxState.glow ?? 0);
     const outline = fill === 'outline' || fill === 'outline-glow', strokeCol = fill === 'outline' ? pal.text : pal.accent1;
@@ -871,12 +885,13 @@ class Studio {
       if (fmt === 'svg'){
         const fam = font.replace(/^.*?\d+px\s*/, '').replace(/"/g, "'"), px = parseFloat(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] || '64');
         const m = document.createElement('canvas').getContext('2d')!; m.font = font;
-        const texts = chars.map(c => `<text x="${(c.r.left - sr.left).toFixed(1)}" y="${(c.r.top - sr.top + baselineIn(m, c.ch, c.r.height)).toFixed(1)}">${c.ch.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>`).join('');
+        const arts = chars.filter(c => c.art).map(c => { const ap = Number(c.art!.dataset.pad || 0); return `<image href="${c.art!.toDataURL('image/png')}" x="${(c.r.left - sr.left - ap).toFixed(1)}" y="${(c.r.top - sr.top - ap).toFixed(1)}" width="${(c.r.width + ap * 2).toFixed(1)}" height="${(c.r.height + ap * 2).toFixed(1)}"/>`; }).join('');
+        const texts = chars.filter(c => !c.art).map(c => `<text x="${(c.r.left - sr.left).toFixed(1)}" y="${(c.r.top - sr.top + baselineIn(m, c.ch, c.r.height)).toFixed(1)}">${c.ch.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>`).join('');
         const gid = 'fxfill';
         const grad = stops ? `<defs><linearGradient id="${gid}" gradientUnits="userSpaceOnUse" ${stops.angle === 'h' ? `x1="${bx0}" y1="0" x2="${bx1}" y2="0"` : stops.angle === 'v-up' ? `x1="0" y1="${by1}" x2="0" y2="${by0}"` : `x1="0" y1="${by0}" x2="0" y2="${by1}"`}>${stops.stops.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join('')}</linearGradient></defs>` : '';
         const paint = outline ? `fill="none" stroke="${strokeCol}" stroke-width="${Math.max(1.5, px * 0.03).toFixed(1)}"` : `fill="${stops ? `url(#${gid})` : pal.text}"`;
         const scene = layerUrl(x => ctrl.scene.paint(x, t)), fin = (fxState.finish || 'none') !== 'none' ? layerUrl(x => paintFinish(x, fxState.finish!, W, H, fxState.finishAmount ?? 0.6, pal, t)) : '';
-        const doc = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><style>@import url('${googleFontsUrl([fam.split(',')[0].replace(/['"]/g, '').trim()]).replace(/&/g, '&amp;')}');</style>${grad}<image href="${scene}" width="${W}" height="${H}"/>${svgText.replace(/^<svg[^>]*>|<\/svg>$/g, '')}<g font-family="${fam}" font-size="${px}" letter-spacing="${ls === 'normal' ? 0 : ls}" ${paint}>${texts}</g>${fin ? `<image href="${fin}" width="${W}" height="${H}"/>` : ''}</svg>`;
+        const doc = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><style>@import url('${googleFontsUrl([fam.split(',')[0].replace(/['"]/g, '').trim()]).replace(/&/g, '&amp;')}');</style>${grad}<image href="${scene}" width="${W}" height="${H}"/>${svgText.replace(/^<svg[^>]*>|<\/svg>$/g, '')}<g font-family="${fam}" font-size="${px}" letter-spacing="${ls === 'normal' ? 0 : ls}" ${paint}>${texts}</g>${arts}${fin ? `<image href="${fin}" width="${W}" height="${H}"/>` : ''}</svg>`;
         this.download(new Blob([doc], { type: 'image/svg+xml' }), `ka-text-effect-${stamp()}.svg`);
       } else {
         const scale = size === '4k' ? 3840 / W : size === '2x' ? 2 : Math.max(1, window.devicePixelRatio || 1);
@@ -893,7 +908,7 @@ class Studio {
           for (const [o, col] of stops.stops) g.addColorStop(o, col); x.fillStyle = g;
         } else x.fillStyle = pal.text;
         x.strokeStyle = strokeCol; x.lineWidth = Math.max(1.5, parseFloat(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] || '64') * 0.03);
-        const drawText = () => { for (const ch of chars){ const yy = ch.r.top - sr.top + baselineIn(x, ch.ch, ch.r.height); if (outline) x.strokeText(ch.ch, ch.r.left - sr.left, yy); else x.fillText(ch.ch, ch.r.left - sr.left, yy); } };
+        const drawText = () => { for (const ch of chars){ if (ch.art){ const ap = Number(ch.art.dataset.pad || 0); x.drawImage(ch.art, ch.r.left - sr.left - ap, ch.r.top - sr.top - ap, ch.r.width + ap * 2, ch.r.height + ap * 2); continue; } const yy = ch.r.top - sr.top + baselineIn(x, ch.ch, ch.r.height); if (outline) x.strokeText(ch.ch, ch.r.left - sr.left, yy); else x.fillText(ch.ch, ch.r.left - sr.left, yy); } };
         if (glow > 0){ x.save(); x.shadowColor = pal.glow; x.shadowBlur = 6 + glow * 18; drawText(); x.shadowColor = pal.accent1; x.shadowBlur = 18 + glow * 30; drawText(); x.restore(); }
         drawText();
         if (withBg) paintFinish(x, fxState.finish || 'none', W, H, fxState.finishAmount ?? 0.6, pal, t);
@@ -901,7 +916,7 @@ class Studio {
         if (blob) this.download(blob, `ka-text-effect-${stamp()}-${c.width}x${c.height}.png`);
       }
       this.toast('Downloaded');
-    } finally { if (playing) tl.play(); }
+    } finally { ctrl.flat(false); if (playing) tl.play(); }
   }
   togglePanel(name: string, trigger: HTMLElement){
     const was = this.openPanel === name;
@@ -1020,6 +1035,7 @@ const TEMPLATE = `
 <button type="button" class="show-tools" data-act="show-tools" hidden aria-label="Show tools (H)">${icon(I.tools)}<span>Tools</span></button>
 <div class="topbar"><div class="tb-history" role="group" aria-label="History"></div><div class="tb-hide"></div></div>
   <div class="panel fx-panel fx-dock" data-panel="fx" hidden aria-label="Text effects">
+    <div class="fx-look" role="group" aria-label="Look"><span>Look</span><button type="button" class="fx-look-b" data-act="fx-look" data-v="2d" aria-pressed="true">2D</button><button type="button" class="fx-look-b" data-act="fx-look" data-v="3d" aria-pressed="false">3D</button><small class="fx-look-hint">Flat illustration, crisp and light</small></div>
     <section class="fx-sec" data-sec="themes"><button type="button" class="fx-sec-h" data-act="fx-sec" aria-expanded="true"><span>Themes</span><small class="fx-sum" data-sum="themes"></small><i aria-hidden="true"></i></button><div class="fx-sec-b">
       <div class="fx-tabs" role="group" aria-label="Theme groups"></div>
       <div class="fx-themes"></div>
@@ -1029,12 +1045,15 @@ const TEMPLATE = `
       <label class="fx-field"><span>Your words</span><textarea name="fxText" rows="2" maxlength="120"></textarea></label>
       <div class="fx-two">
         <label class="fx-field"><span>Font</span><select name="fxFont"></select></label>
-        <label class="fx-field"><span>Fill</span><select name="fxFill"><option value="solid">Solid</option><option value="gradient">Gradient</option><option value="outline">Outline</option><option value="outline-glow">Neon tube</option><option value="metal-gold">Gold foil</option><option value="chrome">Chrome</option><option value="fire">Fire</option><option value="ice">Ice</option></select></label>
+        <label class="fx-field"><span>Material</span><select name="fxFill"><optgroup label="Flat"><option value="solid">Flat colour</option><option value="gradient">Gradient</option><option value="outline">Outline</option></optgroup><optgroup label="3D, lit"><option value="chrome">Chrome</option><option value="gold">Gold</option><option value="rosegold">Rose gold</option><option value="steel">Brushed steel</option><option value="glass">Glass</option><option value="ice">Ice</option><option value="neon">Neon tube</option><option value="lava">Lava</option><option value="stone">Stone</option><option value="carved">Carved stone</option><option value="marble">Marble</option><option value="bone">Bone</option><option value="candy">Glossy candy</option><option value="foil">Foil balloon</option><option value="extrude">Block extrude</option><option value="emboss">Letterpress</option><option value="satin">Satin</option></optgroup></select></label>
         <label class="fx-field"><span>Letters</span><select name="fxCase"><option value="as-typed">As typed</option><option value="upper">CAPITALS</option></select></label>
         <label class="fx-field fx-caret-row"><span>Caret</span><select name="fxCaret"><option value="bar">Bar</option><option value="block">Block</option><option value="underscore">Underscore</option><option value="nib">Pen nib</option><option value="none">None</option></select></label>
       </div>
       <label class="row"><span>Spacing</span><input type="range" name="fxTracking" min="-0.05" max="0.4" step="0.01" value="0"><output for="fxTracking">0.00 em</output></label>
       <label class="row"><span>Glow</span><input type="range" name="fxGlow" min="0" max="1" step="0.05" value="0"><output for="fxGlow">0%</output></label>
+      <div class="fx-3d"><label class="row"><span>Depth</span><input type="range" name="fxDepth" min="0" max="1" step="0.05" value="0.6"><output for="fxDepth">60%</output></label>
+      <label class="row"><span>Light</span><input type="range" name="fxLight" min="0" max="360" step="5" value="225"><output for="fxLight">225°</output></label></div>
+      <label class="fx-field"><span>Camera</span><select name="fxCamera"><option value="still">Still</option><option value="drift">Slow 3D drift</option><option value="dramatic">Dramatic 3D</option></select></label>
     </div></section>
     <section class="fx-sec" data-sec="motion"><button type="button" class="fx-sec-h" data-act="fx-sec" aria-expanded="true"><span>Animation</span><small class="fx-sum" data-sum="motion"></small><i aria-hidden="true"></i></button><div class="fx-sec-b">
       <div class="fx-chips fx-typing" role="group" aria-label="How the words arrive"></div>

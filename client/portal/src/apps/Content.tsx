@@ -431,6 +431,7 @@ function Portfolio(){
         </section>}
         <Switch checked={!!doc!.stacks.featured?.includes(folder)} onChange={v => void updateSiteLive(d => { const cur = (d.stacks.featured || []).filter(x => d.folders.includes(x)); return { ...d, stacks: { ...d.stacks, featured: v ? [...cur.filter(x => x !== folder), folder] : cur.filter(x => x !== folder) } }; })
           .then(live => toast.show(live ? 'Featured Work updated on the site' : 'Changed. Press Publish changes to put it live.', { tone: 'success' })).catch(toast.error)} label={`Show “${folder}” in About › Featured Work (it then leaves the Portfolio, so it never appears twice)`} />
+        {!(doc!.stacks.featured || []).filter(x => doc!.folders.includes(x)).length && <p className="field-hint" style={{ margin: 0 }}>No stack is marked yet, so Devara Campaign and Selected Designs (or the first two stacks) are featured by default. Marking any stack replaces that default.</p>}
         <Switch checked={doc!.stacks.loops?.[folder] ?? doc!.stacks.loop} onChange={v => updateSite(d => ({ ...d, stacks: { ...d.stacks, loops: { ...(d.stacks.loops || {}), [folder]: v } } }))} label={`“${folder}” loops around (coverflow)`} />
         <p className="field-hint" style={{ margin: 0 }}>This choice belongs to this stack only; every other stack keeps its own.</p>
       </div>

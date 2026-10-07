@@ -28,6 +28,6 @@ test('library names are unique and build valid stacks and URLs', () => {
 test('the studio bundle ships the themes, scenes and new effects', () => {
   const js = readFileSync(new URL('../dist/assets/studio.js', import.meta.url), 'utf8');   // themes and effects are in the studio's own bundle
   for (const s of ['Blockbuster', "Doctor's note", 'Command', 'Inferno', 'Frozen', 'Rainy night', 'Deep space', 'Underground', 'Bones', 'Ancient', 'Neon future',
-    'Decode', 'Cinematic blur', 'Neon flicker', 'Constellation', 'Heartbeat line', 'Targeting HUD', 'Laurel wreath', 'Film grain', 'Gold foil', 'Comes in', 'Goes out', 'guide-tablet'])
+    'Decode', 'Cinematic blur', 'Neon flicker', 'Constellation', 'Heartbeat line', 'Targeting HUD', 'Laurel wreath', 'Film grain', 'Gold 3D', 'Chrome 3D', 'Foil balloon 3D', 'Carved stone', 'Real handwriting', 'Aurora', 'Molten lava', 'fx-look', 'Comes in', 'Goes out', 'guide-tablet'])
     assert.ok(js.includes(s), s);
 });
