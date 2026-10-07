@@ -24,7 +24,7 @@ test('every event uses library sounds, has a known category, and a gentle volume
     assert.ok(e.volume > 0 && e.volume <= 0.4, `${e.id} volume ${e.volume}`);
   }
   assert.equal(SOUND_EVENTS.find(e => e.id === 'particles.spark').volume <= 0.1, true, 'particles stay faint');
-  assert.equal(SOUND_DEFAULTS.defaultOn, false, 'visitors start muted');
+  assert.equal(SOUND_DEFAULTS.defaultOn, true, 'sound is on for visitors by default');
 });
 
 test('the server keeps valid sound settings, clamps volumes and refuses foreign files', () => {
@@ -37,7 +37,8 @@ test('the server keeps valid sound settings, clamps volumes and refuses foreign 
   assert.deepEqual(v.events['store.paid'], { volume: 0 });
   assert.equal(v.events['made.up'], undefined);
   assert.throws(() => validateSounds({ events: { 'nav.select': { file: 'https://evil.example/x.mp3' } } }), /library or a file you uploaded/);
-  assert.deepEqual(validateSounds(undefined), { defaultOn: false, master: SOUND_DEFAULTS.master, categories: {}, events: {} });
+  assert.deepEqual(validateSounds(undefined), { defaultOn: true, master: SOUND_DEFAULTS.master, categories: {}, events: {} });
+  assert.equal(validateSounds({ defaultOn: false }).defaultOn, false, 'the owner can switch the default off');
 });
 
 test('the page loads the sound layer and the credits list every library file', () => {

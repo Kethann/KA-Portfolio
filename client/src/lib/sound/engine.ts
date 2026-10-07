@@ -8,7 +8,7 @@ import { SOUND_EVENTS, SOUND_CATEGORIES, SOUND_DEFAULTS, librarySrc } from '../.
 import type { SoundSettings, SoundEvent } from '../../../../shared/sounds.js';
 import { synthBuffer } from './synth';
 
-const KEY = 'ka-sound-2';   // { on: boolean | null, volume: 0-1 } (renamed when the default dropped to 5%, so everyone starts quiet)
+const KEY = 'ka-sound-3';   // { on: boolean | null, volume: 0-1 } (renamed when the default volume changed, so everyone starts at it)
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const clamp01 = (v: unknown, d: number) => { const n = Number(v); return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : d; };
 
@@ -22,10 +22,10 @@ export class SoundEngine {
   private webmOk: boolean | null = null;
   private listeners = new Set<() => void>();
   settings: SoundSettings = { ...SOUND_DEFAULTS, categories: {}, events: {} };
-  user: { on: boolean | null; volume: number } = { on: null, volume: 0.05 };   // 5% to start: quiet by default
+  user: { on: boolean | null; volume: number } = { on: null, volume: 0.1 };   // 10% to start: quiet by default
 
   constructor(){
-    try { const s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s && typeof s === 'object') this.user = { on: typeof s.on === 'boolean' ? s.on : null, volume: clamp01(s.volume, 0.05) }; } catch { /* private mode: defaults */ }
+    try { const s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s && typeof s === 'object') this.user = { on: typeof s.on === 'boolean' ? s.on : null, volume: clamp01(s.volume, 0.1) }; } catch { /* private mode: defaults */ }
     if (typeof window !== 'undefined'){
       const unlock = () => { this.unlock(); };
       for (const t of ['pointerdown', 'keydown', 'touchend']) window.addEventListener(t, unlock, { capture: true, passive: true });
@@ -58,7 +58,7 @@ export class SoundEngine {
     this.user.on = on; this.save(); this.notify();
     if (on){ this.unlock(); this.warm(); this.play('sound.on', { force: true }); }
   }
-  setVolume(v: number){ this.user.volume = clamp01(v, 0.05); this.save(); this.notify(); }
+  setVolume(v: number){ this.user.volume = clamp01(v, 0.1); this.save(); this.notify(); }
   /** settings saved in the portal (served with the site document) */
   configure(s: Partial<SoundSettings> | null | undefined){
     if (!s || typeof s !== 'object') return;

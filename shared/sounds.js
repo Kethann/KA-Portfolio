@@ -88,8 +88,9 @@ export const SOUND_EVENTS = [
 ];
 export const SOUND_EVENT_IDS = SOUND_EVENTS.map(e => e.id);
 
-/** the settings a fresh site starts with (sound is off for visitors until they switch it on) */
-export const SOUND_DEFAULTS = { defaultOn: false, master: 0.7, categories: {}, events: {} };
+/** the settings a fresh site starts with: sound on for visitors (from their first tap or key press; muted for people who
+ *  prefer reduced motion), at a quiet level. Visitors can switch it off in the menu, and the owner can change this in the portal. */
+export const SOUND_DEFAULTS = { defaultOn: true, master: 0.7, categories: {}, events: {} };
 
 /** where a library file lives */
 export const librarySrc = (name, ext) => `/sounds/ui/${name}.${ext}`;

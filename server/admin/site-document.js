@@ -299,7 +299,7 @@ const ownMedia = (u) => { try { return isOwnMediaUrl(u); } catch { return false;
 export function validateSounds(input){
   const s = input && typeof input === 'object' ? input : {};
   const vol = (v, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(1, Math.max(0, Math.round(n * 100) / 100)) : d; };
-  const out = { defaultOn: s.defaultOn === true, master: vol(s.master, SOUND_DEFAULTS.master), categories: {}, events: {} };
+  const out = { defaultOn: typeof s.defaultOn === 'boolean' ? s.defaultOn : SOUND_DEFAULTS.defaultOn, master: vol(s.master, SOUND_DEFAULTS.master), categories: {}, events: {} };
   const cats = s.categories && typeof s.categories === 'object' ? s.categories : {};
   for (const c of SOUND_CATEGORIES) if (cats[c.id] !== undefined) out.categories[c.id] = vol(cats[c.id], c.volume);
   const evs = s.events && typeof s.events === 'object' ? s.events : {};
