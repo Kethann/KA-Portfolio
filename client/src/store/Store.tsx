@@ -255,9 +255,14 @@ function PriceTag({ price }: { price: Price }){
 
 const compact = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}k` : String(n);
 // "★ 4.8 (12) · 340 downloads": nothing when there is nothing to show yet
-function Social({ product }: { product: Product }){
+function Social({ product, short }: { product: Product; short?: boolean }){
   const r = product.rating, d = product.downloads;
   if (!r && !d) return null;
+  // short: for the art tiles, beside the title, so every tile keeps the same two rows (title, then price and Buy)
+  if (short) return <span className="kas-social is-short" aria-label={[r ? `Rated ${r.avg.toFixed(1)} out of 5` : '', d ? `${d} download${d === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ')}>
+    {r && <span className="kas-stars" aria-hidden="true">★ {r.avg.toFixed(1)}</span>}
+    {!!d && <span aria-hidden="true" title={`${d} download${d === 1 ? '' : 's'}`}><svg viewBox="0 0 24 24" width="12" height="12" style={{ verticalAlign: '-1px', marginRight: 3 }}><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>{compact(d)}</span>}
+  </span>;
   return <span className="kas-social">
     {r && <span className="kas-stars" aria-label={`Rated ${r.avg.toFixed(1)} out of 5 by ${r.count} buyer${r.count === 1 ? '' : 's'}`}><span aria-hidden="true">★</span> {r.avg.toFixed(1)} <span className="kas-faint">({r.count})</span></span>}
     {r && !!d && <span aria-hidden="true" className="kas-faint">·</span>}
@@ -281,8 +286,7 @@ function ArtTile({ product, currency, onOpen, onBuy }: { product: Product; curre
       <Ribbon product={product} currency={currency} />
     </button>
     <div className="kas-art-meta">
-      <span className="kas-art-title">{product.title}</span>
-      <Social product={product} />
+      <span className="kas-art-top"><span className="kas-art-title">{product.title}</span><Social product={product} short /></span>
       {product.sellable && price.available && <span className="kas-art-row"><PriceTag price={price} /><BuyButton product={product} currency={currency} onBuy={onBuy} compact /></span>}
     </div>
   </li>;

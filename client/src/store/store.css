@@ -340,3 +340,14 @@ div.kas-lb-img{ width:min(80vw, 600px); aspect-ratio:4/5; }
 /* no visible scroll bars (scrolling still works by touch, wheel and keys) */
 *{ scrollbar-width:none; }
 *::-webkit-scrollbar{ width:0; height:0; display:none; }
+
+/* art tiles: title and its rating/downloads share the first row, price and Buy the second, so every tile lines up */
+.kas-art-top{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; min-width:0; }
+.kas-art-top .kas-art-title{ flex:1; min-width:0; }
+.kas-social.is-short{ flex:none; gap:8px; margin:0; font-size:calc(var(--kas-small) * .9); }
+.kas-art-meta .kas-art-row{ min-height:44px; }
+/* the tile's picture already shows the "−50%" ribbon: the row keeps just the price, the old price and Buy, on one line */
+.kas-art-row{ flex-wrap:nowrap; }
+.kas-art-row .kas-price{ flex-wrap:nowrap; min-width:0; gap:6px; }
+.kas-art-row .kas-badge{ display:none; }
+.kas-art-row .kas-buy{ flex:none; }
