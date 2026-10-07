@@ -226,7 +226,7 @@ const PEN_SVG = `<svg viewBox="-4 -12 108 24" width="108" height="24" aria-hidde
 
 export const handwriting: Effect = {
   id: 'handwriting', name: 'Real handwriting', description: 'Written stroke by stroke with a real pen: it slows into curves, follows every thick and thin, and lifts between strokes.', duration: 3,
-  params: [],
+  params: [{ id: 'pen', name: 'Show the pen', type: 'toggle', value: false }],
   init(ctx){
     plans = [];
     const sr = ctx.stage.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -264,8 +264,9 @@ export const handwriting: Effect = {
     }
     ctx.penAt = (time: number) => penAt(time).p;
   },
-  play(tl, ctx){
-    const r = ctx.rng, sp = Math.max(0.25, ctx.speed), pen = ctx.stage.querySelector<HTMLElement>('.fx-pen');
+  play(tl, ctx, params){
+    // the ink writes itself either way; the fountain pen is shown only when asked for
+    const r = ctx.rng, sp = Math.max(0.25, ctx.speed), pen = params.pen === true ? ctx.stage.querySelector<HTMLElement>('.fx-pen') : null;
     const px = plans.length ? plans[0].c.rect.height : 60, v = px * between(r, 3.1, 3.7) * sp;   // about three and a half letter-heights a second
     let t = 0.45;
     plans.forEach((p, i) => {

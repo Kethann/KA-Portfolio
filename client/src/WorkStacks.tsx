@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import type {CSSProperties,KeyboardEvent as ReactKeyboardEvent,MouseEvent as ReactMouseEvent,PointerEvent as ReactPointerEvent} from 'react';
 import {imageUrl,type Project} from './types';
+import {sfx} from './lib/sound/sfx';
 
 export type StacksSettings={loop?:boolean;loops?:Record<string,boolean>;covers?:Record<string,string>};
 export type WorkStacksProps={folders:string[];images:Project[];stacks?:StacksSettings;/** 'pinned' shows only pinned images (Portfolio ALL / PINNED chips). */filter?:'all'|'pinned';pinned?:string[];onPin?:(slug:string,on:boolean)=>void;/** Distinguishes panels (Portfolio, About) so each plays its own entrance once. */id?:string};
@@ -536,7 +537,7 @@ function Coverflow({stack,loop,reduced,canHover,onClose,pins,onPin,startSlug}:{s
 
   const wrapD=(d:number)=>cfg.current.loop?mod(d+cfg.current.slots/2,cfg.current.slots)-cfg.current.slots/2:d;
   const clampTarget=(t:number)=>cfg.current.loop?t:clamp(t,0,cfg.current.n-1);
-  const report=()=>{const a=mod(Math.round(st.current.target),cfg.current.n);if(a!==activeRef.current){activeRef.current=a;setActive(a);}};
+  const report=()=>{const a=mod(Math.round(st.current.target),cfg.current.n);if(a!==activeRef.current){activeRef.current=a;setActive(a);sfx('gallery.swipe');}};
 
   const layout=useCallback(()=>{
     const s=st.current,{loop:lp,reduced:rd,slots:sl}=cfg.current,cw=s.cw;
@@ -626,7 +627,7 @@ function Coverflow({stack,loop,reduced,canHover,onClose,pins,onPin,startSlug}:{s
     if(!startSlug)return;
     const k=items.findIndex(x=>x.slug===startSlug);if(k<0)return;
     st.current.pos=k;st.current.target=k;activeRef.current=k;setActive(k);
-    viewingRef.current=true;setViewing(true);
+    viewingRef.current=true;setViewing(true);sfx('gallery.view');
   },[]);// eslint-disable-line react-hooks/exhaustive-deps
   // Measure the stage, size the cards, and keep them centred through resizes.
   useLayoutEffect(()=>{
@@ -653,9 +654,9 @@ function Coverflow({stack,loop,reduced,canHover,onClose,pins,onPin,startSlug}:{s
     const s=st.current;let best:HTMLElement|null=null,bd=9;
     for(let i=0;i<cfg.current.slots;i++){let d=i-s.pos;if(cfg.current.loop)d=mod(d+cfg.current.slots/2,cfg.current.slots)-cfg.current.slots/2;if(Math.abs(d)<bd){bd=Math.abs(d);best=magRefs.current[i];}}
     originRect.current=best?best.getBoundingClientRect():null;   // where the picture flies out from
-    viewingRef.current=true;setViewing(true);
+    viewingRef.current=true;setViewing(true);sfx('gallery.view');
   },[]);
-  function closeViewer(){viewingRef.current=false;setViewing(false);requestAnimationFrame(()=>{layout();kick();stageRef.current?.focus({preventScroll:true});});}
+  function closeViewer(){viewingRef.current=false;setViewing(false);sfx('gallery.back');requestAnimationFrame(()=>{layout();kick();stageRef.current?.focus({preventScroll:true});});}
   const centre=useCallback((slot:number)=>{
     const s=st.current;let d=slot-s.pos;if(cfg.current.loop)d=mod(d+cfg.current.slots/2,cfg.current.slots)-cfg.current.slots/2;
     const next=clampTarget(Math.round(s.pos+d));
@@ -772,11 +773,11 @@ export function WorkStacks({folders,images,stacks:settings,id='work',filter='all
     requestAnimationFrame(()=>rootRef.current?.scrollIntoView({behavior:reduced?'instant':'smooth',block:'start'}));
   },[images]);
   const current=stacks.find(s=>s.name===open);
-  const close=useCallback(()=>{setOpen(null);setStartSlug('');const el=opener.current;if(el)requestAnimationFrame(()=>el.isConnected&&el.focus({preventScroll:true}));},[]);
+  const close=useCallback(()=>{sfx('stack.close');setOpen(null);setStartSlug('');const el=opener.current;if(el)requestAnimationFrame(()=>el.isConnected&&el.focus({preventScroll:true}));},[]);
   if(!stacks.length)return <p className="ws-empty" role="status">{filter==='pinned'?'Nothing pinned yet. Open any image and tap the pin to keep it here.':'No work to show yet.'}</p>;
   return <section className="work-stacks" aria-label="Work" ref={rootRef}>
     {current
       ?<Coverflow key={current.name} stack={current} loop={settings?.loops?.[current.name]??(settings?.loop!==false)} reduced={reduced} canHover={canHover} onClose={close} pins={pinSet} onPin={onPin} startSlug={startSlug}/>
-      :<StackGrid id={id} stacks={stacks} reduced={reduced} onOpen={(name,el)=>{opener.current=el;setOpen(name);}}/>}
+      :<StackGrid id={id} stacks={stacks} reduced={reduced} onOpen={(name,el)=>{opener.current=el;sfx('stack.open');setOpen(name);}}/>}
   </section>;
 }

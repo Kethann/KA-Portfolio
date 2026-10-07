@@ -27,6 +27,9 @@
 /assets/panda.js
   ! Cache-Control
   Cache-Control: no-cache
+/assets/sound.js
+  ! Cache-Control
+  Cache-Control: no-cache
 /assets/studio.js
   ! Cache-Control
   Cache-Control: no-cache
@@ -45,3 +48,7 @@
   X-Frame-Options: DENY
   X-Robots-Tag: noindex, nofollow, noarchive
   Cache-Control: no-store
+
+# UI sounds: tiny, versioned by name; a day of caching, then rechecked
+/sounds/*
+  Cache-Control: public, max-age=86400

@@ -4113,6 +4113,7 @@ function clearSurfaceParticles(){
 }
 function emitSurfaceParticles(x,y,moveX=0,moveY=0,count=3){
   const system=surfaceParticles;if(!system)return;
+  if(window.kaSound)window.kaSound.play('particles.spark');   // a faint sparkle (the engine spaces them out and varies the pitch)
   for(let n=0;n<count;n++){
     const angle=Math.atan2(y,x)+(Math.random()-.5)*1.6;
     const px=x+(Math.random()-.5)*6,py=y+(Math.random()-.5)*6;
@@ -6847,6 +6848,7 @@ nav.addEventListener("pointerdown", function(e){
 function processNavDragStep(drag){
   var now = performance.now(), velocity = (drag.x - drag.lastX) / Math.max(8, now - drag.lastT);
   var nearest = drag.bounds.reduce(function(best, b){ return Math.abs(drag.x - b.left - b.width / 2) < Math.abs(drag.x - best.left - best.width / 2) ? b : best; });
+  if (drag.target !== nearest.el && drag.target && window.kaSound) window.kaSound.play("nav.tick");   // a soft tick as the liquid pill passes each item
   drag.target = nearest.el;
   navItems.forEach(function(el){ el.toggleAttribute("data-preview", el === drag.target); });
   pillW = nearest.width;
@@ -6907,6 +6909,7 @@ function switchSection(name, focusTarget){
   var page = navPage(name);
   var incoming = pageSections(page);
   if (!incoming.length) return;
+  if (page !== activeSection && window.kaSound) window.kaSound.play("page.change");
   // "skills" is a place inside the About page (the menu's Portfolio item lands there)
   var scrollTarget = (name === "skills" && document.getElementById("about-skills-block")) || sections[name] || incoming[0];
   if (page === activeSection){
@@ -8731,6 +8734,7 @@ function applySiteAppearance(data){
   if (data.details){
     if (data.details.customFonts) applyCustomFonts(data.details.customFonts);
     try { loadLibraryFonts(data); } catch(e){}
+    try { if (window.kaSound) window.kaSound.configure(data.sounds); else window.__kaSoundCfg = data.sounds; } catch(e){}
     if (data.details.headingFont) root.setProperty("--font-heading", "'" + data.details.headingFont + "'");
     if (data.details.bodyFont) root.setProperty("--font-body", "'" + data.details.bodyFont + "'");
     if (data.details.textScale) root.setProperty("--text-scale", String(data.details.textScale));
@@ -11128,3 +11132,6 @@ html.ka-studio-open .ka-scroll-line, html.ka-modal-open .ka-scroll-line{ opacity
   window.addEventListener("resize", function(){ if (s && s.decided) release(false); });
 })();
 </script>
+
+<!-- UI sounds (silent until the visitor switches them on; nothing plays before a tap or key press) -->
+<script type="module" src="./dist/assets/sound.js"></script>

@@ -6,6 +6,7 @@ import { useFocusTrap, useMedia } from './hooks';
 import { postJson, publicConfig, formatPrice, ApiError, type Currency, type Product } from './api';
 import { reduce, initialState, stepOf, isStage, type Quote, type OrderResult, type Success, type PaymentMethod, type LicenseRef } from './checkout/machine';
 import { PassCard, CountingPrice } from './checkout/PassCard';
+import { sfx } from '../lib/sound/sfx';
 import { DemoPay } from './checkout/DemoPay';
 
 type Req = { mode: 'buy'; product: Product; currency: Currency; opener?: HTMLElement | null } | { mode: 'resend'; opener?: HTMLElement | null };
@@ -153,13 +154,13 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
   // success / failure feedback: confetti, gentle vibration
   useEffect(() => {
     if (s.phase === 'success'){
-      buzz([18, 40, 26]);
+      buzz([18, 40, 26]); sfx('store.paid');
       if (!reduced) import('./checkout/confetti').then(m => {
         const r = cardRef.current?.getBoundingClientRect();
         const host = (cardRef.current?.closest('.kas-modal') as HTMLElement | null) || document.body;   // inside the dialog, above its content
         m.burst(host, r ? { x: r.left + r.width / 2, y: r.top + r.height / 3 } : { x: innerWidth / 2, y: innerHeight / 3 });
       }).catch(() => {});
-    } else if (s.phase === 'failed') buzz([60, 50, 60]);
+    } else if (s.phase === 'failed'){ buzz([60, 50, 60]); sfx('store.failed'); }
   }, [s.phase, reduced]);
 
   // After the PAID stamp lands, the card turns over once to show the license QR on its back, holds a moment, then turns back.
@@ -178,8 +179,8 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
     const c = code.trim().toUpperCase();
     if (!c || codeBusy) return;
     setCodeError(''); setCodeBusy(true);
-    try { const next = [...codes.filter(x => x !== c), c]; dispatch({ type: 'QUOTED', quote: await requestQuote(next, email.trim()) }); setCodes(next); setCode(''); }
-    catch (e){ setCodeError((e as Error).message); }
+    try { const next = [...codes.filter(x => x !== c), c]; dispatch({ type: 'QUOTED', quote: await requestQuote(next, email.trim()) }); setCodes(next); setCode(''); sfx('store.coupon'); }
+    catch (e){ setCodeError((e as Error).message); sfx('store.failed'); }
     finally { setCodeBusy(false); }
   };
   const removeCode = async (c: string) => {

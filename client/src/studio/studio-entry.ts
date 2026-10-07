@@ -3,6 +3,7 @@
 // browser; nothing is uploaded. The drawing stays in memory while the page is open.
 import { FONT_GROUPS, FONT_LIBRARY, fontStack, googleFontsUrl } from '../../../shared/fonts.js';
 import css from './studio.css?inline';
+import { sfx } from '../lib/sound/sfx';
 import {
   BRUSHES, BLENDS, FILTERS, DEFAULT_SETTINGS, MAX_POINTS, POINT_STRIDE, drawBackground, drawItem, drawSpaceFallback, isAlive, needsAnimation,
   newStroke, pushPoint, renderScene, replayTimeline, retimed, totalPoints, itemBox,
@@ -22,7 +23,7 @@ import { PALETTES } from './effects/palettes';
 import { newSeed } from './effects/rng';
 
 export interface StudioOptions { returnFocus?: HTMLElement | null }
-const fxState: Composition & { theme: string } = { theme: 'garden', text: 'Bloom where\nyou are planted', font: "'Playfair Display', serif", typing: 'typewriter', decoration: 'floral', caret: 'bar', palette: 'rose-noir', seed: newSeed(), speed: 1, density: 0.6, params: { typo: true },
+const fxState: Composition & { theme: string } = { theme: 'garden', text: 'Bloom where\nyou are planted', font: "'Playfair Display', serif", typing: 'typewriter', decoration: 'floral', caret: 'bar', palette: 'rose-noir', seed: newSeed(), speed: 1, density: 0.6, params: { typo: true, pen: false },
   scene: 'glow', sceneIntensity: 0.6, sceneSpeed: 1, finish: 'none', finishAmount: 0.6, fill: 'solid', glow: 0, textCase: 'as-typed', tracking: 0, decoSize: 1, colors: {}, depth: 0.6, light: 225, camera: 'drift', look: '2d' };
 let fxTextEdited = false;   // once you type your own words, themes stop replacing them with their sample
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -297,6 +298,7 @@ class Studio {
   }
   extend(e: PointerEvent){
     const st = this.current; if (!st) return;
+    sfx('studio.trail');   // off unless switched on in the portal; spaced out and pitch-varied by the engine
     const p = this.toWorld(e);
     // stabilizer (lazy follow): lighter on touch, where events are fewer and a heavy lag reads as stiff, straight lines
     const k = e.pointerType === 'touch' ? 0.55 : 0.9;
@@ -514,6 +516,7 @@ class Studio {
     const a = document.createElement('a'); a.href = url; a.download = name; a.rel = 'noopener';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
+    sfx('studio.export');
     this.announce(`Saved ${name}`);
   }
 
@@ -737,6 +740,7 @@ class Studio {
         clearTimeout(this.fxTimer); this.fxTimer = window.setTimeout(() => this.fxCompose(), 250); return;
       case 'fxCaret': fxState.caret = el.value as Composition['caret']; this.fxCompose(); return;
       case 'fxTypo': fxState.params = { ...fxState.params, typo: el.checked }; this.fxCompose(); return;
+      case 'fxPen': fxState.params = { ...fxState.params, pen: el.checked }; this.fxCompose(); return;
       case 'fxSpeed': case 'fxDensity': {
         if (name === 'fxSpeed') fxState.speed = num; else fxState.density = num;
         const out = this.root.querySelector(`output[for="${name}"]`); if (out) out.textContent = this.fmt(name, num);
@@ -829,7 +833,9 @@ class Studio {
     r.querySelectorAll<HTMLElement>('[data-act="fx-deco"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === fxState.decoration)));
     r.querySelectorAll<HTMLElement>('[data-act="fx-pal"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === fxState.palette)));
     const seed = r.querySelector('.fx-seed'); if (seed) seed.textContent = String(fxState.seed);
-    r.querySelectorAll<HTMLElement>('.fx-caret-row').forEach(n => { n.hidden = fxState.typing !== 'typewriter'; });   // caret and typo only apply to the typewriter
+    r.querySelectorAll<HTMLElement>('.fx-caret-row').forEach(n => { n.hidden = fxState.typing !== 'typewriter'; });
+    r.querySelectorAll<HTMLElement>('.fx-pen-row').forEach(n => { n.hidden = fxState.typing !== 'handwriting'; });   // the pen only belongs to Real handwriting
+    const penBox = r.querySelector<HTMLInputElement>('[name="fxPen"]'); if (penBox) penBox.checked = fxState.params?.pen === true;   // caret and typo only apply to the typewriter
     const m3 = MATERIALS.find(m => m.id === (LEGACY_FILL[fxState.fill || 'solid'] || fxState.fill))?.shaded; r.querySelectorAll<HTMLElement>('.fx-3d').forEach(n => { n.hidden = !m3; });
   }
   /** how many sections start open: everything on a laptop, the first two on a tablet, only Themes on a phone */
@@ -1059,6 +1065,7 @@ const TEMPLATE = `
       <div class="fx-chips fx-typing" role="group" aria-label="How the words arrive"></div>
       <p class="hint fx-desc" data-desc="typing"></p>
       <label class="row check fx-caret-row"><input type="checkbox" name="fxTypo" checked><span>Make a typo and backspace it</span></label>
+    <label class="row check fx-pen-row"><input type="checkbox" name="fxPen"><span>Show the pen while it writes</span></label>
       <label class="row"><span>Speed</span><input type="range" name="fxSpeed" min="0.5" max="2" step="0.1" value="1"><output for="fxSpeed">1.0×</output></label>
     </div></section>
     <section class="fx-sec" data-sec="deco"><button type="button" class="fx-sec-h" data-act="fx-sec" aria-expanded="true"><span>Decoration</span><small class="fx-sum" data-sum="deco"></small><i aria-hidden="true"></i></button><div class="fx-sec-b">
