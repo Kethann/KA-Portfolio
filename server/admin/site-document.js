@@ -235,7 +235,9 @@ export function validateSiteDocument(input, current, seed){
     }
   }
   // loop: the default for every stack; loops: a stack's own choice (true or false), kept only for folders that exist
-  const stacks = { loop: input.stacks?.loop !== false, loops: {}, covers: {} };
+  const stacks = { loop: input.stacks?.loop !== false, loops: {}, covers: {}, featured: [] };
+  // featured: the stacks shown in About > Featured Work, in this order; the Portfolio below shows all the others (no stack twice)
+  if (Array.isArray(input.stacks?.featured)) for (const f of input.stacks.featured) if (typeof f === 'string' && folders.includes(f) && !stacks.featured.includes(f) && stacks.featured.length < 8) stacks.featured.push(f);
   if (input.stacks?.loops && typeof input.stacks.loops === 'object'){
     for (const [folder, v] of Object.entries(input.stacks.loops)) if (folders.includes(folder) && typeof v === 'boolean') stacks.loops[folder] = v;
   }

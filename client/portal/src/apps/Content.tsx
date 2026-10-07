@@ -355,7 +355,7 @@ function Portfolio(){
     if (!name || name === folder) return;
     if (doc!.folders.includes(name)) return toast.show('That folder already exists.', { tone: 'error' });
     updateSite(d => ({ ...d, folders: d.folders.map(f => f === folder ? name : f), images: d.images.map(i => i.cat === folder ? { ...i, cat: name } : i),
-      stacks: { ...d.stacks, covers: Object.fromEntries(Object.entries(d.stacks.covers).map(([k, v]) => [k === folder ? name : k, v])), loops: Object.fromEntries(Object.entries(d.stacks.loops || {}).map(([k, v]) => [k === folder ? name : k, v])) } }));
+      stacks: { ...d.stacks, featured: (d.stacks.featured || []).map(k => k === folder ? name : k), covers: Object.fromEntries(Object.entries(d.stacks.covers).map(([k, v]) => [k === folder ? name : k, v])), loops: Object.fromEntries(Object.entries(d.stacks.loops || {}).map(([k, v]) => [k === folder ? name : k, v])) } }));
     setFolder(name);
   };
   const removeFolder = async () => {
@@ -378,7 +378,7 @@ function Portfolio(){
         <div className="eyebrow" style={{ padding: '0 8px 6px' }}>Folders</div>
         {doc!.folders.map(f => (
           <button key={f} type="button" className={'folder-btn' + (f === folder ? ' on' : '')} aria-current={f === folder || undefined} onClick={() => setFolder(f)}>
-            <Icon name="archive" size={14} /><span className="truncate grow">{f}</span><span className="faint num">{doc!.images.filter(i => i.cat === f).length}</span>
+            <Icon name="archive" size={14} /><span className="truncate grow">{f}</span>{doc!.stacks.featured?.includes(f) && <span className="badge" title="Shown in About > Featured Work">★</span>}<span className="faint num">{doc!.images.filter(i => i.cat === f).length}</span>
           </button>
         ))}
         <div className="row" style={{ padding: 8, gap: 4 }}><input placeholder="New folder" value={newFolder} onChange={e => setNewFolder(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addFolder(); }} maxLength={70} aria-label="New folder name" />
@@ -429,6 +429,8 @@ function Portfolio(){
                 <button type="button" className="btn sm primary" onClick={() => setArchived(i.slug, false)}>Republish</button></div>
             </li>))}</ul>}
         </section>}
+        <Switch checked={!!doc!.stacks.featured?.includes(folder)} onChange={v => void updateSiteLive(d => { const cur = (d.stacks.featured || []).filter(x => d.folders.includes(x)); return { ...d, stacks: { ...d.stacks, featured: v ? [...cur.filter(x => x !== folder), folder] : cur.filter(x => x !== folder) } }; })
+          .then(live => toast.show(live ? 'Featured Work updated on the site' : 'Changed. Press Publish changes to put it live.', { tone: 'success' })).catch(toast.error)} label={`Show “${folder}” in About › Featured Work (it then leaves the Portfolio, so it never appears twice)`} />
         <Switch checked={doc!.stacks.loops?.[folder] ?? doc!.stacks.loop} onChange={v => updateSite(d => ({ ...d, stacks: { ...d.stacks, loops: { ...(d.stacks.loops || {}), [folder]: v } } }))} label={`“${folder}” loops around (coverflow)`} />
         <p className="field-hint" style={{ margin: 0 }}>This choice belongs to this stack only; every other stack keeps its own.</p>
       </div>

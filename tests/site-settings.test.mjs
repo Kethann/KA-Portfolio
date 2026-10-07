@@ -181,3 +181,10 @@ test('Image downloads are PNG unless the owner chooses JPEG', () => {
   assert.equal(validateSiteDocument({ ...base, visibility: { ...base.visibility, downloadFormat: 'jpeg' } }, seed, seed).visibility.downloadFormat, 'jpeg');
   assert.equal(validateSiteDocument({ ...base, visibility: { ...base.visibility, downloadFormat: 'webp' } }, seed, seed).visibility.downloadFormat, 'png', 'WebP is never offered');
 });
+
+test('Featured Work: a list of existing stacks, in order, no repeats', () => {
+  const base = structuredClone(seed); const [a, b] = base.folders;
+  const d = validateSiteDocument({ ...base, stacks: { loop: true, covers: {}, featured: [b, a, b, 'Nope', 7] } }, seed, seed);
+  assert.deepEqual(d.stacks.featured, [b, a]);
+  assert.deepEqual(validateSiteDocument({ ...base }, seed, seed).stacks.featured, []);
+});

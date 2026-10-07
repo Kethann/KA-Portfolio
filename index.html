@@ -6602,12 +6602,18 @@ var workPanels = [
   { id: 'work', el: portfolioCoverflowEl, handle: null, loading: false },
   { id: 'about', el: document.getElementById('about-work-stacks'), handle: null, loading: false }
 ];
+function kaPanelFolders(id, data){
+  var all = CATEGORIES.slice(), feat = ((data.stacks && data.stacks.featured) || []).filter(function(f){ return all.indexOf(f) !== -1; });
+  if (!feat.length) return all;
+  return id === 'about' ? feat : all.filter(function(f){ return feat.indexOf(f) === -1; });
+}
 function workStacksProps(id){
   var data = window.__kaLastPortfolioData || {};
   var pinned = [];
   try { pinned = POSTERS.filter(function(p){ return isPinned(p.slug); }).map(function(p){ return p.slug; }); } catch (e) {}
   return {
-    id: id, folders: CATEGORIES.slice(), images: POSTERS, stacks: data.stacks || { loop: true, covers: {} },
+    // About > Featured Work shows the featured stacks; the Portfolio shows the rest, so no stack appears twice
+    id: id, folders: kaPanelFolders(id, data), images: POSTERS, stacks: data.stacks || { loop: true, covers: {} },
     filter: id === 'work' ? favFilter : 'all',          // the ALL / PINNED chips filter the Portfolio panel only
     pinned: pinned, onPin: function(slug, on){ setPinned(slug, on); }   // setPinned fires ka-pins-changed, which re-renders
   };
