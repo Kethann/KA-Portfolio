@@ -784,7 +784,7 @@ footer.site-footer{
 .about-stat-label{ display:block; margin-top:10px; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10.5px;
   letter-spacing:0.14em; text-transform:uppercase; color:var(--ink-dim); }
 @media (max-width:1099px){ .about-bio-text{ margin-bottom:28px; } .about-stats{ margin-top:0; } }
-@media (max-width:520px){ .about-stats{ grid-template-columns:repeat(2, 1fr); } }
+@media (max-width:640px){ .about-stats{ grid-template-columns:minmax(0, 1fr); width:min(100%, 420px); margin-inline:auto; } }   /* phones: one tile per row, in order */
 /* wide screens: the numbers sit beside the headline, journey and bio (a 2 x 2 column on the right) instead of leaving
    that side empty; below 1100px they stay under the bio. If the owner switches them off, the bio takes the full width. */
 @media (min-width:1100px){
@@ -793,10 +793,10 @@ footer.site-footer{
   .about-wrap > .about-bio{ display:contents; }
   .about-bio > .about-headline{ grid-column:1; grid-row:1; }
   .about-bio > .about-tagline{ grid-column:1; grid-row:2; }
-  .about-bio > .about-caption{ grid-column:1; grid-row:3; }
-  .about-bio > .about-journey{ grid-column:1; grid-row:4; }
+  .about-bio > .about-caption{ grid-column:2; grid-row:4; align-self:end; justify-self:center; margin:0 0 14px; text-align:center; }   /* above the number tiles */
+  .about-bio > .about-journey{ grid-column:1; grid-row:4; justify-self:center; width:100%; }
   .about-bio > .about-bio-text{ grid-column:1; grid-row:5; min-width:0; }
-  .about-wrap > .about-stats{ grid-column:2; grid-row:5; align-self:center; width:auto; margin:0; grid-template-columns:repeat(2, minmax(0, 1fr)); }   /* beside the paragraph, in the space it leaves */
+  .about-wrap > .about-stats{ grid-column:2; grid-row:5; align-self:start; width:auto; margin:0; grid-template-columns:repeat(2, minmax(0, 1fr)); }   /* beside the paragraph, in the space it leaves */
   .about-wrap > .about-block:first-of-type{ grid-row:6; }
 }
 
