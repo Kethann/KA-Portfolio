@@ -770,11 +770,20 @@ footer.site-footer{
   backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur); overflow:hidden; }
 .about-stat::after{ content:""; position:absolute; left:18%; right:18%; bottom:0; height:2px; border-radius:2px;
   background:linear-gradient(90deg, transparent, rgba(255,148,56,.75), transparent); opacity:.7; }
+/* thin shiny gradient edge in the tile's own colours (glass white + the accent): a 1px ring cut out with a mask, its light slowly sliding round */
+.about-stat::before{ content:""; position:absolute; inset:0; border-radius:inherit; padding:1px; pointer-events:none;
+  background:linear-gradient(120deg, rgba(255,255,255,.34), rgba(255,148,56,.55) 28%, rgba(255,255,255,.06) 50%, rgba(255,148,56,.5) 72%, rgba(255,255,255,.34)) 0 0 / 220% 220%;
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); animation:statSheen 7s linear infinite; }
+.about-stat:nth-child(2)::before{ animation-delay:-1.7s; } .about-stat:nth-child(3)::before{ animation-delay:-3.5s; } .about-stat:nth-child(4)::before{ animation-delay:-5.2s; }
+@keyframes statSheen{ from{ background-position:0% 50%; } to{ background-position:220% 50%; } }
+@media (prefers-reduced-motion: reduce){ .about-stat::before{ animation:none; } }
 .about-stat-num{ display:block; font-family:var(--font-heading), ui-serif, Georgia, serif; font-weight:var(--heading-weight, 500);
   font-size:clamp(30px, 4.4vw, 48px); line-height:1; letter-spacing:-0.02em; color:var(--ink); font-variant-numeric:tabular-nums; }
 .about-stat-num .sfx{ color:var(--amber); margin-left:2px; }
 .about-stat-label{ display:block; margin-top:10px; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10.5px;
   letter-spacing:0.14em; text-transform:uppercase; color:var(--ink-dim); }
+@media (max-width:1099px){ .about-bio-text{ margin-bottom:28px; } .about-stats{ margin-top:0; } }
 @media (max-width:520px){ .about-stats{ grid-template-columns:repeat(2, 1fr); } }
 /* wide screens: the numbers sit beside the headline, journey and bio (a 2 x 2 column on the right) instead of leaving
    that side empty; below 1100px they stay under the bio. If the owner switches them off, the bio takes the full width. */
