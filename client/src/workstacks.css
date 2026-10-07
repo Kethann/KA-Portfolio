@@ -286,3 +286,7 @@
 @keyframes stackRollNext{from{transform:translate3d(46%,6px,0) rotate(9deg) scale(.92);opacity:.25}to{transform:none;opacity:1}}
 @keyframes stackRollPrev{from{transform:translate3d(-46%,6px,0) rotate(-9deg) scale(.92);opacity:.25}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.deck .front.roll-next,.deck .front.roll-prev{animation:none}}
+
+/* no visible scroll bars (scrolling still works by touch, wheel and keys) */
+*{ scrollbar-width:none; }
+*::-webkit-scrollbar{ width:0; height:0; display:none; }

@@ -48,6 +48,7 @@ class Studio {
   dpr = 1; scale = 1; offX = 0; offY = 0;
   current: Stroke | null = null; pointerId: number | null = null;
   sx = 0; sy = 0; lastX = 0; lastY = 0; lastT = 0; pressure = 0.6; hoverTimer = 0;
+  midX = 0; midY = 0; lastP = 0.6;   // the curve so far ends at (midX, midY); (lastX, lastY) is its next control point
   raf = 0; replay: { t0: number; items: Item[]; duration: number; record?: (p: number) => void; done?: () => void } | null = null;
   baked = new Set<number>(); animated = new Set<number>();
   opts: StudioOptions; cleanups: (() => void)[] = [];
@@ -198,7 +199,7 @@ class Studio {
     this.current = newStroke(kind, session.nextId++, s, now());
     this.pointerId = hover ? null : e.pointerId;
     const p = this.toWorld(e);
-    this.sx = p.x; this.sy = p.y; this.lastX = p.x; this.lastY = p.y; this.lastT = e.timeStamp; this.pressure = 0.6;
+    this.sx = p.x; this.sy = p.y; this.lastX = p.x; this.lastY = p.y; this.midX = p.x; this.midY = p.y; this.lastT = e.timeStamp; this.pressure = 0.6; this.lastP = 0.6;
     pushPoint(this.current, p.x, p.y, 0, this.pressureOf(e, 0));
     this.kick();
   }
@@ -212,16 +213,32 @@ class Studio {
   extend(e: PointerEvent){
     const st = this.current; if (!st) return;
     const p = this.toWorld(e);
-    const follow = 1 - Math.min(0.92, session.settings.smoothing * 0.9);   // stabilizer: lazy follow
+    // stabilizer (lazy follow): lighter on touch, where events are fewer and a heavy lag reads as stiff, straight lines
+    const k = e.pointerType === 'touch' ? 0.55 : 0.9;
+    const follow = 1 - Math.min(0.92, session.settings.smoothing * k);
     this.sx += (p.x - this.sx) * follow; this.sy += (p.y - this.sy) * follow;
     const dx = this.sx - this.lastX, dy = this.sy - this.lastY, dist = Math.hypot(dx, dy);
     if (dist < 0.6) return;
     const dt = Math.max(1, e.timeStamp - this.lastT);
-    pushPoint(st, this.sx, this.sy, now() - st.start, this.pressureOf(e, dist / dt));
+    const pr = this.pressureOf(e, dist / dt);
+    // A smooth curve, not straight segments: from the last midpoint, bending through the last point, to the new midpoint.
+    // Sampled every couple of pixels, so a phone that reports few touch points still draws a fluid freehand line.
+    const mx = (this.lastX + this.sx) / 2, my = (this.lastY + this.sy) / 2;
+    const len = Math.hypot(this.lastX - this.midX, this.lastY - this.midY) + Math.hypot(mx - this.lastX, my - this.lastY);
+    const steps = Math.max(1, Math.min(48, Math.ceil(len / (2.2 / Math.max(0.25, this.scale)))));
+    const t1 = now() - st.start;
+    for (let i = 1; i <= steps; i++){
+      const t = i / steps, a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, c = t * t;
+      pushPoint(st, a * this.midX + b * this.lastX + c * mx, a * this.midY + b * this.lastY + c * my, t1, this.lastP + (pr - this.lastP) * t);
+    }
+    this.midX = mx; this.midY = my; this.lastP = pr;
     this.lastX = this.sx; this.lastY = this.sy; this.lastT = e.timeStamp;
   }
   finish(){
-    const st = this.current; this.current = null; this.pointerId = null;
+    const st = this.current;
+    // the line ends where the finger was lifted, not where the stabilizer had got to
+    if (st && st.n > 0 && Math.hypot(this.lastX - this.midX, this.lastY - this.midY) > 0.6) pushPoint(st, this.lastX, this.lastY, now() - st.start, this.lastP);
+    this.current = null; this.pointerId = null;
     clearTimeout(this.hoverTimer);
     if (!st || st.n === 0) return;
     // shrink storage to what was used

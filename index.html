@@ -1018,7 +1018,7 @@ footer.site-footer{
 }
 html{overflow-x:clip;scroll-padding-top:110px;}
 #site-nav{
-  top:max(16px,env(safe-area-inset-top)); max-width:calc(100vw - 24px);
+  top:max(20px, calc(env(safe-area-inset-top, 0px) + 12px)); max-width:calc(100vw - 24px);
   background:linear-gradient(135deg,rgba(72,61,62,0.2990),rgba(20,18,23,0.4030));
   box-shadow:inset 0 1px 0 #ffffff40,inset 0 -1px 0 #afcfff18,0 12px 32px #00000040;
   isolation:isolate;
@@ -6868,6 +6868,7 @@ function focusSectionHeading(section){
 }
 // name: a page (contact / about / store / tips / gallery) or a section inside a page (portfolio).
 // focusTarget: move keyboard focus to the destination's heading (used by the menu).
+function kaCoarse(){ return !!(window.matchMedia && matchMedia("(pointer: coarse)").matches); }
 function switchSection(name, focusTarget){
   var page = navPage(name);
   var incoming = pageSections(page);
@@ -6921,7 +6922,7 @@ function switchSection(name, focusTarget){
     }
     var go = pendingScroll || { el:scrollTarget };
     sectionSwitching = false; pendingScroll = null;
-    go.el.scrollIntoView?.({ behavior:reducedMotion ? "instant" : "smooth", block:"start" });
+    go.el.scrollIntoView?.({ behavior:(reducedMotion || kaCoarse()) ? "instant" : "smooth", block:"start" });
     if (go.focus) focusSectionHeading(go.el);
     sectionTimer = setTimeout(function(){
       incoming.forEach(function(section){ section.classList.remove("fading-in"); });
@@ -10851,6 +10852,13 @@ html{ font-size:calc(100% * var(--text-scale, 1) * var(--screen-scale, 1)); }
 /* ============================================================ SWIPE BETWEEN PAGES (touch) == */
 /* sideways swipes from the sides of the screen switch pages here, so the browser must not also treat them as Back/Forward */
 html, body{ overscroll-behavior-x:none; }
+html, body, *{ scrollbar-width:none; -ms-overflow-style:none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar, *::-webkit-scrollbar{ width:0; height:0; display:none; background:transparent; }
+.ka-scroll-fade{ position:fixed; left:0; right:0; z-index:40; height:clamp(56px, 9vh, 96px); pointer-events:none; opacity:0; transition:opacity .35s ease; }
+.ka-scroll-fade.is-top{ top:0; background:radial-gradient(60% 100% at 50% 0%, rgba(255,170,110,.16), transparent 72%), linear-gradient(to bottom, rgba(6,6,10,.72), rgba(6,6,10,0)); }
+.ka-scroll-fade.is-bottom{ bottom:0; background:radial-gradient(60% 100% at 50% 100%, rgba(255,170,110,.18), transparent 72%), linear-gradient(to top, rgba(6,6,10,.78), rgba(6,6,10,0)); }
+.ka-scroll-fade.on{ opacity:1; }
+html.ka-studio-open .ka-scroll-fade, html.ka-modal-open .ka-scroll-fade{ opacity:0 !important; }
 /* the page only pans up and down natively, so a sideways drag is handed to the page swipe untouched (no vertical wobble while it follows the finger); pinch zoom stays */
 .site-section{ touch-action:pan-y pinch-zoom; }
 .edge-swipe-hint{ position:fixed; top:50%; z-index:120; display:flex; align-items:center; gap:10px; padding:8px 16px 8px 8px;
@@ -10883,6 +10891,13 @@ html, body{ overscroll-behavior-x:none; }
 @keyframes sectionOutRight{ from{ opacity:var(--swipe-o, 1); transform:translate3d(var(--swipe-x, 0px),0,0); } to{ opacity:0; transform:translate3d(calc(var(--swipe-x, 0px) + 9vw),0,0); } }
 @keyframes sectionInRight{ from{ opacity:0; transform:translate3d(9vw,0,0); } to{ opacity:1; transform:none; } }
 @keyframes sectionInLeft{ from{ opacity:0; transform:translate3d(-9vw,0,0); } to{ opacity:1; transform:none; } }
+/* touch screens: the new page fades in where it belongs; the old one fades out from wherever the finger left it */
+@media (pointer: coarse) and (prefers-reduced-motion: no-preference){
+  html[data-nav-dir] .site-section.fading-out{ animation:sectionFadeOut .2s ease forwards !important; }
+  html[data-nav-dir] .site-section.fading-in{ animation:sectionFadeIn .32s ease forwards !important; }
+}
+@keyframes sectionFadeOut{ from{ opacity:var(--swipe-o, 1); transform:translate3d(var(--swipe-x, 0px),0,0); } to{ opacity:0; transform:translate3d(var(--swipe-x, 0px),0,0); } }
+@keyframes sectionFadeIn{ from{ opacity:0; } to{ opacity:1; } }
 </style>
 <script>
 // ==================================================================== SWIPE BETWEEN PAGES ==
@@ -10905,7 +10920,7 @@ html, body{ overscroll-behavior-x:none; }
     return out;
   }
   function busy(){
-    if (root.classList.contains("ka-modal-open")) return true;
+    if (root.classList.contains("ka-modal-open") || root.classList.contains("ka-studio-open")) return true;
     var chat = document.getElementById("assistant-launcher");
     if (chat && chat.getAttribute("aria-expanded") === "true") return true;
     // any dialog that is actually showing (some stay in the page, invisible, while closed)
@@ -11035,6 +11050,25 @@ html, body{ overscroll-behavior-x:none; }
   document.addEventListener("visibilitychange", function(){ if (document.hidden) release(false); });
   // turning the device mid-swipe: drop the gesture so nothing is left half-moved
   window.addEventListener("orientationchange", function(){ release(false); });
+  // the scroll fades: shown only when there is more page above / below
+  (function(){
+    var top = document.createElement("div"), bot = document.createElement("div");
+    top.className = "ka-scroll-fade is-top"; bot.className = "ka-scroll-fade is-bottom";
+    top.setAttribute("aria-hidden", "true"); bot.setAttribute("aria-hidden", "true");
+    document.body.appendChild(top); document.body.appendChild(bot);
+    var queued = false;
+    function update(){
+      queued = false;
+      var y = window.scrollY || 0, max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      top.classList.toggle("on", y > 24);
+      bot.classList.toggle("on", max - y > 24);
+    }
+    function q(){ if (!queued){ queued = true; requestAnimationFrame(update); } }
+    window.addEventListener("scroll", q, { passive: true });
+    window.addEventListener("resize", q);
+    if (window.ResizeObserver) new ResizeObserver(q).observe(document.body);
+    q();
+  })();
   window.addEventListener("resize", function(){ if (s && s.decided) release(false); });
 })();
 </script>

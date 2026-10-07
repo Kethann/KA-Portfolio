@@ -427,3 +427,7 @@ select option:checked, select option:hover{ background:#ff9438; color:#1a0f05; }
   .dock-wrap.compact .dock-label{ display:none; }
   body.is-compact .toasts{ bottom:60px; }
 }
+
+/* no visible scroll bars (scrolling still works by touch, wheel and keys) */
+*{ scrollbar-width:none; }
+*::-webkit-scrollbar{ width:0; height:0; display:none; }

@@ -10,6 +10,7 @@ import { Modal, useConfirm, useFocusTrap, useToast } from '../ui';
 import { useDebounced, useLoad, usePref } from '../hooks';
 import { TZ } from '../format';
 import { useFullscreen } from './fullscreen';
+import { useRotation } from './rotate';
 import { ChartBar, ChatCircleText, DownloadSimple, Gauge, GearSix, GlobeHemisphereWest, Images, Lightbulb, Package, Palette as PaletteGlyph, Receipt, Scales, Ticket } from '@phosphor-icons/react';
 import type { Icon as PhIcon } from '@phosphor-icons/react';
 
@@ -91,6 +92,9 @@ export function MenuBar({ theme, setTheme, accent, setAccent, pulse, onPalette, 
   const desk = useDesk();
   const f = desk.focused;
   const openWins = desk.wins;
+  const toast = useToast();
+  const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;   // phones and tablets: the only screens that rotate
+  const rot = useRotation(async () => { if (!fs.active) await fs.toggle(); }, (text, ok) => toast.show(text, { tone: ok ? 'success' : 'info' }));
   return (
     <nav className="menubar" aria-label="Portal menu bar">
       <Menu label="KA Portal menu" className="mb-logo" button={<img src={logo} alt="" width={18} height={18} />} items={[
@@ -131,6 +135,9 @@ export function MenuBar({ theme, setTheme, accent, setAccent, pulse, onPalette, 
       <button type="button" className="mb-icon" onClick={() => desk.open('messages', 'inbox')} aria-label={`Messages, ${pulse?.newMessages || 0} new`} title="Messages">
         <Icon name="bell" size={15} />{pulse?.newMessages > 0 && <span className="mb-badge">{pulse.newMessages > 99 ? '99+' : pulse.newMessages}</span>}
       </button>
+      {touch && <button type="button" className={'mb-icon' + (rot.mode !== 'auto' ? ' is-on' : '')} onClick={() => void rot.next()}
+        aria-label={`Rotate screen: ${rot.mode === 'auto' ? 'follows the device' : rot.mode}. Tap to change`} title={rot.mode === 'auto' ? 'Rotate: auto (tap for landscape)' : rot.mode === 'landscape' ? 'Rotate: landscape (tap for portrait)' : 'Rotate: portrait (tap for auto)'}>
+        <Icon name="refresh" size={15} />{rot.mode !== 'auto' && <span className="mb-badge" aria-hidden="true">{rot.mode === 'landscape' ? 'L' : 'P'}</span>}</button>}
       {fs.available && <button type="button" className="mb-icon" onClick={() => void fs.toggle()} aria-label={fs.active ? 'Exit full screen' : 'Full screen'} aria-pressed={fs.active} title={fs.active ? 'Exit full screen' : 'Full screen'}>
         <Icon name={fs.active ? 'unmaximize' : 'maximize'} size={15} /></button>}
       <button type="button" className="mb-icon mb-search" onClick={onPalette} aria-label={`Search and commands (${MOD}+K)`} title={`Search (${MOD}+K)`}><Icon name="search" size={15} /></button>
