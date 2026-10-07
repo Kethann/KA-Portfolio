@@ -781,10 +781,14 @@ footer.site-footer{
 @media (min-width:1100px){
   .about-wrap{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(260px, 360px); column-gap:clamp(36px, 4vw, 72px); align-items:start; max-width:min(1320px, 94vw); }
   .about-wrap > *{ grid-column:1 / -1; }
-  .about-wrap > .about-bio{ grid-column:1; grid-row:1; min-width:0; }
-  .about-wrap > .about-stats{ grid-column:2; grid-row:1; align-self:center; width:auto; margin:0; grid-template-columns:repeat(2, minmax(0, 1fr)); }
-  .about-wrap:has(> .about-stats:not(.is-off)) > .about-bio{ grid-row:1 / span 2; }
-  .about-wrap > .about-block:first-of-type{ grid-row:2; }
+  .about-wrap > .about-bio{ display:contents; }
+  .about-bio > .about-headline{ grid-column:1; grid-row:1; }
+  .about-bio > .about-tagline{ grid-column:1; grid-row:2; }
+  .about-bio > .about-caption{ grid-column:1; grid-row:3; }
+  .about-bio > .about-journey{ grid-column:1; grid-row:4; }
+  .about-bio > .about-bio-text{ grid-column:1; grid-row:5; min-width:0; }
+  .about-wrap > .about-stats{ grid-column:2; grid-row:5; align-self:center; width:auto; margin:0; grid-template-columns:repeat(2, minmax(0, 1fr)); }   /* beside the paragraph, in the space it leaves */
+  .about-wrap > .about-block:first-of-type{ grid-row:6; }
 }
 
 /* ============================================================ IMAGE UPSCALER: coming-soon dialog only == */
@@ -1495,9 +1499,12 @@ html.ka-modal-open{ overflow:hidden; }
 
 /* ---- headline / bio ---- */
 .about-headline{
-  font-size:var(--step-3); line-height:1.08; margin:0 0 20px; max-width:16ch;
+  font-size:var(--step-3); line-height:1.08; margin:0 0 8px; max-width:none; white-space:normal;
   opacity:0; transform:translateY(18px);
 }
+ .about-tagline{ margin:0 0 10px; max-width:34ch; font-family:var(--font-sub), ui-serif, Georgia, serif; font-style:italic; font-weight:400;
+  font-size:clamp(1rem, .92rem + .55vw, 1.4rem); line-height:1.3; letter-spacing:0; color:rgba(237,235,232,.86); }
+.about-caption{ margin:0 0 26px; }
 .about-bio-text{
   font-size:var(--step-0); line-height:1.7; color:var(--ink-dim); max-width:62ch; margin:0 0 64px;
   opacity:0; transform:translateY(14px);
@@ -1517,14 +1524,16 @@ html.ka-modal-open{ overflow:hidden; }
 .about-block .gallery-head{ margin-bottom:28px; }
 
 /* ---- About: journey since a year (points on a line; fast, letter-by-letter text) ---- */
-.about-journey{ margin:0 0 34px; max-width:min(100%, 940px); }
+.about-journey{ margin:0 0 34px; max-width:min(100%, 940px); display:grid; grid-template-columns:auto minmax(0,1fr); column-gap:clamp(14px, 2vw, 24px); align-items:start; padding-top:12px; }
 .about-journey[hidden]{ display:none; }
 .journey-since{ display:inline-flex; align-items:baseline; gap:10px; padding:8px 18px 8px 16px; border-radius:999px;
   border:1px solid rgba(255,148,56,.38); background:linear-gradient(135deg, rgba(255,148,56,.16), rgba(255,148,56,.03));
   font-family:var(--font-mono, monospace); font-size:11px; letter-spacing:.24em; color:#ffd9b8;
   box-shadow:0 0 0 1px rgba(255,255,255,.03) inset, 0 8px 28px -12px rgba(255,148,56,.45); }
 .journey-since b{ font-size:20px; letter-spacing:.06em; font-weight:700; color:#fff; font-variant-numeric:tabular-nums; min-width:4ch; display:inline-block; }
-.journey-line{ list-style:none; margin:30px 0 0; padding:0 26px 0 0; display:grid; grid-template-columns:repeat(var(--n, 5), minmax(0,1fr)); position:relative; }
+.journey-since{ align-self:start; height:36px; margin-top:-11px; align-items:center; line-height:1; }
+.journey-since b{ line-height:1; }
+.journey-line{ list-style:none; margin:0; padding:0 26px 0 0; display:grid; grid-template-columns:repeat(var(--n, 5), minmax(0,1fr)); position:relative; }
 /* the track and its glowing fill; the line carries on past the last point and ends in an arrow, because the journey is not over */
 .journey-line::before, .journey-line::after{ content:""; position:absolute; top:6px; left:7px; right:8px; height:2px; border-radius:2px; }
 .journey-line::before{ background:linear-gradient(90deg, rgba(255,255,255,.18), rgba(255,255,255,.08) 72%, rgba(255,255,255,.04)); }
@@ -1569,6 +1578,8 @@ html.ka-modal-open{ overflow:hidden; }
 .journey-line li.now strong{ color:#fff; }
 .journey-line li:not(.on) strong, .journey-line li:not(.on) span.jt{ opacity:0; }
 @media (max-width:760px){
+  .about-journey{ grid-template-columns:1fr; padding-top:0; }
+  .journey-since{ margin:0 auto 18px; }
   .journey-line{ grid-template-columns:1fr; padding:0 0 30px 0; }
   .journey-line::before, .journey-line::after{ top:7px; bottom:8px; left:6px; right:auto; width:2px; height:auto; }
   .journey-line::before{ background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.05)); }
@@ -1835,7 +1846,8 @@ html.ka-modal-open{ overflow:hidden; }
 
   <div class="about-wrap">
     <div class="about-bio">
-      <h1 class="about-headline" id="about-headline">Kethan Artzz — Visual Storyteller for the Big Screen</h1>
+      <h1 class="about-headline" id="about-headline">Kethan Artzz</h1>
+      <p class="about-tagline" id="about-tagline">Visual Storyteller for the Big Screen</p>
       <p class="about-caption">IMAGINE &middot; CREATE &middot; EVOLVE</p>
       <div class="about-journey" id="about-journey" aria-label="My journey">
         <span class="journey-since"><span>SINCE</span><b id="journey-year">2021</b></span>
@@ -8570,7 +8582,9 @@ function applyPortfolioData(data){
   if (data.details){
     if(data.details.creatorName)document.title=data.details.creatorName+' · '+data.details.portfolioTitle;
     var aboutHeading=document.getElementById('about-headline');
-    if(aboutHeading&&data.details.creatorName)aboutHeading.textContent=data.details.creatorName+' — '+data.details.tagline;
+    if(aboutHeading&&data.details.creatorName)aboutHeading.textContent=data.details.creatorName;
+    var aboutTag=document.getElementById('about-tagline');
+    if(aboutTag&&data.details.tagline)aboutTag.textContent=data.details.tagline;
     var copyright=document.querySelector('.footer-copyright');
     if(copyright&&data.details.creatorName)copyright.textContent='© '+new Date().getFullYear()+' '+data.details.creatorName;
     if(data.details.contactButton)contactForm.querySelector('.contact-submit').textContent=data.details.contactButton;
@@ -8741,6 +8755,9 @@ function renderAboutStats(stats, projectCount){
   var box = document.getElementById("about-stats");
   if (!box) return;
   var items = stats && stats.enabled !== false && Array.isArray(stats.items) ? stats.items.filter(function(x){ return x && x.label; }) : [];
+  // fixed order: years, clients, projects, delivered (anything else follows, in the order it was given)
+  var rank = function(l){ l = String(l).toLowerCase(); return /year/.test(l) ? 0 : /client/.test(l) ? 1 : /project/.test(l) ? 2 : /deliver/.test(l) ? 3 : 4; };
+  items = items.map(function(x, i){ return { x: x, i: i, r: rank(x.label) }; }).sort(function(a, b){ return a.r - b.r || a.i - b.i; }).map(function(o){ return o.x; });
   box.hidden = !items.length;
   box.classList.toggle("is-off", !items.length);   // switched off: the bio takes the full width (see .about-wrap)
   var fmt = function(n){ try { return Math.round(n).toLocaleString("en-IN"); } catch(e){ return String(Math.round(n)); } };
@@ -8764,9 +8781,11 @@ function renderAboutStats(stats, projectCount){
   var state = window.__kaStats || (window.__kaStats = { box: null, queued: false, completed: false, running: false, frame: 0 });
   state.box = box; state.completed = false; state.running = false; state.frame++;
   var paint = function(p){
-    var eased = 1 - Math.pow(1 - p, 3);
+    // a gentle ease-out (not the steep cubic, which leapt several numbers per frame at the start); the text is only touched when the whole number changes
+    var eased = p >= 1 ? 1 : 1 - Math.pow(1 - p, 2.2);
     box.querySelectorAll(".about-stat-num > span:first-child").forEach(function(el){
-      el.textContent = fmt((Number(el.dataset.target) || 0) * eased);
+      var n = Math.round((Number(el.dataset.target) || 0) * eased);
+      if (el.__n !== n){ el.__n = n; el.textContent = fmt(n); }
     });
   };
   if (reduce){ state.completed = true; paint(1); return; }
@@ -8778,7 +8797,7 @@ function renderAboutStats(stats, projectCount){
     if (!r.height || r.bottom <= 0 || r.top >= vh){ if (state.completed || state.running){ state.frame++; state.running = false; state.completed = false; paint(0); } return; }
     if (state.completed || state.running) return;
     state.running = true;
-    var frame = state.frame, start = 0, duration = 900;
+    var frame = state.frame, start = 0, duration = 700;
     var step = function(now){
       if (frame !== state.frame || state.box !== b) return;
       if (!start) start = now || 1;
@@ -10607,7 +10626,7 @@ html{ font-size:calc(100% * var(--text-scale, 1) * var(--screen-scale, 1)); }
     letterSpan: 0.5,        // random reveal: how long (of the whole 0..1) each letter takes to unblur
     blurPx: 7,              // strength of the blur each letter starts from
     inkSelector: ".gallery-head h2, #contact-title, #about-headline, #portfolio-title, #skills-title, #reel-h, #store-title, #tips-title",
-    emergeSelector: ".gallery-head p, .fav-filter, #contact-intro, .about-caption, .about-bio-text, #portfolio-intro, #skills-intro, #skills-meta, #reel-intro, #store-intro, #tips-intro",
+    emergeSelector: ".gallery-head p, .fav-filter, #contact-intro, .about-caption, .about-tagline, .about-bio-text, #portfolio-intro, #skills-intro, #skills-meta, #reel-intro, #store-intro, #tips-intro",
     ghostLabelSelector: ".contact-form label",
     twoLineSelector: "#contact-intro",
     ghostBoxSelector: ".contact-form input:not(.hp-field), .contact-form textarea, .contact-form .contact-submit",

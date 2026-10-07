@@ -659,6 +659,13 @@ class Studio {
         case 'do-export': this.runExport(); break;
       }
     }) as EventListener);
+    // tapping the words on the stage edits them: focus the "Your words" box (always visible at the top of the panel)
+    this.on(this.$('.fx-stage'), 'click', (() => {
+      const ta = this.$('textarea[name="fxText"]') as HTMLTextAreaElement;
+      if (this.$('.panel[data-panel="fx"]').hidden) return;
+      ta.closest('.fx-dock')?.scrollTo({ top: 0, behavior: 'smooth' });
+      ta.focus({ preventScroll: true }); ta.select();
+    }) as EventListener);
     this.on(r, 'input', ((e: Event) => this.onControl(e.target as HTMLInputElement)) as EventListener);
     this.on(r, 'change', ((e: Event) => this.onControl(e.target as HTMLInputElement)) as EventListener);
     this.on(r, 'keydown', ((e: KeyboardEvent) => this.onKey(e)) as EventListener);
@@ -789,7 +796,7 @@ class Studio {
     this.$('[data-act="brush-menu"] .label').textContent = b.name;
     this.$('[data-act="brush-menu"]').setAttribute('aria-pressed', String(session.tool === 'brush'));
     this.$('[data-act="eraser"]').setAttribute('aria-pressed', String(session.tool === 'eraser'));
-    this.$('[data-act="text"]').setAttribute('aria-pressed', String(session.tool === 'text'));
+    this.root.querySelector('[data-act="text"]')?.setAttribute('aria-pressed', String(session.tool === 'text'));
     this.$('.text-options').hidden = session.tool !== 'text';
     this.root.querySelectorAll<HTMLElement>('.brush-opt').forEach(el => el.setAttribute('aria-checked', String(el.dataset.brush === session.settings.brush)));
     this.stage.dataset.tool = session.tool;
@@ -818,7 +825,7 @@ class Studio {
     const t = THEMES.find(x => x.id === id); if (!t) return;
     Object.assign(fxState, { theme: t.id, font: fontStack(t.font), typing: t.typing, decoration: t.decoration, palette: t.palette, scene: t.scene, finish: t.finish,
       fill: t.fill || 'solid', glow: t.glow ?? 0, depth: t.depth ?? 0.6, light: t.light ?? 225, camera: t.camera || 'drift',
-      look: t.look || (t.fill && t.fill !== 'solid' && t.fill !== 'gradient' && t.fill !== 'outline' ? '3d' : '2d'), textCase: t.textCase || 'as-typed', tracking: t.tracking ?? 0, speed: t.speed ?? 1, density: t.density ?? 0.6,
+      look: t.look || fxState.look || '2d', textCase: t.textCase || 'as-typed', tracking: t.tracking ?? 0, speed: t.speed ?? 1, density: t.density ?? 0.6,
       sceneIntensity: t.sceneIntensity ?? 0.6, caret: t.caret || 'bar', colors: {}, decoSize: 1, sceneSpeed: 1, finishAmount: 0.6 });
     if (!fxTextEdited) fxState.text = t.sample;
     this.fxSyncInputs(); this.fxCompose();
@@ -835,7 +842,7 @@ class Studio {
   fxSync(){
     const r = this.root;
     r.querySelectorAll<HTMLElement>('[data-act="fx-theme"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === fxState.theme)));
-    r.querySelectorAll<HTMLElement>('[data-act="fx-look"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === (fxState.look || '3d'))));
+    r.querySelectorAll<HTMLElement>('[data-act="fx-look"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === (fxState.look || '2d'))));
     const lh = r.querySelector('.fx-look-hint'); if (lh) lh.textContent = fxState.look === '2d' ? 'Flat illustration, crisp and light' : 'Lit materials, depth, real light';
     const base = PALETTES.find(p => p.id === fxState.palette) || PALETTES[0], pal = { ...base, ...fxState.colors };
     for (const k of ['bg', 'text', 'accent1', 'accent2', 'glow'] as const){ const el = r.querySelector<HTMLInputElement>(`[name="fxC_${k}"]`); if (el) el.value = pal[k]; }
@@ -856,7 +863,7 @@ class Studio {
   }
   /** how many sections start open: everything on a laptop, the first two on a tablet, only Themes on a phone */
   fxSections(){
-    const dev = this.$('.studio').dataset.device || 'laptop', keep = dev === 'laptop' ? 99 : dev === 'tablet' ? 2 : 1;
+    const dev = this.$('.studio').dataset.device || 'laptop', keep = dev === 'laptop' ? 99 : dev === 'tablet' ? 3 : 2;
     this.root.querySelectorAll<HTMLElement>('.fx-sec').forEach((sec, i) => { const open = i < keep; sec.classList.toggle('is-shut', !open); sec.querySelector('.fx-sec-h')?.setAttribute('aria-expanded', String(open)); });
   }
   toggleFx(trigger: HTMLElement){
@@ -993,7 +1000,6 @@ class Studio {
     if (/^[0-9]$/.test(k)){ const i = (Number(k) + 9) % 10; this.setBrush(BRUSHES[i].id); }
     else if (k === 'b') this.setTool('brush');
     else if (k === 'e') this.setTool('eraser');
-    else if (k === 't') this.setTool('text');
     else if (k === 'l') this.toggleTrail();
     else if (k === '[') { s.size = Math.max(1, s.size - (s.size > 10 ? 2 : 1)); this.syncControls(); }
     else if (k === ']') { s.size = Math.min(80, s.size + (s.size >= 10 ? 2 : 1)); this.syncControls(); }
@@ -1060,13 +1066,13 @@ const TEMPLATE = `
 <div class="topbar"><div class="tb-history" role="group" aria-label="History"></div><div class="tb-hide"></div></div>
   <div class="panel fx-panel fx-dock" data-panel="fx" hidden aria-label="Text effects">
     <div class="fx-look" role="group" aria-label="Look"><span>Look</span><button type="button" class="fx-look-b" data-act="fx-look" data-v="2d" aria-pressed="true">2D</button><button type="button" class="fx-look-b" data-act="fx-look" data-v="3d" aria-pressed="false">3D</button><small class="fx-look-hint">Flat illustration, crisp and light</small></div>
+    <label class="fx-field fx-words"><span>Your words <em>tap the text on screen to edit it</em></span><textarea name="fxText" rows="2" maxlength="120" enterkeyhint="done" autocapitalize="sentences" aria-label="Your words"></textarea></label>
     <section class="fx-sec" data-sec="themes"><button type="button" class="fx-sec-h" data-act="fx-sec" aria-expanded="true"><span>Themes</span><small class="fx-sum" data-sum="themes"></small><i aria-hidden="true"></i></button><div class="fx-sec-b">
       <div class="fx-tabs" role="group" aria-label="Theme groups"></div>
       <div class="fx-themes"></div>
       <p class="hint fx-theme-hint">A theme sets everything below at once. Change any part after.</p>
     </div></section>
     <section class="fx-sec" data-sec="text"><button type="button" class="fx-sec-h" data-act="fx-sec" aria-expanded="true"><span>Text &amp; font</span><small class="fx-sum" data-sum="text"></small><i aria-hidden="true"></i></button><div class="fx-sec-b">
-      <label class="fx-field"><span>Your words</span><textarea name="fxText" rows="2" maxlength="120"></textarea></label>
       <div class="fx-two">
         <label class="fx-field"><span>Font</span><select name="fxFont"></select></label>
         <label class="fx-field"><span>Material</span><select name="fxFill"><optgroup label="Flat"><option value="solid">Flat colour</option><option value="gradient">Gradient</option><option value="outline">Outline</option></optgroup><optgroup label="3D, lit"><option value="chrome">Chrome</option><option value="gold">Gold</option><option value="rosegold">Rose gold</option><option value="steel">Brushed steel</option><option value="glass">Glass</option><option value="ice">Ice</option><option value="neon">Neon tube</option><option value="lava">Lava</option><option value="stone">Stone</option><option value="carved">Carved stone</option><option value="marble">Marble</option><option value="bone">Bone</option><option value="candy">Glossy candy</option><option value="foil">Foil balloon</option><option value="extrude">Block extrude</option><option value="emboss">Letterpress</option><option value="satin">Satin</option></optgroup></select></label>
@@ -1226,7 +1232,6 @@ const TEMPLATE = `
     <div class="group">
       <button type="button" data-act="brush-menu" aria-haspopup="menu" aria-expanded="false" aria-pressed="true" title="Brushes (1–0)">${icon(I.pen)}<span class="label">Round pen</span></button>
       <button type="button" data-act="eraser" aria-pressed="false" aria-label="Eraser (E)" title="Eraser (E)">${icon(I.eraser)}</button>
-      <button type="button" data-act="text" aria-pressed="false" aria-label="Text (T)" title="Text (T)">${icon(I.text)}</button>
       <button type="button" data-act="trail" aria-pressed="false" title="Fading cursor trail (L)">${icon(I.trail)}<span class="label">Trail</span></button>
     </div>
     <div class="group colors">
