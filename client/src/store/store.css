@@ -378,3 +378,14 @@ div.kas-lb-img{ width:min(80vw, 600px); aspect-ratio:4/5; }
 @media (pointer:coarse){ .kas-filterbar .kas-chip, .kas-filterbar .kas-sort select{ min-height:40px; } }
 /* small screens: a slimmer switch, so it fits beside the page title */
 @media (max-width:520px){ .kas-seg{ min-width:0; } .kas-seg-btn{ padding:0 14px; letter-spacing:.06em; } }
+/* the filter bar never widens the page (the sort menu used to size itself to its longest option, which differs
+   between Artzz and Artifacts, so the page width, and the phone's zoom, changed when switching tabs) */
+.kas-filterbar, .kas-fb-group, .kas-fb-end, .kas-filterbar .kas-sort{ min-width:0; max-width:100%; }
+@media (max-width:640px){
+  .kas-store{ min-width:0; max-width:100%; overflow-x:clip; }
+  .kas-fb-end{ display:grid; grid-template-columns:minmax(0, 1fr) auto; align-items:center; gap:8px; width:100%; }
+  .kas-filterbar .kas-sort{ display:block; width:100%; }
+  .kas-filterbar .kas-sort select{ width:100%; max-width:none; min-width:0; text-overflow:ellipsis; }
+  .kas-filterbar .kas-currency{ flex:none; }
+  .kas-filterbar .kas-cur-btn{ min-width:0; padding:0 10px; }
+}
