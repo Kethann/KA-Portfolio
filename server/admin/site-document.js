@@ -85,7 +85,7 @@ export const SKILLS_DEFAULT = {
       sk('Email (SMTP)', '@', '#9AA3AF', 3, 'Receipts, alerts and auto-replies'), sk('ipstack', 'IP', '#38BDF8', 3, 'IP geolocation for visitor insights') ] },
     { name: 'DevOps & tools', icon: 'tools', items: [
       sk('Docker', 'Dk', '#2496ED', 3, 'Containers, images and compose setups'), sk('Kubernetes', 'K8', '#326CE5', 2, 'Deployments, services and scaling'),
-      sk('CI/CD pipelines', 'CI', '#22C55E', 3, 'Automated build, test and deploy'), sk('Linux', 'Lx', '#FCC624', 3, 'Shell, servers and administration'),
+      sk('CI/CD pipelines', 'CI', '#22C55E', 3, 'Automated build, test and deploy'), sk('Playwright', 'Pw', '#45BA4B', 3, 'End-to-end browser testing across Chromium, Firefox and WebKit'), sk('Linux', 'Lx', '#FCC624', 3, 'Shell, servers and administration'),
       sk('Networking', 'Nw', '#38BDF8', 3, 'TCP/IP, DNS, HTTP and routing'), sk('Git', 'Gt', '#F05032', 4, 'Version control, branching and merges'),
       sk('GitHub', 'GH', '#E6EDF3', 4, 'Repositories, pull requests and Actions'),
       sk('Cloudflared', 'Cf', '#F38020', 3, 'Secure tunnels from local servers to the web') ] },
@@ -130,7 +130,7 @@ function httpUrl(u){ try { return ['https:', 'http:'].includes(new URL(u).protoc
 // `current` is the stored document, `seed` the shipped one: an image without its own upload must be
 // one of the site's exported originals (known widths), found in either.
 /** skills added to sites that already have their own list (once each, by name; see handlers/public.js) */
-export const SKILLS_ADDITIONS = { id: 'skills-2026-10i',
+export const SKILLS_ADDITIONS = { id: 'skills-2026-10j',
   categories: [
     { name: 'Design', icon: 'design', items: SKILLS_DEFAULT.categories.find(c => c.name === 'Design').items.filter(i => i.name === 'Blender') },
     SKILLS_DEFAULT.categories.find(c => c.name === 'DevOps & tools'),

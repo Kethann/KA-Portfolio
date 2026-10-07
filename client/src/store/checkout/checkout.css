@@ -321,3 +321,16 @@
 .kco-back::after{ z-index:6; }
 
 .kco-back-grid{ position:relative; z-index:2; }
+
+/* ---- flip fix: only ever one face of a card is visible ----
+   backdrop-filter children (the "Instant download" tag, the bottom strip) escape their parent's backface-visibility on
+   many GPUs, so the front showed through, mirrored, on the back. The face that is turned away is now also hidden
+   outright, swapped at the half-way point of the turn, and every child hides its own back as well. */
+.kco-face *, .kdp-face *{ -webkit-backface-visibility:hidden; backface-visibility:hidden; }
+.kco-front, .kdp-front{ visibility:visible; transition:visibility 0s linear .32s; }
+.kco-back, .kdp-back{ visibility:hidden; transition:visibility 0s linear .32s; }
+.kco-card.is-flipped .kco-front, .kdp-card.is-flipped .kdp-front{ visibility:hidden; }
+.kco-card.is-flipped .kco-back, .kdp-card.is-flipped .kdp-back{ visibility:visible; }
+@media (prefers-reduced-motion: reduce){
+  .kco-front, .kco-back, .kdp-front, .kdp-back{ transition:none; }
+}

@@ -17,7 +17,7 @@ test('the new skills are added once, only what is missing, each with a logo, in 
   assert.deepEqual(cat('Backend'), ['Node.js', 'Render', 'Netlify'], 'Render and Netlify moved to Backend');
   assert.equal(after.skills.categories.find(c => c.name === 'Backend').items[1].note, 'mine', 'a moved skill keeps the owner edits');
   assert.deepEqual(cat('Database'), ['Cloudflare D1', 'Cloudflare R2']);
-  assert.deepEqual(cat('DevOps & tools'), ['docker', 'Kubernetes', 'CI/CD pipelines', 'Linux', 'Networking', 'Git', 'GitHub', 'Cloudflared'], 'Docker was already there (any case): not added twice');
+  assert.deepEqual(cat('DevOps & tools'), ['docker', 'Kubernetes', 'CI/CD pipelines', 'Playwright', 'Linux', 'Networking', 'Git', 'GitHub', 'Cloudflared'], 'Docker was already there (any case): not added twice');
   assert.deepEqual(cat('Robotics'), ['ROS', 'RViz', 'Model training', 'Inference', 'Validation', 'Datasets', 'Vision-based navigation'], 'ROS leads Robotics');
   assert.deepEqual(cat('Design'), ['Blender']);
   for (const i of after.skills.categories.flatMap(c => c.items).filter(i => i.color)) assert.ok(skillLogoFor(i), `${i.name} has a logo`);
