@@ -63,11 +63,15 @@ Written for this site (client/src/lib/sound/synth.ts); no third-party audio invo
 |---|---|
 | synth:glass | a clear crystal tink with a faint sparkle (taps) |
 | synth:frost | a tiny icy crackle (ticks, small controls) |
+| synth:bloom | two gentle rising notes (opening, page change) |
+| synth:fold | the same notes falling (closing) |
+| synth:glide | one soft note bending upward (next / previous) |
+| synth:pad | a slow warm chord (intro) |
 | synth:air | a soft breath of moving air |
 | synth:swish | a shorter, lighter air movement |
 | synth:drift | a slow wash of air with a faint glimmer (intro) |
-| synth:gather | tiny glints rising out of air (intro particles) |
-| synth:assemble | a warm low swell with a clear glass tone (KA assembled) |
+| synth:gather | soft glints rising one after another (intro particles) |
+| synth:assemble | a warm low swell with a clear bell on top (KA assembled) |
 | synth:shimmer | one faint glint (particles) |
 | synth:tap | a soft round tap |
 | synth:tick | a tiny dry tick |

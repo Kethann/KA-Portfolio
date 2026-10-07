@@ -8,6 +8,10 @@
 //   shimmer  one faint glint (particles)
 //   glass    a clear crystal "tink" with a faint sparkle after it (taps, nav: made for the frozen-glass look)
 //   frost    a tiny icy crackle (ticks, small controls)
+//   bloom    two gentle notes rising (opening, page change)
+//   fold     the same notes falling (closing)
+//   glide    one soft note bending upward (next / previous)
+//   pad      a slow warm chord (the intro)
 //   tap      a soft round tap
 //   tick     a tiny, dry tick (dragging the nav)
 //   chime    two gentle notes rising (success)
@@ -52,20 +56,43 @@ const GENS: Record<string, Gen> = {
     for (let k = 0; k < 5; k++) tone(out, sr, 0.7 + k * 0.42 + r() * 0.2, 2200 + r() * 1400, 0.035, 5 + r() * 3);   // faint glimmer far away
     return fade(out, sr, 30);
   },
-  gather: (sr, r) => {
-    const dur = 1.5, out = airNoise(sr, dur, r, u => 700 + 2600 * u, 1.3, u => bell(u, 0.75) * 0.6);
-    normalise(out, 0.25);
-    for (let k = 0; k < 9; k++){ const at = 0.1 + (k / 9) * 1.1 + r() * 0.06; tone(out, sr, at, 2000 + k * 160 + r() * 300, 0.07 + k * 0.006, 9 + r() * 4, { partials: [[1, 1], [2.01, 0.25]] }); }
-    return fade(normalise(out, 0.5), sr, 10);
+  gather: (sr, r) => {   // soft glints rising one after another (no noise)
+    const out = new Float32Array(Math.floor(sr * 1.6));
+    for (let k = 0; k < 7; k++){ const at = 0.05 + k * 0.16 + r() * 0.04; tone(out, sr, at, [1318.5, 1568, 1760, 1975.5, 2349.3, 2637, 3136][k], 0.12 + k * 0.01, 7, { attack: 0.012, partials: [[1, 1], [2, 0.08]] }); }
+    return fade(normalise(out, 0.45), sr, 12);
   },
-  assemble: (sr, r) => {
-    const dur = 2.2, out = new Float32Array(Math.floor(sr * dur));
-    tone(out, sr, 0, 98, 0.5, 1.4, { attack: 0.28, partials: [[1, 1], [1.5, 0.35], [2, 0.18]] });   // warm low swell
-    tone(out, sr, 0.16, 1318.5, 0.16, 2.4, { attack: 0.006, partials: [[1, 1], [2.76, 0.18], [5.4, 0.05]] });   // the clear glass tone
-    tone(out, sr, 0.2, 1975.5, 0.08, 3.2, { partials: [[1, 1], [2.76, 0.12]] });
-    const tail = airNoise(sr, dur, r, u => 1800 - 1200 * u, 1.5, u => (u < 0.08 ? u / 0.08 : Math.exp(-(u - 0.08) * 5)) * 0.18);
-    for (let i = 0; i < out.length; i++) out[i] += tail[i] * 0.6;
-    return fade(normalise(out, 0.6), sr, 20);
+  assemble: (sr) => {   // a warm low swell with a clear bell on top, settling (no noise)
+    const dur = 2.4, out = new Float32Array(Math.floor(sr * dur));
+    tone(out, sr, 0, 110, 0.45, 1.3, { attack: 0.35, partials: [[1, 1], [1.5, 0.3], [2, 0.15]] });
+    tone(out, sr, 0.18, 880, 0.2, 2.2, { attack: 0.02, partials: [[1, 1], [2, 0.1], [3, 0.03]] });
+    tone(out, sr, 0.26, 1318.5, 0.14, 2.6, { attack: 0.02, partials: [[1, 1], [2, 0.06]] });
+    tone(out, sr, 0.34, 1760, 0.08, 3, { attack: 0.02 });
+    return fade(normalise(out, 0.55), sr, 25);
+  },
+  bloom: (sr) => {   // two gentle notes rising: something opens
+    const out = new Float32Array(Math.floor(sr * 0.75));
+    tone(out, sr, 0, 784, 0.4, 6, { attack: 0.014, partials: [[1, 1], [2, 0.12], [3, 0.03]] });
+    tone(out, sr, 0.065, 1174.7, 0.32, 6.5, { attack: 0.014, partials: [[1, 1], [2, 0.08]] });
+    return fade(normalise(out, 0.45), sr, 8);
+  },
+  fold: (sr) => {   // the same two notes falling: something closes
+    const out = new Float32Array(Math.floor(sr * 0.65));
+    tone(out, sr, 0, 1174.7, 0.3, 7, { attack: 0.012, partials: [[1, 1], [2, 0.08]] });
+    tone(out, sr, 0.06, 784, 0.36, 7.5, { attack: 0.012, partials: [[1, 1], [2, 0.12]] });
+    return fade(normalise(out, 0.4), sr, 8);
+  },
+  glide: (sr) => {   // one soft note bending slightly upward: next / previous
+    const n = Math.floor(sr * 0.28), out = new Float32Array(n); let ph = 0;
+    for (let i = 0; i < n; i++){ const t = i / sr, f = 880 * (1 + 0.07 * (1 - Math.exp(-t * 18))), e = Math.min(1, t / 0.01) * Math.exp(-t * 14);
+      ph += TAU * f / sr; out[i] = (Math.sin(ph) + 0.1 * Math.sin(ph * 2)) * e; }
+    return fade(normalise(out, 0.4), sr, 4);
+  },
+  pad: (sr) => {   // a slow, warm chord with a gentle shimmer: the intro while the shards fly
+    const dur = 3.6, n = Math.floor(sr * dur), out = new Float32Array(n);
+    const notes = [220, 329.6, 440, 554.4];
+    notes.forEach((f, k) => { let ph = 0; for (let i = 0; i < n; i++){ const t = i / sr, u = t / dur, env = Math.sin(Math.PI * Math.min(1, u)) ** 1.5;
+      ph += TAU * f * (1 + 0.003 * Math.sin(TAU * (4.5 + k * 0.4) * t)) / sr; out[i] += Math.sin(ph) * env * (0.32 - k * 0.05); } });
+    return fade(normalise(out, 0.4), sr, 40);
   },
   shimmer: (sr, r) => { const out = new Float32Array(Math.floor(sr * 0.32)); const f = 2600 + r() * 600; tone(out, sr, 0, f, 0.5, 14, { partials: [[1, 1], [1.5, 0.35], [2.01, 0.2]] }); return fade(normalise(out, 0.45), sr, 3); },
   glass: (sr, r) => {
