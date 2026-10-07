@@ -776,6 +776,16 @@ footer.site-footer{
 .about-stat-label{ display:block; margin-top:10px; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10.5px;
   letter-spacing:0.14em; text-transform:uppercase; color:var(--ink-dim); }
 @media (max-width:520px){ .about-stats{ grid-template-columns:repeat(2, 1fr); } }
+/* wide screens: the numbers sit beside the headline, journey and bio (a 2 x 2 column on the right) instead of leaving
+   that side empty; below 1100px they stay under the bio. If the owner switches them off, the bio takes the full width. */
+@media (min-width:1100px){
+  .about-wrap{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(260px, 360px); column-gap:clamp(36px, 4vw, 72px); align-items:start; max-width:min(1320px, 94vw); }
+  .about-wrap > *{ grid-column:1 / -1; }
+  .about-wrap > .about-bio{ grid-column:1; grid-row:1; min-width:0; }
+  .about-wrap > .about-stats{ grid-column:2; grid-row:1; align-self:center; width:auto; margin:0; grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  .about-wrap:has(> .about-stats:not(.is-off)) > .about-bio{ grid-row:1 / span 2; }
+  .about-wrap > .about-block:first-of-type{ grid-row:2; }
+}
 
 /* ============================================================ IMAGE UPSCALER: coming-soon dialog only == */
 #upscaler-modal{ position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; padding:24px; }
@@ -8732,6 +8742,7 @@ function renderAboutStats(stats, projectCount){
   if (!box) return;
   var items = stats && stats.enabled !== false && Array.isArray(stats.items) ? stats.items.filter(function(x){ return x && x.label; }) : [];
   box.hidden = !items.length;
+  box.classList.toggle("is-off", !items.length);   // switched off: the bio takes the full width (see .about-wrap)
   var fmt = function(n){ try { return Math.round(n).toLocaleString("en-IN"); } catch(e){ return String(Math.round(n)); } };
   box.replaceChildren.apply(box, items.map(function(x){
     var tile = document.createElement("div"); tile.className = "about-stat"; tile.setAttribute("role", "listitem");
