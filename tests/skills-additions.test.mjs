@@ -18,7 +18,7 @@ test('the new skills are added once, only what is missing, each with a logo, in 
   assert.equal(after.skills.categories.find(c => c.name === 'Backend').items[1].note, 'mine', 'a moved skill keeps the owner edits');
   assert.deepEqual(cat('Database'), ['Cloudflare D1', 'Cloudflare R2']);
   assert.deepEqual(cat('DevOps & tools'), ['docker', 'Kubernetes', 'CI/CD pipelines', 'Linux', 'Networking', 'Git', 'GitHub', 'Cloudflared'], 'Docker was already there (any case): not added twice');
-  assert.deepEqual(cat('Robotics'), ['ROS', 'RViz'], 'ROS leads Robotics');
+  assert.deepEqual(cat('Robotics'), ['ROS', 'RViz', 'Model training', 'Inference', 'Validation', 'Datasets', 'Vision-based navigation'], 'ROS leads Robotics');
   assert.deepEqual(cat('Design'), ['Blender']);
   for (const i of after.skills.categories.flatMap(c => c.items).filter(i => i.color)) assert.ok(skillLogoFor(i), `${i.name} has a logo`);
   assert.equal(after.skillsAdded, SKILLS_ADDITIONS.id);
@@ -29,7 +29,7 @@ test('RViz joins an existing Robotics category instead of making a second one', 
   const after = addSkills(site([{ name: 'robotics', icon: 'tools', items: [{ name: 'ROS' }] }]));
   const robotics = after.skills.categories.filter(c => c.name.toLowerCase() === 'robotics');
   assert.equal(robotics.length, 1);
-  assert.deepEqual(robotics[0].items.map(i => i.name), ['ROS', 'RViz'], 'ROS first, RViz added after it');
+  assert.deepEqual(robotics[0].items.map(i => i.name), ['ROS', 'RViz', 'Model training', 'Inference', 'Validation', 'Datasets', 'Vision-based navigation'], 'ROS first, the rest added after it');
 });
 
 test('nothing missing means no change, and a portal save marks the additions as done', async () => {

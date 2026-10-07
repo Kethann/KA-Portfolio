@@ -90,12 +90,13 @@ export const SKILLS_DEFAULT = {
     { name: 'Robotics', icon: 'tools', items: [
       sk('ROS', 'ROS', '#8FA8CC', 3, 'Robot Operating System nodes, topics and tooling'),
       sk('RViz', 'RV', '#5FB3E4', 3, 'Visualising robot models, sensors and maps in 3D'),
+      sk('Model training', 'Mt', '#C792FF', 3, 'Training robot perception and control models'), sk('Inference', 'If', '#7FD4FF', 3, 'Running trained models on the robot in real time'),
+      sk('Validation', 'Va', '#4FD08A', 3, 'Testing models against held-out data and real runs'), sk('Datasets', 'Ds', '#F5C451', 3, 'Collecting, labelling and curating training data'),
+      sk('Vision-based navigation', 'Vn', '#FFB347', 3, 'Camera-driven models that guide a robot'),
       sk('Sensor integrations', 'Se', '#7FD4FF', 3, 'Wiring, reading and calibrating robot sensors'),
-      sk('Arduino Nano', 'An', '#00A3AD', 3, 'Compact microcontroller builds and firmware'),
-      sk('Vision-based navigation models', 'Vn', '#FFB347', 3, 'Camera-driven models that guide a robot') ] },
+      sk('Arduino Nano', 'An', '#00A3AD', 3, 'Compact microcontroller builds and firmware') ] },
     { name: 'Data & ML', icon: 'ai', items: [
       sk('Power BI', 'BI', '#F2C811', 3, 'Dashboards and reports from live data'),
-      sk('Model training', 'Mt', '#C792FF', 3, 'Training and evaluating machine-learning models'),
       sk('NumPy', 'Np', '#4DABCF', 3, 'Arrays and numerical computing'), sk('pandas', 'Pd', '#E70488', 3, 'Tables, cleaning and analysis'),
       sk('Matplotlib', 'Mp', '#4C9BE8', 3, 'Charts and plots'), sk('OpenCV', 'Cv', '#5C3EE8', 3, 'Computer vision and image processing'),
       sk('scikit-learn', 'Sk', '#F7931E', 3, 'Classic machine learning'), sk('TensorFlow', 'Tf', '#FF6F00', 3, 'Neural networks and training'),
@@ -127,7 +128,7 @@ function httpUrl(u){ try { return ['https:', 'http:'].includes(new URL(u).protoc
 // `current` is the stored document, `seed` the shipped one: an image without its own upload must be
 // one of the site's exported originals (known widths), found in either.
 /** skills added to sites that already have their own list (once each, by name; see handlers/public.js) */
-export const SKILLS_ADDITIONS = { id: 'skills-2026-10g',
+export const SKILLS_ADDITIONS = { id: 'skills-2026-10i',
   categories: [
     { name: 'Design', icon: 'design', items: SKILLS_DEFAULT.categories.find(c => c.name === 'Design').items.filter(i => i.name === 'Blender') },
     SKILLS_DEFAULT.categories.find(c => c.name === 'DevOps & tools'),
@@ -138,11 +139,11 @@ export const SKILLS_ADDITIONS = { id: 'skills-2026-10g',
     { name: 'Python libraries', icon: 'languages', items: SKILLS_DEFAULT.categories.find(c => c.name === 'Data & ML').items.filter(i => ['NumPy', 'pandas', 'Matplotlib', 'OpenCV', 'scikit-learn', 'TensorFlow', 'PyTorch', 'Flask'].includes(i.name)) },
     { name: 'Frontend', icon: 'frontend', items: SKILLS_DEFAULT.categories.find(c => c.name === 'Frontend').items.filter(i => i.name === 'Streamlit') },
     { name: 'Database', icon: 'database', items: SKILLS_DEFAULT.categories.find(c => c.name === 'Database').items.filter(i => i.name === 'Cloudflare R2') },
-    { ...SKILLS_DEFAULT.categories.find(c => c.name === 'Robotics'), items: SKILLS_DEFAULT.categories.find(c => c.name === 'Robotics').items.filter(i => ['ROS', 'RViz'].includes(i.name)) },
+    { ...SKILLS_DEFAULT.categories.find(c => c.name === 'Robotics'), items: SKILLS_DEFAULT.categories.find(c => c.name === 'Robotics').items.filter(i => ['ROS', 'RViz', 'Model training', 'Inference', 'Validation', 'Datasets', 'Vision-based navigation'].includes(i.name)) },
   ],
   // skills that belong in another category (moved, keeping the owner's edits), and names that lead their category
   moves: [{ names: ['Render', 'Netlify'], to: 'Backend' }],
-  first: [{ category: 'Robotics', names: ['ROS', 'RViz'] }],
+  first: [{ category: 'Robotics', names: ['ROS', 'RViz', 'Model training', 'Inference', 'Validation', 'Datasets', 'Vision-based navigation'] }],
 };
 
 export function validateSiteDocument(input, current, seed){
