@@ -86,7 +86,7 @@ function StackGrid({id,stacks,reduced,onOpen}:{id:string;stacks:Stack[];reduced:
     const g=sw.current;if(!g||g.id!==e.pointerId)return;sw.current=null;
     const deck=g.el.querySelector<HTMLElement>('.deck');if(deck){deck.style.transition='';deck.style.translate='';deck.style.rotate='';}
     const dx=e.clientX-g.x;
-    if(g.moved){suppress.current=performance.now()+400;if(e.type==='pointerup'&&Math.abs(dx)>36&&count>1)roll(g.name,dx<0?1:-1);}
+    if(g.moved){suppress.current=performance.now()+400;if(e.type==='pointerup'&&Math.abs(dx)>36&&count>1){roll(g.name,dx<0?1:-1);sfx('stack.roll',{rate:dx<0?1.04:0.96});}}
   };
   // Magnetic pull: covers near the cursor lean toward it (tilt in 3D, lift, fan their card edges), eased every frame.
   // Only the inner deck moves (transform + custom properties), so it never fights the entrance animation.
@@ -555,7 +555,11 @@ function Coverflow({stack,loop,reduced,canHover,onClose,pins,onPin,startSlug}:{s
 
   const wrapD=(d:number)=>cfg.current.loop?mod(d+cfg.current.slots/2,cfg.current.slots)-cfg.current.slots/2:d;
   const clampTarget=(t:number)=>cfg.current.loop?t:clamp(t,0,cfg.current.n-1);
-  const report=()=>{const a=mod(Math.round(st.current.target),cfg.current.n);if(a!==activeRef.current){activeRef.current=a;setActive(a);sfx('gallery.swipe');}};
+  // each picture passing ticks softly: quicker spins tick faster and a little higher, and get softer (never harsh)
+  const lastTick=useRef(0);
+  const tickSound=()=>{const now=performance.now(),dt=Math.max(16,now-(lastTick.current||now-400));lastTick.current=now;const speed=1000/dt;
+    sfx('gallery.swipe',{rate:0.94+Math.min(speed,24)*0.018,volume:speed>7?Math.max(0.3,1-(speed-7)*0.045):1});};
+  const report=()=>{const a=mod(Math.round(st.current.target),cfg.current.n);if(a!==activeRef.current){activeRef.current=a;setActive(a);tickSound();}};
 
   const layout=useCallback(()=>{
     const s=st.current,{loop:lp,reduced:rd,slots:sl}=cfg.current,cw=s.cw;

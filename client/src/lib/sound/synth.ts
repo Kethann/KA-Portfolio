@@ -12,6 +12,7 @@
 //   fold     the same notes falling (closing)
 //   glide    one soft note bending upward (next / previous)
 //   pad      a slow warm chord (the intro)
+//   flick    a soft, rounded wheel tick (spinning a stack: rate and loudness follow the spin speed)
 //   tap      a soft round tap
 //   tick     a tiny, dry tick (dragging the nav)
 //   chime    two gentle notes rising (success)
@@ -111,6 +112,7 @@ const GENS: Record<string, Gen> = {
     for (let k = 0; k < 6; k++){ const at = Math.floor((k * 0.009 + r() * 0.004) * sr), len = Math.floor(sr * 0.006); for (let i = 0; i < len && at + i < ice.length; i++) out[at + i] += ice[at + i] * (1 - i / len) * 0.9; }
     return fade(normalise(out, 0.38), sr, 1);
   },
+  flick: (sr) => { const out = new Float32Array(Math.floor(sr * 0.09)); tone(out, sr, 0, 1180, 0.5, 58, { attack: 0.0025, partials: [[1, 1], [2.02, 0.16], [3.1, 0.04]] }); return fade(normalise(out, 0.4), sr, 2); },
   tap: (sr) => { const out = new Float32Array(Math.floor(sr * 0.12)); tone(out, sr, 0, 760, 0.6, 38, { attack: 0.002, glide: 26, partials: [[1, 1], [2, 0.12]] }); return fade(normalise(out, 0.55), sr, 2); },
   tick: (sr, r) => { const out = new Float32Array(Math.floor(sr * 0.035)); tone(out, sr, 0, 2100, 0.5, 140, { attack: 0.0008 }); for (let i = 0; i < 90 && i < out.length; i++) out[i] += (r() * 2 - 1) * 0.08 * (1 - i / 90); return fade(normalise(out, 0.4), sr, 1); },
   chime: (sr) => { const out = new Float32Array(Math.floor(sr * 1.3)); tone(out, sr, 0, 1318.5, 0.32, 3.6, { partials: [[1, 1], [2, 0.08], [3, 0.03]] }); tone(out, sr, 0.13, 1975.5, 0.28, 3.4, { partials: [[1, 1], [2, 0.06]] }); return fade(normalise(out, 0.5), sr, 8); },

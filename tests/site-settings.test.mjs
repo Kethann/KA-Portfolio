@@ -36,7 +36,7 @@ test('passCard: defaults for older sites, values kept in range, fonts and logo c
 test('Skills: defaults for older sites, cleaned input, limits refused, can be hidden', () => {
   const base = structuredClone(seed); delete base.skills;
   const d = validateSiteDocument({ ...base }, seed, seed).skills;
-  assert.equal(d.enabled, true); assert.deepEqual(d.categories.map(c => c.name), ['Design', 'Motion design', 'Video', 'AI & generative', 'Arts', 'Languages', 'Frontend', 'Backend', 'Database', 'APIs', 'Robotics', 'Data & ML']);
+  assert.equal(d.enabled, true); assert.deepEqual(d.categories.map(c => c.name), ['Design', 'Motion design', 'Video', 'AI & generative', 'Arts', 'Languages', 'Frontend', 'Backend', 'Database', 'APIs', 'DevOps & tools', 'Robotics', 'Data & ML']);
   assert.ok(['After Effects', 'Premiere Pro', 'Adobe Media Encoder', 'Adobe Firefly'].every(n => d.categories.some(c => c.items.some(x => x.name === n))));
   assert.ok(d.categories.every(c => c.items.length && c.items.every(x => /^#[0-9A-F]{6}$/.test(x.color) && x.level >= 0 && x.level <= 5)));
   const s = validateSiteDocument({ ...base, skills: { enabled: false, title: '  My stack  ', intro: 'x'.repeat(300), categories: [

@@ -19,7 +19,7 @@ export const SOUND_CATEGORIES = [
 ];
 
 /** generated sounds (no files) */
-export const SOUND_SYNTHS = ['synth:glass', 'synth:frost', 'synth:bloom', 'synth:fold', 'synth:glide', 'synth:pad', 'synth:air', 'synth:swish', 'synth:drift', 'synth:gather', 'synth:assemble', 'synth:shimmer', 'synth:tap', 'synth:tick', 'synth:chime', 'synth:low'];
+export const SOUND_SYNTHS = ['synth:glass', 'synth:frost', 'synth:flick', 'synth:bloom', 'synth:fold', 'synth:glide', 'synth:pad', 'synth:air', 'synth:swish', 'synth:drift', 'synth:gather', 'synth:assemble', 'synth:shimmer', 'synth:tap', 'synth:tick', 'synth:chime', 'synth:low'];
 /** the built-in files: every one in /sounds/ui (all CC0, Kenney via soundcn) */
 export const SOUND_FILES = [
   'impact-glass-light-001', 'impact-glass-light-002', 'impact-glass-light-003', 'click-soft', 'select-001', 'tick-001', 'hover-tick',
@@ -49,7 +49,8 @@ export const SOUND_EVENTS = [
 
   E('stack.open', 'Folder / stack opens', 'gallery', 'synth:bloom', 'book-open', 0.26, { gap: 200 }),
   E('stack.close', 'Folder / stack closes', 'gallery', 'synth:fold', 'book-close', 0.2, { gap: 200 }),
-  E('gallery.swipe', 'Poster gallery: next / previous', 'gallery', 'synth:glide', 'book-flip-3', 0.13, { gap: 90, jitter: 0.12 }),
+  E('gallery.swipe', 'Poster gallery: each picture passing (follows the spin speed)', 'gallery', 'synth:flick', 'synth:glide', 0.16, { gap: 28, jitter: 0.04 }),
+  E('stack.roll', 'Stack: roll the pictures (swipe a stack)', 'gallery', 'synth:glide', 'card-slide-4', 0.16, { gap: 120 }),
   E('gallery.view', 'Click to view (full image)', 'gallery', 'synth:bloom', 'maximize-008', 0.2, { gap: 200 }),
   E('gallery.back', 'Back from the full image', 'gallery', 'synth:fold', 'minimize-008', 0.16, { gap: 200 }),
   E('gallery.pin', 'Pin / unpin an image', 'gallery', 'synth:glass', 'drop-002', 0.22, { gap: 150 }),

@@ -37,6 +37,7 @@ export const SKILLS_DEFAULT = {
       sk('Photoshop', 'Ps', '#31A8FF', 5, 'Compositing and retouching every key-art layer'),
       sk('Illustrator', 'Ai', '#FF9A00', 4, 'Vector typography and title treatments'),
       sk('InDesign', 'Id', '#FF3366', 3, 'Press kits and print-ready layouts'),
+      sk('Blender', 'Bl', '#E87D0D', 3, '3D modelling, lighting and renders'),
       sk('Figma', 'Fg', '#A259FF', 4, 'Campaign layouts and social deliverable systems') ] },
     { name: 'Motion design', icon: 'motion', items: [
       sk('After Effects', 'Ae', '#9999FF', 4, 'Motion posters, title animation and compositing'),
@@ -75,8 +76,16 @@ export const SKILLS_DEFAULT = {
       sk('REST APIs', 'API', '#8B8BFF', 4, 'Designing and consuming JSON APIs'), sk('Razorpay', 'Rp', '#3395FF', 4, 'Payments, webhooks and refunds'),
       sk('AI APIs', 'AI', '#D97757', 4, 'Gemini and Claude assistants'), sk('Webhooks', 'Wh', '#C73A63', 3, 'Signed event delivery'),
       sk('Email (SMTP)', '@', '#9AA3AF', 3, 'Receipts, alerts and auto-replies') ] },
+    { name: 'DevOps & tools', icon: 'tools', items: [
+      sk('Docker', 'Dk', '#2496ED', 3, 'Containers, images and compose setups'), sk('Kubernetes', 'K8', '#326CE5', 2, 'Deployments, services and scaling'),
+      sk('CI/CD pipelines', 'CI', '#22C55E', 3, 'Automated build, test and deploy'), sk('Linux', 'Lx', '#FCC624', 3, 'Shell, servers and administration'),
+      sk('Networking', 'Nw', '#38BDF8', 3, 'TCP/IP, DNS, HTTP and routing'), sk('Git', 'Gt', '#F05032', 4, 'Version control, branching and merges'),
+      sk('GitHub', 'GH', '#E6EDF3', 4, 'Repositories, pull requests and Actions'),
+      sk('Cloudflared', 'Cf', '#F38020', 3, 'Secure tunnels from local servers to the web'), sk('Render', 'Rn', '#FFFFFF', 3, 'Web services, workers and deploys'),
+      sk('Netlify', 'Nf', '#00C7B7', 3, 'Static sites, previews and functions') ] },
     { name: 'Robotics', icon: 'tools', items: [
       sk('ROS', 'ROS', '#8FA8CC', 3, 'Robot Operating System nodes, topics and tooling'),
+      sk('RViz', 'RV', '#5FB3E4', 3, 'Visualising robot models, sensors and maps in 3D'),
       sk('Sensor integrations', 'Se', '#7FD4FF', 3, 'Wiring, reading and calibrating robot sensors'),
       sk('Arduino Nano', 'An', '#00A3AD', 3, 'Compact microcontroller builds and firmware'),
       sk('Vision-based navigation models', 'Vn', '#FFB347', 3, 'Camera-driven models that guide a robot') ] },
@@ -109,6 +118,13 @@ function httpUrl(u){ try { return ['https:', 'http:'].includes(new URL(u).protoc
 
 // `current` is the stored document, `seed` the shipped one: an image without its own upload must be
 // one of the site's exported originals (known widths), found in either.
+/** skills added to sites that already have their own list (once each, by name; see handlers/public.js) */
+export const SKILLS_ADDITIONS = { id: 'skills-2026-10c', categories: [
+  { name: 'Design', icon: 'design', items: SKILLS_DEFAULT.categories.find(c => c.name === 'Design').items.filter(i => i.name === 'Blender') },
+  SKILLS_DEFAULT.categories.find(c => c.name === 'DevOps & tools'),
+  { ...SKILLS_DEFAULT.categories.find(c => c.name === 'Robotics'), items: SKILLS_DEFAULT.categories.find(c => c.name === 'Robotics').items.filter(i => i.name === 'RViz') },
+] };
+
 export function validateSiteDocument(input, current, seed){
   if (!input || typeof input !== 'object') throw bad('Send the whole portfolio document.');
   if (!Array.isArray(input.folders) || input.folders.length > 30 || !Array.isArray(input.images) || input.images.length > 300) throw bad('Use up to 30 folders and 300 images.');
@@ -289,7 +305,9 @@ export function validateSiteDocument(input, current, seed){
   const about = validateAbout(input.about);
   const sounds = validateSounds(input.sounds);
   const intro = { version: introVersion(input.intro?.version) };   // which homepage intro runs (Studio > Intro)
-  return { typeV2: true, details, folders, images, notice, visibility, stacks, layoutOverrides, branding, elementStyles, socialLinks, passCard, stats, skills, about, sounds, intro };
+  // a save from the portal makes the owner's skill list the authority: the one-time additions (handlers/public.js) never apply after it
+  const skillsAdded = SKILLS_ADDITIONS.id;
+  return { typeV2: true, details, folders, images, notice, visibility, stacks, layoutOverrides, branding, elementStyles, socialLinks, passCard, stats, skills, about, sounds, intro, skillsAdded };
 }
 
 // About > story. Missing (a document saved before the story was editable) means the defaults; bad values are refused.

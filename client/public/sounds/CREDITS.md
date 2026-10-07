@@ -63,6 +63,7 @@ Written for this site (client/src/lib/sound/synth.ts); no third-party audio invo
 |---|---|
 | synth:glass | a clear crystal tink with a faint sparkle (taps) |
 | synth:frost | a tiny icy crackle (ticks, small controls) |
+| synth:flick | a soft rounded wheel tick (spinning a stack) |
 | synth:bloom | two gentle rising notes (opening, page change) |
 | synth:fold | the same notes falling (closing) |
 | synth:glide | one soft note bending upward (next / previous) |

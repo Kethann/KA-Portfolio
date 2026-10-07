@@ -1,6 +1,7 @@
 // Public site endpoints: config, portfolio document, contact form, notify-me list.
 import { SOUND_DEFAULTS } from '../../shared/sounds.js';
 import { introVersion } from '../../shared/intros.js';
+import { SKILLS_ADDITIONS } from '../admin/site-document.js';
 import { json, readJson, HttpError } from '../core/http.js';
 import { env } from '../core/env.js';
 import { getDb } from '../core/db.js';
@@ -51,8 +52,34 @@ export async function publicConfig(ctx){
 
 // The portfolio document the homepage renders (Featured Work + Portfolio). Same shape as the old
 // JSON file; seeded from server/portfolio-seed.json the first time.
+// One-time additions to the owner's saved skills (e.g. the DevOps & tools skills): added once, only what is missing by name,
+// then marked done in the document, so a skill the owner later removes is never added back.
+/** the document with the one-time skill additions applied, or null when there is nothing to do (pure: tested) */
+export function addSkills(value, add = SKILLS_ADDITIONS){
+  if (!value || !add?.categories?.length || value.skillsAdded === add.id || !value.skills || !Array.isArray(value.skills.categories)) return null;
+  let categories = value.skills.categories, changed = false;
+  for (const cat of add.categories){
+    if (!cat) continue;
+    const have = new Set(categories.flatMap(c => Array.isArray(c.items) ? c.items : []).map(i => String(i?.name || '').toLowerCase()));
+    const missing = cat.items.filter(i => !have.has(i.name.toLowerCase())).map(i => ({ ...i }));
+    if (!missing.length) continue;
+    const at = categories.findIndex(c => String(c.name).toLowerCase() === cat.name.toLowerCase());
+    categories = at >= 0 ? categories.map((c, k) => k === at ? { ...c, items: [...c.items, ...missing].slice(0, 24) } : c)
+      : categories.length < 14 ? [...categories, { ...cat, items: missing }] : categories;
+    changed = true;
+  }
+  if (!changed) return null;   // nothing missing: no write
+  return { ...value, skills: { ...value.skills, categories }, skillsAdded: add.id };
+}
+async function withSkillAdditions(value, revision){
+  const next = addSkills(value); if (!next) return { value, revision };
+  try { const rev = await setSetting('site', next, revision); return rev === null ? { value, revision } : { value: next, revision: rev }; }
+  catch { return { value, revision }; }
+}
+
 export async function loadSiteDocument(){
-  const { value, revision } = await getSettingWithRevision('site');
+  const loaded = await getSettingWithRevision('site');
+  const { value, revision } = loaded.value ? await withSkillAdditions(loaded.value, loaded.revision) : loaded;
   if (value) return { ...value, stats: value.stats || STATS_DEFAULT, skills: value.skills || SKILLS_DEFAULT, about: value.about || ABOUT_DEFAULT, sounds: value.sounds || SOUND_DEFAULTS, intro: { version: introVersion(value.intro?.version) }, revision };   // sites saved before About numbers / Skills existed
   const initial = { ...seed };
   delete initial.revision;
