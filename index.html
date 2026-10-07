@@ -790,7 +790,7 @@ footer.site-footer{
 @media (max-width:1099px){ .about-bio-text{ margin-bottom:28px; } }
 .about-wrap > .about-stats{ margin-top:0; }
 .about-bio-text{ margin-bottom:clamp(8px, 2vw, 24px); }
-@media (max-width:640px){ .about-stats{ grid-template-columns:minmax(0, 1fr); width:min(100%, 420px); margin-inline:auto; } }   /* phones: one tile per row, in order */
+@media (max-width:640px){ .about-stats{ grid-template-columns:repeat(2, minmax(0, 1fr)); width:100%; gap:10px; } .about-stat{ padding:16px 10px; } .about-stat-label{ font-size:9.5px; letter-spacing:.1em; } }   /* phones: two by two, in order */
 /* the caption and the four number tiles sit centred, directly above Skills, on every screen size */
 @media (min-width:1100px){
   .about-wrap{ max-width:min(1320px, 94vw); }
@@ -1512,6 +1512,7 @@ html.ka-modal-open{ overflow:hidden; }
 .about-caption{ margin:0 0 26px; }
 .about-wrap > .about-caption{ text-align:center; margin:clamp(28px, 4vw, 48px) 0 14px; }
 .about-caption[hidden]{ display:none; }
+[data-ka-indent] *{ text-indent:0; }   /* only the first line of the paragraph itself is indented, never each word, letter or line piece inside it */
 .about-bio-text{
   font-size:var(--step-0); line-height:1.7; color:var(--ink-dim); max-width:62ch; margin:0 0 64px;
   opacity:0; transform:translateY(14px);
@@ -8670,7 +8671,10 @@ function applyElementStyles(styles){
     el.style.color = style.color || "";
     el.style.fontWeight = style.weight ? String(style.weight) : "";
     el.style.textAlign = style.align || "";
-    el.style.textIndent = typeof style.indent === "number" && style.indent > 0 ? style.indent + "em" : "";
+    // text-indent is inherited, so the effect's per-word / per-letter / per-line pieces would each indent themselves; the flag below resets them (see [data-ka-indent] in the styles)
+    var ind = typeof style.indent === "number" && style.indent > 0;
+    el.style.textIndent = ind ? style.indent + "em" : "";
+    if (ind) el.setAttribute("data-ka-indent", ""); else el.removeAttribute("data-ka-indent");
     el.style.letterSpacing = typeof style.spacing === "number" ? style.spacing + "em" : "";
     el.style.lineHeight = typeof style.lineHeight === "number" ? String(style.lineHeight) : "";
   });
