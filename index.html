@@ -5373,13 +5373,9 @@ function buildShardGlow(){
     for(let y=0;y<tile;y++)for(let x=0;x<tile;x++){
       const n=y*tile+x,k=n*4,a=original[k+3]/255;
       let edge=0,contrast=0;
-      if(x>0&&y>0&&x<tile-1&&y<tile-1){
-        const ln=luminance[n];
-        let d=n-1;edge=Math.max(edge,a-original[d*4+3]/255);contrast=Math.max(contrast,Math.abs(ln-luminance[d]));
-        d=n+1;edge=Math.max(edge,a-original[d*4+3]/255);contrast=Math.max(contrast,Math.abs(ln-luminance[d]));
-        d=n-tile;edge=Math.max(edge,a-original[d*4+3]/255);contrast=Math.max(contrast,Math.abs(ln-luminance[d]));
-        d=n+tile;edge=Math.max(edge,a-original[d*4+3]/255);contrast=Math.max(contrast,Math.abs(ln-luminance[d]));
-      }
+      if(x>0&&y>0&&x<tile-1&&y<tile-1){for(const d of offsets){
+        edge=Math.max(edge,a-original[(n+d)*4+3]/255);contrast=Math.max(contrast,Math.abs(luminance[n]-luminance[n+d]));
+      }}
       // Crack lips and bright facets emit; dark interiors retain their original contrast.
       const energy=a*Math.min(1,edge*.85+contrast*.5+Math.pow(luminance[n],2.4)*.38);
       pixels.data[k]=pixels.data[k+1]=pixels.data[k+2]=255;pixels.data[k+3]=Math.round(energy*255);
