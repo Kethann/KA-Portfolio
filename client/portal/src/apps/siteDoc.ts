@@ -12,7 +12,7 @@ export type SiteImage = { id: string; slug: string; title: string; cat: string; 
 export type SiteDoc = {
   revision: number; details: Record<string, any> & { customFonts: { family: string; url: string }[] }; folders: string[]; images: SiteImage[];
   notice: { enabled: boolean; text: string; tone: 'info' | 'warning' }; visibility: { navGallery: boolean; navAbout: boolean; autoFullscreen?: boolean; downloadFormat?: 'png' | 'jpeg' };
-  stacks: { loop: boolean; loops?: Record<string, boolean>; covers: Record<string, string>; featured?: string[] }; layoutOverrides: Record<string, Record<string, { x: number; y: number; scale: number }>>;
+  stacks: { loop: boolean; loops?: Record<string, boolean>; covers: Record<string, string>; featured?: string[] }; layoutOverrides: Record<string, Record<string, { x: number; y: number; scale: number; width?: number }>>;
   branding: { enabled: boolean; logoUrl: string }; elementStyles: Record<string, any>; socialLinks: { label: string; url: string; icon: string }[];
   passCard: PassDraft;
   stats: StatsDraft;

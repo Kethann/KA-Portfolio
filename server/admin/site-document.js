@@ -246,7 +246,13 @@ export function validateSiteDocument(input, current, seed){
         const x = Number(pos?.x), y = Number(pos?.y), s = pos?.scale === undefined ? 1 : Number(pos.scale);
         if (!Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > bound || Math.abs(y) > bound) throw bad('Layout position out of range.');
         if (!Number.isFinite(s) || s < 0.5 || s > 2.5) throw bad('Layout scale out of range.');
-        clean[id] = { x, y, scale: s };
+        const entry = { x, y, scale: s };
+        if (TEXT_DRAGGABLE_IDS.includes(id) && pos?.width !== undefined && pos.width !== null && pos.width !== ''){
+          const w = Number(pos.width);
+          if (!Number.isFinite(w) || w < 120 || w > 2400) throw bad('Text width out of range.');
+          entry.width = Math.round(w);
+        }
+        clean[id] = entry;
       }
     }
     layoutOverrides[bp] = clean;

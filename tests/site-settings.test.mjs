@@ -188,3 +188,16 @@ test('Featured Work: a list of existing stacks, in order, no repeats', () => {
   assert.deepEqual(d.stacks.featured, [b, a]);
   assert.deepEqual(validateSiteDocument({ ...base }, seed, seed).stacks.featured, []);
 });
+
+test('About elements can be arranged per screen size, with an optional text width and text formatting', () => {
+  const base = structuredClone(seed);
+  const d = validateSiteDocument({ ...base,
+    layoutOverrides: { mobile: {}, tablet: {}, desktop: { 'about-bio-text': { x: 10, y: -5, scale: 1.2, width: 700.4 }, 'about-stats': { x: 0, y: 4, scale: 1, width: 500 } } },
+    elementStyles: { 'about-headline': { weight: 700, align: 'center', spacing: 0.05, lineHeight: 1.2 }, 'about-caption': { weight: 999, align: 'diagonal' } } }, seed, seed);
+  assert.deepEqual(d.layoutOverrides.desktop['about-bio-text'], { x: 10, y: -5, scale: 1.2, width: 700 });
+  assert.equal(d.layoutOverrides.desktop['about-stats'].width, undefined, 'only text boxes take a width');
+  assert.deepEqual(d.layoutOverrides.mobile, {}, 'other screen sizes stay untouched');
+  assert.deepEqual(d.elementStyles['about-headline'], { weight: 700, align: 'center', spacing: 0.05, lineHeight: 1.2 });
+  assert.equal(d.elementStyles['about-caption'], undefined, 'bad weight / alignment are dropped');
+  assert.throws(() => validateSiteDocument({ ...base, layoutOverrides: { mobile: {}, tablet: {}, desktop: { 'about-bio-text': { x: 0, y: 0, scale: 1, width: 50 } } } }, seed, seed));
+});

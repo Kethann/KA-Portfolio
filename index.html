@@ -8912,6 +8912,7 @@ function applySiteAppearance(data){
 // page any more -- only dormant CSS and a JS variable that always resolves to null. See the
 // identical note on server/creator.js's DRAGGABLE_IDS.
 var PREVIEW_DRAGGABLE_IDS = ["assistant-launcher", "site-notice", "portfolio-title", "portfolio-intro", "contact-title", "contact-intro", "about-headline", "about-tagline", "about-caption", "about-journey", "about-bio-text", "about-stats"];
+var PREVIEW_TEXT_IDS = ["portfolio-title", "portfolio-intro", "contact-title", "contact-intro", "about-headline", "about-tagline", "about-caption", "about-bio-text"];
 function currentLayoutBreakpoint(){
   return kaLayoutW() <= 760 ? "mobile" : kaLayoutW() <= 1024 ? "tablet" : "desktop";
 }
@@ -8930,6 +8931,11 @@ function applyLayoutOverrides(data){
     var pos = overrides[id];
     el.style.translate = pos ? pos.x + "px " + pos.y + "px" : "";
     el.style.scale = pos && pos.scale ? String(pos.scale) : "";
+    // a text box can also be made wider or narrower (its own setting, separate from the scale), for this screen size only
+    if (PREVIEW_TEXT_IDS.indexOf(id) !== -1){
+      if (pos && pos.width){ el.style.width = pos.width + "px"; el.style.maxWidth = "none"; }
+      else { el.style.width = ""; el.style.maxWidth = ""; }
+    }
   });
 }
 // ---- About number tiles: the edge light turns toward the pointer, drifts with the scroll and spins slowly on its own; the
@@ -9016,7 +9022,7 @@ window.addEventListener("resize", function(){
 // registered for it, i.e. a harmless no-op. Nothing here can be triggered by a visitor: entering
 // edit mode requires a postMessage the studio itself sends, and the studio only runs behind the
 // authenticated /creator login.
-var kaPreviewEditMode = false, kaPreviewOutline = null, kaPreviewHandle = null, kaPreviewSelectedEl = null;
+var kaPreviewEditMode = false, kaPreviewOutline = null, kaPreviewHandle = null, kaPreviewWidthHandle = null, kaPreviewSelectedEl = null;
 function kaPreviewEnsureOutline(){
   if (kaPreviewOutline) return kaPreviewOutline;
   kaPreviewOutline = document.createElement("div");
@@ -9026,6 +9032,11 @@ function kaPreviewEnsureOutline(){
   kaPreviewHandle = document.createElement("div");
   kaPreviewHandle.style.cssText = "position:fixed;z-index:100000;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#FF9438;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:none;cursor:nwse-resize;";
   kaPreviewHandle.addEventListener("pointerdown", kaPreviewResizePointerDown);
+  // a second handle on the right edge widens or narrows a text box (its width, not its scale)
+  kaPreviewWidthHandle = document.createElement("div");
+  kaPreviewWidthHandle.style.cssText = "position:fixed;z-index:100000;width:12px;height:30px;margin:-15px 0 0 -6px;border-radius:7px;background:#fff;border:2px solid #FF9438;box-shadow:0 1px 4px rgba(0,0,0,.4);display:none;cursor:ew-resize;touch-action:none;";
+  kaPreviewWidthHandle.addEventListener("pointerdown", kaPreviewWidthPointerDown);
+  document.documentElement.appendChild(kaPreviewWidthHandle);
   document.documentElement.appendChild(kaPreviewOutline);
   document.documentElement.appendChild(kaPreviewHandle);
   return kaPreviewOutline;
@@ -9033,13 +9044,15 @@ function kaPreviewEnsureOutline(){
 function kaPreviewShowOutline(el){
   var o = kaPreviewEnsureOutline();
   kaPreviewSelectedEl = el;
-  if (!el){ o.style.display = "none"; kaPreviewHandle.style.display = "none"; return; }
+  if (!el){ o.style.display = "none"; kaPreviewHandle.style.display = "none"; kaPreviewWidthHandle.style.display = "none"; return; }
   var r = el.getBoundingClientRect();
   o.style.display = "block";
   o.style.left = (r.left - 4) + "px"; o.style.top = (r.top - 4) + "px";
   o.style.width = (r.width + 8) + "px"; o.style.height = (r.height + 8) + "px";
   kaPreviewHandle.style.display = "block";
   kaPreviewHandle.style.left = (r.right + 4) + "px"; kaPreviewHandle.style.top = (r.bottom + 4) + "px";
+  if (PREVIEW_TEXT_IDS.indexOf(el.id) !== -1){ kaPreviewWidthHandle.style.display = "block"; kaPreviewWidthHandle.style.left = (r.right + 4) + "px"; kaPreviewWidthHandle.style.top = (r.top + r.height / 2) + "px"; }
+  else kaPreviewWidthHandle.style.display = "none";
 }
 function kaPreviewSetEditMode(enabled){
   kaPreviewEditMode = enabled;
@@ -9054,7 +9067,7 @@ function kaPreviewSetEditMode(enabled){
 // comment above for why these are the standalone CSS properties, not `transform`.
 function kaPreviewReadPos(el){
   var m = /(-?[\d.]+)px\s+(-?[\d.]+)px/.exec(el.style.translate || "");
-  return { x: m ? parseFloat(m[1]) : 0, y: m ? parseFloat(m[2]) : 0, scale: parseFloat(el.style.scale) || 1 };
+  return { x: m ? parseFloat(m[1]) : 0, y: m ? parseFloat(m[2]) : 0, scale: parseFloat(el.style.scale) || 1, width: parseFloat(el.style.width) || 0 };
 }
 function kaPreviewPointerDown(e){
   if (!kaPreviewEditMode) return;
@@ -9079,7 +9092,28 @@ function kaPreviewPointerDown(e){
     window.removeEventListener("pointerup", onUp);
     var x = base.x + (ev.clientX - startX), y = base.y + (ev.clientY - startY);
     try {
-      window.parent.postMessage({ type: "ka-preview-moved", id: id, breakpoint: currentLayoutBreakpoint(), x: x, y: y, scale: base.scale }, window.location.origin);
+      window.parent.postMessage({ type: "ka-preview-moved", id: id, breakpoint: currentLayoutBreakpoint(), x: x, y: y, scale: base.scale, width: base.width }, window.location.origin);
+    } catch(err){}
+  }
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+}
+// Dragging the right-edge handle changes a text box's width, so the words can take more (or less) room and re-wrap.
+function kaPreviewWidthPointerDown(e){
+  if (!kaPreviewEditMode || !kaPreviewSelectedEl) return;
+  e.preventDefault(); e.stopPropagation();
+  var el = kaPreviewSelectedEl, id = el.id, base = kaPreviewReadPos(el);
+  var sc = base.scale || 1, startX = e.clientX, w0 = el.getBoundingClientRect().width / sc;
+  function widthFor(ev){ return Math.round(Math.min(2400, Math.max(120, w0 + (ev.clientX - startX) / sc))); }
+  function onMove(ev){
+    el.style.width = widthFor(ev) + "px"; el.style.maxWidth = "none";
+    kaPreviewShowOutline(el);
+  }
+  function onUp(ev){
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    try {
+      window.parent.postMessage({ type: "ka-preview-moved", id: id, breakpoint: currentLayoutBreakpoint(), x: base.x, y: base.y, scale: base.scale, width: widthFor(ev) }, window.location.origin);
     } catch(err){}
   }
   window.addEventListener("pointermove", onMove);
@@ -9107,7 +9141,7 @@ function kaPreviewResizePointerDown(e){
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
     try {
-      window.parent.postMessage({ type: "ka-preview-moved", id: id, breakpoint: currentLayoutBreakpoint(), x: base.x, y: base.y, scale: scaleFor(ev) }, window.location.origin);
+      window.parent.postMessage({ type: "ka-preview-moved", id: id, breakpoint: currentLayoutBreakpoint(), x: base.x, y: base.y, scale: scaleFor(ev), width: base.width }, window.location.origin);
     } catch(err){}
   }
   window.addEventListener("pointermove", onMove);
@@ -9135,7 +9169,7 @@ window.addEventListener("message", function(e){
     kaPreviewSetEditMode(!!msg.enabled);
   } else if (msg.type === "ka-preview-reset-position"){
     var target = document.getElementById(msg.id);
-    if (target){ target.style.translate = ""; target.style.scale = ""; kaPreviewShowOutline(target); }
+    if (target){ target.style.translate = ""; target.style.scale = ""; target.style.width = ""; target.style.maxWidth = ""; kaPreviewShowOutline(target); }
   }
 });
 if (window.parent !== window){

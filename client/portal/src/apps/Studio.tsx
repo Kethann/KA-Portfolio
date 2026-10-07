@@ -113,6 +113,18 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
                 return <li key={id}><span className="grow">{label}</span>{pos ? <span className="faint num" style={{ fontSize: 12 }}>{Math.round(pos.x)}, {Math.round(pos.y)} · {Math.round(pos.scale * 100)}%</span> : <span className="faint" style={{ fontSize: 12 }}>default</span>}
                   {pos && <button type="button" className="btn sm ghost" onClick={() => updateSite(x => { const bp = { ...(x.layoutOverrides[device] || {}) }; delete bp[id]; return { ...x, layoutOverrides: { ...x.layoutOverrides, [device]: bp } }; })}>Reset</button>}</li>;
               })}</ul>
+              {TEXT_FIELDS[selected] && (() => {
+                const pos = d.layoutOverrides[device]?.[selected];
+                const setW = (w: number | null) => updateSite(x => {
+                  const cur = x.layoutOverrides[device]?.[selected] || { x: 0, y: 0, scale: 1 };
+                  const next: { x: number; y: number; scale: number; width?: number } = { x: cur.x, y: cur.y, scale: cur.scale };
+                  if (w) next.width = w;
+                  return { ...x, layoutOverrides: { ...x.layoutOverrides, [device]: { ...(x.layoutOverrides[device] || {}), [selected]: next } } };
+                });
+                return <Field label={`Text width (${DEVICES[device].label} only) · ${pos?.width ? pos.width + ' px' : 'auto'}`} hint="Wider gives the words more room; narrower wraps them sooner. You can also drag the white handle on the right edge in the preview. This is separate from the size dot.">
+                  <div className="row"><input type="range" min={120} max={1600} step={10} value={pos?.width || 600} onChange={e => setW(Number(e.target.value))} />{pos?.width && <button type="button" className="btn sm ghost" onClick={() => setW(null)}>Auto</button>}</div>
+                </Field>;
+              })()}
               <div className="eyebrow">Selected element</div>
               <Elements doc={d} selected={selected} setSelected={setSelected} />
             </>}
@@ -301,9 +313,9 @@ function Preview({ doc, device, setDevice, arrange, onSelect }: { doc: SiteDoc; 
       if (e.data.type === 'ka-preview-ready') setReady(true);
       else if (e.data.type === 'ka-preview-selected' && typeof e.data.id === 'string') selectRef.current(e.data.id);
       else if (e.data.type === 'ka-preview-moved' && typeof e.data.id === 'string'){
-        const { id, breakpoint, x, y, scale: sc } = e.data;
+        const { id, breakpoint, x, y, scale: sc, width } = e.data;
         if (!['mobile', 'tablet', 'desktop'].includes(breakpoint) || ![x, y, sc].every(Number.isFinite)) return;
-        updateSite(dd => ({ ...dd, layoutOverrides: { ...dd.layoutOverrides, [breakpoint]: { ...(dd.layoutOverrides[breakpoint] || {}), [id]: { x: Math.round(x), y: Math.round(y), scale: Math.round(sc * 100) / 100 } } } }));
+        updateSite(dd => ({ ...dd, layoutOverrides: { ...dd.layoutOverrides, [breakpoint]: { ...(dd.layoutOverrides[breakpoint] || {}), [id]: { x: Math.round(x), y: Math.round(y), scale: Math.round(sc * 100) / 100, ...(Number.isFinite(width) && width > 0 ? { width: Math.round(width) } : {}) } } } }));
       }
     };
     addEventListener('message', on);
