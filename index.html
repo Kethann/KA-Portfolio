@@ -794,6 +794,8 @@ footer.site-footer{
 /* the caption and the four number tiles sit centred, directly above Skills, on every screen size */
 @media (min-width:1100px){
   .about-wrap{ max-width:min(1320px, 94vw); }
+  /* one shared column: name, tagline, timeline, paragraph, caption and tiles all share the same width and edges */
+  .about-bio > .about-headline, .about-bio > .about-tagline, .about-bio > .about-bio-text{ width:min(100%, 960px); max-width:none; margin-left:auto; margin-right:auto; }
 }
 
 /* ============================================================ IMAGE UPSCALER: coming-soon dialog only == */
