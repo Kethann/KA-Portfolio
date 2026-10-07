@@ -84,7 +84,9 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
      picks it, without a page reload. Google Fonts only actually downloads a family's font files
      once something on the page is rendered in it, so having unused choices listed costs one small
      CSS response, not extra font-file bytes. -->
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Poppins:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400..700&family=Sora:wght@400..700&display=swap" rel="stylesheet">
+<!-- fonts load without blocking the first paint (display=swap shows the text at once in a fallback font) -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Poppins:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400..700&family=Sora:wght@400..700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Poppins:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400..700&family=Sora:wght@400..700&display=swap"></noscript>
 <style>
 :root{
   --ground:#050506;
@@ -771,6 +773,8 @@ footer.site-footer{
 .about-stat::after{ content:""; position:absolute; left:18%; right:18%; bottom:0; height:2px; border-radius:2px;
   background:linear-gradient(90deg, transparent, rgba(255,148,56,.75), transparent); opacity:.7; }
 /* thin shiny gradient edge in the tile's own colours (glass white + the accent): a 1px ring cut out with a mask, its light slowly sliding round */
+/* phones and tablets: a lighter blur on every glass surface (same look, far less GPU work while scrolling) */
+@media (pointer:coarse), (max-width:900px){ :root{ --glass-blur: blur(10px) saturate(125%); } }
 .about-stat::before{ content:""; position:absolute; inset:0; border-radius:inherit; padding:1px; pointer-events:none;
   background:linear-gradient(120deg, rgba(255,255,255,.34), rgba(255,148,56,.55) 28%, rgba(255,255,255,.06) 50%, rgba(255,148,56,.5) 72%, rgba(255,255,255,.34)) 0 0 / 220% 220%;
   -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor;
@@ -1846,11 +1850,11 @@ html.ka-modal-open{ overflow:hidden; }
   <!-- starts finished (transparent): About is the landing page, so this full-screen overlay must not
        cover the hero on load. playAboutIntro() replays it on later visits to About. -->
   <div class="poster-wall-intro pw-done" id="poster-wall-intro" aria-hidden="true">
-    <img class="pw-thumb pw-1" src="images/tiger-blue-480.webp" alt="">
-    <img class="pw-thumb pw-2" src="images/devara-11-days-480.webp" alt="">
-    <img class="pw-thumb pw-3" src="images/devara-14-days-480.webp" alt="">
-    <img class="pw-thumb pw-4" src="images/vara-23-days-480.webp" alt="">
-    <img class="pw-thumb pw-5" src="images/wa-00-40-18-480.webp" alt="">
+    <img class="pw-thumb pw-1" src="images/tiger-blue-480.webp" alt="" decoding="async">
+    <img class="pw-thumb pw-2" src="images/devara-11-days-480.webp" alt="" decoding="async">
+    <img class="pw-thumb pw-3" src="images/devara-14-days-480.webp" alt="" decoding="async">
+    <img class="pw-thumb pw-4" src="images/vara-23-days-480.webp" alt="" decoding="async">
+    <img class="pw-thumb pw-5" src="images/wa-00-40-18-480.webp" alt="" decoding="async">
   </div>
 
   <div class="about-wrap">
