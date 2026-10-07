@@ -7,7 +7,9 @@ import { isOwnMediaUrl } from './catalog.js';
 import { SKILL_LOGOS } from '../../shared/skill-logos.js';
 import { ABOUT_DEFAULT, ABOUT_LIMITS } from '../../shared/about-default.js';
 
-export const FONT_CHOICES = ['Fraunces', 'Manrope', 'Sora', 'Poppins', 'Playfair Display', 'Space Grotesk', 'system-ui'];
+import { FONT_NAMES } from '../../shared/fonts.js';
+
+export const FONT_CHOICES = FONT_NAMES;   // the shared library (studio, portal, homepage) + system-ui
 export const SOCIAL_ICONS = ['behance', 'instagram', 'x', 'linkedin', 'youtube', 'website', 'email'];
 export const ANIM_PRESETS = ['fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'scale-in', 'pop'];
 export const ANIM_EASINGS = ['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out', 'bounce'];

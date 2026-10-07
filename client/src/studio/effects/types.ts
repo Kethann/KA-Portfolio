@@ -24,6 +24,8 @@ export interface EffectContext {
   onReveal(fn: (c: CharInfo, time: number) => void): void;
   /** handwriting: the pen tip at a time, so decorations can follow the pen */
   penAt?(time: number): Point | null;
+  /** how the letters are painted (so effects that draw them on a canvas match the page exactly) */
+  paint?: { color: string; stops: { angle: 'h' | 'v-up' | 'v'; stops: [number, string][] } | null; outline: string | null };
 }
 
 export interface EffectParam { id: string; name: string; type: 'range' | 'select' | 'toggle'; min?: number; max?: number; step?: number; options?: { value: string; name: string }[]; value: number | string | boolean }

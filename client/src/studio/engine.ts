@@ -404,6 +404,18 @@ export function renderScene(ctx: CanvasRenderingContext2D, items: Item[], o: Ren
   ctx.restore();
 }
 
+// The box an item covers (world pixels): in / out animations grow, shrink and move it around its own centre.
+export function itemBox(it: Item){
+  if (it.kind === 'text'){
+    const lines = it.text.split('\n'), w = Math.max(...lines.map(l => l.length), 1) * it.px * 0.55;
+    return { x: it.x, y: it.y, w, h: lines.length * it.px * 1.2 };
+  }
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < it.n; i++){ const x = it.pts[i * POINT_STRIDE], y = it.pts[i * POINT_STRIDE + 1]; if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; }
+  if (!isFinite(x0)) return { x: 0, y: 0, w: 0, h: 0 };
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
 // Replay timeline: original timings, with long pauses between strokes shortened to 600 ms.
 export function replayTimeline(items: Item[]){
   const map = new Map<number, number>();

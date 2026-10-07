@@ -8494,6 +8494,21 @@ function loadPortfolioFromAPI(){
 // maps that name to a real file -- this injects/replaces one <style> tag with exactly that, kept
 // idempotent (full replace, not append) so repeated calls from live-preview edits never accumulate
 // stale duplicate rules.
+// The shared font library (shared/fonts.js): name -> Google css2 axes. A font picked in the portal (headings, body,
+// an element, the pass card) is loaded here on demand, so any of them works on the live site.
+var KA_FONT_AXES = {"Great Vibes":"","Sacramento":"","Satisfy":"","Dancing Script":"wght@400..700","Pacifico":"","Parisienne":"","Allura":"","Pinyon Script":"","Yellowtail":"","Alex Brush":"","Mrs Saint Delafield":"","Monsieur La Doulaise":"","Caveat":"wght@400..700","Kalam":"wght@400;700","Shadows Into Light":"","Permanent Marker":"","Amatic SC":"wght@400;700","Homemade Apple":"","Rock Salt":"","Reenie Beanie":"","Gloria Hallelujah":"","Indie Flower":"","Nanum Pen Script":"","Fraunces":"opsz,wght@9..144,300..900","Playfair Display":"wght@400..900","Cormorant Garamond":"wght@400;600;700","DM Serif Display":"","Bodoni Moda":"opsz,wght@6..96,400..900","Cinzel":"wght@400..900","Abril Fatface":"","Yeseva One":"","Italiana":"","Prata":"","Manrope":"wght@300..800","Sora":"wght@300..800","Poppins":"wght@400;500;600;700;800","Space Grotesk":"wght@300..700","Outfit":"wght@300..800","Syne":"wght@400..800","Unbounded":"wght@300..900","Bricolage Grotesque":"wght@300..800","Archivo Black":"","Bebas Neue":"","Anton":"","Oswald":"wght@300..700","Big Shoulders Display":"wght@400..900","Righteous":"","Lobster":"","Shrikhand":"","Bungee":"","Audiowide":"","Orbitron":"wght@400..900","Monoton":"","Bungee Shade":"","Bungee Spice":"","Nabla":"","Rubik Glitch":"","Rubik Wet Paint":"","Fascinate":"","Faster One":"","Creepster":"","Pirata One":"","UnifrakturMaguntia":"","Press Start 2P":"","Silkscreen":"wght@400;700","VT323":"","Major Mono Display":"","Space Mono":"wght@400;700","JetBrains Mono":"wght@400..700"};
+var kaFontsLinked = {};
+function loadLibraryFonts(data){
+  var names = [];
+  if (data && data.details){ names.push(data.details.headingFont, data.details.bodyFont); }
+  if (data && data.elementStyles) Object.keys(data.elementStyles).forEach(function(k){ var st = data.elementStyles[k]; if (st && st.font) names.push(st.font); });
+  if (data && data.passCard) names.push(data.passCard.titleFont, data.passCard.priceFont, data.passCard.signatureFont);
+  var fams = [];
+  names.forEach(function(n){ if (n && Object.prototype.hasOwnProperty.call(KA_FONT_AXES, n) && !kaFontsLinked[n]){ kaFontsLinked[n] = 1; fams.push("family=" + n.replace(/ /g, "+") + (KA_FONT_AXES[n] ? ":" + KA_FONT_AXES[n] : "")); } });
+  if (!fams.length) return;
+  var l = document.createElement("link"); l.rel = "stylesheet"; l.href = "https://fonts.googleapis.com/css2?" + fams.join("&") + "&display=swap";
+  document.head.appendChild(l);
+}
 function applyCustomFonts(customFonts){
   var styleEl = document.getElementById("ka-custom-fonts");
   if (!styleEl){
@@ -8687,6 +8702,7 @@ function applySiteAppearance(data){
   var root = document.documentElement.style;
   if (data.details){
     if (data.details.customFonts) applyCustomFonts(data.details.customFonts);
+    try { loadLibraryFonts(data); } catch(e){}
     if (data.details.headingFont) root.setProperty("--font-heading", "'" + data.details.headingFont + "'");
     if (data.details.bodyFont) root.setProperty("--font-body", "'" + data.details.bodyFont + "'");
     if (data.details.textScale) root.setProperty("--text-scale", String(data.details.textScale));
@@ -10861,9 +10877,10 @@ html, body{ overscroll-behavior-x:none; }
 html, body, *{ scrollbar-width:none; -ms-overflow-style:none; }
 html::-webkit-scrollbar, body::-webkit-scrollbar, *::-webkit-scrollbar{ width:0; height:0; display:none; background:transparent; }
 .ka-scroll-line{ position:fixed; z-index:70; left:0; right:0; top:env(safe-area-inset-top, 0px); height:2px; pointer-events:none;
-  transform-origin:50% 50%; transform:scaleX(0); opacity:0; transition:opacity .3s ease; will-change:transform;
-  background:linear-gradient(90deg, rgba(255,148,56,0) 0%, #ff9438 18%, #ffd9b8 50%, #ff9438 82%, rgba(255,148,56,0) 100%);
-  box-shadow:0 0 10px rgba(255,148,56,.55), 0 0 2px rgba(255,217,184,.9); }
+  transform-origin:50% 50%; transform:translateZ(0) scaleX(0); opacity:0; transition:opacity .35s ease; will-change:transform, opacity; contain:layout style;
+  background:linear-gradient(90deg, rgba(255,148,56,0) 0%, #ff9438 18%, #ffd9b8 50%, #ff9438 82%, rgba(255,148,56,0) 100%); }
+/* the glow is a blurred copy drawn once and scaled with the line (a box-shadow would repaint on every frame) */
+.ka-scroll-line::after{ content:""; position:absolute; left:0; right:0; top:-3px; height:8px; background:inherit; filter:blur(4px); opacity:.6; }
 .ka-scroll-line.on{ opacity:1; }
 html.ka-studio-open .ka-scroll-line, html.ka-modal-open .ka-scroll-line{ opacity:0 !important; }
 /* the page only pans up and down natively, so a sideways drag is handed to the page swipe untouched (no vertical wobble while it follows the finger); pinch zoom stays */
@@ -11062,19 +11079,23 @@ html.ka-studio-open .ka-scroll-line, html.ka-modal-open .ka-scroll-line{ opacity
     var line = document.createElement("div");
     line.className = "ka-scroll-line"; line.setAttribute("aria-hidden", "true");
     document.body.appendChild(line);
-    var queued = false;
-    function update(){
-      queued = false;
-      var y = window.scrollY || 0, max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-      var p = max > 8 ? Math.min(1, Math.max(0, y / max)) : 0;
-      line.style.transform = "scaleX(" + p.toFixed(4) + ")";
-      line.classList.toggle("on", p > 0.002);
+    // the page height is measured only when it can change (resize / content growing), never per scroll frame,
+    // and the line eases towards the scroll position so it glides instead of stepping
+    var max = 0, target = 0, shown = 0, raf = 0, on = false;
+    function measure(){ max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight); read(); }
+    function read(){ var y = window.scrollY || 0; target = max > 8 ? Math.min(1, Math.max(0, y / max)) : 0; if (!raf) raf = requestAnimationFrame(tick); }
+    function tick(){
+      var d = target - shown;
+      shown = Math.abs(d) < 0.0008 ? target : shown + d * 0.32;
+      line.style.transform = "translateZ(0) scaleX(" + shown.toFixed(4) + ")";
+      var want = shown > 0.002; if (want !== on){ on = want; line.classList.toggle("on", on); }
+      raf = shown === target ? 0 : requestAnimationFrame(tick);
     }
-    function q(){ if (!queued){ queued = true; requestAnimationFrame(update); } }
-    window.addEventListener("scroll", q, { passive: true });
-    window.addEventListener("resize", q);
-    if (window.ResizeObserver) new ResizeObserver(q).observe(document.body);
-    q();
+    var mq = 0; function remeasure(){ if (!mq) mq = requestAnimationFrame(function(){ mq = 0; measure(); }); }
+    window.addEventListener("scroll", read, { passive: true });
+    window.addEventListener("resize", remeasure);
+    if (window.ResizeObserver) new ResizeObserver(remeasure).observe(document.body);
+    measure();
   })();
   window.addEventListener("resize", function(){ if (s && s.decided) release(false); });
 })();

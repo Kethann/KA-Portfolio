@@ -15,8 +15,9 @@ import { Uploader, useSaveKey } from './common';
 import { SiteSaveBar } from './Content';
 import { loadSite, saveSite, thumb, updateSite, useSite, PASS_DRAFT_DEFAULTS } from './siteDoc';
 import type { SiteDoc, PassDraft } from './siteDoc';
+import { FONT_GROUPS, FONT_LIBRARY, FONT_NAMES, fontStack, googleFontsUrl } from '../../../../shared/fonts.js';
 
-const FONTS = ['Fraunces', 'Manrope', 'Sora', 'Poppins', 'Playfair Display', 'Space Grotesk', 'system-ui'];
+const FONTS = FONT_NAMES;
 const ACCENTS = ['#FF9438', '#E0303E', '#F5C451', '#4FD08A', '#6AA8FF', '#B98CFF', '#FF6FAE', '#EDEBE8'];
 const ELEMENTS: [string, string][] = [['portfolio-title', 'Portfolio heading'], ['portfolio-intro', 'Portfolio intro'], ['contact-title', 'Contact heading'], ['contact-intro', 'Contact intro'], ['site-notice', 'Notice banner'], ['assistant-launcher', 'Assistant button']];
 const ICONS = ['behance', 'instagram', 'x', 'linkedin', 'youtube', 'website', 'email'];
@@ -66,8 +67,8 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
 
             {section === 'type' && <>
               <div className="form-grid">
-                <Field label="Headings"><select value={d.details.headingFont} onChange={e => det('headingFont', e.target.value)} style={{ fontFamily: fam(d.details.headingFont) }}>{fontList(d).map(f => <option key={f} value={f} style={{ fontFamily: fam(f) }}>{f}</option>)}</select></Field>
-                <Field label="Body text"><select value={d.details.bodyFont} onChange={e => det('bodyFont', e.target.value)} style={{ fontFamily: fam(d.details.bodyFont) }}>{fontList(d).map(f => <option key={f} value={f} style={{ fontFamily: fam(f) }}>{f}</option>)}</select></Field>
+                <Field label="Headings"><select value={d.details.headingFont} onChange={e => det('headingFont', e.target.value)} style={{ fontFamily: fam(d.details.headingFont) }}><FontOptions doc={d} /></select></Field>
+                <Field label="Body text"><select value={d.details.bodyFont} onChange={e => det('bodyFont', e.target.value)} style={{ fontFamily: fam(d.details.bodyFont) }}><FontOptions doc={d} /></select></Field>
               </div>
               <Field label={`Text size · ${Math.round((d.details.textScale ?? 1) * 100)}%`}><input type="range" min={0.85} max={1.2} step={0.01} value={d.details.textScale ?? 1} onChange={e => det('textScale', Number(e.target.value))} /></Field>
               <CustomFonts doc={d} />
@@ -110,7 +111,22 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
   );
 }
 
-const fam = (f: string) => f === 'system-ui' ? 'system-ui' : `'${f}', system-ui`;
+const fam = (f: string) => fontStack(f);
+// The whole library's stylesheet, added once: only the fonts actually drawn (the picked ones, and options as they show) download.
+let libraryLinked = false;
+function linkLibraryFonts(){
+  if (libraryLinked || typeof document === 'undefined') return; libraryLinked = true;
+  const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = googleFontsUrl(FONT_LIBRARY.map(f => f.name)); document.head.appendChild(l);
+}
+/** every font, grouped (your uploads first), each option shown in its own face */
+function FontOptions({ doc }: { doc: SiteDoc }){
+  linkLibraryFonts();
+  return <>
+    {doc.details.customFonts.length > 0 && <optgroup label="Your fonts">{doc.details.customFonts.map(f => <option key={f.family} value={f.family} style={{ fontFamily: fam(f.family) }}>{f.family}</option>)}</optgroup>}
+    {FONT_GROUPS.map(g => <optgroup key={g.id} label={g.label}>{FONT_LIBRARY.filter(f => f.group === g.id).map(f => <option key={f.name} value={f.name} style={{ fontFamily: fam(f.name) }}>{f.name}</option>)}</optgroup>)}
+    <optgroup label="System"><option value="system-ui">system-ui</option></optgroup>
+  </>;
+}
 const fontList = (d: SiteDoc) => [...FONTS, ...d.details.customFonts.map(f => f.family)];
 
 // Uploaded fonts are registered with the browser once, so every select, sample and the pass preview
@@ -226,7 +242,7 @@ function Elements({ doc, selected, setSelected }: { doc: SiteDoc; selected: stri
       <Field label="Element" hint="Tip: in Arrange, clicking an element in the preview selects it here">
         <select value={selected} onChange={e => setSelected(e.target.value)}>{ELEMENTS.map(([id, l]) => <option key={id} value={id}>{l}</option>)}</select></Field>
       <div className="form-grid">
-        <Field label="Font"><select value={st.font || ''} onChange={e => set({ font: e.target.value })}><option value="">Site default</option>{fontList(doc).map(f => <option key={f}>{f}</option>)}</select></Field>
+        <Field label="Font"><select value={st.font || ''} onChange={e => set({ font: e.target.value })}><option value="">Site default</option><FontOptions doc={doc} /></select></Field>
         <Field label="Colour"><div className="row"><input type="color" aria-label="Colour" value={st.color || '#EDEBE8'} onChange={e => set({ color: e.target.value.toUpperCase() })} />{st.color && <button type="button" className="btn sm ghost" onClick={() => set({ color: '' })}>Default</button>}</div></Field>
       </div>
       <div className="eyebrow">Entrance animation</div>
@@ -310,8 +326,8 @@ function PassSettingsForm({ doc }: { doc: SiteDoc }){
     <div className="stack"><Switch checked={p.showTag} onChange={v => set({ showTag: v })} label="Show the tag in the top corner" />
       {p.showTag && <Field label="Tag text" hint="Empty = “Instant download” (or “Free download” for free items)"><input value={p.tagText} maxLength={30} onChange={e => set({ tagText: e.target.value })} placeholder="Instant download" /></Field>}</div>
     <div className="form-grid">
-      <Field label="Title font"><select value={p.titleFont} onChange={e => set({ titleFont: e.target.value })}><option value="">Site heading font</option>{fontList(doc).map(f => <option key={f} value={f}>{f}</option>)}</select></Field>
-      <Field label="Price font"><select value={p.priceFont} onChange={e => set({ priceFont: e.target.value })}><option value="">Monospace (default)</option>{fontList(doc).map(f => <option key={f} value={f}>{f}</option>)}</select></Field>
+      <Field label="Title font"><select value={p.titleFont} onChange={e => set({ titleFont: e.target.value })}><option value="">Site heading font</option><FontOptions doc={doc} /></select></Field>
+      <Field label="Price font"><select value={p.priceFont} onChange={e => set({ priceFont: e.target.value })}><option value="">Monospace (default)</option><FontOptions doc={doc} /></select></Field>
     </div>
     <Field label="Title and price sit at the"><Segmented label="Text position" value={p.textPosition} onChange={v => set({ textPosition: v })} options={[{ value: 'top', label: 'Top' }, { value: 'center', label: 'Middle' }, { value: 'bottom', label: 'Bottom' }]} /></Field>
     <Field label="Price goes"><Segmented label="Price position" value={p.pricePosition} onChange={v => set({ pricePosition: v })} options={[{ value: 'right', label: 'Right' }, { value: 'left', label: 'Left' }, { value: 'below', label: 'Below the title' }]} /></Field>
@@ -326,8 +342,7 @@ function PassSettingsForm({ doc }: { doc: SiteDoc }){
       <Field label="Signature text" hint={`${p.signatureText.length}/40`}><input value={p.signatureText} maxLength={40} onChange={e => set({ signatureText: e.target.value })} placeholder="Kethan Artzz" /></Field>
       <Field label="Signature font"><select value={p.signatureFont} onChange={e => set({ signatureFont: e.target.value })} style={{ fontFamily: p.signatureFont ? fam(p.signatureFont) : SIGNATURE_DEFAULT_FONT }}>
         <option value="">Handwriting (default)</option>
-        {doc.details.customFonts.length > 0 && <optgroup label="Your fonts">{doc.details.customFonts.map(f => <option key={f.family} value={f.family} style={{ fontFamily: fam(f.family) }}>{f.family}</option>)}</optgroup>}
-        <optgroup label="Site fonts">{FONTS.map(f => <option key={f} value={f} style={{ fontFamily: fam(f) }}>{f}</option>)}</optgroup>
+        <FontOptions doc={doc} />
       </select>
         <div style={{ marginTop: 8 }}><Uploader kind="font" accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf" label="Upload a signature font"
           onUploaded={u => {
