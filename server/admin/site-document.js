@@ -16,8 +16,10 @@ export const SOCIAL_ICONS = ['behance', 'instagram', 'x', 'linkedin', 'youtube',
 export const ANIM_PRESETS = ['fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'scale-in', 'pop'];
 export const ANIM_EASINGS = ['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out', 'bounce'];
 export const ANIM_TRIGGERS = ['load', 'scroll'];
-export const DRAGGABLE_IDS = ['assistant-launcher', 'site-notice', 'portfolio-title', 'portfolio-intro', 'contact-title', 'contact-intro'];
-const TEXT_DRAGGABLE_IDS = ['portfolio-title', 'portfolio-intro', 'contact-title', 'contact-intro'];
+export const DRAGGABLE_IDS = ['assistant-launcher', 'site-notice', 'portfolio-title', 'portfolio-intro', 'contact-title', 'contact-intro', 'about-headline', 'about-tagline', 'about-caption', 'about-journey', 'about-bio-text', 'about-stats'];
+const TEXT_DRAGGABLE_IDS = ['portfolio-title', 'portfolio-intro', 'contact-title', 'contact-intro', 'about-headline', 'about-tagline', 'about-caption', 'about-bio-text'];
+export const TEXT_WEIGHTS = [300, 400, 500, 600, 700, 800];
+export const TEXT_ALIGNS = ['left', 'center', 'right'];
 export const LAYOUT_BREAKPOINTS = ['mobile', 'tablet', 'desktop'];
 export const DETAIL_FIELDS = { creatorName: 80, tagline: 160, portfolioTitle: 100, portfolioIntro: 500, contactTitle: 100, contactIntro: 1000, openLabel: 60, closeLabel: 60, projectLabel: 60, contactButton: 60 };
 
@@ -169,6 +171,7 @@ export function validateSiteDocument(input, current, seed){
     if (!isFontUrl(url)) throw bad('Upload this font before saving.');
     customFonts.push({ family, url });
   }
+  details.aboutCaption = text(input.details?.aboutCaption, 80);   // optional: blank = the built-in line
   details.customFonts = customFonts;
   const allowedFonts = [...FONT_CHOICES, ...customFonts.map(f => f.family)];
   details.headingFont = allowedFonts.includes(input.details?.headingFont) ? input.details.headingFont : 'Fraunces';
@@ -191,6 +194,11 @@ export function validateSiteDocument(input, current, seed){
       const clean = {};
       if (style.font){ if (!allowedFonts.includes(style.font)) throw bad(`Unknown font for ${id}.`); clean.font = style.font; }
       if (style.color){ const c = text(style.color, 20); if (!/^#[0-9a-fA-F]{6}$/.test(c)) throw bad('Colours must be a 6-digit hex value.'); clean.color = c; }
+      const weight = Number(style.weight), spacing = Number(style.spacing), lh = Number(style.lineHeight);
+      if (TEXT_WEIGHTS.includes(weight)) clean.weight = weight;
+      if (TEXT_ALIGNS.includes(style.align)) clean.align = style.align;
+      if (style.spacing !== undefined && style.spacing !== '' && Number.isFinite(spacing)) clean.spacing = Math.min(0.4, Math.max(-0.1, Math.round(spacing * 100) / 100));
+      if (style.lineHeight !== undefined && style.lineHeight !== '' && Number.isFinite(lh)) clean.lineHeight = Math.min(2.6, Math.max(0.9, Math.round(lh * 100) / 100));
       if (style.animation && typeof style.animation === 'object' && ANIM_PRESETS.includes(style.animation.preset)){
         const d = Number(style.animation.duration), dl = Number(style.animation.delay);
         clean.animation = {

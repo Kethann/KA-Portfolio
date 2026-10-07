@@ -20,7 +20,15 @@ import { FONT_GROUPS, FONT_LIBRARY, FONT_NAMES, fontStack, googleFontsUrl } from
 
 const FONTS = FONT_NAMES;
 const ACCENTS = ['#FF9438', '#E0303E', '#F5C451', '#4FD08A', '#6AA8FF', '#B98CFF', '#FF6FAE', '#EDEBE8'];
-const ELEMENTS: [string, string][] = [['portfolio-title', 'Portfolio heading'], ['portfolio-intro', 'Portfolio intro'], ['contact-title', 'Contact heading'], ['contact-intro', 'Contact intro'], ['site-notice', 'Notice banner'], ['assistant-launcher', 'Assistant button']];
+const ELEMENTS: [string, string][] = [['portfolio-title', 'Portfolio heading'], ['portfolio-intro', 'Portfolio intro'], ['contact-title', 'Contact heading'], ['contact-intro', 'Contact intro'], ['site-notice', 'Notice banner'], ['assistant-launcher', 'Assistant button'], ['about-headline', 'About name'], ['about-tagline', 'About tagline'], ['about-caption', 'About caption line'], ['about-journey', 'About timeline'], ['about-bio-text', 'About bio'], ['about-stats', 'About number tiles']];
+// elements whose words can be typed straight into the Studio: where each one is stored (details.<key>, or the About bio)
+const TEXT_FIELDS: Record<string, { key: string; about?: boolean; max: number; rows: number }> = {
+  'portfolio-title': { key: 'portfolioTitle', max: 100, rows: 1 }, 'portfolio-intro': { key: 'portfolioIntro', max: 500, rows: 3 },
+  'contact-title': { key: 'contactTitle', max: 100, rows: 1 }, 'contact-intro': { key: 'contactIntro', max: 1000, rows: 3 },
+  'about-headline': { key: 'creatorName', max: 80, rows: 1 }, 'about-tagline': { key: 'tagline', max: 160, rows: 2 }, 'about-caption': { key: 'aboutCaption', max: 80, rows: 1 },
+  'about-bio-text': { key: 'bio', about: true, max: 1600, rows: 8 },
+};
+const WEIGHTS = [300, 400, 500, 600, 700, 800];
 const ICONS = ['behance', 'instagram', 'x', 'linkedin', 'youtube', 'website', 'email'];
 const ANIMS = ['', 'fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'scale-in', 'pop'];
 const DEVICES = { desktop: { w: 1440, h: 900, label: 'Desktop' }, tablet: { w: 820, h: 1180, label: 'Tablet' }, mobile: { w: 390, h: 844, label: 'Phone' } } as const;
@@ -98,13 +106,15 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
             {section === 'pass' && <PassSettingsForm doc={d} />}
 
             {section === 'arrange' && <>
-              <p className="muted">Drag elements in the preview to move them; drag the orange dot to resize. Positions are saved separately for desktop, tablet and phone.</p>
+              <p className="muted">Click an element in the preview to select it, drag to move it, drag the orange dot to resize. Switch to Elements to change its words, font, weight, alignment and spacing; everything shows in the preview as you go. Positions are saved separately for desktop, tablet and phone.</p>
               <Field label="Screen size"><Segmented label="Screen size" value={device} onChange={setDevice} options={Object.entries(DEVICES).map(([k, v]) => ({ value: k as Device, label: v.label }))} /></Field>
               <ul className="list">{ELEMENTS.map(([id, label]) => {
                 const pos = d.layoutOverrides[device]?.[id];
                 return <li key={id}><span className="grow">{label}</span>{pos ? <span className="faint num" style={{ fontSize: 12 }}>{Math.round(pos.x)}, {Math.round(pos.y)} · {Math.round(pos.scale * 100)}%</span> : <span className="faint" style={{ fontSize: 12 }}>default</span>}
                   {pos && <button type="button" className="btn sm ghost" onClick={() => updateSite(x => { const bp = { ...(x.layoutOverrides[device] || {}) }; delete bp[id]; return { ...x, layoutOverrides: { ...x.layoutOverrides, [device]: bp } }; })}>Reset</button>}</li>;
               })}</ul>
+              <div className="eyebrow">Selected element</div>
+              <Elements doc={d} selected={selected} setSelected={setSelected} />
             </>}
           </div>
         </div>
@@ -244,6 +254,20 @@ function Elements({ doc, selected, setSelected }: { doc: SiteDoc; selected: stri
     <div className="stack">
       <Field label="Element" hint="Tip: in Arrange, clicking an element in the preview selects it here">
         <select value={selected} onChange={e => setSelected(e.target.value)}>{ELEMENTS.map(([id, l]) => <option key={id} value={id}>{l}</option>)}</select></Field>
+      {TEXT_FIELDS[selected] && (() => {
+        const tf = TEXT_FIELDS[selected];
+        const value: string = tf.about ? (doc.about as any).bio || '' : doc.details[tf.key] || '';
+        const onText = (v: string) => updateSite(x => tf.about ? { ...x, about: { ...x.about, bio: v } } : { ...x, details: { ...x.details, [tf.key]: v } });
+        return <Field label="Text" hint={`${value.length}/${tf.max} · appears in the preview as you type`}>
+          {tf.rows > 1 ? <textarea rows={tf.rows} maxLength={tf.max} value={value} onChange={e => onText(e.target.value)} /> : <input type="text" maxLength={tf.max} value={value} placeholder={tf.key === 'aboutCaption' ? 'IMAGINE · CREATE · EVOLVE' : ''} onChange={e => onText(e.target.value)} />}
+        </Field>;
+      })()}
+      <div className="form-grid">
+        <Field label="Weight"><select value={st.weight || ''} onChange={e => set({ weight: e.target.value ? Number(e.target.value) : '' })}><option value="">Default</option>{WEIGHTS.map(w => <option key={w} value={w}>{w}</option>)}</select></Field>
+        <Field label="Align"><Segmented label="Align" value={st.align || ''} onChange={v => set({ align: v })} options={[{ value: '', label: 'Default' }, { value: 'left', label: 'Left' }, { value: 'center', label: 'Centre' }, { value: 'right', label: 'Right' }]} /></Field>
+        <Field label={`Letter spacing · ${typeof st.spacing === 'number' ? st.spacing.toFixed(2) + ' em' : 'default'}`}><div className="row"><input type="range" min={-0.05} max={0.4} step={0.01} value={st.spacing ?? 0} onChange={e => set({ spacing: Number(e.target.value) })} />{typeof st.spacing === 'number' && <button type="button" className="btn sm ghost" onClick={() => set({ spacing: '' })}>Default</button>}</div></Field>
+        <Field label={`Line height · ${typeof st.lineHeight === 'number' ? st.lineHeight.toFixed(2) : 'default'}`}><div className="row"><input type="range" min={0.9} max={2.6} step={0.05} value={st.lineHeight ?? 1.4} onChange={e => set({ lineHeight: Number(e.target.value) })} />{typeof st.lineHeight === 'number' && <button type="button" className="btn sm ghost" onClick={() => set({ lineHeight: '' })}>Default</button>}</div></Field>
+      </div>
       <div className="form-grid">
         <Field label="Font"><select value={st.font || ''} onChange={e => set({ font: e.target.value })}><option value="">Site default</option><FontOptions doc={doc} /></select></Field>
         <Field label="Colour"><div className="row"><input type="color" aria-label="Colour" value={st.color || '#EDEBE8'} onChange={e => set({ color: e.target.value.toUpperCase() })} />{st.color && <button type="button" className="btn sm ghost" onClick={() => set({ color: '' })}>Default</button>}</div></Field>

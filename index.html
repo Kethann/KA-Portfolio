@@ -776,12 +776,12 @@ footer.site-footer{
 /* phones and tablets: a lighter blur on every glass surface (same look, far less GPU work while scrolling) */
 @media (pointer:coarse), (max-width:900px){ :root{ --glass-blur: blur(10px) saturate(125%); } }
 .about-stat::before{ content:""; position:absolute; inset:0; border-radius:inherit; padding:1px; pointer-events:none;
-  background:linear-gradient(120deg, rgba(255,255,255,.34), rgba(255,148,56,.55) 28%, rgba(255,255,255,.06) 50%, rgba(255,148,56,.5) 72%, rgba(255,255,255,.34)) 0 0 / 220% 220%;
+  /* the edge is a conic light: --ang is driven by the pointer, the scroll and a slow spin (see the stat-edge script), and its colours are the page's own (glass white, the accent, the timeline's violet and sky) */
+  background:conic-gradient(from var(--ang, 0deg) at 50% 50%, rgba(255,255,255,.62), rgba(255,148,56,.7) 14%, rgba(255,255,255,.05) 30%, rgba(214,164,255,.5) 46%, rgba(255,255,255,.05) 58%, rgba(127,212,255,.5) 72%, rgba(255,148,56,.7) 86%, rgba(255,255,255,.62));
   -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor;
-  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); animation:statSheen 7s linear infinite; }
-.about-stat:nth-child(2)::before{ animation-delay:-1.7s; } .about-stat:nth-child(3)::before{ animation-delay:-3.5s; } .about-stat:nth-child(4)::before{ animation-delay:-5.2s; }
-@keyframes statSheen{ from{ background-position:0% 50%; } to{ background-position:220% 50%; } }
-@media (prefers-reduced-motion: reduce){ .about-stat::before{ animation:none; } }
+  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+/* a soft reflection on the glass that follows the pointer (--mx / --my) */
+.about-stat{ background:radial-gradient(120% 90% at var(--mx, 50%) var(--my, 0%), rgba(255,196,140,.12), transparent 60%), var(--glass-bg); }
 .about-stat-num{ display:block; font-family:var(--font-heading), ui-serif, Georgia, serif; font-weight:var(--heading-weight, 500);
   font-size:clamp(30px, 4.4vw, 48px); line-height:1; letter-spacing:-0.02em; color:var(--ink); font-variant-numeric:tabular-nums; }
 .about-stat-num .sfx{ color:var(--amber); margin-left:2px; }
@@ -797,10 +797,11 @@ footer.site-footer{
   .about-wrap > .about-bio{ display:contents; }
   .about-bio > .about-headline{ grid-column:1; grid-row:1; }
   .about-bio > .about-tagline{ grid-column:1; grid-row:2; }
+  .about-bio > .about-journey{ grid-column:1 / -1; grid-row:3; justify-self:center; width:min(100%, 960px); }   /* the timeline sits centred across the whole width */
   .about-bio > .about-caption{ grid-column:2; grid-row:4; align-self:end; justify-self:center; margin:0 0 14px; text-align:center; }   /* above the number tiles */
-  .about-bio > .about-journey{ grid-column:1; grid-row:4; justify-self:center; width:100%; }
   .about-bio > .about-bio-text{ grid-column:1; grid-row:5; min-width:0; }
   .about-wrap > .about-stats{ grid-column:2; grid-row:5; align-self:start; width:auto; margin:0; grid-template-columns:repeat(2, minmax(0, 1fr)); }   /* beside the paragraph, in the space it leaves */
+  .about-wrap > .about-block{ grid-row:auto; }   /* Skills, promo cuts and the rest follow below, as before */
   .about-wrap > .about-block:first-of-type{ grid-row:6; }
 }
 
@@ -1861,7 +1862,7 @@ html.ka-modal-open{ overflow:hidden; }
     <div class="about-bio">
       <h1 class="about-headline" id="about-headline">Kethan Artzz</h1>
       <p class="about-tagline" id="about-tagline">Visual Storyteller for the Big Screen</p>
-      <p class="about-caption">IMAGINE &middot; CREATE &middot; EVOLVE</p>
+      <p class="about-caption" id="about-caption">IMAGINE &middot; CREATE &middot; EVOLVE</p>
       <div class="about-journey" id="about-journey" aria-label="My journey">
         <span class="journey-since"><span>SINCE</span><b id="journey-year">2021</b></span>
         <ol class="journey-line" id="journey-steps"></ol>
@@ -8596,6 +8597,8 @@ function applyPortfolioData(data){
     if(data.details.creatorName)document.title=data.details.creatorName+' · '+data.details.portfolioTitle;
     var aboutHeading=document.getElementById('about-headline');
     if(aboutHeading&&data.details.creatorName)aboutHeading.textContent=data.details.creatorName;
+    var aboutCap=document.getElementById('about-caption');
+    if(aboutCap){ var capText=data.details.aboutCaption||'IMAGINE · CREATE · EVOLVE'; if(aboutCap.textContent!==capText)aboutCap.textContent=capText; }
     var aboutTag=document.getElementById('about-tagline');
     if(aboutTag&&data.details.tagline)aboutTag.textContent=data.details.tagline;
     var copyright=document.querySelector('.footer-copyright');
@@ -8672,6 +8675,10 @@ function applyElementStyles(styles){
     var style = (styles && styles[id]) || {};
     el.style.fontFamily = style.font ? "'" + style.font + "'" : "";
     el.style.color = style.color || "";
+    el.style.fontWeight = style.weight ? String(style.weight) : "";
+    el.style.textAlign = style.align || "";
+    el.style.letterSpacing = typeof style.spacing === "number" ? style.spacing + "em" : "";
+    el.style.lineHeight = typeof style.lineHeight === "number" ? String(style.lineHeight) : "";
   });
 }
 // ---- per-element entrance animation (Creator Portal "Text animation" panel + the live-preview
@@ -8910,7 +8917,7 @@ function applySiteAppearance(data){
 // [fix] 'replay' was removed after discovering there's no actual <button id="replay"> in the
 // page any more -- only dormant CSS and a JS variable that always resolves to null. See the
 // identical note on server/creator.js's DRAGGABLE_IDS.
-var PREVIEW_DRAGGABLE_IDS = ["assistant-launcher", "site-notice", "portfolio-title", "portfolio-intro", "contact-title", "contact-intro"];
+var PREVIEW_DRAGGABLE_IDS = ["assistant-launcher", "site-notice", "portfolio-title", "portfolio-intro", "contact-title", "contact-intro", "about-headline", "about-tagline", "about-caption", "about-journey", "about-bio-text", "about-stats"];
 function currentLayoutBreakpoint(){
   return kaLayoutW() <= 760 ? "mobile" : kaLayoutW() <= 1024 ? "tablet" : "desktop";
 }
@@ -8931,6 +8938,44 @@ function applyLayoutOverrides(data){
     el.style.scale = pos && pos.scale ? String(pos.scale) : "";
   });
 }
+// ---- About number tiles: the edge light turns toward the pointer, drifts with the scroll and spins slowly on its own; the
+// glass carries a soft reflection that follows the pointer. One rAF loop, only while the tiles are on screen.
+(function(){
+  var box = document.getElementById("about-stats");
+  if (!box || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
+  var px = 0, py = 0, moved = -1e9, spin = 0, sv = 0, lastY = window.scrollY, vis = false, raf = 0, last = 0;
+  var st = new WeakMap();
+  function wrap(d){ return ((d + 540) % 360) - 180; }
+  window.addEventListener("pointermove", function(e){ px = e.clientX; py = e.clientY; moved = performance.now(); }, { passive: true });
+  window.addEventListener("scroll", function(){ var y = window.scrollY; sv = Math.max(-40, Math.min(40, sv + (y - lastY) * 0.06)); lastY = y; }, { passive: true });
+  function frame(now){
+    raf = 0;
+    if (!vis) return;
+    var dt = Math.min(64, now - (last || now)); last = now;
+    spin = (spin + dt * 0.014 + sv * 0.6) % 360; sv *= Math.pow(0.9, dt / 16);
+    var live = Math.max(0, 1 - (now - moved) / 1800);           // the pointer's pull fades out once it rests
+    Array.prototype.forEach.call(box.children, function(t){
+      var r = t.getBoundingClientRect(), s = st.get(t);
+      if (!s){ s = { a: spin, mx: 50, my: 0 }; st.set(t, s); }
+      var cx = r.left + r.width / 2, cy = r.top + r.height / 2, dx = px - cx, dy = py - cy, dist = Math.hypot(dx, dy);
+      var w = live * Math.max(0, 1 - dist / 900);
+      var toward = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+      var tgt = spin + w * wrap(toward - spin);
+      s.a = (s.a + wrap(tgt - s.a) * Math.min(1, dt / 90) + 360) % 360;
+      var tx = r.width ? Math.max(0, Math.min(100, (px - r.left) / r.width * 100)) : 50, ty = r.height ? Math.max(0, Math.min(100, (py - r.top) / r.height * 100)) : 0;
+      if (w < 0.02){ tx = 50; ty = 0; }
+      s.mx += (tx - s.mx) * Math.min(1, dt / 120); s.my += (ty - s.my) * Math.min(1, dt / 120);
+      t.style.setProperty("--ang", s.a.toFixed(1) + "deg");
+      t.style.setProperty("--mx", s.mx.toFixed(1) + "%"); t.style.setProperty("--my", s.my.toFixed(1) + "%");
+    });
+    raf = requestAnimationFrame(frame);
+  }
+  function start(){ if (!raf && vis){ last = 0; raf = requestAnimationFrame(frame); } }
+  var inView = false;
+  function sync(){ vis = inView && !document.hidden; start(); }
+  if ("IntersectionObserver" in window) new IntersectionObserver(function(en){ inView = en[0].isIntersecting; sync(); }, { threshold: 0 }).observe(box);
+  document.addEventListener("visibilitychange", sync);
+})();
 loadPortfolioFromAPI();
 // ---- live updates: what's published in the portal appears on open pages without a reload.
 // /api/live is a tiny version number that moves after every portal change. It's checked every 15s
