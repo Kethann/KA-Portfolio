@@ -45,6 +45,13 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;margin:18px 0 0}dt{c
 .item{font:500 22px/1.2 Georgia,serif;margin:16px 0 2px}.summary{color:var(--dim);margin:0}
 .sign{margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}.sign .name{font-size:clamp(30px,6vw,40px);line-height:1.15}.sign small{display:block;color:var(--faint);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
 .note{margin-top:20px;color:var(--faint);font-size:13.5px}
+.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:24px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:0 26px;border-radius:999px;text-decoration:none;
+font:700 12px/1 ui-monospace,"JetBrains Mono",monospace;letter-spacing:.16em;text-transform:uppercase;transition:transform .2s ease,box-shadow .2s ease}
+.btn.primary{color:#1a0f0a;background:linear-gradient(145deg,#ffb478,#c8784a);border:1px solid #ffb478;box-shadow:0 12px 30px -12px rgba(255,140,70,.6)}
+.btn.ghost{color:var(--ink);border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.03)}
+.btn:hover{transform:translateY(-2px)}.btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+@media (prefers-reduced-motion:reduce){.btn{transition:none}.btn:hover{transform:none}}
 form{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}input{flex:1 1 240px;min-height:52px;padding:0 16px;border-radius:14px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.3);color:var(--ink);
 font:600 18px/1 ui-monospace,"JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase}
 button{min-height:52px;padding:0 26px;border-radius:999px;border:1px solid rgba(255,170,120,.55);background:linear-gradient(145deg,rgba(255,180,120,.35),rgba(200,120,70,.25));color:#fffaf5;
@@ -81,6 +88,7 @@ export async function licensePage(ctx){
   const db = await getDb();
   const r = await db.maybeOne(`select o.public_id, o.email, o.status, o.paid_at, o.created_at, o.refunded_at, o.license_holder,
       i.title, i.license_key, i.license_version, i.product_id, l.name as license_name, l.summary as license_summary,
+      (select p.slug from products p where p.id = i.product_id and p.status = 'published') as product_slug,
       (select m.url from product_media m where m.product_id = i.product_id order by m.sort, m.id limit 1) as thumb
     from orders o join order_items i on i.order_id = o.id left join licenses l on l.key = i.license_key
     where o.license_code = $1 order by i.id limit 1`, [code]);
@@ -105,6 +113,7 @@ export async function licensePage(ctx){
 <dt>Issued by</dt><dd>${esc(issuer)}</dd></dl>
 <div class="sign"><span class="name" style="font-family:${esc(sig.family)};color:${sig.ink}">${esc(sig.text)}</span><small>Authorised signature</small></div></div>
 <div class="seal">${sealSvg({ url, code, issuer, id: 'ka-license-seal' })}<p class="code">${esc(code)}</p></div></div>
+<div class="actions"><a class="btn primary" href="/?page=store"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.1 11.2a2 2 0 0 1-2 1.8H8.1a2 2 0 0 1-2-1.8z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/></svg>Explore the store</a>${r.product_slug ? `<a class="btn ghost" href="/?product=${encodeURIComponent(r.product_slug)}">View this item</a>` : ''}</div>
 <p class="note">Anyone can open this page by scanning the seal. It never shows payment details${r.license_holder ? '' : ' or the full email address'}. <a href="/license">Check another code</a></p>`;
   return page(200, `${state[1]} · ${code}`, body, sig.face);
 }

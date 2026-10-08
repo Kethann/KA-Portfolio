@@ -72,7 +72,8 @@ export async function deliveryExtras(productId){
 export async function sendDeliveryEmails(order, siteUrl){
   const db = await getDb();
   const store = await getSetting('store');
-  const items = await db.query(`select i.*, p.title as product_title, p.summary as product_summary, p.version as product_version, p.link_ttl_hours, p.max_downloads, p.delivery_custom, l.name as license_name, l.body_md as license_body
+  const items = await db.query(`select i.*, p.title as product_title, p.summary as product_summary, p.version as product_version, p.link_ttl_hours, p.max_downloads, p.delivery_custom, l.name as license_name, l.body_md as license_body,
+    (select m.url from product_media m where m.product_id = p.id order by m.sort, m.id limit 1) as product_thumb
     from order_items i join products p on p.id = i.product_id left join licenses l on l.key = i.license_key where i.order_id = $1 order by i.id`, [order.id]);
   let ok = true;
   const code = await ensureLicenseCode(db, order.id);
@@ -84,6 +85,9 @@ export async function sendDeliveryEmails(order, siteUrl){
     const extra = await deliveryExtras(it.product_id);
     const terms = termsFor(it, store);
     const res = await sendEmail({
+      card: { badge: 'Ready to download', title: it.product_title, subtitle: it.product_summary || '', image: absImage(siteUrl, it.product_thumb),
+        rows: [['Order', order.public_id], ['License', `${license ? license.name : 'Personal'}${code ? ` · ${code}` : ''}`], ['Link works until', fmtDate(Date.now() + terms.hours * 3600000)], ['Downloads', `${terms.max} with this link`]],
+        cta: { label: 'Download', url } },
       to: order.email, template: 'order_delivery', subjectOverride: extra.subject || undefined,
       vars: { order_id: order.public_id, product_title: it.product_title, download_url: url, expires: fmtDate(Date.now() + terms.hours * 3600000),
         max_downloads: terms.max, license_name: license ? license.name : 'Personal', license_text: text, extra_note: extra.note,
@@ -100,6 +104,13 @@ export async function sendDeliveryEmails(order, siteUrl){
   return ok;
 }
 
+/** a picture for an email must be an absolute https address */
+function absImage(site, url){
+  if (!url || typeof url !== 'string') return '';
+  if (/^https:\/\//.test(url)) return url;
+  return url.startsWith('/') && /^https:\/\//.test(site || '') ? `${site}${url}` : '';
+}
+
 export async function sendReceipt(order, items){
   const store = await getSetting('store');
   const cur = order.currency;
@@ -112,6 +123,8 @@ export async function sendReceipt(order, items){
   } else if (!store.taxEnabled){ taxLabel = `${taxLabel}`; tax = formatMoney(0, cur); }
   const seller = [store.sellerName, store.sellerAddress, store.sellerTaxId ? `Tax ID: ${store.sellerTaxId}` : ''].filter(Boolean).join('\n');
   return sendEmail({
+    card: { badge: 'Paid', title: `Receipt INV-${String(order.invoice_number).padStart(6, '0')}`, subtitle: items.map(i => i.product_title || i.title).join(', '),
+      rows: [['Order', order.public_id], ['Date', fmtDate(order.paid_at || order.created_at)], ['Total paid', formatMoney(order.total, cur)]] },
     to: order.email, template: 'order_receipt',
     vars: { invoice_number: `INV-${String(order.invoice_number).padStart(6, '0')}`, date: fmtDate(order.paid_at || order.created_at), order_id: order.public_id, email: order.email,
       lines, subtotal: formatMoney(order.subtotal, cur), discount: formatMoney(order.discount, cur), tax_label: taxLabel, tax, total: formatMoney(order.total, cur),
@@ -361,6 +374,8 @@ export async function resendLinks(email, siteUrl){
     ttl = Math.min(ttl, (await productTerms(db, it.product_id)).hours);
     lines.push(`${it.title} (order ${it.public_id}):\n${url}`);
   }
-  await sendEmail({ to: email, template: 'resend_link', vars: { links: lines.join('\n\n'), expires: fmtDate(Date.now() + ttl * 3600000) } });
+  await sendEmail({ to: email, template: 'resend_link', vars: { links: lines.join('\n\n'), expires: fmtDate(Date.now() + ttl * 3600000) },
+    card: { badge: 'Fresh links', title: 'Your download links', subtitle: `${items.length} item${items.length === 1 ? '' : 's'} · links work until ${fmtDate(Date.now() + ttl * 3600000)}` },
+    buttons: Object.fromEntries(lines.map(l => [l.split('\n').pop(), 'Download'])) });
   return { sent: true };
 }

@@ -84,17 +84,57 @@ export function escapeHtml(s){
 export function fill(template, vars){
   return String(template).replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, k) => (vars[k] === undefined || vars[k] === null ? '' : String(vars[k])));
 }
-// Plain text -> simple HTML: escaped paragraphs, line breaks, and clickable https links.
-export function textToHtml(body){
-  const esc = escapeHtml(body);
-  const linked = esc.replace(/https:\/\/[^\s<]+/g, (u) => `<a href="${u}" style="color:#c9864f">${u}</a>`);
-  return linked.split(/\n{2,}/).map(p => `<p style="margin:0 0 14px;line-height:1.6">${p.replace(/\n/g, '<br>')}</p>`).join('');
+// ---- the email design: the site's dark, warm look (like the license page), in tables and inline styles so it holds up
+// in Gmail, Outlook, Apple Mail and phone apps. The owner's text (templates) is kept word for word and set in this style;
+// a link that sits on its own line becomes a button.
+const FONT = "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif", SERIF = "Georgia,'Times New Roman',serif", MONO = "'Courier New',ui-monospace,monospace";
+const C = { bg: '#0f0c0b', card: '#1b1513', inner: '#241b18', line: '#3a2c26', ink: '#efe9e2', dim: '#b9afa6', faint: '#8e857d', amber: '#c9864f', link: '#ffc795' };
+function button(label, url, primary = true){
+  return `<a href="${escapeHtml(url)}" style="display:inline-block;padding:14px 26px;border-radius:999px;${primary
+    ? 'background:#c8784a;background-image:linear-gradient(145deg,#ffb478,#c8784a);color:#1a0f0a;border:1px solid #ffb478'
+    : `background:transparent;color:${C.ink};border:1px solid #5a463c`};font:700 12px/1 ${MONO};letter-spacing:.16em;text-transform:uppercase;text-decoration:none">${escapeHtml(label)}</a>`;
 }
-function layout(inner, siteName){
-  return `<!doctype html><html><body style="margin:0;background:#f4f1ee;padding:24px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1d1a1c">
-<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:14px;padding:28px 28px 18px;border:1px solid #eadfd6">
-<div style="font-weight:700;letter-spacing:.08em;font-size:12px;color:#9a6a44;margin-bottom:18px">${escapeHtml(siteName)}</div>
-${inner}</div></body></html>`;
+// Plain text -> HTML in the theme: escaped paragraphs, line breaks, clickable https links; a URL alone on its line is a button.
+export function textToHtml(body, buttons = {}){
+  const paras = String(body).split(/\n{2,}/);
+  return paras.map(p => {
+    const lines = p.split('\n').map(line => {
+      const t = line.trim();
+      if (/^https:\/\/\S+$/.test(t)) return `<span style="display:block;margin:6px 0 4px">${button(buttons[t] || 'Open link', t)}</span>`;
+      return escapeHtml(line).replace(/https:\/\/[^\s<]+/g, (u) => `<a href="${u}" style="color:${C.link};text-decoration:underline">${u}</a>`);
+    });
+    return `<p style="margin:0 0 14px;line-height:1.65;color:${C.dim};font:15px/1.65 ${FONT}">${lines.join('<br>')}</p>`;
+  }).join('');
+}
+/** an item card at the top of the email: picture, status badge, title, a line under it, and details */
+function cardHtml(card){
+  if (!card) return '';
+  const rows = (card.rows || []).filter(r => r && r[1] !== undefined && r[1] !== null && r[1] !== '').map(([k, v]) =>
+    `<tr><td style="padding:4px 16px 4px 0;color:${C.faint};font:13px/1.4 ${FONT};white-space:nowrap;vertical-align:top">${escapeHtml(k)}</td><td style="padding:4px 0;color:${C.ink};font:14px/1.45 ${FONT}">${escapeHtml(v)}</td></tr>`).join('');
+  const img = card.image ? `<td width="104" valign="top" style="padding:20px 20px 20px 0"><img src="${escapeHtml(card.image)}" width="104" alt="" style="display:block;width:104px;height:auto;border-radius:12px;border:1px solid ${C.line}"></td>` : '';
+  const badge = card.badge ? `<span style="display:inline-block;padding:7px 12px;border-radius:999px;background:${card.tone === 'bad' ? '#ff8c8c' : '#7fe0a6'};color:${card.tone === 'bad' ? '#2a0c0c' : '#0b2416'};font:700 11px/1 ${MONO};letter-spacing:.16em;text-transform:uppercase">&#10003;&nbsp;${escapeHtml(card.badge)}</span>` : '';
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px;background:${C.inner};border:1px solid ${C.line};border-radius:18px">
+<tr><td valign="top" style="padding:20px">${badge}
+<div style="margin:${badge ? '14px' : '0'} 0 4px;color:${C.ink};font:500 22px/1.25 ${SERIF}">${escapeHtml(card.title || '')}</div>
+${card.subtitle ? `<div style="color:${C.dim};font:14px/1.5 ${FONT}">${escapeHtml(card.subtitle)}</div>` : ''}
+${rows ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px">${rows}</table>` : ''}
+${card.cta ? `<div style="margin-top:18px">${button(card.cta.label, card.cta.url)}</div>` : ''}
+</td>${img}</tr></table>`;
+}
+function layout(inner, siteName, { card, site } = {}){
+  const store = site ? `${site}/?page=store` : '';
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"></head>
+<body style="margin:0;padding:0;background:${C.bg}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.bg}" style="background:${C.bg};background-image:radial-gradient(ellipse at 50% 0,#3a2016 0,${C.bg} 62%)">
+<tr><td align="center" style="padding:30px 14px 36px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px">
+<tr><td style="padding:0 6px 14px;color:${C.amber};font:700 11px/1 ${MONO};letter-spacing:.22em;text-transform:uppercase">${escapeHtml(siteName)}</td></tr>
+<tr><td style="background:${C.card};border:1px solid ${C.line};border-radius:24px;padding:26px 24px 12px">
+${cardHtml(card)}${inner}
+</td></tr>
+${store ? `<tr><td align="center" style="padding:22px 6px 6px">${button('Explore the store', store, false)}</td></tr>` : ''}
+<tr><td align="center" style="padding:14px 6px 0;color:${C.faint};font:12px/1.5 ${FONT}">${escapeHtml(siteName)}${site ? ` &middot; <a href="${escapeHtml(site)}" style="color:${C.faint}">${escapeHtml(site.replace(/^https?:\/\//, ''))}</a>` : ''}</td></tr>
+</table></td></tr></table></body></html>`;
 }
 
 // Built-in templates; the portal can override subject/body per key (email_templates table).
@@ -121,7 +161,7 @@ export async function loadTemplate(key){
 
 // Sends one email. Returns {ok, id} and never throws for provider failures (they are logged in
 // email_log and surfaced in the portal), so a slow or broken provider can't break a checkout.
-export async function sendEmail({ to, template, vars = {}, replyTo, attachments, subjectOverride, bodyOverride }){
+export async function sendEmail({ to, template, vars = {}, replyTo, attachments, subjectOverride, bodyOverride, card, buttons }){
   const db = await getDb();
   const siteName = env('SITE_NAME', 'Kethan Artzz');
   const from = { email: env('MAIL_FROM', 'no-reply@localhost'), name: env('MAIL_FROM_NAME', siteName) };
@@ -129,7 +169,8 @@ export async function sendEmail({ to, template, vars = {}, replyTo, attachments,
   const allVars = { signature: env('MAIL_SIGNATURE', `— ${siteName}`), ...vars };
   const subject = fill(subjectOverride ?? tpl.subject, allVars).replace(/[\r\n]+/g, ' ').slice(0, 200);
   const text = fill(bodyOverride ?? tpl.body, allVars).replace(/\n{3,}/g, '\n\n');   // an empty placeholder never leaves a gap
-  const html = layout(textToHtml(text), siteName);
+  const site = (env('PUBLIC_SITE_URL') || '').replace(/\/+$/, '');
+  const html = layout(textToHtml(text, buttons || (card?.cta ? { [card.cta.url]: card.cta.label } : {})), siteName, { card, site: /^https?:\/\//.test(site) ? site : '' });
   try {
     const res = await getTransport().send({ from, to, replyTo, subject, text, html, attachments });
     await db.query('insert into email_log (to_email, subject, template, status, provider_id) values ($1,$2,$3,$4,$5)', [to, subject, template, 'sent', res.id || null]);
