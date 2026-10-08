@@ -60,6 +60,60 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
      every @media(max-width:600px) rule in this file silently never applies on a real device,
      and everything renders zoomed out (tiny nav/hamburger/chat bubble) until pinch-zoomed. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+// ==================================================================== IMAGE PROTECTION ==
+// On by default (the portal can switch it off: Studio > Banner & nav > Image protection). Images can't be right-clicked,
+// saved, dragged or long-pressed; save / print / view-source / developer-tools shortcuts are blocked; images blur the
+// instant the page loses focus (screenshot tools, app switching, developer tools) or a screenshot key is pressed, and they
+// never print. The same rules reach the store and gallery, which render in their own shadow roots. Never inside the
+// portal's live preview. No web page can stop a phone screenshot or a camera: this is a deterrent, not a lock.
+(function(){
+  var preview = window.parent !== window || /[?&]preview=1(&|$)/.test(location.search);
+  var root = document.documentElement, on = !preview, shieldTimer = 0;
+  var SHADOW_CSS = ":host(.ka-protect) img,:host(.ka-protect) video,:host(.ka-protect) canvas,:host(.ka-protect) picture{-webkit-user-drag:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}"
+    + ":host(.ka-shield) img,:host(.ka-shield) video,:host(.ka-shield) canvas,:host(.ka-shield) picture,:host(.ka-shield) [style*='background-image']{filter:blur(30px) brightness(.55)!important;transition:none!important}"
+    + "@media print{:host(.ka-protect) img,:host(.ka-protect) video,:host(.ka-protect) canvas,:host(.ka-protect) picture{visibility:hidden!important}}";
+  function hosts(){ return document.querySelectorAll('[data-ka-shadow]'); }
+  function dress(h){
+    if (h.shadowRoot && !h.shadowRoot.__kaProt){ var st = document.createElement('style'); st.textContent = SHADOW_CSS; h.shadowRoot.appendChild(st); h.shadowRoot.__kaProt = 1; }
+    h.classList.toggle('ka-protect', on);
+  }
+  function sync(){ root.classList.toggle('ka-protect', on); Array.prototype.forEach.call(hosts(), dress); if (!on) shield(false); }
+  function shield(v){
+    if (v && !on) return;
+    root.classList.toggle('ka-shield', !!v);
+    Array.prototype.forEach.call(hosts(), function(h){ dress(h); h.classList.toggle('ka-shield', !!v); });
+  }
+  function flash(ms){ shield(true); clearTimeout(shieldTimer); shieldTimer = setTimeout(function(){ if (document.hasFocus()) shield(false); }, ms); }
+  var editable = function(t){ return t && t.closest && t.closest('input, textarea, select, [contenteditable="true"], .ka-allow-menu'); };
+  // right-click / long-press menus and dragging (shadow content included: the event's path is checked)
+  document.addEventListener('contextmenu', function(e){ if (!on) return; var t = e.composedPath ? e.composedPath()[0] : e.target; if (editable(t)) return; e.preventDefault(); }, true);
+  document.addEventListener('dragstart', function(e){ if (!on) return; var t = e.composedPath ? e.composedPath()[0] : e.target; if (t && /^(IMG|CANVAS|VIDEO|PICTURE)$/.test(t.tagName || '')) e.preventDefault(); }, true);
+  document.addEventListener('keydown', function(e){
+    if (!on) return;
+    var k = (e.key || '').toLowerCase(), mod = e.ctrlKey || e.metaKey;
+    if (k === 'printscreen'){ flash(2500); try { navigator.clipboard && navigator.clipboard.writeText(''); } catch(err){} return; }
+    if (e.metaKey && e.shiftKey && /^[3456s]$/.test(k)){ flash(4000); return; }              // macOS / Windows screenshot shortcuts
+    if (e.metaKey && e.shiftKey){ flash(1200); }                                              // the start of a screenshot chord
+    if (k === 'f12' || (mod && e.shiftKey && /^[ijc]$/.test(k)) || (mod && /^[sup]$/.test(k) && !e.shiftKey && !editable(e.target))){ e.preventDefault(); }
+  }, true);
+  document.addEventListener('keyup', function(e){ if (on && (e.key || '').toLowerCase() === 'printscreen'){ flash(2500); try { navigator.clipboard && navigator.clipboard.writeText(''); } catch(err){} } }, true);
+  // losing focus (a screenshot tool takes over, another app, developer tools): blur until the page is back
+  window.addEventListener('blur', function(){ if (!on) return; setTimeout(function(){ var a = document.activeElement; if (a && a.tagName === 'IFRAME') return; if (!document.hasFocus()) shield(true); }, 0); });
+  window.addEventListener('focus', function(){ shield(false); });
+  document.addEventListener('visibilitychange', function(){ if (!on) return; if (document.hidden) shield(true); else if (document.hasFocus()) shield(false); });
+  // the store and gallery mount later: dress their shadow roots as they appear
+  if (window.MutationObserver) new MutationObserver(function(list){ for (var i = 0; i < list.length; i++){ var n = list[i].addedNodes; for (var j = 0; j < n.length; j++){ var el = n[j]; if (el.nodeType !== 1) continue; if (el.hasAttribute && el.hasAttribute('data-ka-shadow')) setTimeout(function(h){ return function(){ dress(h); }; }(el), 0); else if (el.querySelectorAll){ var inner = el.querySelectorAll('[data-ka-shadow]'); for (var q = 0; q < inner.length; q++) setTimeout(function(h){ return function(){ dress(h); }; }(inner[q]), 0); } } } }).observe(document.documentElement, { childList: true, subtree: true });
+  window.kaSetProtection = function(v){ on = !!v && !preview; sync(); };
+  sync();
+})();
+</script>
+<style>
+html.ka-protect img, html.ka-protect video, html.ka-protect canvas, html.ka-protect picture{ -webkit-user-drag:none; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+html.ka-shield img, html.ka-shield video, html.ka-shield picture, html.ka-shield canvas:not(.ka-keep), html.ka-shield .folder-card, html.ka-shield .pw-thumb{ filter:blur(30px) brightness(.55) !important; transition:none !important; }
+@media print{ html.ka-protect img, html.ka-protect video, html.ka-protect canvas, html.ka-protect picture{ visibility:hidden !important; } }
+</style>
+
 <!-- the first rel="icon" is the one the Creator Portal's favicon setting replaces (applyFavicon) -->
 <link rel="icon" type="image/png" sizes="64x64" href="images/favicon-64.png">
 <link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32.png">
@@ -8919,6 +8973,7 @@ function applySiteAppearance(data){
     noticeEl.hidden = true;
   }
   if (typeof window !== "undefined"){
+    if (window.kaSetProtection) window.kaSetProtection(!data.visibility || data.visibility.protectImages !== false);
     window.KA_DL_CONFIG = Object.assign(window.KA_DL_CONFIG || {}, { format: data.visibility && data.visibility.downloadFormat === "jpeg" ? "jpeg" : "png" });
     window.kaPassCard = data.passCard || null;   // the checkout pass design (Studio > Checkout pass)
     // load the pass's fonts now (the browser would only fetch a font when it is first drawn, so the signature would flash in the wrong font)

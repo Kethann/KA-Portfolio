@@ -11,7 +11,7 @@ import { ABOUT_DEFAULT, ABOUT_LIMITS } from '../../../../shared/about-default.js
 export type SiteImage = { id: string; slug: string; title: string; cat: string; description: string; technologies: string[]; link: string; downloadable?: boolean; hidden?: boolean; archived?: boolean; focusX?: number; focusY?: number; zoom?: number; src?: string; widths: number[]; full: number; width?: number; height?: number };
 export type SiteDoc = {
   revision: number; details: Record<string, any> & { customFonts: { family: string; url: string }[] }; folders: string[]; images: SiteImage[];
-  notice: { enabled: boolean; text: string; tone: 'info' | 'warning' }; visibility: { navGallery: boolean; navAbout: boolean; autoFullscreen?: boolean; downloadFormat?: 'png' | 'jpeg' };
+  notice: { enabled: boolean; text: string; tone: 'info' | 'warning' }; visibility: { navGallery: boolean; navAbout: boolean; autoFullscreen?: boolean; downloadFormat?: 'png' | 'jpeg'; protectImages?: boolean };
   stacks: { loop: boolean; loops?: Record<string, boolean>; covers: Record<string, string>; featured?: string[] }; layoutOverrides: Record<string, Record<string, { x: number; y: number; scale: number; width?: number }>>;
   branding: { enabled: boolean; logoUrl: string }; elementStyles: Record<string, any>; socialLinks: { label: string; url: string; icon: string }[];
   passCard: PassDraft;
@@ -59,7 +59,7 @@ export async function loadSite(force = false){
   } catch (e: any){ emit({ error: e.message, loading: false }); }
 }
 function withDefaults(d: SiteDoc): SiteDoc {
-  return { ...d, notice: d.notice || { enabled: false, text: '', tone: 'info' }, visibility: { navGallery: d.visibility?.navGallery ?? true, navAbout: d.visibility?.navAbout ?? true, autoFullscreen: d.visibility?.autoFullscreen ?? false, downloadFormat: d.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png' },
+  return { ...d, notice: d.notice || { enabled: false, text: '', tone: 'info' }, visibility: { protectImages: d.visibility?.protectImages ?? true, navGallery: d.visibility?.navGallery ?? true, navAbout: d.visibility?.navAbout ?? true, autoFullscreen: d.visibility?.autoFullscreen ?? false, downloadFormat: d.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png' },
     stacks: d.stacks || { loop: true, covers: {} }, layoutOverrides: d.layoutOverrides || { mobile: {}, tablet: {}, desktop: {} }, branding: d.branding || { enabled: false, logoUrl: '' },
     elementStyles: d.elementStyles || {}, socialLinks: d.socialLinks || [], passCard: { ...PASS_DRAFT_DEFAULTS, ...(d.passCard || {}) }, stats: d.stats ? { enabled: d.stats.enabled !== false, items: d.stats.items || [] } : STATS_DEFAULTS,
     intro: { version: d.intro?.version || 'v1' },

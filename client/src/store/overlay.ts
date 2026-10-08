@@ -9,6 +9,7 @@ export function overlayLayer(): HTMLElement {
   if (overlayTarget && overlayTarget.isConnected) return overlayTarget;
   const host = document.createElement('div');
   host.className = 'ka-store-overlays';
+  host.setAttribute('data-ka-shadow', '');
   registerAnimatedProps(host);
   document.body.appendChild(host);
   const shadow = host.attachShadow({ mode: 'open' });

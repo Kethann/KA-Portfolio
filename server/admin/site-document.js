@@ -236,7 +236,7 @@ export function validateSiteDocument(input, current, seed){
   // plain text only: the homepage sets it with textContent, never as HTML
   const notice = { enabled: !!input.notice?.enabled, text: text(input.notice?.text, 220), tone: input.notice?.tone === 'warning' ? 'warning' : 'info' };
   if (notice.enabled && !notice.text) throw bad('Add notice text before turning the banner on, or turn it off.');
-  const visibility = { navGallery: input.visibility?.navGallery !== false, navAbout: input.visibility?.navAbout !== false, autoFullscreen: input.visibility?.autoFullscreen === true, downloadFormat: input.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png' };
+  const visibility = { navGallery: input.visibility?.navGallery !== false, navAbout: input.visibility?.navAbout !== false, autoFullscreen: input.visibility?.autoFullscreen === true, downloadFormat: input.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png', protectImages: input.visibility?.protectImages !== false };
 
   const layoutOverrides = {};
   for (const bp of LAYOUT_BREAKPOINTS){

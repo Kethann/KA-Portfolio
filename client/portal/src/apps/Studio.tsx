@@ -93,6 +93,12 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
                 <Switch checked={d.visibility.navGallery} onChange={v => updateSite(x => ({ ...x, visibility: { ...x.visibility, navGallery: v } }))} label="Show the gallery in the nav" />
                 <Switch checked={d.visibility.navAbout} onChange={v => updateSite(x => ({ ...x, visibility: { ...x.visibility, navAbout: v } }))} label="Show About in the nav" />
               </div>
+              <div className="stack"><div className="eyebrow">Image protection</div>
+                <Switch checked={d.visibility.protectImages !== false} onChange={v => updateSite(x => ({ ...x, visibility: { ...x.visibility, protectImages: v } }))} label="Protect my images" />
+                <p className="field-hint">On: no right-click, “Save image”, dragging or long-press saving; save, print and view-source shortcuts are blocked; images blur
+                  the moment the page loses focus (screenshot tools, switching apps, opening developer tools) and when a screenshot key is pressed, and they never print.
+                  Your own Download buttons keep working. No website can stop a phone screenshot or a camera, so this is a strong deterrent, not a lock.</p>
+              </div>
               <div className="stack"><div className="eyebrow">Image downloads</div>
                 <Segmented label="Download format" value={d.visibility.downloadFormat === 'jpeg' ? 'jpeg' : 'png'} onChange={v => updateSite(x => ({ ...x, visibility: { ...x.visibility, downloadFormat: v } }))} options={[{ value: 'png', label: 'PNG (lossless)' }, { value: 'jpeg', label: 'JPEG (smaller)' }]} />
                 <p className="field-hint">Every gallery image visitors download is saved in this format, never WebP.</p>
