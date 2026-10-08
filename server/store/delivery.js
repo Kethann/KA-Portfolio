@@ -86,7 +86,8 @@ export async function sendDeliveryEmails(order, siteUrl){
     const terms = termsFor(it, store);
     const res = await sendEmail({
       card: { badge: 'Ready to download', title: it.product_title, subtitle: it.product_summary || '', image: absImage(siteUrl, it.product_thumb),
-        rows: [['Order', order.public_id], ['License', `${license ? license.name : 'Personal'}${code ? ` · ${code}` : ''}`], ['Link works until', fmtDate(Date.now() + terms.hours * 3600000)], ['Downloads', `${terms.max} with this link`]],
+        rows: [['Order', order.public_id], ['License', `${license ? license.name : 'Personal'}${code ? ` · ${code}` : ''}`]],
+        stats: [{ value: `${terms.max}`, label: terms.max === 1 ? 'download' : 'downloads' }, { value: lifeLabel(terms.hours), label: `until ${fmtDate(Date.now() + terms.hours * 3600000)}` }],
         cta: { label: 'Download', url } },
       to: order.email, template: 'order_delivery', subjectOverride: extra.subject || undefined,
       vars: { order_id: order.public_id, product_title: it.product_title, download_url: url, expires: fmtDate(Date.now() + terms.hours * 3600000),
@@ -104,6 +105,8 @@ export async function sendDeliveryEmails(order, siteUrl){
   return ok;
 }
 
+/** how long a link lasts, in words: "48 hours", "7 days" */
+function lifeLabel(h){ return h % 24 === 0 && h >= 48 ? `${h / 24} days` : `${h} hour${h === 1 ? '' : 's'}`; }
 /** a picture for an email must be an absolute https address */
 function absImage(site, url){
   if (!url || typeof url !== 'string') return '';
@@ -161,6 +164,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #ff9438;outline-offset:3p
 .rate textarea,.rate input[name=name]{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(0,0,0,.25);color:#edebe8;font:inherit}
 .live{margin:18px 0 16px;padding:16px 16px 14px;border-radius:16px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.1)}.live .row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}.live .label{font:600 11px/1.4 ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(237,235,232,.6)}.live .time{font:600 22px/1.1 ui-monospace,monospace;font-variant-numeric:tabular-nums;color:#ffd9b8;letter-spacing:.02em}.meter{position:relative;height:8px;margin:12px 0 10px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}.meter i{position:absolute;inset:0 auto 0 0;border-radius:inherit;background:linear-gradient(90deg,#ff9438,#ffc795);transition:width .6s cubic-bezier(.2,.8,.2,1)}.live.low .meter i{background:linear-gradient(90deg,#ff6a3d,#ff9438)}.live.low .time{color:#ffb08a}.live.dead{opacity:.7}.live.dead .meter i{background:rgba(255,255,255,.25)}.live b.n{color:#fff;font-size:18px}.note{min-height:1.4em;margin:12px 0 0;font-size:14px}.note.ok{color:#9fe0b0}.note.bad{color:#ffb0a0}button.busy{opacity:.75;cursor:progress}button:disabled{opacity:.5;cursor:not-allowed}@media (prefers-reduced-motion:reduce){.meter i{transition:none}}
 .dlwrap{display:flex;flex-direction:column;align-items:center;gap:10px;margin:22px 0 4px}.dlb{position:relative;width:96px;height:96px;min-height:0;padding:0;border-radius:50%;overflow:hidden;display:grid;place-items:center;letter-spacing:0;border:1.5px solid rgba(255,170,120,.6);background:radial-gradient(circle at 34% 28%,rgba(255,214,176,.24),rgba(255,140,80,.08) 58%,rgba(0,0,0,.28));box-shadow:inset 0 2px 6px rgba(255,255,255,.2),inset 0 -12px 22px rgba(0,0,0,.38),0 12px 34px -12px rgba(255,120,60,.55);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .2s cubic-bezier(.2,.8,.2,1),box-shadow .3s ease,border-color .3s ease;isolation:isolate}.dlb:hover{transform:translateY(-2px);box-shadow:inset 0 2px 6px rgba(255,255,255,.24),inset 0 -12px 22px rgba(0,0,0,.38),0 16px 40px -12px rgba(255,120,60,.7)}.dlb:active{transform:scale(.94)}.dlb-liquid{position:absolute;left:0;right:0;bottom:0;height:0;z-index:0;background:linear-gradient(180deg,#ffbd7a,#ff7a2f 70%,#e2541c);transition:height .6s ease}.dlb.is-filling .dlb-liquid{height:100%;transition:height 1.6s cubic-bezier(.45,.05,.3,1)}.dlb-wave{position:absolute;left:0;bottom:100%;width:200%;height:14px;margin-bottom:-2px;fill:#ffbd7a;animation:dlbWave 1.3s linear infinite;opacity:0;transition:opacity .3s ease}.dlb.is-filling .dlb-wave{opacity:1}.dlb.is-filling .dlb-wave.w2{opacity:.55}.dlb-wave.w2{fill:#ffd2a3;height:12px;animation-duration:2.1s;animation-direction:reverse}@keyframes dlbWave{from{transform:translateX(0)}to{transform:translateX(-50%)}}.dlb-ico{position:relative;z-index:2;width:38px;height:38px;fill:none;stroke:#fff6ee;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45));overflow:visible}.dlb .arr{animation:dlbNod 1.8s ease-in-out infinite}.dlb .tray,.dlb .arr{transition:opacity .2s ease}@keyframes dlbNod{0%,55%,100%{transform:translateY(0)}25%{transform:translateY(3px)}}.dlb.is-filling .arr{animation:dlbDrop .75s ease-in infinite}@keyframes dlbDrop{0%{transform:translateY(-4px);opacity:0}30%{opacity:1}100%{transform:translateY(6px);opacity:0}}.dlb .tick{opacity:0;stroke-dasharray:24;stroke-dashoffset:24}.dlb.is-done .arr,.dlb.is-done .tray{opacity:0;animation:none}.dlb.is-done .tick{opacity:1;animation:dlbTick .45s .05s ease forwards}@keyframes dlbTick{to{stroke-dashoffset:0}}.dlb.is-done{border-color:rgba(143,224,168,.8);box-shadow:inset 0 2px 6px rgba(255,255,255,.2),0 0 0 4px rgba(143,224,168,.18),0 12px 34px -12px rgba(110,220,150,.6)}.dlb.is-done .dlb-liquid{background:linear-gradient(180deg,#a5ecbc,#4fc47f 75%,#2f9a5d)}.dlb.is-done .dlb-wave{fill:#a5ecbc}.dlb.is-done .dlb-wave.w2{fill:#c9f3d6}.dlb.is-error{border-color:rgba(255,140,140,.85);animation:dlbShake .42s ease}.dlb.is-error .dlb-liquid{background:linear-gradient(180deg,#ff9c8c,#e0483a)}.dlb.is-error .dlb-wave{fill:#ff9c8c}@keyframes dlbShake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(3px)}30%,50%,70%{transform:translateX(-5px)}40%,60%{transform:translateX(5px)}}.dlb:disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.6);transform:none}.dlb:disabled .arr{animation:none}.dlb:focus-visible{outline:3px solid #ff9438;outline-offset:4px}.dlb-cap{font:600 11px/1 ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:rgba(237,235,232,.55)}@media (prefers-reduced-motion:reduce){.dlb-wave,.dlb .arr,.dlb.is-filling .arr{animation:none}.dlb .dlb-liquid,.dlb.is-filling .dlb-liquid{transition:none}}
+.stats{display:grid;grid-template-columns:auto minmax(0,1fr);gap:18px;align-items:center}.ring{position:relative;width:104px;height:104px;flex:none}.ring svg{width:100%;height:100%;transform:rotate(-90deg)}.ring .trk{fill:none;stroke:rgba(255,255,255,.08);stroke-width:7}.ring .arc{fill:none;stroke:url(#dlg);stroke-width:7;stroke-linecap:round;transition:stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1)}.ring .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}.ring .in b{font:600 32px/1 Georgia,serif;color:#fff}.ring .in small{margin-top:4px;font:600 10px/1 ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(237,235,232,.55)}.clock .segs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.clock .seg{padding:9px 4px 7px;border-radius:12px;text-align:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}.clock .seg b{display:block;font:600 22px/1 ui-monospace,monospace;font-variant-numeric:tabular-nums;color:#ffd9b8}.clock .seg small{display:block;margin-top:5px;font:600 9.5px/1 ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(237,235,232,.5)}.clock .when{margin-top:9px;font-size:13px;color:rgba(237,235,232,.62)}.live.low .clock .seg b{color:#ffb08a}.live.dead .ring .arc{stroke:rgba(255,255,255,.25)}.clock .seg b.tick{animation:segTick .35s ease}@keyframes segTick{from{transform:translateY(-3px);opacity:.4}to{transform:none;opacity:1}}@media (max-width:420px){.stats{grid-template-columns:1fr;justify-items:center}.clock{width:100%}}@media (prefers-reduced-motion:reduce){.ring .arc{transition:none}.clock .seg b.tick{animation:none}}
 .seal{display:block;width:150px;margin:24px auto 6px}.seal svg{display:block;width:100%;height:auto}.seal-code{text-align:center;margin:0}
 button.ghost{background:transparent;border-color:rgba(255,255,255,.25);justify-self:start}.ts{margin:0 0 16px}.brand{font:600 11px/1 ui-monospace,monospace;letter-spacing:.14em;color:#c9864f;margin-bottom:18px;display:block}
 </style>${withTs ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>' : ''}</head>
@@ -245,9 +249,15 @@ export async function downloadPage(token, siteUrl, { rated = false } = {}){
   return page(200, `Download ${t.product_title}`, `<h1>${escapeHtml(t.product_title)}</h1>
 <p>Order ${escapeHtml(t.public_id)}</p>
 <section class="live${left <= 1 || ms < 3600e3 ? ' low' : ''}" id="dl" data-token="${escapeHtml(token)}" data-expires="${expiresIso}" data-used="${t.download_count}" data-max="${t.max_downloads}" aria-label="Your download link">
-<div class="row"><span class="label">Link expires in</span><b class="time" id="dl-time">${escapeHtml(spanText(ms))}</b></div>
-<div class="meter" id="dl-meter" role="meter" aria-label="Downloads left" aria-valuemin="0" aria-valuemax="${t.max_downloads}" aria-valuenow="${left}"><i id="dl-bar" style="width:${pct}%"></i></div>
-<div class="row"><span><b class="n" id="dl-left">${left}</b> of <span id="dl-max">${t.max_downloads}</span> downloads left</span><small>until ${escapeHtml(fmtDate(t.expires_at))}</small></div>
+<div class="stats">
+<div class="ring" id="dl-meter" role="meter" aria-label="Downloads left" aria-valuemin="0" aria-valuemax="${t.max_downloads}" aria-valuenow="${left}">
+<svg viewBox="0 0 104 104" aria-hidden="true"><defs><linearGradient id="dlg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffc795"/><stop offset="1" stop-color="#ff7a2f"/></linearGradient></defs>
+<circle class="trk" cx="52" cy="52" r="46"/><circle class="arc" id="dl-arc" cx="52" cy="52" r="46" stroke-dasharray="289.03" stroke-dashoffset="${(289.03 * (1 - pct / 100)).toFixed(2)}"/></svg>
+<div class="in"><b id="dl-left">${left}</b><small>of <span id="dl-max">${t.max_downloads}</span> left</small></div></div>
+<div class="clock"><span class="label">Link expires in</span>
+<div class="segs" id="dl-time" aria-label="${escapeHtml(spanText(ms))}">${segsHtml(ms)}</div>
+<div class="when">until ${escapeHtml(fmtDate(t.expires_at))}</div></div>
+</div>
 </section>
 <form method="post" id="dl-form" class="dlwrap">{{TURNSTILE}}<button type="submit" id="dl-btn" class="dlb" aria-label="Download" title="Download">
 <span class="dlb-liquid" aria-hidden="true"><svg class="dlb-wave" viewBox="0 0 120 20" preserveAspectRatio="none"><path d="M0 10 Q 15 0 30 10 T 60 10 T 90 10 T 120 10 V 20 H 0 Z"/></svg><svg class="dlb-wave w2" viewBox="0 0 120 20" preserveAspectRatio="none"><path d="M0 10 Q 15 0 30 10 T 60 10 T 90 10 T 120 10 V 20 H 0 Z"/></svg></span>
@@ -256,6 +266,13 @@ export async function downloadPage(token, siteUrl, { rated = false } = {}){
 <p class="note" id="dl-note" role="status" aria-live="polite"></p>${seal}${rateHtml}`, { turnstile: true, script: LIVE_SCRIPT });
 }
 
+/** the countdown as four tiles: days, hours, minutes, seconds */
+function segsHtml(ms){
+  let s = Math.max(0, Math.floor(ms / 1000)); const d = Math.floor(s / 86400); s %= 86400;
+  const h = Math.floor(s / 3600); s %= 3600; const m = Math.floor(s / 60); s %= 60;
+  const two = (n) => String(n).padStart(2, '0');
+  return [[d, 'days', 'dl-d'], [two(h), 'hrs', 'dl-h'], [two(m), 'min', 'dl-m'], [two(s), 'sec', 'dl-s']].map(([v, l, id]) => `<span class="seg"><b id="${id}">${v}</b><small>${l}</small></span>`).join('');
+}
 function spanText(ms){
   if (ms <= 0) return 'Expired';
   let s = Math.floor(ms / 1000); const d = Math.floor(s / 86400); s %= 86400;
@@ -273,8 +290,10 @@ function two(n){return(n<10?'0':'')+n}
 function span(ms){if(ms<=0)return'Expired';var s=Math.floor(ms/1000),d=Math.floor(s/86400);s%=86400;var h=Math.floor(s/3600);s%=3600;var m=Math.floor(s/60);s%=60;return(d?d+'d ':'')+two(h)+':'+two(m)+':'+two(s)}
 function paint(){
   var ms=exp-Date.now(),rem=Math.max(0,max-used);
-  $('dl-time').textContent=span(ms);$('dl-left').textContent=rem;$('dl-max').textContent=max;
-  $('dl-bar').style.width=(max?Math.round(rem/max*100):0)+'%';
+  var left=Math.max(0,Math.floor(ms/1000)),parts=[Math.floor(left/86400),two(Math.floor(left%86400/3600)),two(Math.floor(left%3600/60)),two(left%60)];
+  ['dl-d','dl-h','dl-m','dl-s'].forEach(function(id,i){var b=$(id);if(b&&b.textContent!==String(parts[i])){b.textContent=parts[i];b.classList.remove('tick');void b.offsetWidth;b.classList.add('tick');}});
+  $('dl-time').setAttribute('aria-label',span(ms));$('dl-left').textContent=rem;$('dl-max').textContent=max;
+  var arc=$('dl-arc');if(arc){var C=+arc.getAttribute('stroke-dasharray');arc.style.strokeDashoffset=(C*(1-(max?rem/max:0))).toFixed(2);}
   var m=$('dl-meter');m.setAttribute('aria-valuenow',rem);m.setAttribute('aria-valuemax',max);
   el.classList.toggle('low',rem<=1||(ms>0&&ms<3600e3));
   var dead=ms<=0?'expired':rem<=0?'limit':state!=='ok'?state:'';

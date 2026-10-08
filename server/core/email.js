@@ -118,8 +118,16 @@ function cardHtml(card){
 <div style="margin:${badge ? '14px' : '0'} 0 4px;color:${C.ink};font:500 22px/1.25 ${SERIF}">${escapeHtml(card.title || '')}</div>
 ${card.subtitle ? `<div style="color:${C.dim};font:14px/1.5 ${FONT}">${escapeHtml(card.subtitle)}</div>` : ''}
 ${rows ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px">${rows}</table>` : ''}
+${statsHtml(card.stats)}
 ${card.cta ? `<div style="margin-top:18px">${button(card.cta.label, card.cta.url)}</div>` : ''}
 </td>${img}</tr></table>`;
+}
+/** big-number tiles (downloads left, how long the link lasts) */
+function statsHtml(stats){
+  if (!Array.isArray(stats) || !stats.length) return '';
+  const cells = stats.map(st => `<td width="${Math.floor(100 / stats.length)}%" valign="top" style="padding:0 ${stats.length > 1 ? 6 : 0}px 0 0"><div style="background:${C.bg};border:1px solid ${C.line};border-radius:14px;padding:12px 14px">
+<div style="color:#ffd9b0;font:600 26px/1.1 ${SERIF}">${escapeHtml(st.value)}</div><div style="margin-top:4px;color:${C.faint};font:12px/1.4 ${FONT}">${escapeHtml(st.label)}</div></div></td>`).join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:14px"><tr>${cells}</tr></table>`;
 }
 function layout(inner, siteName, { card, site } = {}){
   const store = site ? `${site}/?page=store` : '';
@@ -139,16 +147,16 @@ ${store ? `<tr><td align="center" style="padding:22px 6px 6px">${button('Explore
 
 // Built-in templates; the portal can override subject/body per key (email_templates table).
 export const DEFAULT_TEMPLATES = {
-  contact_notify: { subject: 'New message: {{subject}}', body: 'From: {{name}} <{{email}}>\n\n{{message}}\n\nOpen the inbox: {{portal_url}}' },
-  contact_autoreply: { subject: 'Thanks for your message', body: 'Hi {{name}},\n\nThanks for reaching out. I read every message and will reply soon.\n\n{{signature}}' },
-  notify_confirm: { subject: 'You’re on the list', body: 'Thanks! You’ll get one email when {{topic_name}} launches.\n\n{{signature}}' },
-  order_delivery: { subject: 'Your download is ready: {{product_title}} (order {{order_id}})', body: 'Hello,\n\nThank you for your purchase. Your order {{order_id}} is confirmed and {{product_title}} is ready to download.\n\nDownload your files\n{{download_url}}\n\nThis secure link works until {{expires}} and allows up to {{max_downloads}} downloads. Please save the files somewhere safe once they have downloaded.\n\n{{extra_note}}\n\nYour license\n{{license_name}} license. The full terms are attached to this email as LICENSE.txt, and the key points are below.\n\n{{license_text}}\n\nYour receipt follows in a separate email. If the link expires, you can request a new one at any time from the store with "Email me my download links", using this email address.\n\nIf anything does not work as expected, just reply to this email and we will help.\n\n{{signature}}' },
-  order_receipt: { subject: 'Receipt {{invoice_number}} for order {{order_id}}', body: 'Receipt / Invoice {{invoice_number}}\nDate: {{date}}\nOrder: {{order_id}}\nBilled to: {{email}}\n\n{{lines}}\n\nSubtotal: {{subtotal}}\nDiscount: {{discount}}\n{{tax_label}}: {{tax}}\nTotal paid: {{total}}\n\nPayment reference: {{payment_id}}\n{{seller_block}}\n\n{{signature}}' },
-  resend_link: { subject: 'Your download links', body: 'Here are fresh download links for your orders:\n\n{{links}}\n\nEach link works until {{expires}}.\n\n{{signature}}' },
-  report: { subject: '{{period}} sales report', body: '{{summary}}\n\nOpen the portal: {{portal_url}}' },
+  contact_notify: { subject: 'New message: {{subject}}', body: 'From {{name}} <{{email}}>\n\n{{message}}\n\nReply from the inbox:\n{{portal_url}}' },
+  contact_autoreply: { subject: 'Thanks for writing, {{name}}', body: 'Hi {{name}},\n\nThank you for getting in touch. Your message is with me, and I’ll reply personally, usually within a day or two.\n\n{{signature}}' },
+  notify_confirm: { subject: 'You’re on the list', body: 'You’re on the list.\n\nYou’ll get exactly one email when {{topic_name}} launches. Nothing else.\n\n{{signature}}' },
+  order_delivery: { subject: 'Your download is ready: {{product_title}}', body: 'Hi there,\n\nThank you for your order. {{product_title}} is yours. Download it here:\n\n{{download_url}}\nThe link works until {{expires}}, for up to {{max_downloads}} downloads.\n\n{{extra_note}}\n\nYour {{license_name}} license is attached as LICENSE.txt. Keep this email: it’s your proof of purchase.\n\nLink expired? Get a fresh one any time from the store with “Email me my download links”. Questions? Just reply.\n\n{{signature}}' },
+  order_receipt: { subject: 'Receipt {{invoice_number}} · order {{order_id}}', body: 'Thank you for your payment.\n\n{{lines}}\n\nSubtotal: {{subtotal}}\nDiscount: {{discount}}\n{{tax_label}}: {{tax}}\nTotal paid: {{total}}\n\nInvoice {{invoice_number}} · {{date}}\nOrder {{order_id}} · billed to {{email}}\nPayment reference {{payment_id}}\n{{seller_block}}\n\n{{signature}}' },
+  resend_link: { subject: 'Your download links', body: 'Here are fresh links for your purchases.\n\n{{links}}\n\nThey work until {{expires}}. Need a hand? Just reply.\n\n{{signature}}' },
+  report: { subject: '{{period}} sales report', body: '{{summary}}\n\nOpen the portal:\n{{portal_url}}' },
   alert: { subject: 'Alert: {{title}}', body: '{{body}}' },
   reply: { subject: 'Re: {{subject}}', body: '{{body}}\n\n{{signature}}' },
-  launch: { subject: '{{topic_title}} is live', body: 'Hi,\n\nYou asked to hear when {{topic_name}} launches. It’s ready now:\n{{link}}\n\n{{message}}\n\nYou got this one email because you signed up on the site; you won’t get more about it.\n\n{{signature}}' }
+  launch: { subject: '{{topic_title}} is live', body: 'Hi,\n\n{{topic_name}} is live, and you asked to be the first to know.\n\n{{link}}\n\n{{message}}\n\nThis was the one email you signed up for. There won’t be more about it.\n\n{{signature}}' }
 };
 
 export async function loadTemplate(key){

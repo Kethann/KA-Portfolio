@@ -409,3 +409,14 @@
 .intro-versions{ display:flex; flex-direction:column; gap:8px; }
 .intro-version{ display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:12px; border:1px solid var(--line, rgba(255,255,255,.1)); cursor:pointer; }
 .intro-version:has(input:checked){ border-color:rgba(255,170,120,.6); background:rgba(255,148,56,.06); }
+
+/* ---- Overview: Cloudflare storage (free plan) ---- */
+.storage-card .storage-total{ margin:0 0 var(--sp-3); color:var(--text-2, inherit); }
+.storage-card .storage-total b{ font-size:1.35em; color:var(--text-1, inherit); }
+.storage-list{ list-style:none; margin:0 0 var(--sp-3); padding:0; display:grid; gap:var(--sp-4, 16px); }
+.storage-list li{ display:grid; gap:6px; }
+.storage-bar{ display:block; height:10px; border-radius:6px; background:var(--surface-3); overflow:hidden; position:relative; }
+.storage-bar > i{ display:block; height:100%; border-radius:6px; transition:width var(--dur-2) var(--ease-out);
+  background:linear-gradient(90deg, var(--success), color-mix(in srgb, var(--success) 60%, #fff)); }
+.storage-bar.is-warn > i{ background:linear-gradient(90deg, var(--warning), color-mix(in srgb, var(--warning) 60%, #fff)); }
+.storage-bar.is-bad > i{ background:linear-gradient(90deg, var(--danger), color-mix(in srgb, var(--danger) 60%, #fff)); }

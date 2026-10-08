@@ -309,7 +309,7 @@ function System(){
       ))}</ul>
       <div><AsyncButton className="btn" onClick={async () => { const r = await post<{ to: string }>('/system/test-email'); toast.show(`Test email sent to ${r.to}`, { tone: 'success' }); s.reload(); }}><Icon name="mail" /> Send a test email</AsyncButton></div>
     </Section>
-    <Section title="File storage" desc="Supabase’s free plan includes 1 GB.">
+    <Section title="File storage" desc="Cloudflare R2’s free plan includes 10 GB for all files together.">
       {!st.data ? <SkeletonRows rows={3} /> : Object.entries(st.data.buckets).map(([k, b]: [string, any]) => (
         <div key={k} className="stack" style={{ gap: 4 }}><div className="row between"><span>{k === 'media' ? 'Images & fonts (public)' : k === 'deliverables' ? 'Files for buyers (private)' : 'Backups (private)'}</span><span className="faint num">{b.error ? b.error : `${bytes(b.bytes)} · ${b.count} files`}</span></div>
           <div className="meter"><i style={{ width: `${pct(b.bytes, st.data.limitBytes)}%` }} /></div></div>

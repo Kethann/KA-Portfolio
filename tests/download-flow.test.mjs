@@ -143,8 +143,8 @@ test('the download page counts down live and the button downloads without leavin
   await withUploadedFile(id);
   const token = await claim(id, 'live@example.com');
   const page = await app.call('GET', `/api/download/${token}`, { ip: ip() });
-  assert.match(page.text, /id="dl-time">0?4:5\d:\d\d<\/b>/, 'about 5 hours left, shown as a countdown');
-  assert.match(page.text, /id="dl-left">2<\/b> of <span id="dl-max">2<\/span> downloads left/);
+  assert.match(page.text, /id="dl-d">0<\/b>[\s\S]*id="dl-h">0?4<\/b>[\s\S]*id="dl-m">5\d<\/b>/, 'about 5 hours left, shown as countdown tiles');
+  assert.match(page.text, /id="dl-left">2<\/b><small>of <span id="dl-max">2<\/span> left/);
   const nonce = /<script nonce="([A-Za-z0-9_-]+)">/.exec(page.text)?.[1];
   assert.ok(nonce, 'the live script is inline with a nonce');
   const csp = page.headers.get('content-security-policy');

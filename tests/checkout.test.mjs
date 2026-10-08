@@ -94,7 +94,7 @@ test('success: signature + webhook -> paid -> delivered, receipt numbered, one-t
   assert.equal(db.status, 'delivered'); assert.ok(db.signature_verified_at && db.captured_at && db.paid_at); assert.equal(db.invoice_number, 1);
   const mails = mailsTo('asha@example.com');
   assert.equal(mails.length, 2, 'delivery + receipt');
-  assert.match(mails[0].subject, /Your download/); assert.match(mails[0].text, /No resale/); assert.equal(mails[0].attachments[0].name, 'LICENSE.txt');
+  assert.match(mails[0].subject, /Your download/); assert.match(mails[0].attachments[0].content.toString(), /No resale/, 'the license terms travel as LICENSE.txt'); assert.equal(mails[0].attachments[0].name, 'LICENSE.txt');
   assert.match(mails[1].subject, /Receipt INV-000001/); assert.match(mails[1].text, /₹499/);
   const st = await app.call('POST', '/api/checkout/status', { body: { orderId: o.orderId, clientSecret: o.clientSecret }, ip: ip() });
   assert.equal(st.json.status, 'delivered'); assert.match(st.json.downloadUrl || r.verify.json.downloadUrl, /\/api\/download\//);
@@ -103,7 +103,7 @@ test('success: signature + webhook -> paid -> delivered, receipt numbered, one-t
   // the download itself
   const link = linkIn(mails[0]), token = link.split('/').pop();
   const page = await app.call('GET', `/api/download/${token}`, { ip: ip() });
-  assert.equal(page.status, 200); assert.match(page.text, /id="dl-left">3<\/b> of <span id="dl-max">3<\/span> downloads left/); assert.match(page.headers.get('content-security-policy'), /default-src 'none'/);
+  assert.equal(page.status, 200); assert.match(page.text, /id="dl-left">3<\/b><small>of <span id="dl-max">3<\/span> left/); assert.match(page.headers.get('content-security-policy'), /default-src 'none'/);
   const dl = await app.call('POST', `/api/download/${token}`, { body: '', raw: true, headers: { 'content-type': 'application/x-www-form-urlencoded' }, ip: '203.0.113.50' });
   assert.equal(dl.status, 303); assert.match(dl.headers.get('location'), /^\/__storage\/deliverables\/.+\?exp=\d+&sig=[0-9a-f]+&download=file.zip$/);
   const ev = (await app.pg.query(`select e.ip from download_events e join orders o on o.id = e.order_id where o.public_id = $1`, [o.orderId])).rows;
@@ -435,7 +435,7 @@ test('delivery email: the owner\'s message, subject and attachments for a produc
   assert.equal(res.status, 201); await pay(res.json);
   const mail = mailsTo('guided@example.com')[0];
   assert.equal(mail.subject, 'Welcome to guided kit');
-  assert.match(mail.text, /Start with Setup-guide\.pdf, then run the installer\./); assert.match(mail.text, /secure link works until/);
+  assert.match(mail.text, /Start with Setup-guide\.pdf, then run the installer\./); assert.match(mail.text, /link works until .+, for up to 3 downloads/);
   assert.ok(!/\n{3,}/.test(mail.text), 'no stretches of blank lines');
   assert.deepEqual(mail.attachments.map(a => a.name), ['LICENSE.txt', 'Setup-guide.pdf']);
   assert.equal(Buffer.from(mail.attachments[1].content).toString(), 'PDFDATA');
@@ -444,6 +444,6 @@ test('delivery email: the owner\'s message, subject and attachments for a produc
   const res2 = await order(plainId, { email: 'plain@example.com' });
   await pay(res2.json);
   const plain = mailsTo('plain@example.com')[0];
-  assert.match(plain.subject, /Your download is ready: plain kit/); assert.match(plain.text, /Thank you for your purchase/); assert.ok(!plain.text.includes('{{')); assert.ok(!/\n{3,}/.test(plain.text));
+  assert.match(plain.subject, /Your download is ready: plain kit/); assert.match(plain.text, /Thank you for your order/); assert.ok(!plain.text.includes('{{')); assert.ok(!/\n{3,}/.test(plain.text));
   assert.deepEqual(plain.attachments.map(a => a.name), ['LICENSE.txt']);
 });

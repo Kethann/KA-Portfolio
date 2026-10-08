@@ -23,7 +23,8 @@ const ACT: Record<string, { icon: string; tone: string; text: (a: any) => string
 // Cards the owner can show or hide (Customize). Revenue cards are per currency.
 const CARDS: { id: string; label: string }[] = [
   { id: 'rev-INR', label: 'Revenue · INR' }, { id: 'rev-USD', label: 'Revenue · USD' }, { id: 'conversion', label: 'Conversion' },
-  { id: 'visitors', label: 'Visitors' }, { id: 'chart', label: 'Revenue per day' }, { id: 'top', label: 'Top items' }, { id: 'activity', label: 'Latest activity' }
+  { id: 'visitors', label: 'Visitors' }, { id: 'chart', label: 'Revenue per day' }, { id: 'top', label: 'Top items' }, { id: 'activity', label: 'Latest activity' },
+  { id: 'storage', label: 'Cloudflare storage' }
 ];
 
 export default function Overview({ active, open }: AppProps){
@@ -114,6 +115,8 @@ export default function Overview({ active, open }: AppProps){
         </section>}
       </div>}
 
+      {show('storage') && <StorageCard open={open} />}
+
       {show('activity') && <section className="card" aria-labelledby="ov-act">
         <h3 id="ov-act"><Icon name="bell" /> <span className="grow">Latest activity</span>{s.loading && d && <span className="faint" style={{ fontSize: 12 }}>Updating…</span>}</h3>
         {!d ? <div className="stack">{[0, 1, 2, 3, 4].map(i => <Skeleton key={i} h={30} />)}</div> : d.activity.length ? (
@@ -191,5 +194,40 @@ function Customize({ off, setOff, net, setNet }: { off: string[]; setOff: (v: st
         <button type="button" role="menuitem" className="menu-item" disabled={!off.length && net} onClick={() => { setOff([]); setNet(true); }}><span className="menu-check" /><span className="menu-label">Reset to default</span></button>
       </div>}
     </span>
+  );
+}
+
+// How much of Cloudflare's free plan is used: file storage (R2, 10 GB) and the database (D1, 500 MB). Measured on the
+// server every few hours; Refresh measures again now.
+type UsageItem = { key: string; label: string; used: number | null; limit: number; ratio: number | null };
+const gb = (n: number) => n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(2)} GB` : n >= 1024 ** 2 ? `${(n / 1024 ** 2).toFixed(1)} MB` : `${Math.max(0, Math.round(n / 1024))} KB`;
+function StorageCard({ open }: { open: AppProps['open'] }){
+  const [fresh, setFresh] = useState(0);
+  const u = useLoad<{ items: UsageItem[]; level: string; measuredAt: string }>(`/usage${fresh ? '?fresh=1&n=' + fresh : ''}`);
+  const items = u.data?.items || [];
+  const used = items.reduce((a, i) => a + (i.used || 0), 0), total = items.reduce((a, i) => a + i.limit, 0);
+  return (
+    <section className="card storage-card" aria-labelledby="ov-st">
+      <h3 id="ov-st"><Icon name="downloads" /> <span className="grow">Cloudflare storage <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>free plan</span></span>
+        <button type="button" className="icon-btn" aria-label="Measure again" title="Measure again" onClick={() => setFresh(Date.now())}><Icon name="refresh" /></button></h3>
+      {u.error && !u.data ? <p className="field-error">{u.error}</p> : !u.data ? <div className="stack">{[0, 1].map(i => <Skeleton key={i} h={44} />)}</div> : <>
+        <p className="storage-total"><b className="num">{gb(used)}</b> used of <span className="num">{gb(total)}</span> free <span className="faint">({items.map(i => `${gb(i.limit)} ${i.key === 'files' ? 'files' : 'database'}`).join(' + ')})</span></p>
+        <ul className="storage-list">
+          {items.map(i => {
+            const pct = i.used === null ? 0 : Math.min(100, (i.used / i.limit) * 100);
+            const tone = pct >= 95 ? 'bad' : pct >= 80 ? 'warn' : 'ok';
+            return (
+              <li key={i.key}>
+                <div className="row between"><span>{i.key === 'files' ? 'Files (R2)' : 'Database (D1)'} <span className="faint">· {i.label.replace(/^[^(]*\(|\)$/g, '')}</span></span>
+                  <span className="num">{i.used === null ? '—' : gb(i.used)} <span className="faint">of {gb(i.limit)}</span></span></div>
+                <span className={'storage-bar is-' + tone} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} aria-label={`${i.key === 'files' ? 'File storage' : 'Database'} used`}><i style={{ width: `${Math.max(pct, i.used ? 1.5 : 0)}%` }} /></span>
+                <div className="row between faint" style={{ fontSize: 12 }}><span>{pct < 1 && i.used ? '<1' : Math.round(pct)}% used</span><span>{i.used === null ? '' : `${gb(Math.max(0, i.limit - i.used))} free`}</span></div>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="faint" style={{ fontSize: 12, margin: 0 }}>Measured {ago(u.data.measuredAt)}. <button type="button" className="btn sm ghost" onClick={() => open('settings', 'system')}>Details in System status</button></p>
+      </>}
+    </section>
   );
 }
