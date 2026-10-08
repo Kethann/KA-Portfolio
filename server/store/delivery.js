@@ -147,6 +147,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #ff9438;outline-offset:3p
 .stars input:checked~label,.stars label:hover,.stars label:hover~label{color:#ffb35c}.stars input:focus-visible+label{outline:2px solid #ff9438;border-radius:4px}
 .rate textarea,.rate input[name=name]{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(0,0,0,.25);color:#edebe8;font:inherit}
 .live{margin:18px 0 16px;padding:16px 16px 14px;border-radius:16px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.1)}.live .row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}.live .label{font:600 11px/1.4 ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(237,235,232,.6)}.live .time{font:600 22px/1.1 ui-monospace,monospace;font-variant-numeric:tabular-nums;color:#ffd9b8;letter-spacing:.02em}.meter{position:relative;height:8px;margin:12px 0 10px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}.meter i{position:absolute;inset:0 auto 0 0;border-radius:inherit;background:linear-gradient(90deg,#ff9438,#ffc795);transition:width .6s cubic-bezier(.2,.8,.2,1)}.live.low .meter i{background:linear-gradient(90deg,#ff6a3d,#ff9438)}.live.low .time{color:#ffb08a}.live.dead{opacity:.7}.live.dead .meter i{background:rgba(255,255,255,.25)}.live b.n{color:#fff;font-size:18px}.note{min-height:1.4em;margin:12px 0 0;font-size:14px}.note.ok{color:#9fe0b0}.note.bad{color:#ffb0a0}button.busy{opacity:.75;cursor:progress}button:disabled{opacity:.5;cursor:not-allowed}@media (prefers-reduced-motion:reduce){.meter i{transition:none}}
+.dlwrap{display:flex;flex-direction:column;align-items:center;gap:10px;margin:22px 0 4px}.dlb{position:relative;width:96px;height:96px;min-height:0;padding:0;border-radius:50%;overflow:hidden;display:grid;place-items:center;letter-spacing:0;border:1.5px solid rgba(255,170,120,.6);background:radial-gradient(circle at 34% 28%,rgba(255,214,176,.24),rgba(255,140,80,.08) 58%,rgba(0,0,0,.28));box-shadow:inset 0 2px 6px rgba(255,255,255,.2),inset 0 -12px 22px rgba(0,0,0,.38),0 12px 34px -12px rgba(255,120,60,.55);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .2s cubic-bezier(.2,.8,.2,1),box-shadow .3s ease,border-color .3s ease;isolation:isolate}.dlb:hover{transform:translateY(-2px);box-shadow:inset 0 2px 6px rgba(255,255,255,.24),inset 0 -12px 22px rgba(0,0,0,.38),0 16px 40px -12px rgba(255,120,60,.7)}.dlb:active{transform:scale(.94)}.dlb-liquid{position:absolute;left:0;right:0;bottom:0;height:0;z-index:0;background:linear-gradient(180deg,#ffbd7a,#ff7a2f 70%,#e2541c);transition:height .6s ease}.dlb.is-filling .dlb-liquid{height:100%;transition:height 1.6s cubic-bezier(.45,.05,.3,1)}.dlb-wave{position:absolute;left:0;bottom:100%;width:200%;height:14px;margin-bottom:-2px;fill:#ffbd7a;animation:dlbWave 1.3s linear infinite;opacity:0;transition:opacity .3s ease}.dlb.is-filling .dlb-wave{opacity:1}.dlb.is-filling .dlb-wave.w2{opacity:.55}.dlb-wave.w2{fill:#ffd2a3;height:12px;animation-duration:2.1s;animation-direction:reverse}@keyframes dlbWave{from{transform:translateX(0)}to{transform:translateX(-50%)}}.dlb-ico{position:relative;z-index:2;width:38px;height:38px;fill:none;stroke:#fff6ee;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45));overflow:visible}.dlb .arr{animation:dlbNod 1.8s ease-in-out infinite}.dlb .tray,.dlb .arr{transition:opacity .2s ease}@keyframes dlbNod{0%,55%,100%{transform:translateY(0)}25%{transform:translateY(3px)}}.dlb.is-filling .arr{animation:dlbDrop .75s ease-in infinite}@keyframes dlbDrop{0%{transform:translateY(-4px);opacity:0}30%{opacity:1}100%{transform:translateY(6px);opacity:0}}.dlb .tick{opacity:0;stroke-dasharray:24;stroke-dashoffset:24}.dlb.is-done .arr,.dlb.is-done .tray{opacity:0;animation:none}.dlb.is-done .tick{opacity:1;animation:dlbTick .45s .05s ease forwards}@keyframes dlbTick{to{stroke-dashoffset:0}}.dlb.is-done{border-color:rgba(143,224,168,.8);box-shadow:inset 0 2px 6px rgba(255,255,255,.2),0 0 0 4px rgba(143,224,168,.18),0 12px 34px -12px rgba(110,220,150,.6)}.dlb.is-done .dlb-liquid{background:linear-gradient(180deg,#a5ecbc,#4fc47f 75%,#2f9a5d)}.dlb.is-done .dlb-wave{fill:#a5ecbc}.dlb.is-done .dlb-wave.w2{fill:#c9f3d6}.dlb.is-error{border-color:rgba(255,140,140,.85);animation:dlbShake .42s ease}.dlb.is-error .dlb-liquid{background:linear-gradient(180deg,#ff9c8c,#e0483a)}.dlb.is-error .dlb-wave{fill:#ff9c8c}@keyframes dlbShake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(3px)}30%,50%,70%{transform:translateX(-5px)}40%,60%{transform:translateX(5px)}}.dlb:disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.6);transform:none}.dlb:disabled .arr{animation:none}.dlb:focus-visible{outline:3px solid #ff9438;outline-offset:4px}.dlb-cap{font:600 11px/1 ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:rgba(237,235,232,.55)}@media (prefers-reduced-motion:reduce){.dlb-wave,.dlb .arr,.dlb.is-filling .arr{animation:none}.dlb .dlb-liquid,.dlb.is-filling .dlb-liquid{transition:none}}
 .seal{display:block;width:150px;margin:24px auto 6px}.seal svg{display:block;width:100%;height:auto}.seal-code{text-align:center;margin:0}
 button.ghost{background:transparent;border-color:rgba(255,255,255,.25);justify-self:start}.ts{margin:0 0 16px}.brand{font:600 11px/1 ui-monospace,monospace;letter-spacing:.14em;color:#c9864f;margin-bottom:18px;display:block}
 </style>${withTs ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>' : ''}</head>
@@ -235,7 +236,10 @@ export async function downloadPage(token, siteUrl, { rated = false } = {}){
 <div class="meter" id="dl-meter" role="meter" aria-label="Downloads left" aria-valuemin="0" aria-valuemax="${t.max_downloads}" aria-valuenow="${left}"><i id="dl-bar" style="width:${pct}%"></i></div>
 <div class="row"><span><b class="n" id="dl-left">${left}</b> of <span id="dl-max">${t.max_downloads}</span> downloads left</span><small>until ${escapeHtml(fmtDate(t.expires_at))}</small></div>
 </section>
-<form method="post" id="dl-form">{{TURNSTILE}}<button type="submit" id="dl-btn">Download</button></form>
+<form method="post" id="dl-form" class="dlwrap">{{TURNSTILE}}<button type="submit" id="dl-btn" class="dlb" aria-label="Download" title="Download">
+<span class="dlb-liquid" aria-hidden="true"><svg class="dlb-wave" viewBox="0 0 120 20" preserveAspectRatio="none"><path d="M0 10 Q 15 0 30 10 T 60 10 T 90 10 T 120 10 V 20 H 0 Z"/></svg><svg class="dlb-wave w2" viewBox="0 0 120 20" preserveAspectRatio="none"><path d="M0 10 Q 15 0 30 10 T 60 10 T 90 10 T 120 10 V 20 H 0 Z"/></svg></span>
+<svg class="dlb-ico" viewBox="0 0 24 24" aria-hidden="true"><path class="arr" d="M12 3.5v11.5m0 0l-4.6-4.6M12 15l4.6-4.6"/><path class="tray" d="M4.5 19.5h15"/><path class="tick" d="M5 12.5l4.2 4.2L19 7"/></svg>
+</button></form>
 <p class="note" id="dl-note" role="status" aria-live="polite"></p>${seal}${rateHtml}`, { turnstile: true, script: LIVE_SCRIPT });
 }
 
@@ -261,7 +265,7 @@ function paint(){
   var m=$('dl-meter');m.setAttribute('aria-valuenow',rem);m.setAttribute('aria-valuemax',max);
   el.classList.toggle('low',rem<=1||(ms>0&&ms<3600e3));
   var dead=ms<=0?'expired':rem<=0?'limit':state!=='ok'?state:'';
-  if(dead){btn.disabled=true;btn.textContent=dead==='expired'?'Link expired':dead==='limit'?'No downloads left':'Unavailable';el.classList.add('dead');}
+  if(dead){btn.disabled=true;var why=dead==='expired'?'Link expired':dead==='limit'?'No downloads left':'Unavailable';btn.setAttribute('aria-label',why);btn.title=why;el.classList.add('dead');}
 }
 function refresh(){
   fetch('/api/download/'+token+'/status',{cache:'no-store',headers:{Accept:'application/json'}}).then(function(r){return r.json()}).then(function(s){
@@ -271,26 +275,40 @@ function refresh(){
 paint();setInterval(paint,1000);
 setInterval(function(){if(!document.hidden)refresh()},15000);
 document.addEventListener('visibilitychange',function(){if(!document.hidden)refresh()});
+var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+function fail(msg){
+  note.textContent=msg;note.className='note bad';
+  btn.classList.remove('is-filling');btn.classList.add('is-error');
+  setTimeout(function(){btn.classList.remove('is-error');busy=false;if(!btn.disabled)btn.setAttribute('aria-label','Try the download again');paint()},900);
+}
 form.addEventListener('submit',function(e){
   if(!window.fetch||!window.URLSearchParams||!window.FormData)return;
   e.preventDefault();if(busy||btn.disabled)return;
-  busy=true;btn.classList.add('busy');btn.textContent='Preparing your file…';note.textContent='';note.className='note';
+  busy=true;btn.classList.remove('is-done','is-error');void btn.offsetWidth;btn.classList.add('is-filling');
+  btn.setAttribute('aria-label','Preparing your download');note.textContent='Preparing your file…';note.className='note';
+  var t0=Date.now(),FILL=reduce?0:1600;
+  // the bubble always fills completely before anything happens, so the motion never cuts short
+  var after=function(fn){setTimeout(fn,Math.max(0,FILL-(Date.now()-t0)))};
   fetch(location.pathname,{method:'POST',body:new URLSearchParams(new FormData(form)),headers:{Accept:'application/json'},credentials:'same-origin'})
   .then(function(r){return r.json().then(function(j){return{ok:r.ok,j:j||{}}},function(){return{ok:false,j:{}}})})
   .then(function(x){
     var j=x.j;
-    if(x.ok&&j.url){
-      used=j.used;max=j.max;exp=Date.parse(j.expiresAt);paint();
-      var rem=Math.max(0,max-used);
-      note.textContent='Your download has started. '+rem+' of '+max+' download'+(max===1?'':'s')+' left on this link.';note.className='note ok';
-      var a=document.createElement('a');a.href=j.url;a.rel='noopener';a.style.display='none';document.body.appendChild(a);a.click();setTimeout(function(){a.remove()},1000);
-    }else{
-      if(j.state){state=j.state}
-      note.textContent=j.message||j.error||'Something went wrong. Please try again.';note.className='note bad';refresh();
-    }
+    after(function(){
+      if(x.ok&&j.url){
+        used=j.used;max=j.max;exp=Date.parse(j.expiresAt);paint();
+        var rem=Math.max(0,max-used);
+        btn.classList.add('is-done');btn.setAttribute('aria-label','Download started');
+        note.textContent='Your download has started. '+rem+' of '+max+' download'+(max===1?'':'s')+' left on this link.';note.className='note ok';
+        var a=document.createElement('a');a.href=j.url;a.rel='noopener';a.style.display='none';document.body.appendChild(a);a.click();setTimeout(function(){a.remove()},1000);
+        setTimeout(function(){btn.classList.remove('is-filling','is-done');busy=false;if(!btn.disabled){btn.setAttribute('aria-label','Download again');btn.title='Download again';}paint()},2600);
+      }else{
+        if(j.state){state=j.state}
+        fail(j.message||j.error||'Something went wrong. Please try again.');refresh();
+      }
+      if(window.turnstile){try{window.turnstile.reset()}catch(err){}}
+    });
   })
-  .catch(function(){note.textContent='No connection. Check your internet and try again.';note.className='note bad'})
-  .then(function(){busy=false;btn.classList.remove('busy');if(!btn.disabled)btn.textContent='Download again';if(window.turnstile){try{window.turnstile.reset()}catch(err){}}paint()});
+  .catch(function(){after(function(){fail('No connection. Check your internet and try again.')})});
 });
 })();`;
 
