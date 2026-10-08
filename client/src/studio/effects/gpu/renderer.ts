@@ -74,6 +74,9 @@ export class GpuText {
     if (this.gl) this.available = this.init(this.gl);
     this.canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); this.stop(); this.available = false; this.canvas.hidden = true; });
     this.canvas.hidden = true;
+    // phones, tablets and in-app browsers (lite mode) start a little lighter; the quality then adapts to the frame rate
+    const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    this.quality = (window as unknown as { kaLite?: boolean }).kaLite ? 0.7 : coarse ? 0.85 : 1;
   }
   private compile(g: WebGLRenderingContext, vs: string, fs: string, attrs: string[], unis: string[]): Prog | null {
     const sh = (type: number, src: string) => { const s = g.createShader(type)!; g.shaderSource(s, src); g.compileShader(s); if (!g.getShaderParameter(s, g.COMPILE_STATUS)){ console.warn('gpu text shader', g.getShaderInfoLog(s)); return null; } return s; };

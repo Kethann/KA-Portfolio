@@ -314,7 +314,6 @@ function drawBone(x: CanvasRenderingContext2D, cx: number, cy: number, len: numb
 const rgb = (h: string) => { const n = parseInt(h.replace('#', '').slice(0, 6), 16); return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; };
 const colsOf = (p: Palette) => ({ bg: rgb(p.bg), text: rgb(p.text), a1: rgb(p.accent1), a2: rgb(p.accent2), glow: rgb(p.glow) });
 let exportPainter: ShaderPainter | null = null;
-const ELEMENT_SCENES = new Set(['fire', 'snow', 'rain', 'storm', 'ice', 'lava']);
 
 /** the scene's layer, behind the words: realistic scenes run on the GPU (shaders.ts), the rest (and every scene on
  *  a device without WebGL) on a 2D canvas. The GPU resolution adapts: if frames get slow it renders a little smaller
@@ -336,8 +335,9 @@ export class SceneRunner {
   set(id: string, pal: Palette, intensity: number, speed: number, seed: number){
     const r = this.canvas.parentElement!.getBoundingClientRect(), w = Math.max(1, r.width), h = Math.max(1, r.height);
     this.scene = SCENES.find(s => s.id === id) || SCENES[0]; this.speed = speed;
-    // the elements (fire, snow, rain, storm) are always the realistic GPU versions, in the 2D look too
-    this.useGL = (!this.flat || ELEMENT_SCENES.has(this.scene.id)) && !!fragmentFor(this.scene.id) && !!this.gpu()?.supports(this.scene.id);
+    // backgrounds are always the realistic GPU versions when the device can draw them (the 2D look keeps flat letters);
+    // the drawn canvas versions are the fallback for devices without WebGL
+    this.useGL = !!fragmentFor(this.scene.id) && !!this.gpu()?.supports(this.scene.id);
     this.gl.hidden = !this.useGL; this.canvas.hidden = this.useGL;
     const key = [this.scene.id, this.useGL, pal.bg, pal.text, pal.accent1, pal.accent2, pal.glow, Math.round(w), Math.round(h), seed, intensity.toFixed(2)].join('|');
     if (key !== this.key){

@@ -62,6 +62,19 @@ vec3 env(vec3 r){
   return c;
 }
 vec3 tint(vec3 base, vec3 env3, float k){ return env3 * mix(vec3(1.0), base, k); }
+// polished metal lettering: the reflection runs down the word as a band of sky, horizon and warm floor
+vec3 metalRamp(float t, float kind){
+  t = clamp(t, 0.0, 1.0);
+  vec3 a, b, c, d, e;
+  if (kind < 2.5){ a = vec3(1.0); b = vec3(0.78, 0.86, 0.95); c = vec3(0.12, 0.15, 0.2); d = vec3(0.78, 0.68, 0.55); e = vec3(1.0, 0.97, 0.92); }
+  else if (kind < 3.5){ a = vec3(1.0, 0.98, 0.88); b = vec3(1.0, 0.86, 0.5); c = vec3(0.36, 0.2, 0.03); d = vec3(0.86, 0.58, 0.16); e = vec3(1.0, 0.93, 0.7); }
+  else if (kind < 4.5){ a = vec3(1.0, 0.95, 0.93); b = vec3(0.98, 0.74, 0.66); c = vec3(0.36, 0.16, 0.13); d = vec3(0.8, 0.48, 0.4); e = vec3(1.0, 0.9, 0.86); }
+  else { a = vec3(0.95); b = vec3(0.76, 0.79, 0.82); c = vec3(0.3, 0.32, 0.35); d = vec3(0.62, 0.65, 0.69); e = vec3(0.92); }
+  vec3 col = mix(a, b, smoothstep(0.0, 0.3, t));
+  col = mix(col, c, smoothstep(0.38, 0.5, t));
+  col = mix(col, d, smoothstep(0.52, 0.72, t));
+  return mix(col, e, smoothstep(0.8, 1.0, t));
+}
 
 void main(){
   float sc = max(vExtra.w, 0.05);
@@ -133,11 +146,11 @@ void main(){
     if (m < 1.5){                                   // satin: the letters' own colour, softly lit
       c = uText * (0.35 + 0.75 * diff) + vec3(1.0) * pow(nh, 40.0) * 0.35 + uText * fres * 0.25;
     } else if (m < 5.5){                            // chrome, gold, rose gold, brushed steel
-      vec3 e3 = env(Rf + vec3(0.0, (B.y - 0.5) * 0.6, 0.0));
-      if (m > 4.5) e3 = mix(e3, vec3(dot(e3, vec3(0.33))), 0.4) * (0.85 + 0.3 * noise(vec2(W.x * 0.02, W.y * 1.6)));
+      float rt = B.y * 0.92 + Rf.y * 0.6 + uEnvRot * 0.12 - Rf.x * 0.1;
+      if (m > 4.5) rt += (noise(vec2(W.x * 0.02, W.y * 1.6)) - 0.5) * 0.12;   // brushed grain
       vec3 base = m < 2.5 ? vec3(0.92, 0.94, 0.97) : m < 3.5 ? vec3(1.0, 0.76, 0.33) : m < 4.5 ? vec3(0.98, 0.66, 0.56) : vec3(0.78, 0.8, 0.83);
-      c = e3 * base * 0.8 + base * 0.06;
-      c += vec3(1.0) * pow(nh, m > 4.5 ? 60.0 : 180.0) * 2.0 + base * sweep * 1.4;
+      c = metalRamp(rt, m) * (0.55 + 0.6 * diff) + env(Rf) * base * 0.12;
+      c += vec3(1.0) * pow(nh, m > 4.5 ? 60.0 : 160.0) * 1.6 + base * sweep * 1.1;
     } else if (m < 7.5){                            // glass, ice
       vec3 t3 = m < 6.5 ? mix(uGlow, vec3(1.0), 0.5) : vec3(0.72, 0.9, 1.0);
       float frost = 0.0;
@@ -163,6 +176,7 @@ void main(){
       vec3 sb = m < 10.5 ? mix(mix(uText, vec3(0.55, 0.53, 0.5), 0.65), vec3(0.28, 0.27, 0.26), gr * 0.6) : uBg * 0.9 + 0.04;
       sb = mix(sb, sp > 0.94 ? vec3(0.95) : sp < 0.05 ? vec3(0.1) : sb, 0.5);
       c = sb * (0.22 + 0.95 * diff) + vec3(1.0) * pow(nh, 20.0) * 0.1;
+      if (m > 10.5) c *= 0.75 + 0.5 * smoothstep(0.2, 1.0, diff);   // carved: deeper shade in the cut
     } else if (m < 12.5){                           // marble with veins
       float n = fbm(W * 0.02 + seed), v = abs(sin((W.x * 0.6 + W.y * 0.35) * 0.06 + n * 7.0));
       c = mix(vec3(0.96, 0.95, 0.93), vec3(0.32, 0.32, 0.34), pow(1.0 - v, 14.0) * 0.75);
@@ -178,9 +192,10 @@ void main(){
     } else if (m < 16.5){                           // block extrude: bold colour, crisp light
       c = uText * (0.45 + 0.6 * diff) + vec3(1.0) * pow(nh, 40.0) * 0.4;
     } else {                                        // letterpress: the paper itself, raised
-      vec3 pap = uBg + 0.05;
-      c = pap * (0.65 + 0.55 * diff);
-      a = clamp(0.25 + (1.0 - nv) * 3.5, 0.0, 1.0);
+      vec3 pap = uBg + 0.06;
+      float lit = dot(N.xy, normalize(L.xy + 1e-4));
+      c = pap * (0.55 + 0.7 * diff) + vec3(1.0) * max(lit, 0.0) * (1.0 - nv) * 0.6 - vec3(0.25) * max(-lit, 0.0) * (1.0 - nv) * 3.0;
+      a = clamp(0.4 + (1.0 - nv) * 4.0, 0.0, 1.0);
     }
     // what the elements do to the surface
     if (uElem > 2.5 && uElem < 3.5){ c = c * 0.82 + env(Rf) * 0.12 + vec3(1.0) * pow(nh, 300.0) * 1.5; }   // wet: darker, glossier
