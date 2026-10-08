@@ -735,6 +735,10 @@ p, li{ text-wrap:pretty; }
 }
 
 /* ============================================================ FOOTER ======================== */
+/* hidden while pages swap (see switchSection), then faded back in: no jump while the page height changes */
+html.ka-page-switching footer.site-footer{ visibility:hidden; opacity:0; }
+footer.site-footer{ transition:opacity .35s ease; }
+@media (prefers-reduced-motion: reduce){ footer.site-footer{ transition:none; } }
 footer.site-footer{
   position:relative; z-index:10; padding:48px clamp(20px,5vw,64px) 56px;
   display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:14px;
@@ -7017,6 +7021,8 @@ function focusSectionHeading(section){
 // focusTarget: move keyboard focus to the destination's heading (used by the menu).
 function kaCoarse(){ return !!(window.matchMedia && matchMedia("(pointer: coarse)").matches); }
 function switchSection(name, focusTarget){
+  // the old standalone Gallery page was folded into About > Portfolio; old links (?page=gallery) land there instead of an empty page
+  if (name === "gallery") name = "portfolio";
   var page = navPage(name);
   var incoming = pageSections(page);
   if (!incoming.length) return;
@@ -7045,6 +7051,9 @@ function switchSection(name, focusTarget){
   movePill();
 
   showing.forEach(function(section){ section.classList.add("fading-out"); });
+  // while one page leaves and the next arrives the page is briefly short, which pulled the footer up into view and then
+  // pushed it back down (a visible jump). The footer sits out the swap and fades back in once the new page is in place.
+  document.documentElement.classList.add("ka-page-switching");
   sectionSwitching = true; pendingScroll = { el:scrollTarget, focus:focusTarget };
   var outMs = reducedMotion ? 150 : 300;
   sectionTimer = setTimeout(function(){
@@ -7075,12 +7084,13 @@ function switchSection(name, focusTarget){
     sectionTimer = setTimeout(function(){
       incoming.forEach(function(section){ section.classList.remove("fading-in"); });
       document.documentElement.removeAttribute("data-nav-dir");
+      document.documentElement.classList.remove("ka-page-switching");
     }, reducedMotion ? 150 : 430);
   }, outMs);
 }
 
 // other bundles (the Typography studio's page menu) jump to a page this way
-window.kaGoTo = function(name){ if (name === "portfolio") switchSection("skills", true); else if (sections[name] || PAGE_SECTIONS[name]) switchSection(name, true); };
+window.kaGoTo = function(name){ if (name === "portfolio" || name === "gallery") switchSection("skills", true); else if (sections[name] || PAGE_SECTIONS[name]) switchSection(name, true); };
 function navGo(name){
   if (name === "typography"){ movePill(); openTypographyStudio(); return; }
   switchSection(name);
@@ -10886,7 +10896,9 @@ html{ font-size:calc(100% * var(--text-scale, 1) * var(--screen-scale, 1)); }
       // small text: random word-by-word (or letter-by-letter for short labels); rich markup stays whole
       it.text = el.textContent;
       if (el.children.length){ it.mode = "whole"; el.style.opacity = "0"; }
-      else { it.mode = "units"; wrapUnits(it, el, it.text, true, el.matches(CFG.twoLineSelector)); }   // every small text: each LETTER has its own random moment
+      // short texts: each LETTER has its own random moment; a long paragraph (the bio) goes word by word instead: the same
+      // haze, about six times fewer pieces to animate, so the page stays smooth on phones and in in-app browsers
+      else { it.mode = "units"; wrapUnits(it, el, it.text, it.text.length <= 220 && !window.kaLite, el.matches(CFG.twoLineSelector)); }
     }
     it.delay = it.kind === "ink" ? 0 : (it.kind === "ghost" || it.kind === "box" ? 160 + it.order * 110 : 260);
     it.r = 0;
