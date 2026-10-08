@@ -72,6 +72,7 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
   var root = document.documentElement, on = !preview, shieldTimer = 0;
   var SHADOW_CSS = ":host(.ka-protect) img,:host(.ka-protect) video,:host(.ka-protect) canvas,:host(.ka-protect) picture{-webkit-user-drag:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}"
     + ":host(.ka-shield) img,:host(.ka-shield) video,:host(.ka-shield) canvas,:host(.ka-shield) picture,:host(.ka-shield) [style*='background-image']{filter:blur(30px) brightness(.55)!important;transition:none!important}"
+    + ":host(.ka-unshield) img,:host(.ka-unshield) video,:host(.ka-unshield) canvas,:host(.ka-unshield) picture,:host(.ka-unshield) [style*='background-image']{transition:filter .28s ease-out!important}"
     + "@media print{:host(.ka-protect) img,:host(.ka-protect) video,:host(.ka-protect) canvas,:host(.ka-protect) picture{visibility:hidden!important}}";
   var ZONE = '#section-gallery, #section-portfolio, #section-store, #section-tips, #lightbox, [data-ka-shadow]';
   function inZone(e){ var p = e.composedPath ? e.composedPath() : [e.target]; for (var i = 0; i < p.length; i++){ if (p[i].nodeType === 1 && p[i].matches && p[i].matches(ZONE)) return true; } return false; }
@@ -80,13 +81,27 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
     if (h.shadowRoot && !h.shadowRoot.__kaProt){ var st = document.createElement('style'); st.textContent = SHADOW_CSS; h.shadowRoot.appendChild(st); h.shadowRoot.__kaProt = 1; }
     h.classList.toggle('ka-protect', on);
   }
-  function sync(){ root.classList.toggle('ka-protect', on); Array.prototype.forEach.call(hosts(), dress); if (!on) shield(false); }
-  function shield(v){
-    if (v && !on) return;
-    root.classList.toggle('ka-shield', !!v);
-    Array.prototype.forEach.call(hosts(), function(h){ dress(h); h.classList.toggle('ka-shield', !!v); });
+  function sync(){ root.classList.toggle('ka-protect', on); Array.prototype.forEach.call(hosts(), dress); apply(); }
+  // One timing model for every trigger: images are shielded while ANY reason holds (a screenshot-key hold that hasn't
+  // run out, the page having lost focus, the page being hidden). A returning focus can't cut a hold short, and every part
+  // of the page (light DOM and shadow roots) blurs in the same frame and clears together with the same short fade.
+  var HOLD = 3000, ARM = 1500, holdUntil = 0, away = false, shown = false, fadeTimer = 0;
+  function want(){ return on && (Date.now() < holdUntil || away || document.hidden); }
+  function setShield(v){
+    var all = [root].concat(Array.prototype.slice.call(hosts()));
+    clearTimeout(fadeTimer);
+    all.forEach(function(h){ if (h !== root) dress(h); h.classList.toggle('ka-shield', v); h.classList.toggle('ka-unshield', !v); });
+    if (!v) fadeTimer = setTimeout(function(){ all.forEach(function(h){ h.classList.remove('ka-unshield'); }); }, 320);
+    shown = v;
   }
-  function flash(ms){ shield(true); clearTimeout(shieldTimer); shieldTimer = setTimeout(function(){ if (document.hasFocus()) shield(false); }, ms); }
+  function apply(){
+    var v = want();
+    if (v !== shown) setShield(v);
+    clearTimeout(shieldTimer);
+    if (v && holdUntil > Date.now()) shieldTimer = setTimeout(apply, holdUntil - Date.now() + 16);
+  }
+  function hold(ms){ if (!on) return; holdUntil = Math.max(holdUntil, Date.now() + ms); apply(); }
+  function wipeClipboard(){ try { navigator.clipboard && navigator.clipboard.writeText('').catch(function(){}); } catch(err){} }
   var editable = function(t){ return t && t.closest && t.closest('input, textarea, select, [contenteditable="true"], .ka-allow-menu'); };
   // right-click / long-press menus and dragging (shadow content included: the event's path is checked)
   document.addEventListener('contextmenu', function(e){ if (!on) return; var t = e.composedPath ? e.composedPath()[0] : e.target; if (editable(t) || !inZone(e)) return; e.preventDefault(); }, true);
@@ -94,16 +109,24 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
   document.addEventListener('keydown', function(e){
     if (!on) return;
     var k = (e.key || '').toLowerCase(), mod = e.ctrlKey || e.metaKey;
-    if (k === 'printscreen'){ flash(2500); try { navigator.clipboard && navigator.clipboard.writeText(''); } catch(err){} return; }
-    if (e.metaKey && e.shiftKey && /^[3456s]$/.test(k)){ flash(4000); return; }              // macOS / Windows screenshot shortcuts
-    if (e.metaKey && e.shiftKey){ flash(1200); }                                              // the start of a screenshot chord
+    if (k === 'printscreen'){ hold(HOLD); wipeClipboard(); return; }
+    if (e.metaKey && e.shiftKey && /^[3456s]$/.test(k)){ hold(HOLD); return; }               // macOS / Windows screenshot shortcuts
+    // arm early: the Windows / Command key (or Shift with it) starts every screenshot and recorder chord (Win+Shift+S,
+    // Win+Alt+R, Cmd+Shift+3/4/5), so images are already blurred before the last key is pressed and the screen freezes
+    if (k === 'meta' || k === 'os' || e.metaKey){ hold(ARM); }
     if (k === 'f12' || (mod && e.shiftKey && /^[ijc]$/.test(k)) || (mod && /^[sup]$/.test(k) && !e.shiftKey && !editable(e.target))){ e.preventDefault(); }
   }, true);
-  document.addEventListener('keyup', function(e){ if (on && (e.key || '').toLowerCase() === 'printscreen'){ flash(2500); try { navigator.clipboard && navigator.clipboard.writeText(''); } catch(err){} } }, true);
-  // losing focus (a screenshot tool takes over, another app, developer tools): blur until the page is back
-  window.addEventListener('blur', function(){ if (!on) return; setTimeout(function(){ var a = document.activeElement; if (a && a.tagName === 'IFRAME') return; if (!document.hasFocus()) shield(true); }, 0); });
-  window.addEventListener('focus', function(){ shield(false); });
-  document.addEventListener('visibilitychange', function(){ if (!on) return; if (document.hidden) shield(true); else if (document.hasFocus()) shield(false); });
+  document.addEventListener('keyup', function(e){ if (on && (e.key || '').toLowerCase() === 'printscreen'){ hold(HOLD); wipeClipboard(); } }, true);
+  // losing focus (a screenshot tool takes over, another app, developer tools): blur in the same moment, until the page is
+  // back. Focus moving into one of our own frames (Razorpay, the human check) is not "away": that is undone at once.
+  window.addEventListener('blur', function(){
+    if (!on) return;
+    var a = document.activeElement; if (a && a.tagName === 'IFRAME') return;
+    away = true; apply();
+    setTimeout(function(){ var b = document.activeElement; if (b && b.tagName === 'IFRAME'){ away = false; apply(); } }, 0);
+  });
+  window.addEventListener('focus', function(){ away = false; apply(); });
+  document.addEventListener('visibilitychange', apply);
   // the store and gallery mount later: dress their shadow roots as they appear
   if (window.MutationObserver) new MutationObserver(function(list){ for (var i = 0; i < list.length; i++){ var n = list[i].addedNodes; for (var j = 0; j < n.length; j++){ var el = n[j]; if (el.nodeType !== 1) continue; if (el.hasAttribute && el.hasAttribute('data-ka-shadow')) setTimeout(function(h){ return function(){ dress(h); }; }(el), 0); else if (el.querySelectorAll){ var inner = el.querySelectorAll('[data-ka-shadow]'); for (var q = 0; q < inner.length; q++) setTimeout(function(h){ return function(){ dress(h); }; }(inner[q]), 0); } } } }).observe(document.documentElement, { childList: true, subtree: true });
   window.kaSetProtection = function(v){ on = !!v && !preview; sync(); };
@@ -114,6 +137,7 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
 /* only the gallery, portfolio, store and poster viewer are protected; the rest of the page records normally */
 html.ka-protect #section-gallery img, html.ka-protect #section-gallery video, html.ka-protect #section-gallery canvas, html.ka-protect #section-gallery picture, html.ka-protect #section-portfolio img, html.ka-protect #section-portfolio video, html.ka-protect #section-portfolio canvas, html.ka-protect #section-portfolio picture, html.ka-protect #section-store img, html.ka-protect #section-store video, html.ka-protect #section-store canvas, html.ka-protect #section-store picture, html.ka-protect #section-tips img, html.ka-protect #section-tips video, html.ka-protect #section-tips canvas, html.ka-protect #section-tips picture, html.ka-protect #lightbox img, html.ka-protect #lightbox video, html.ka-protect #lightbox canvas, html.ka-protect #lightbox picture{ -webkit-user-drag:none; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
 html.ka-shield #section-gallery img, html.ka-shield #section-gallery video, html.ka-shield #section-gallery picture, html.ka-shield #section-gallery canvas, html.ka-shield #section-gallery .folder-card, html.ka-shield #section-gallery [style*="background-image"], html.ka-shield #section-portfolio img, html.ka-shield #section-portfolio video, html.ka-shield #section-portfolio picture, html.ka-shield #section-portfolio canvas, html.ka-shield #section-portfolio .folder-card, html.ka-shield #section-portfolio [style*="background-image"], html.ka-shield #section-store img, html.ka-shield #section-store video, html.ka-shield #section-store picture, html.ka-shield #section-store canvas, html.ka-shield #section-store .folder-card, html.ka-shield #section-store [style*="background-image"], html.ka-shield #section-tips img, html.ka-shield #section-tips video, html.ka-shield #section-tips picture, html.ka-shield #section-tips canvas, html.ka-shield #section-tips .folder-card, html.ka-shield #section-tips [style*="background-image"], html.ka-shield #lightbox img, html.ka-shield #lightbox video, html.ka-shield #lightbox picture, html.ka-shield #lightbox canvas, html.ka-shield #lightbox .folder-card, html.ka-shield #lightbox [style*="background-image"]{ filter:blur(30px) brightness(.55) !important; transition:none !important; }
+html.ka-unshield #section-gallery img, html.ka-unshield #section-gallery video, html.ka-unshield #section-gallery picture, html.ka-unshield #section-gallery canvas, html.ka-unshield #section-gallery .folder-card, html.ka-unshield #section-gallery [style*="background-image"], html.ka-unshield #section-portfolio img, html.ka-unshield #section-portfolio video, html.ka-unshield #section-portfolio picture, html.ka-unshield #section-portfolio canvas, html.ka-unshield #section-portfolio .folder-card, html.ka-unshield #section-portfolio [style*="background-image"], html.ka-unshield #section-store img, html.ka-unshield #section-store video, html.ka-unshield #section-store picture, html.ka-unshield #section-store canvas, html.ka-unshield #section-store .folder-card, html.ka-unshield #section-store [style*="background-image"], html.ka-unshield #section-tips img, html.ka-unshield #section-tips video, html.ka-unshield #section-tips picture, html.ka-unshield #section-tips canvas, html.ka-unshield #section-tips .folder-card, html.ka-unshield #section-tips [style*="background-image"], html.ka-unshield #lightbox img, html.ka-unshield #lightbox video, html.ka-unshield #lightbox picture, html.ka-unshield #lightbox canvas, html.ka-unshield #lightbox .folder-card, html.ka-unshield #lightbox [style*="background-image"]{ transition:filter .28s ease-out !important; }
 @media print{ html.ka-protect #section-gallery img, html.ka-protect #section-gallery video, html.ka-protect #section-gallery canvas, html.ka-protect #section-gallery picture, html.ka-protect #section-portfolio img, html.ka-protect #section-portfolio video, html.ka-protect #section-portfolio canvas, html.ka-protect #section-portfolio picture, html.ka-protect #section-store img, html.ka-protect #section-store video, html.ka-protect #section-store canvas, html.ka-protect #section-store picture, html.ka-protect #section-tips img, html.ka-protect #section-tips video, html.ka-protect #section-tips canvas, html.ka-protect #section-tips picture, html.ka-protect #lightbox img, html.ka-protect #lightbox video, html.ka-protect #lightbox canvas, html.ka-protect #lightbox picture{ visibility:hidden !important; } }
 </style>
 
