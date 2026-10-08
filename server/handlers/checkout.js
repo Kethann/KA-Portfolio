@@ -1,7 +1,7 @@
 // Checkout, payment verification, webhooks, downloads and link resends.
 import { json, readJson, readBody, HttpError } from '../core/http.js';
 import { siteUrl } from '../core/env.js';
-import { rateLimit, verifyTurnstile } from '../core/guard.js';
+import { rateLimit, verifyTurnstile, verifyTurnstileLenient } from '../core/guard.js';
 import { email as vEmail, currency as vCurrency, str } from '../core/validate.js';
 import { getDb } from '../core/db.js';
 import * as orders from '../store/orders.js';
@@ -131,7 +131,7 @@ export async function downloadPost(ctx){
   } else if (type.startsWith('application/json')){
     token = (await readJson(ctx.request, 16 * 1024)).turnstileToken || '';
   }
-  await verifyTurnstile(token, ctx.ip);
+  await verifyTurnstileLenient(token, ctx.ip);
   return redeem({ token: ctx.params.token, ip: ctx.ip, country: ctx.geo?.country || null, userAgent: ctx.request.headers.get('user-agent'), siteUrl: siteUrl(ctx.request) });
 }
 

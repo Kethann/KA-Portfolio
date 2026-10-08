@@ -19,6 +19,16 @@
 // origin than this page -- browsers never send/accept cookies cross-origin without it, with or
 // without CORS headers. See server/app.js for the matching Access-Control-Allow-* response side.
 var KA_API_BASE = "";
+// "Lite" mode: in-app browsers (Snapchat, Instagram, Facebook, TikTok, LinkedIn...) and weak or data-saving devices get the same
+// site with the most expensive extras toned down (lighter glass blur, no looping tile light), so scrolling stays smooth.
+(function(){
+  var ua = navigator.userAgent || "", c = navigator.connection || {};
+  var inApp = /Snapchat|Instagram|FBAN|FBAV|FB_IAB|TikTok|musical_ly|Bytedance|LinkedInApp|Line\/|Twitter|Pinterest|MicroMessenger/i.test(ua);
+  var weak = (navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2) || c.saveData === true || /(^|slow-)2g/.test(c.effectiveType || "");
+  window.kaLite = !!(inApp || weak);
+  window.kaInApp = inApp;
+  if (window.kaLite) document.documentElement.classList.add("ka-lite");
+})();
 function kaApiUrl(path){ return KA_API_BASE + path; }
 // [pinch-zoom fix] iOS Safari reports the ZOOMED visual viewport through window.innerWidth/innerHeight,
 // so every pinch shrank the WebGL canvas/camera (logo got smaller) while the DOM (nav, chat) zoomed
@@ -773,6 +783,9 @@ footer.site-footer{
 .about-stat::after{ content:""; position:absolute; left:18%; right:18%; bottom:0; height:2px; border-radius:2px;
   background:linear-gradient(90deg, transparent, rgba(255,148,56,.75), transparent); opacity:.7; }
 /* thin shiny gradient edge in the tile's own colours (glass white + the accent): a 1px ring cut out with a mask, its light slowly sliding round */
+/* lite mode (in-app browsers, weak devices): a light blur and no looping effects */
+html.ka-lite{ --glass-blur: blur(5px); }
+html.ka-lite .about-stat::before{ background:linear-gradient(135deg, rgba(255,255,255,.4), rgba(255,148,56,.55) 50%, rgba(255,255,255,.12)); }
 /* phones and tablets: a lighter blur on every glass surface (same look, far less GPU work while scrolling) */
 @media (pointer:coarse), (max-width:900px){ :root{ --glass-blur: blur(10px) saturate(125%); } }
 .about-stat::before{ content:""; position:absolute; inset:0; border-radius:inherit; padding:1px; pointer-events:none;
@@ -8959,7 +8972,7 @@ function applyLayoutOverrides(data){
 // glass carries a soft reflection that follows the pointer. One rAF loop, only while the tiles are on screen.
 (function(){
   var box = document.getElementById("about-stats");
-  if (!box || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
+  if (!box || window.kaLite || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
   var px = 0, py = 0, moved = -1e9, spin = 0, sv = 0, lastY = window.scrollY, vis = false, raf = 0, last = 0;
   var st = new WeakMap();
   function wrap(d){ return ((d + 540) % 360) - 180; }

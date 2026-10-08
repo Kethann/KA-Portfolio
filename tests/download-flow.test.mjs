@@ -122,3 +122,18 @@ test('store-wide link expiry: products follow the portal default unless they set
   assert.equal(pub.status, 200); assert.deepEqual(pub.json.product.delivery, { linkHours: 6, maxDownloads: 2 }, 'the store shows the default');
   assert.deepEqual((await app.call('GET', '/api/store/products/own-terms', { ip: ip() })).json.product.delivery, { linkHours: 24, maxDownloads: 4 });
 });
+
+test('the human check on the download button never blocks a buyer: no secret, no widget token, or Cloudflare down', async () => {
+  const { verifyTurnstileLenient } = await import('../server/core/guard.js');
+  const { setEnvSource } = await import('../server/core/env.js');
+  const fetchAns = (body, ok = true) => async () => ({ ok, json: async () => body });
+  try {
+    setEnvSource({ ...app.vars, KA_ENV: 'production' });
+    assert.equal(await verifyTurnstileLenient('', ip(), fetchAns({})), true, 'no secret configured (production): allowed');
+    setEnvSource({ ...app.vars, KA_ENV: 'production', TURNSTILE_SECRET_KEY: 's', TURNSTILE_SITE_KEY: 'k' });
+    assert.equal(await verifyTurnstileLenient('', ip(), fetchAns({})), true, 'the widget did not load (in-app browser): allowed');
+    assert.equal(await verifyTurnstileLenient('tok', ip(), async () => { throw new Error('offline'); }), true, 'Cloudflare unreachable: allowed');
+    assert.equal(await verifyTurnstileLenient('tok', ip(), fetchAns({ success: true })), true);
+    await assert.rejects(verifyTurnstileLenient('tok', ip(), fetchAns({ success: false })), /verification check failed/, 'an answered "no" is still refused');
+  } finally { setEnvSource(app.vars); }
+});
