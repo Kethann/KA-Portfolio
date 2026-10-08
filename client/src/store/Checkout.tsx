@@ -2,6 +2,7 @@
 // and the email. Real payment details are entered in Razorpay's own secure window (cards, UPI,
 // net banking, wallets): this site never sees, sends, stores or logs card numbers or CVV.
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useFocusTrap, useMedia } from './hooks';
 import { postJson, publicConfig, formatPrice, ApiError, type Currency, type Product } from './api';
 import { reduce, initialState, stepOf, isStage, type Quote, type OrderResult, type Success, type PaymentMethod, type LicenseRef } from './checkout/machine';
@@ -107,6 +108,8 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
   const [codeBusy, setCodeBusy] = useState(false);
   /** the last code that went through: the field turns green and says what it saved */
   const [codeOk, setCodeOk] = useState('');
+  /** a code that makes a paid item free: a short celebration with the old price struck through */
+  const [freeWin, setFreeWin] = useState<{ was: string; now: string } | null>(null);
   const [flipped, setFlipped] = useState(false);
   const [holderError, setHolderError] = useState('');
   const holderRef = useRef<HTMLInputElement>(null);
@@ -185,10 +188,26 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
       const next = [...codes.filter(x => x !== c), c], q = await requestQuote(next, email.trim());
       dispatch({ type: 'QUOTED', quote: q }); setCodes(next); setCode(''); sfx('store.coupon');
       setCodeOk(q.discount > 0 ? `${c} applied: you save ${formatPrice(q.discount, q.currency)}` : `${c} applied`);
+      if (q.total === 0 && q.subtotal > 0) celebrateFree(formatPrice(q.subtotal, q.currency), formatPrice(0, q.currency));
     }
     catch (e){ setCodeError((e as Error).message); sfx('store.failed'); }
     finally { setCodeBusy(false); }
   };
+  // a paid item just became free: a popup for about two seconds, with confetti and a little buzz
+  const freeTimer = useRef(0);
+  const celebrateFree = (was: string, now: string) => {
+    setFreeWin({ was, now }); buzz([20, 50, 20, 50, 30]); sfx('store.paid');
+    clearTimeout(freeTimer.current); freeTimer.current = window.setTimeout(() => setFreeWin(null), reduced ? 1600 : 2300);
+    if (!reduced) import('./checkout/confetti').then(m => {
+      // the confetti goes in the popup itself, so it flies in front of the blur
+      const modal = cardRef.current?.closest('.kas-modal') as HTMLElement | null;
+      const host = (modal?.querySelector('.kco-free') as HTMLElement | null) || modal || document.body;
+      m.burst(host, { x: innerWidth / 2, y: innerHeight * 0.42 });
+      setTimeout(() => m.burst(host, { x: innerWidth * 0.32, y: innerHeight * 0.5 }), 180);
+      setTimeout(() => m.burst(host, { x: innerWidth * 0.68, y: innerHeight * 0.5 }), 320);
+    }).catch(() => {});
+  };
+  useEffect(() => () => clearTimeout(freeTimer.current), []);
   const removeCode = async (c: string) => {
     const next = codes.filter(x => x !== c);
     setCodes(next); setCodeBusy(true); setCodeOk('');
@@ -276,6 +295,14 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
   const lines = STATUS_LINES[s.phase === 'paying' && (quote?.currency || currency) === 'USD' ? 'payingUSD' : s.phase];
   const usd = (quote?.currency || currency) === 'USD';
   return <div className={`kco kas-modal-card ${stage ? 'is-stage' : ''}`} data-phase={s.phase}>
+    {freeWin && createPortal(<div className="kco-free" role="status" aria-live="assertive" onClick={() => setFreeWin(null)}>
+      <div className="kco-free-card">
+        <span className="kco-free-gift" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 11h16v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M3 7h18v4H3z"/><path d="M12 7v14"/><path d="M12 7c-1.5-3.5-6-3.5-6-1s3 1 6 1c3 0 6 1.5 6-1s-4.5-2.5-6 1z"/></svg></span>
+        <strong>It’s free!</strong>
+        <span className="kco-free-sub">Your code turned this paid item free.</span>
+        <span className="kco-free-price"><s>{freeWin.was}</s><b>{freeWin.now}</b></span>
+      </div>
+    </div>, (cardRef.current?.closest('.kas-modal') as HTMLElement | null) || document.body)}
     <header className="kco-head">
       <ol className="kco-steps" style={{ ['--step' as string]: step } as React.CSSProperties} aria-label="Checkout progress">
         {['Details', 'Payment', 'Done'].map((label, i) => <li key={label} aria-current={i === step ? 'step' : undefined} className={i < step ? 'is-done' : ''}>{label}</li>)}

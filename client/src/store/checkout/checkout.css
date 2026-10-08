@@ -370,3 +370,34 @@
   .kco-code-row.is-applied, .kco-code-row.is-rejected, .kco-okmsg:not(:empty), .kco-dl::after, .kco-dl-ico, .kco-dl.is-going, .kco-dl.is-going .kco-dl-ico, :host(.no-houdini) .tone-busy .kco-face::after{ animation:none; }
   .kco-okmsg svg{ animation:none; stroke-dashoffset:0; }
 }
+
+
+/* ---- a code made a paid item free: a two-second celebration ---- */
+.kco-free{ position:fixed; inset:0; z-index:30; display:grid; place-items:center; padding:16px; cursor:pointer;
+  background:radial-gradient(ellipse at 50% 45%, rgba(110,220,150,.18), rgba(10,8,10,.72) 62%); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+  animation:kcoFreeIn .3s ease both, kcoFreeOut .35s ease 1.95s forwards; }
+@keyframes kcoFreeIn{ from{ opacity:0; } to{ opacity:1; } }
+@keyframes kcoFreeOut{ to{ opacity:0; visibility:hidden; } }
+.kco-free-card{ position:relative; display:flex; flex-direction:column; align-items:center; gap:8px; padding:30px 34px 26px; border-radius:26px; text-align:center;
+  background:linear-gradient(160deg, rgba(36,52,40,.96), rgba(20,26,22,.96)); border:1px solid rgba(143,224,168,.55);
+  box-shadow:0 0 0 6px rgba(143,224,168,.08), 0 30px 80px -20px rgba(0,0,0,.7), 0 0 60px -10px rgba(110,220,150,.5);
+  animation:kcoFreePop .6s cubic-bezier(.34,1.56,.64,1) both; }
+@keyframes kcoFreePop{ from{ transform:scale(.6) translateY(18px); opacity:0; } to{ transform:none; opacity:1; } }
+.kco-free-card::before{ content:""; position:absolute; inset:-2px; border-radius:inherit; pointer-events:none;
+  background:linear-gradient(115deg, transparent 35%, rgba(255,255,255,.35) 50%, transparent 65%) 0 0 / 300% 100% no-repeat; animation:kcoFreeSheen 1.4s .35s ease-out both; }
+@keyframes kcoFreeSheen{ from{ background-position:130% 0; } to{ background-position:-130% 0; } }
+.kco-free-gift{ display:grid; place-items:center; width:64px; height:64px; border-radius:50%; color:#0b2416; background:linear-gradient(145deg,#b8f2cb,#5fd08e);
+  box-shadow:0 10px 30px -8px rgba(95,208,142,.8); animation:kcoFreeGift .9s .15s cubic-bezier(.34,1.56,.64,1) both; }
+.kco-free-gift svg{ width:32px; height:32px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+@keyframes kcoFreeGift{ 0%{ transform:scale(0) rotate(-30deg); } 60%{ transform:scale(1.15) rotate(8deg); } 80%{ transform:scale(.95) rotate(-4deg); } 100%{ transform:none; } }
+.kco-free-card strong{ font:500 30px/1.1 var(--font-heading, 'Fraunces'), Georgia, serif; color:#eafff1; margin-top:6px; }
+.kco-free-sub{ font-size:14px; color:rgba(234,255,241,.75); }
+.kco-free-price{ display:flex; align-items:baseline; gap:14px; margin-top:6px; font:700 16px/1 ui-monospace, 'JetBrains Mono', monospace; }
+.kco-free-price s{ position:relative; text-decoration:none; color:rgba(255,255,255,.5); }
+.kco-free-price s::after{ content:""; position:absolute; left:-4px; right:-4px; top:50%; height:2px; background:#ff8c8c; transform:scaleX(0); transform-origin:left; animation:kcoStrike .4s .55s ease-out forwards; }
+@keyframes kcoStrike{ to{ transform:scaleX(1); } }
+.kco-free-price b{ font-size:26px; color:#8fe0a8; animation:kcoFreeGift .6s .85s cubic-bezier(.34,1.56,.64,1) both; }
+@media (prefers-reduced-motion: reduce){
+  .kco-free, .kco-free-card, .kco-free-card::before, .kco-free-gift, .kco-free-price b{ animation:none; }
+  .kco-free-price s::after{ animation:none; transform:none; }
+}
