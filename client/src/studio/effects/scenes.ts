@@ -123,6 +123,12 @@ export const SCENES: Scene[] = [
     // frosted corners
     for (const [cx, cy] of [[0, 0], [s.w, 0], [0, s.h], [s.w, s.h]]) glowAt(x, cx, cy, Math.min(s.w, s.h) * 0.45, '#ffffff', 0.14 + s.intensity * 0.12);
   } },
+  { id: 'snow', name: 'Winter night snow', group: 'Elements', init(s){ s.d.f = parts(s, count(s, 160)); }, draw(x, s, t){
+    fill(x, s, vgrad(x, s, [[0, mix(s.pal.bg, '#0a1430', 0.6)], [1, mix(s.pal.bg, '#1c2a48', 0.5)]]));
+    glowAt(x, s.w * 0.7, s.h * 0.2, s.w * 0.35, '#cfdcff', 0.22);
+    for (const p of s.d.f){ const y = wrap(p.y + t * 0.02 * (0.4 + p.z)), xx = wrap(p.x + Math.sin(t * 0.5 * p.v + p.p) * 0.02 + t * 0.004);
+      x.fillStyle = rgba('#ffffff', 0.3 + p.z * 0.6); x.beginPath(); x.arc(xx * s.w, y * s.h, 0.6 + p.z * p.z * 3.2, 0, TAU); x.fill(); }
+  } },
   { id: 'rain', name: 'Night rain', group: 'Elements', init(s){ s.d.r = parts(s, count(s, 160)); }, draw(x, s, t){
     fill(x, s, vgrad(x, s, [[0, mix(s.pal.bg, '#000000', 0.2)], [1, mix(s.pal.bg, s.pal.accent2, 0.15)]]));
     // a city glow behind the rain, and a rare lightning flash
@@ -308,6 +314,7 @@ function drawBone(x: CanvasRenderingContext2D, cx: number, cy: number, len: numb
 const rgb = (h: string) => { const n = parseInt(h.replace('#', '').slice(0, 6), 16); return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; };
 const colsOf = (p: Palette) => ({ bg: rgb(p.bg), text: rgb(p.text), a1: rgb(p.accent1), a2: rgb(p.accent2), glow: rgb(p.glow) });
 let exportPainter: ShaderPainter | null = null;
+const ELEMENT_SCENES = new Set(['fire', 'snow', 'rain', 'storm', 'ice', 'lava']);
 
 /** the scene's layer, behind the words: realistic scenes run on the GPU (shaders.ts), the rest (and every scene on
  *  a device without WebGL) on a 2D canvas. The GPU resolution adapts: if frames get slow it renders a little smaller
@@ -329,7 +336,8 @@ export class SceneRunner {
   set(id: string, pal: Palette, intensity: number, speed: number, seed: number){
     const r = this.canvas.parentElement!.getBoundingClientRect(), w = Math.max(1, r.width), h = Math.max(1, r.height);
     this.scene = SCENES.find(s => s.id === id) || SCENES[0]; this.speed = speed;
-    this.useGL = !this.flat && !!fragmentFor(this.scene.id) && !!this.gpu()?.supports(this.scene.id);
+    // the elements (fire, snow, rain, storm) are always the realistic GPU versions, in the 2D look too
+    this.useGL = (!this.flat || ELEMENT_SCENES.has(this.scene.id)) && !!fragmentFor(this.scene.id) && !!this.gpu()?.supports(this.scene.id);
     this.gl.hidden = !this.useGL; this.canvas.hidden = this.useGL;
     const key = [this.scene.id, this.useGL, pal.bg, pal.text, pal.accent1, pal.accent2, pal.glow, Math.round(w), Math.round(h), seed, intensity.toFixed(2)].join('|');
     if (key !== this.key){

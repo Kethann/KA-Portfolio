@@ -105,6 +105,8 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
   const [codes, setCodes] = useState<string[]>([]);
   const [codeError, setCodeError] = useState('');
   const [codeBusy, setCodeBusy] = useState(false);
+  /** the last code that went through: the field turns green and says what it saved */
+  const [codeOk, setCodeOk] = useState('');
   const [flipped, setFlipped] = useState(false);
   const [holderError, setHolderError] = useState('');
   const holderRef = useRef<HTMLInputElement>(null);
@@ -178,14 +180,18 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
   const applyCode = async () => {
     const c = code.trim().toUpperCase();
     if (!c || codeBusy) return;
-    setCodeError(''); setCodeBusy(true);
-    try { const next = [...codes.filter(x => x !== c), c]; dispatch({ type: 'QUOTED', quote: await requestQuote(next, email.trim()) }); setCodes(next); setCode(''); sfx('store.coupon'); }
+    setCodeError(''); setCodeOk(''); setCodeBusy(true);
+    try {
+      const next = [...codes.filter(x => x !== c), c], q = await requestQuote(next, email.trim());
+      dispatch({ type: 'QUOTED', quote: q }); setCodes(next); setCode(''); sfx('store.coupon');
+      setCodeOk(q.discount > 0 ? `${c} applied: you save ${formatPrice(q.discount, q.currency)}` : `${c} applied`);
+    }
     catch (e){ setCodeError((e as Error).message); sfx('store.failed'); }
     finally { setCodeBusy(false); }
   };
   const removeCode = async (c: string) => {
     const next = codes.filter(x => x !== c);
-    setCodes(next); setCodeBusy(true);
+    setCodes(next); setCodeBusy(true); setCodeOk('');
     try { dispatch({ type: 'QUOTED', quote: await requestQuote(next, email.trim()) }); } catch (e){ setCodeError((e as Error).message); } finally { setCodeBusy(false); }
   };
   const validateEmail = () => { const ok = EMAIL.test(email.trim()); setEmailError(ok || !email ? '' : 'Enter a valid email address.'); return ok; };
@@ -301,7 +307,8 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
               ? <>A download link{s.success.free ? '' : ' and your receipt'} {s.success.free ? 'was' : 'were'} sent to <strong>{email.trim()}</strong>.</>
               : <>Your download link{s.success.free ? '' : ' and receipt'} will be emailed to <strong>{email.trim()}</strong> shortly. Use “Download now” to get it right away.</>}</p>
             <div className="kas-co-actions">
-              {s.success.downloadUrl && <a className="kas-buy" href={s.success.downloadUrl}>Download now</a>}
+              {s.success.downloadUrl && <a className="kas-buy kco-dl" href={s.success.downloadUrl} onClick={e => { const a = e.currentTarget; a.classList.remove('is-going'); void a.offsetWidth; a.classList.add('is-going'); }}>
+                <svg className="kco-dl-ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19.5h14" /></svg>Download now</a>}
               {s.success.license && <a className="kas-btn is-ghost" href={s.success.license.url} target="_blank" rel="noopener">View your license<span className="kas-sr"> {s.success.license.code} (opens in a new tab)</span></a>}
               <button type="button" className={s.success.downloadUrl ? 'kas-btn is-ghost' : 'kas-buy'} onClick={onClose}>Continue browsing</button>
             </div>
@@ -336,15 +343,16 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
         <label className="kco-remember"><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} /> Remember my email and name on this device for receipts</label>
         {quote && !quote.free ? <div className="kco-code">
           {!codeOpen ? <button type="button" className="kas-link" onClick={() => setCodeOpen(true)}>Have a discount code?</button> : <>
-            <div className="kco-code-row">
-              <div className={`kco-field ${codeError ? 'is-error' : ''}`}>
-                <input id="kco-code" value={code} placeholder=" " onChange={e => { setCode(e.target.value); setCodeError(''); }} autoCapitalize="characters" spellCheck={false} maxLength={32}
+            <div className={`kco-code-row ${codeError ? 'is-rejected' : codeOk || codes.length ? 'is-applied' : ''}`} key={codeError ? 'rejected-' + codeError : 'row'}>
+              <div className={`kco-field ${codeError ? 'is-error' : codeOk || codes.length ? 'is-ok' : ''}`}>
+                <input id="kco-code" value={code} placeholder=" " onChange={e => { setCode(e.target.value); setCodeError(''); setCodeOk(''); }} autoCapitalize="characters" spellCheck={false} maxLength={32}
                   onKeyDown={e => { if (e.key === 'Enter'){ e.preventDefault(); applyCode(); } }} aria-describedby="kco-code-err" autoFocus />
                 <label htmlFor="kco-code">Discount code</label>
               </div>
               <button type="button" className="kas-btn" onClick={applyCode} disabled={codeBusy || !code.trim()}>{codeBusy ? '…' : 'Apply'}</button>
             </div>
             <span id="kco-code-err" className="kco-err" role={codeError ? 'alert' : undefined}>{codeError}</span>
+            <span className="kco-okmsg" role={codeOk ? 'status' : undefined}>{codeOk && <><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" /></svg>{codeOk}</>}</span>
             {codes.length > 0 && <ul className="kas-co-codes">{codes.map(c => <li key={c}>{c}<button type="button" onClick={() => removeCode(c)} aria-label={`Remove ${c}`}>×</button></li>)}</ul>}
           </>}
         </div> : null}

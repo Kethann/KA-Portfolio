@@ -316,8 +316,9 @@ fieldset .primary{ align-self:flex-start; }
 .fx-scene{ transform-origin:50% 50%; }
 .fx-scene[hidden]{ display:none; }
 /* a 3D material letter: the rendered object sits in the letter's own box, so every animation still moves it */
-.fx-char.has-mat{ position:relative; }
-.fx-mat{ position:absolute; pointer-events:none; max-width:none; }
+/* the GPU layer: lit 3D letters and the elements (fire, snow, rain, lightning), above the DOM letters it follows */
+.fx-gpu{ position:absolute; inset:0; width:100%; height:100%; z-index:3; pointer-events:none; }
+.fx-gpu[hidden]{ display:none; }
 .fx-3d[hidden]{ display:none; }
 
 /* 2D / 3D look switch, top of the effects panel */

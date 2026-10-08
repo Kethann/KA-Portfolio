@@ -12,7 +12,9 @@ import { PALETTES } from './palettes';
 import { SceneRunner } from './scenes';
 import { FinishRunner } from './finish';
 import { deco as decoSize, decoDefs } from './decorations/kit';
-import { renderGlyph, isShaded, LEGACY_FILL } from './materials';
+import { isShaded, LEGACY_FILL } from './materials';
+import { GpuText, type ElementKind } from './gpu/renderer';
+import type { Decoration } from './decorations';
 import type { CharInfo, EffectContext, Palette, Timeline } from './types';
 
 export interface Composition {
@@ -53,6 +55,8 @@ export class EffectController {
   stage: HTMLElement; textEl: HTMLDivElement; svg: SVGSVGElement; caret: HTMLSpanElement; pen: HTMLSpanElement;
   tl: Timeline | null = null; ctx: EffectContext | null = null; comp: Composition | null = null; palette: Palette | null = null;
   scene: SceneRunner; finish: FinishRunner; cam: HTMLDivElement;
+  /** the GPU layer: lit 3D letters and the elements (fire, snow, rain, lightning) */
+  gpu: GpuText;
   private camRaf = 0; private camAmp = 0; private ptr = { x: 0, y: 0, tx: 0, ty: 0 };
   built = 0;   // the time the piece is fully composed (the frame a still export uses)
   private building = 0;
@@ -68,14 +72,15 @@ export class EffectController {
     this.cam = document.createElement('div'); this.cam.className = 'fx-cam';
     this.cam.append(this.svg, this.textEl, this.caret, this.pen);
     stage.append(this.cam);
+    this.gpu = new GpuText(this.cam, this.caret);
     this.scene = new SceneRunner(stage); this.finish = new FinishRunner(stage);
     stage.addEventListener('pointermove', this.onPointer);
     stage.addEventListener('pointerleave', this.onPointerLeave);
     (stage as HTMLElement & { fxController?: EffectController }).fxController = this;   // for tests and debugging
-    this.scene.reduced = this.finish.reduced = this.reduced;
+    this.scene.reduced = this.finish.reduced = this.gpu.reduced = this.reduced;
     document.addEventListener('visibilitychange', this.onVis);
   }
-  private onVis = () => { if (document.hidden){ this.tl?.pause(); this.scene.stop(); cancelAnimationFrame(this.camRaf); this.camRaf = 0; } else { if (!this.reduced) this.tl?.play(); this.scene.start(); this.startCam(); } };
+  private onVis = () => { if (document.hidden){ this.tl?.pause(); this.scene.stop(); this.gpu.stop(); cancelAnimationFrame(this.camRaf); this.camRaf = 0; } else { if (!this.reduced) this.tl?.play(); this.scene.start(); this.gpu.start(); this.startCam(); } };
   private onPointer = (e: PointerEvent) => { if (e.pointerType !== 'mouse') return; const r = this.stage.getBoundingClientRect(); this.ptr.tx = ((e.clientX - r.left) / r.width - 0.5) * 2; this.ptr.ty = ((e.clientY - r.top) / r.height - 0.5) * 2; };
   private onPointerLeave = () => { this.ptr.tx = 0; this.ptr.ty = 0; };
   /** the slow 3D drift of the camera, with a little parallax on the background */
@@ -89,13 +94,14 @@ export class EffectController {
       const rx = Math.sin(t * 0.31) * A * 0.55 - P.y * A * 0.8, ry = Math.sin(t * 0.23 + 1) * A + P.x * A * 1.1;
       this.cam.style.transform = `perspective(1300px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg)`;
       this.scene.canvas.style.transform = this.scene.gl.style.transform = `scale(1.05) translate(${(-ry * 0.45).toFixed(2)}%, ${(rx * 0.45).toFixed(2)}%)`;
+      this.gpu.setCamera(rx, ry);   // the reflections and highlights follow the turn
       this.camRaf = requestAnimationFrame(tick);
     };
     this.camRaf = requestAnimationFrame(tick);
   }
   /** flat (no camera turn) while measuring the letters or exporting, so positions are exact */
   flat(on: boolean){
-    if (on){ cancelAnimationFrame(this.camRaf); this.camRaf = 0; this.cam.style.transform = 'none'; }
+    if (on){ cancelAnimationFrame(this.camRaf); this.camRaf = 0; this.cam.style.transform = 'none'; this.gpu.setCamera(0, 0); }
     else this.startCam();
   }
 
@@ -129,6 +135,7 @@ export class EffectController {
     decoSize.flat = flat2d; this.scene.flat = flat2d;
     if (flat2d && isShaded(c.fill || 'solid')) c = { ...c, fill: 'solid' };   // a 3D material becomes flat paint
     else if (!flat2d && c.look === '3d' && (c.fill || 'solid') === 'solid') c = { ...c, fill: 'satin' };   // flat paint gets real depth
+    if (isShaded(c.fill || 'solid') && !this.gpu.available) c = { ...c, fill: 'solid' };   // no WebGL here: flat letters, still readable
     this.textEl.style.letterSpacing = (c.tracking || 0) + 'em';
     this.applyPalette(palette, !this.ctx);
     const typing = TYPING.find(t => t.id === c.typing) || TYPING[0];
@@ -159,7 +166,6 @@ export class EffectController {
       return { index, char: s.el.textContent || '', el: s.el, rect, anchors: glyphAnchors(s.el.textContent || '', fontCss, rect, sr), word: s.word, line: s.line };
     });
     this.styleText(chars, c, palette);
-    if (isShaded(c.fill || 'solid')){ await this.renderMaterials(chars, c, palette, sr, fontCss, run); if (run !== this.building) return; }
     this.flat(false);
     const reveals: { i: number; t: number }[] = [];
     const ctx: EffectContext = {
@@ -178,26 +184,20 @@ export class EffectController {
     const built = end + 0.15;
     this.built = built;
     // hold the finished piece, then cut back to the empty stage the loop starts from
-    const hold = 1.8 / Math.max(0.25, c.speed);
+    const hold = ((deco as Decoration).gpu ? 7 : 1.8) / Math.max(0.25, c.speed);
     tl.to([this.textEl, this.svg, this.caret], { opacity: 0, duration: 0.5, ease: 'power1.in' }, built + hold);
     tl.set({}, {}, built + hold + 0.6);
     this.tl = tl;
+    // the GPU layer: lit 3D letters (3D look) and the elements on and around the letters (both looks)
+    const fillId = LEGACY_FILL[c.fill || 'solid'] || c.fill || 'solid';
+    this.gpu.setup({ chars, stage: sr, font: fontCss, fontPx: parseFloat(/(\d+(?:\.\d+)?)px/.exec(fontCss)?.[1] || String(px)), palette,
+      material: isShaded(fillId) ? fillId : null, depth: c.depth ?? 0.6, light: c.light ?? 225, glow: c.glow ?? 0,
+      element: ((deco as Decoration).gpu || 'none') as ElementKind, amount: c.density ?? 0.6, seed: c.seed, textEl: this.textEl,
+      clock: () => this.tl ? this.tl.time() : 0 });
     if (this.reduced){ tl.progress(Math.min(1, built / tl.duration())); return; }
     tl.play(0);
   }
 
-  /** each letter as a lit 3D object (materials.ts); the work is spread over frames so the page never stalls */
-  private async renderMaterials(chars: CharInfo[], c: Composition, p: Palette, sr: DOMRect, font: string, run: number){
-    let y0 = Infinity, y1 = -Infinity, x0 = Infinity;
-    for (const ch of chars){ y0 = Math.min(y0, ch.rect.top - sr.top); y1 = Math.max(y1, ch.rect.bottom - sr.top); x0 = Math.min(x0, ch.rect.left - sr.left); }
-    const word = { x0, y0, h: Math.max(1, y1 - y0) }, opts = { depth: c.depth ?? 0.6, light: c.light ?? 225, dpr: Math.min(2, window.devicePixelRatio || 1), seed: c.seed };
-    let since = performance.now();
-    for (const ch of chars){
-      const art = renderGlyph(ch.char, font, ch.rect.width, ch.rect.height, c.fill || 'solid', p, opts, word, { x: ch.rect.left - sr.left, y: ch.rect.top - sr.top });
-      if (art){ ch.el.appendChild(art.canvas); ch.el.classList.add('has-mat'); ch.el.style.color = 'transparent'; ch.el.style.removeProperty('-webkit-text-stroke'); }
-      if (performance.now() - since > 28){ await new Promise(r => requestAnimationFrame(r)); since = performance.now(); if (run !== this.building) return; }
-    }
-  }
   /** fill (a gradient across the whole text, outline) and glow on every letter */
   private styleText(chars: CharInfo[], c: Composition, p: Palette){
     const fill = LEGACY_FILL[c.fill || 'solid'] || c.fill || 'solid', grad = fillGradient(fill, p), g = Math.max(0, Math.min(1, c.glow ?? 0)), shaded = isShaded(fill);
@@ -225,5 +225,5 @@ export class EffectController {
     }
     gsap.set([this.textEl, this.svg, this.caret], { opacity: 1 }); gsap.set(this.pen, { opacity: 0 });
   }
-  destroy(){ this.stop(); cancelAnimationFrame(this.camRaf); this.camAmp = 0; this.stage.removeEventListener('pointermove', this.onPointer); this.stage.removeEventListener('pointerleave', this.onPointerLeave); this.scene.destroy(); this.finish.destroy(); document.removeEventListener('visibilitychange', this.onVis); this.stage.replaceChildren(); }
+  destroy(){ this.stop(); cancelAnimationFrame(this.camRaf); this.camAmp = 0; this.stage.removeEventListener('pointermove', this.onPointer); this.stage.removeEventListener('pointerleave', this.onPointerLeave); this.gpu.destroy(); this.scene.destroy(); this.finish.destroy(); document.removeEventListener('visibilitychange', this.onVis); this.stage.replaceChildren(); }
 }

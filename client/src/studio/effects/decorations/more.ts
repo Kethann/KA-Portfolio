@@ -86,67 +86,14 @@ const flare = whole('flare', 'Lens flare', 'A cinematic flare sweeps across the 
 }, 0.6);
 
 // ---------------------------------------------------------------- elements
-const flames = perLetter('flames', 'Flames & embers', 'Flames lick up from the letters and embers float away.', 0.6, (tl, ctx, g, c, at) => {
-  const r = ctx.rng, p = ctx.palette, u = unit(c), top = topOf(c), H = between(r, 22, 40) * u, W = between(r, 9, 15) * u;
-  const fl = (h: number, w: number, col: string, op: number) => svgEl('path', { d: `M${f(top.x)} ${f(top.y + 2)} C${f(top.x - w)} ${f(top.y - h * 0.25)} ${f(top.x - w * 0.3)} ${f(top.y - h * 0.6)} ${f(top.x + w * 0.1)} ${f(top.y - h)} C${f(top.x + w * 0.2)} ${f(top.y - h * 0.55)} ${f(top.x + w)} ${f(top.y - h * 0.35)} ${f(top.x)} ${f(top.y + 2)}Z`, fill: col, opacity: op });
-  const outer = fl(H, W, 'url(#fxgFlame)', 0.95), inner = fl(H * 0.6, W * 0.55, 'url(#fxgGlow)', 0.9);
-  g.append(outer, inner);
-  const o = `${f(top.x)} ${f(top.y)}`;
-  tl.fromTo([outer, inner], { scaleY: 0, scaleX: 0.4, svgOrigin: o }, { scaleY: 1, scaleX: 1, svgOrigin: o, duration: 0.35 / S(ctx), ease: 'power2.out' }, at);
-  tl.to(outer, { scaleY: 0.82, scaleX: 1.1, skewX: 6, svgOrigin: o, duration: 0.18, yoyo: true, repeat: 9, ease: 'sine.inOut' }, at + 0.35 / S(ctx));
-  tl.to(inner, { scaleY: 1.15, skewX: -5, svgOrigin: o, duration: 0.14, yoyo: true, repeat: 11, ease: 'sine.inOut' }, at + 0.35 / S(ctx));
-  for (let k = 0; k < 3; k++){
-    const e = svgEl('circle', { cx: f(top.x), cy: f(top.y - H * 0.6), r: f(between(r, 1, 2.2) * u), fill: p.glow }); g.appendChild(e);
-    tl.fromTo(e, { x: 0, y: 0, opacity: 0 }, { x: (r() - 0.5) * 40 * u, y: -between(r, 50, 110) * u, opacity: 0, keyframes: { opacity: [0, 1, 0] }, duration: between(r, 1.2, 2), ease: 'power1.out' }, at + 0.3 + k * 0.35);
-  }
-  return at + 0.5 / S(ctx);
-});
-
-const frost = perLetter('frost', 'Frost crystals', 'Ice crystals branch out from the letters.', 0.5, (tl, ctx, g, c, at) => {
-  const r = ctx.rng, p = ctx.palette, u = unit(c), o = c.anchors.outline[Math.floor(r() * c.anchors.outline.length)];
-  const L = between(r, 12, 22) * u; let d = '';
-  for (let k = 0; k < 6; k++){
-    const a = (k / 6) * Math.PI * 2 + r() * 0.2, ex = o.x + Math.cos(a) * L, ey = o.y + Math.sin(a) * L;
-    d += `M${f(o.x)} ${f(o.y)} L${f(ex)} ${f(ey)} `;
-    for (const s of [0.45, 0.72]){ const bx = o.x + Math.cos(a) * L * s, by = o.y + Math.sin(a) * L * s, bl = L * (0.4 - s * 0.25);
-      for (const sg of [-1, 1]){ const ba = a + sg * 0.75; d += `M${f(bx)} ${f(by)} L${f(bx + Math.cos(ba) * bl)} ${f(by + Math.sin(ba) * bl)} `; } }
-  }
-  const cr = svgEl('path', { d, stroke: p.glow, 'stroke-width': f(1.2 * u), 'stroke-linecap': 'round', fill: 'none', opacity: 0.95 });
-  const sp = svgEl('circle', { cx: f(o.x), cy: f(o.y), r: f(2 * u), fill: '#ffffff' });
-  g.append(cr, sp);
-  tl.fromTo(cr, { scale: 0, rotate: -30, opacity: 0, svgOrigin: `${f(o.x)} ${f(o.y)}` }, { scale: 1, rotate: 0, opacity: 0.95, svgOrigin: `${f(o.x)} ${f(o.y)}`, duration: 0.7 / S(ctx), ease: 'expo.out' }, at);
-  tl.fromTo(sp, { opacity: 0 }, { opacity: 1, duration: 0.2, yoyo: true, repeat: 3 }, at + 0.3);
-  return at + 0.7 / S(ctx);
-});
-
-const ripples = perLetter('ripples', 'Rain ripples', 'Raindrops land under the letters and ripple outward.', 0.55, (tl, ctx, g, c, at) => {
-  const r = ctx.rng, p = ctx.palette, u = unit(c), b = baseOf(c), y = b.y + between(r, 8, 18) * u;
-  for (let k = 0; k < 3; k++){
-    const e = svgEl('ellipse', { cx: f(b.x), cy: f(y), rx: f(4 * u), ry: f(1.4 * u), fill: 'none', stroke: k ? p.accent2 : p.glow, 'stroke-width': f(1.2 * u) }); g.appendChild(e);
-    tl.fromTo(e, { scale: 0.2, opacity: 0.9, svgOrigin: `${f(b.x)} ${f(y)}` }, { scale: 4 + k * 1.5, opacity: 0, svgOrigin: `${f(b.x)} ${f(y)}`, duration: 1.4 / S(ctx), ease: 'power2.out' }, at + k * 0.22);
-  }
-  const drop = svgEl('path', { d: `M${f(c.anchors.center.x)} ${f(c.rect.height * -0.2 + topOf(c).y)} q ${f(-2.5 * u)} ${f(6 * u)} 0 ${f(8 * u)} q ${f(2.5 * u)} ${f(-2 * u)} 0 ${f(-8 * u)}Z`, fill: p.glow, opacity: 0.85 }); g.appendChild(drop);
-  tl.fromTo(drop, { y: 0, opacity: 0 }, { y: c.rect.height * 0.9, keyframes: { opacity: [0, 1, 1, 0] }, duration: 0.9 / S(ctx), ease: 'power2.in' }, at);
-  return at + 0.6 / S(ctx);
-});
-
-const lightning = whole('lightning', 'Lightning', 'Bolts crack between the letters.', (tl, ctx, g, at) => {
-  const p = ctx.palette, r = ctx.rng, cs = ctx.chars.filter(c => !/\s/.test(c.char)); if (cs.length < 2) return at;
-  const n = 2 + Math.round(ctx.density * 3);
-  for (let k = 0; k < n; k++){
-    const a = cs[Math.floor(r() * cs.length)], b = cs[Math.floor(r() * cs.length)]; if (a === b) continue;
-    const A = topOf(a), B = topOf(b); let d = `M${f(A.x)} ${f(A.y)}`; const segs = 7;
-    for (let i = 1; i < segs; i++){ const t = i / segs; d += ` L${f(A.x + (B.x - A.x) * t + (r() - 0.5) * 26)} ${f(A.y + (B.y - A.y) * t - Math.sin(t * Math.PI) * 40 + (r() - 0.5) * 18)}`; }
-    d += ` L${f(B.x)} ${f(B.y)}`;
-    const glow = svgEl('path', { d, stroke: p.accent2, 'stroke-width': 6, fill: 'none', opacity: 0, 'stroke-linejoin': 'round' });
-    const core = svgEl('path', { d, stroke: '#ffffff', 'stroke-width': 1.6, fill: 'none', opacity: 0, 'stroke-linejoin': 'round' });
-    g.append(glow, core);
-    const t0 = at + k * 0.45 / S(ctx);
-    tl.to([glow, core], { keyframes: { opacity: [0, 1, 0.2, 1, 0] }, duration: 0.45, ease: 'none' }, t0);
-    tl.set(glow, { opacity: 0.35 }, t0 + 0.45).to(glow, { opacity: 0, duration: 0.8 }, t0 + 0.5);
-  }
-  return at + n * 0.45 / S(ctx) + 0.5;
-}, 0.5);
+// Fire, snow, rain and lightning are drawn on the GPU (gpu/renderer.ts, gpu/shaders.ts): real flames that rise off the
+// letters, snow that settles on their tops, rain that runs down them, bolts that strike them.
+const element = (id: string, name: string, description: string, gpu: 'fire' | 'snow' | 'rain' | 'storm'): Decoration =>
+  ({ id, name, description, duration: 0, params: [], gpu, init(){ /* drawn on the GPU */ }, play(){ return 0; }, reset(){ /* drawn on the GPU */ } });
+const flames = element('flames', 'Fire', 'Real flames rise off the letters, their rims glow with heat and embers drift up.', 'fire');
+const frost = element('frost', 'Snowfall', 'Snow falls in depth and settles on every letter, building up as it goes.', 'snow');
+const ripples = element('ripples', 'Rain', 'Rain streaks past, runs down the letters and splashes on their tops.', 'rain');
+const lightning = element('lightning', 'Lightning strike', 'Bolts strike the letters, electricity crawls along them and the frame flashes.', 'storm');
 
 const drips = perLetter('drips', 'Ink drips', 'Ink runs down from the letters and drops fall.', 0.5, (tl, ctx, g, c, at) => {
   const r = ctx.rng, p = ctx.palette, u = unit(c), b = c.anchors.base[Math.floor(r() * Math.max(1, c.anchors.base.length))] || baseOf(c), L = between(r, 14, 46) * u, w = between(r, 2.2, 4) * u;

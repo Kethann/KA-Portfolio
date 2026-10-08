@@ -334,3 +334,39 @@
 @media (prefers-reduced-motion: reduce){
   .kco-front, .kco-back, .kdp-front, .kdp-back{ transition:none; }
 }
+
+
+/* ---- discount code: the whole row says whether it worked (green) or not (red) ---- */
+.kco-code-row{ position:relative; border-radius:16px; transition:box-shadow .35s ease; }
+.kco-code-row.is-applied{ box-shadow:0 0 0 1.5px rgba(143,224,168,.6), 0 0 22px -4px rgba(110,220,150,.45); animation:kcoCodeOk .55s var(--kas-ease) both; }
+.kco-code-row.is-rejected{ box-shadow:0 0 0 1.5px rgba(255,140,140,.7), 0 0 22px -4px rgba(255,110,110,.45); animation:kcoShake .42s ease both; }
+.kco-code-row.is-applied .kco-field input{ border-color:rgba(143,224,168,.75); }
+@keyframes kcoCodeOk{ 0%{ box-shadow:0 0 0 0 rgba(143,224,168,.0), 0 0 0 0 rgba(110,220,150,0); } 40%{ box-shadow:0 0 0 3px rgba(143,224,168,.55), 0 0 30px 2px rgba(110,220,150,.5); } 100%{ box-shadow:0 0 0 1.5px rgba(143,224,168,.6), 0 0 22px -4px rgba(110,220,150,.45); } }
+.kco-okmsg{ display:flex; align-items:center; gap:6px; margin-top:6px; font-size:13px; color:#8fe0a8; }
+.kco-okmsg:empty{ display:none; }
+.kco-okmsg:not(:empty){ animation:kcoSlide .3s var(--kas-ease) both; }
+.kco-okmsg svg{ fill:none; stroke:currentColor; stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:24; stroke-dashoffset:24; animation:kcoDraw .45s .1s var(--kas-ease) forwards; }
+.kas-co-codes li{ background:rgba(110,220,150,.12); border-color:rgba(143,224,168,.5); color:#c9f3d6; }
+
+/* ---- Download now: a light sweeps across it, the arrow nods, and a press answers at once ---- */
+.kco-dl{ position:relative; overflow:hidden; gap:8px; }
+.kco-dl::after{ content:""; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
+  background:linear-gradient(105deg, transparent 35%, rgba(255,245,230,.38) 50%, transparent 65%) 0 0 / 300% 100% no-repeat;
+  animation:kcoDlSheen 2.6s ease-in-out infinite; }
+@keyframes kcoDlSheen{ 0%{ background-position:120% 0; } 60%, 100%{ background-position:-120% 0; } }
+.kco-dl-ico{ fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; animation:kcoDlNod 1.6s ease-in-out infinite; }
+@keyframes kcoDlNod{ 0%, 55%, 100%{ transform:translateY(0); } 25%{ transform:translateY(3px); } }
+.kco-dl.is-going{ animation:kcoBounce .45s var(--kas-ease); }
+.kco-dl.is-going .kco-dl-ico{ animation:kcoDlDrop .6s ease-in both; }
+@keyframes kcoDlDrop{ 0%{ transform:translateY(0); opacity:1; } 60%{ transform:translateY(10px); opacity:0; } 61%{ transform:translateY(-10px); opacity:0; } 100%{ transform:translateY(0); opacity:1; } }
+
+/* ---- browsers without animatable custom properties (older Safari / Firefox, some in-app browsers): the same
+   card sweeps with a moving gradient instead, so no animation is ever missing ---- */
+:host(.no-houdini) .tone-busy .kco-face::after{ background:linear-gradient(110deg, rgba(255,255,255,.08) 30%, rgba(255,200,150,.95) 50%, rgba(255,255,255,.08) 70%) 0 0 / 300% 100%;
+  animation:kcoSweepFb 1.6s linear infinite; }
+@keyframes kcoSweepFb{ from{ background-position:150% 0; } to{ background-position:-150% 0; } }
+
+@media (prefers-reduced-motion: reduce){
+  .kco-code-row.is-applied, .kco-code-row.is-rejected, .kco-okmsg:not(:empty), .kco-dl::after, .kco-dl-ico, .kco-dl.is-going, .kco-dl.is-going .kco-dl-ico, :host(.no-houdini) .tone-busy .kco-face::after{ animation:none; }
+  .kco-okmsg svg{ animation:none; stroke-dashoffset:0; }
+}

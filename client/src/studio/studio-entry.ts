@@ -15,7 +15,7 @@ import { SCENES } from './effects/scenes';
 import { baselineIn } from './effects/typing/handwriting';
 import { FINISHES, paintFinish } from './effects/finish';
 import { THEMES, THEME_GROUPS } from './effects/themes';
-import { MATERIALS, LEGACY_FILL } from './effects/materials';
+import { MATERIALS, LEGACY_FILL, isShaded } from './effects/materials';
 import type { Palette } from './effects/types';
 import { TYPING } from './effects/typing';
 import { DECORATIONS } from './effects/decorations';
@@ -919,7 +919,9 @@ class Studio {
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     const stage = ctrl.stage, sr = stage.getBoundingClientRect(), pal = ctrl.palette || PALETTES[0];
     const font = getComputedStyle(ctrl.textEl).font, ls = getComputedStyle(ctrl.textEl).letterSpacing;
-    const chars = Array.from(ctrl.textEl.querySelectorAll<HTMLElement>('.fx-char')).map(c => ({ ch: c.dataset.ch || c.textContent || '', r: c.getBoundingClientRect(), art: c.querySelector<HTMLCanvasElement>('canvas.fx-mat') }));
+    const chars = Array.from(ctrl.textEl.querySelectorAll<HTMLElement>('.fx-char')).map(c => ({ ch: c.dataset.ch || c.textContent || '', r: c.getBoundingClientRect() }));
+    // the GPU layer: 3D letters (when a 3D material is on) and the elements; drawn into the file as one picture
+    const gpuOn = !ctrl.gpu.canvas.hidden, gpuLetters = gpuOn && isShaded(fxState.fill || 'solid') && fxState.look !== '2d';
     const svgText = new XMLSerializer().serializeToString(ctrl.svg);
     const fill = fxState.fill || 'solid', stops = fillStops(fill, pal), glow = fill === 'outline-glow' ? Math.max(0.6, fxState.glow ?? 0) : (fxState.glow ?? 0);
     const outline = fill === 'outline' || fill === 'outline-glow', strokeCol = fill === 'outline' ? pal.text : pal.accent1;
@@ -932,8 +934,8 @@ class Studio {
       if (fmt === 'svg'){
         const fam = font.replace(/^.*?\d+px\s*/, '').replace(/"/g, "'"), px = parseFloat(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] || '64');
         const m = document.createElement('canvas').getContext('2d')!; m.font = font;
-        const arts = chars.filter(c => c.art).map(c => { const ap = Number(c.art!.dataset.pad || 0); return `<image href="${c.art!.toDataURL('image/png')}" x="${(c.r.left - sr.left - ap).toFixed(1)}" y="${(c.r.top - sr.top - ap).toFixed(1)}" width="${(c.r.width + ap * 2).toFixed(1)}" height="${(c.r.height + ap * 2).toFixed(1)}"/>`; }).join('');
-        const texts = chars.filter(c => !c.art).map(c => `<text x="${(c.r.left - sr.left).toFixed(1)}" y="${(c.r.top - sr.top + baselineIn(m, c.ch, c.r.height)).toFixed(1)}">${c.ch.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>`).join('');
+        const arts = gpuOn ? `<image href="${layerUrl(x => ctrl.gpu.paintInto(x, W, H, 2))}" width="${W}" height="${H}"/>` : '';
+        const texts = chars.filter(() => !gpuLetters).map(c => `<text x="${(c.r.left - sr.left).toFixed(1)}" y="${(c.r.top - sr.top + baselineIn(m, c.ch, c.r.height)).toFixed(1)}">${c.ch.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>`).join('');
         const gid = 'fxfill';
         const grad = stops ? `<defs><linearGradient id="${gid}" gradientUnits="userSpaceOnUse" ${stops.angle === 'h' ? `x1="${bx0}" y1="0" x2="${bx1}" y2="0"` : stops.angle === 'v-up' ? `x1="0" y1="${by1}" x2="0" y2="${by0}"` : `x1="0" y1="${by0}" x2="0" y2="${by1}"`}>${stops.stops.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join('')}</linearGradient></defs>` : '';
         const paint = outline ? `fill="none" stroke="${strokeCol}" stroke-width="${Math.max(1.5, px * 0.03).toFixed(1)}"` : `fill="${stops ? `url(#${gid})` : pal.text}"`;
@@ -955,9 +957,10 @@ class Studio {
           for (const [o, col] of stops.stops) g.addColorStop(o, col); x.fillStyle = g;
         } else x.fillStyle = pal.text;
         x.strokeStyle = strokeCol; x.lineWidth = Math.max(1.5, parseFloat(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] || '64') * 0.03);
-        const drawText = () => { for (const ch of chars){ if (ch.art){ const ap = Number(ch.art.dataset.pad || 0); x.drawImage(ch.art, ch.r.left - sr.left - ap, ch.r.top - sr.top - ap, ch.r.width + ap * 2, ch.r.height + ap * 2); continue; } const yy = ch.r.top - sr.top + baselineIn(x, ch.ch, ch.r.height); if (outline) x.strokeText(ch.ch, ch.r.left - sr.left, yy); else x.fillText(ch.ch, ch.r.left - sr.left, yy); } };
+        const drawText = () => { if (gpuLetters) return; for (const ch of chars){ const yy = ch.r.top - sr.top + baselineIn(x, ch.ch, ch.r.height); if (outline) x.strokeText(ch.ch, ch.r.left - sr.left, yy); else x.fillText(ch.ch, ch.r.left - sr.left, yy); } };
         if (glow > 0){ x.save(); x.shadowColor = pal.glow; x.shadowBlur = 6 + glow * 18; drawText(); x.shadowColor = pal.accent1; x.shadowBlur = 18 + glow * 30; drawText(); x.restore(); }
         drawText();
+        if (gpuOn) ctrl.gpu.paintInto(x, W, H, scale);
         if (withBg) paintFinish(x, fxState.finish || 'none', W, H, fxState.finishAmount ?? 0.6, pal, t);
         const blob: Blob | null = await new Promise(r => c.toBlob(r, 'image/png'));
         if (blob) this.download(blob, `ka-text-effect-${stamp()}-${c.width}x${c.height}.png`);

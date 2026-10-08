@@ -9,6 +9,7 @@ export function overlayLayer(): HTMLElement {
   if (overlayTarget && overlayTarget.isConnected) return overlayTarget;
   const host = document.createElement('div');
   host.className = 'ka-store-overlays';
+  registerAnimatedProps(host);
   document.body.appendChild(host);
   const shadow = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
@@ -16,4 +17,18 @@ export function overlayLayer(): HTMLElement {
   overlayTarget = document.createElement('div');
   shadow.append(style, overlayTarget);
   return overlayTarget;
+}
+
+// @property rules inside a shadow root are ignored, so the card's animated custom properties (the busy sweep, the foil
+// sheen) are registered once for the whole page here. Browsers that can't register them get gradient fallbacks
+// instead (checkout.css :host(.no-houdini)), so no animation is ever missing.
+let registered = false;
+function registerAnimatedProps(host: HTMLElement){
+  const css = (window as unknown as { CSS?: { registerProperty?: (o: { name: string; syntax: string; inherits: boolean; initialValue: string }) => void } }).CSS;
+  if (!css || typeof css.registerProperty !== 'function'){ host.classList.add('no-houdini'); return; }
+  if (registered) return; registered = true;
+  // the same definitions as the @property rules in checkout.css
+  for (const p of [{ name: '--kco-sweep', syntax: '<angle>', inherits: false, initialValue: '0deg' }, { name: '--gx', syntax: '<percentage>', inherits: true, initialValue: '50%' }]){
+    try { css.registerProperty(p); } catch { /* already registered */ }
+  }
 }
