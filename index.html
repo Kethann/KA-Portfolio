@@ -73,6 +73,8 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
   var SHADOW_CSS = ":host(.ka-protect) img,:host(.ka-protect) video,:host(.ka-protect) canvas,:host(.ka-protect) picture{-webkit-user-drag:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}"
     + ":host(.ka-shield) img,:host(.ka-shield) video,:host(.ka-shield) canvas,:host(.ka-shield) picture,:host(.ka-shield) [style*='background-image']{filter:blur(30px) brightness(.55)!important;transition:none!important}"
     + "@media print{:host(.ka-protect) img,:host(.ka-protect) video,:host(.ka-protect) canvas,:host(.ka-protect) picture{visibility:hidden!important}}";
+  var ZONE = '#section-gallery, #section-portfolio, #section-store, #section-tips, #lightbox, [data-ka-shadow]';
+  function inZone(e){ var p = e.composedPath ? e.composedPath() : [e.target]; for (var i = 0; i < p.length; i++){ if (p[i].nodeType === 1 && p[i].matches && p[i].matches(ZONE)) return true; } return false; }
   function hosts(){ return document.querySelectorAll('[data-ka-shadow]'); }
   function dress(h){
     if (h.shadowRoot && !h.shadowRoot.__kaProt){ var st = document.createElement('style'); st.textContent = SHADOW_CSS; h.shadowRoot.appendChild(st); h.shadowRoot.__kaProt = 1; }
@@ -87,8 +89,8 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
   function flash(ms){ shield(true); clearTimeout(shieldTimer); shieldTimer = setTimeout(function(){ if (document.hasFocus()) shield(false); }, ms); }
   var editable = function(t){ return t && t.closest && t.closest('input, textarea, select, [contenteditable="true"], .ka-allow-menu'); };
   // right-click / long-press menus and dragging (shadow content included: the event's path is checked)
-  document.addEventListener('contextmenu', function(e){ if (!on) return; var t = e.composedPath ? e.composedPath()[0] : e.target; if (editable(t)) return; e.preventDefault(); }, true);
-  document.addEventListener('dragstart', function(e){ if (!on) return; var t = e.composedPath ? e.composedPath()[0] : e.target; if (t && /^(IMG|CANVAS|VIDEO|PICTURE)$/.test(t.tagName || '')) e.preventDefault(); }, true);
+  document.addEventListener('contextmenu', function(e){ if (!on) return; var t = e.composedPath ? e.composedPath()[0] : e.target; if (editable(t) || !inZone(e)) return; e.preventDefault(); }, true);
+  document.addEventListener('dragstart', function(e){ if (!on) return; var t = e.composedPath ? e.composedPath()[0] : e.target; if (t && /^(IMG|CANVAS|VIDEO|PICTURE)$/.test(t.tagName || '') && inZone(e)) e.preventDefault(); }, true);
   document.addEventListener('keydown', function(e){
     if (!on) return;
     var k = (e.key || '').toLowerCase(), mod = e.ctrlKey || e.metaKey;
@@ -109,9 +111,10 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
 })();
 </script>
 <style>
-html.ka-protect img, html.ka-protect video, html.ka-protect canvas, html.ka-protect picture{ -webkit-user-drag:none; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
-html.ka-shield img, html.ka-shield video, html.ka-shield picture, html.ka-shield canvas:not(.ka-keep), html.ka-shield .folder-card, html.ka-shield .pw-thumb{ filter:blur(30px) brightness(.55) !important; transition:none !important; }
-@media print{ html.ka-protect img, html.ka-protect video, html.ka-protect canvas, html.ka-protect picture{ visibility:hidden !important; } }
+/* only the gallery, portfolio, store and poster viewer are protected; the rest of the page records normally */
+html.ka-protect #section-gallery img, html.ka-protect #section-gallery video, html.ka-protect #section-gallery canvas, html.ka-protect #section-gallery picture, html.ka-protect #section-portfolio img, html.ka-protect #section-portfolio video, html.ka-protect #section-portfolio canvas, html.ka-protect #section-portfolio picture, html.ka-protect #section-store img, html.ka-protect #section-store video, html.ka-protect #section-store canvas, html.ka-protect #section-store picture, html.ka-protect #section-tips img, html.ka-protect #section-tips video, html.ka-protect #section-tips canvas, html.ka-protect #section-tips picture, html.ka-protect #lightbox img, html.ka-protect #lightbox video, html.ka-protect #lightbox canvas, html.ka-protect #lightbox picture{ -webkit-user-drag:none; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+html.ka-shield #section-gallery img, html.ka-shield #section-gallery video, html.ka-shield #section-gallery picture, html.ka-shield #section-gallery canvas, html.ka-shield #section-gallery .folder-card, html.ka-shield #section-gallery [style*="background-image"], html.ka-shield #section-portfolio img, html.ka-shield #section-portfolio video, html.ka-shield #section-portfolio picture, html.ka-shield #section-portfolio canvas, html.ka-shield #section-portfolio .folder-card, html.ka-shield #section-portfolio [style*="background-image"], html.ka-shield #section-store img, html.ka-shield #section-store video, html.ka-shield #section-store picture, html.ka-shield #section-store canvas, html.ka-shield #section-store .folder-card, html.ka-shield #section-store [style*="background-image"], html.ka-shield #section-tips img, html.ka-shield #section-tips video, html.ka-shield #section-tips picture, html.ka-shield #section-tips canvas, html.ka-shield #section-tips .folder-card, html.ka-shield #section-tips [style*="background-image"], html.ka-shield #lightbox img, html.ka-shield #lightbox video, html.ka-shield #lightbox picture, html.ka-shield #lightbox canvas, html.ka-shield #lightbox .folder-card, html.ka-shield #lightbox [style*="background-image"]{ filter:blur(30px) brightness(.55) !important; transition:none !important; }
+@media print{ html.ka-protect #section-gallery img, html.ka-protect #section-gallery video, html.ka-protect #section-gallery canvas, html.ka-protect #section-gallery picture, html.ka-protect #section-portfolio img, html.ka-protect #section-portfolio video, html.ka-protect #section-portfolio canvas, html.ka-protect #section-portfolio picture, html.ka-protect #section-store img, html.ka-protect #section-store video, html.ka-protect #section-store canvas, html.ka-protect #section-store picture, html.ka-protect #section-tips img, html.ka-protect #section-tips video, html.ka-protect #section-tips canvas, html.ka-protect #section-tips picture, html.ka-protect #lightbox img, html.ka-protect #lightbox video, html.ka-protect #lightbox canvas, html.ka-protect #lightbox picture{ visibility:hidden !important; } }
 </style>
 
 <!-- the first rel="icon" is the one the Creator Portal's favicon setting replaces (applyFavicon) -->

@@ -95,9 +95,10 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
               </div>
               <div className="stack"><div className="eyebrow">Image protection</div>
                 <Switch checked={d.visibility.protectImages !== false} onChange={v => updateSite(x => ({ ...x, visibility: { ...x.visibility, protectImages: v } }))} label="Protect my images" />
-                <p className="field-hint">On: no right-click, “Save image”, dragging or long-press saving; save, print and view-source shortcuts are blocked; images blur
-                  the moment the page loses focus (screenshot tools, switching apps, opening developer tools) and when a screenshot key is pressed, and they never print.
-                  Your own Download buttons keep working. No website can stop a phone screenshot or a camera, so this is a strong deterrent, not a lock.</p>
+                <p className="field-hint">Covers the gallery, portfolio, store and poster viewer only; the rest of the site records and screenshots normally.
+                  On: no right-click, “Save image”, dragging or long-press saving there; save, print and view-source shortcuts are blocked; those images blur
+                  the moment the page loses focus (screenshot and recording tools, switching apps, developer tools) or a screenshot key is pressed, and they never print.
+                  Your own Download buttons keep working. No website can fully stop a phone’s own screenshot or screen recorder, or a camera.</p>
               </div>
               <div className="stack"><div className="eyebrow">Image downloads</div>
                 <Segmented label="Download format" value={d.visibility.downloadFormat === 'jpeg' ? 'jpeg' : 'png'} onChange={v => updateSite(x => ({ ...x, visibility: { ...x.visibility, downloadFormat: v } }))} options={[{ value: 'png', label: 'PNG (lossless)' }, { value: 'jpeg', label: 'JPEG (smaller)' }]} />
