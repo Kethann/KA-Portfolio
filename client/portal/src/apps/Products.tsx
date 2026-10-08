@@ -16,7 +16,7 @@ type Product = {
   tags: string[]; techTags: string[]; version: string; status: 'draft' | 'published' | 'archived'; sellable: boolean; isFree: boolean;
   priceInr: number | null; priceUsd: number | null; salePriceInr: number | null; salePriceUsd: number | null; saleStartsAt: string | null; saleEndsAt: string | null;
   licenseId: string | null; license: string | null; demoUrl: string; previewUrl: string; maxDownloads: number; linkTtlHours: number; deliveryCustom: boolean; refundAfterDownload: boolean;
-  sort: number; media: Media[]; file: { id: string; filename: string; bytes: number; licenseVersion: number | null; createdAt: string; source?: 'upload' | 'drive' } | null; sales: number; updatedAt: string; publishedAt: string | null;
+  sort: number; media: Media[]; file: { id: string; filename: string; bytes: number; licenseVersion: number | null; createdAt: string; source?: 'upload' | 'drive'; fromDrive?: boolean | number } | null; sales: number; updatedAt: string; publishedAt: string | null;
 };
 type Kind = 'all' | 'artzz' | 'artifacts' | 'archived';
 
@@ -335,7 +335,8 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
                   <div className="file-row">
                     <Icon name="zip" size={22} />
                     <div className="grow" style={{ minWidth: 0 }}><div className="truncate" style={{ fontWeight: 600 }}>{p.file.filename}</div>
-                      <div className="faint" style={{ fontSize: 12 }}>{p.file.source === 'drive' ? `Google Drive${p.file.bytes ? ` · ${bytes(p.file.bytes)}` : ''}` : bytes(p.file.bytes)} · {p.file.source === 'drive' ? 'linked' : 'uploaded'} {ago(p.file.createdAt)}{p.file.licenseVersion ? ` · LICENSE.txt v${p.file.licenseVersion} inside` : ''}</div></div>
+                      <div className="faint" style={{ fontSize: 12 }}>{p.file.source === 'drive' ? `Streams from Google Drive${p.file.bytes ? ` · ${bytes(p.file.bytes)}` : ''}` : p.file.fromDrive ? `Private copy of a Google Drive file · ${bytes(p.file.bytes)}` : bytes(p.file.bytes)} · {p.file.source === 'drive' ? 'linked' : p.file.fromDrive ? 'copied' : 'uploaded'} {ago(p.file.createdAt)}{p.file.licenseVersion ? ` · LICENSE.txt v${p.file.licenseVersion} inside` : ''}</div></div>
+                    {p.file.source === 'drive' && <AsyncButton className="btn sm" onClick={async () => { const r = await post<{ product: Product }>(`/products/${id}/drive-file/copy`); refresh(r); toast.show('Private copy made: downloads no longer use Google Drive', { tone: 'success' }); }}>Make a private copy</AsyncButton>}
                     <AsyncButton className="btn sm" onClick={async () => { const r = await get<{ url: string }>(`/products/${id}/file`); window.open(r.url, '_blank', 'noopener'); }}><Icon name="downloads" /> Download</AsyncButton>
                   </div>
                 ) : <p className="muted">No file yet. A for-sale item can’t be published without one.</p>}
@@ -345,12 +346,13 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
                 </Uploader>
                 <p className="field-hint">Replacing keeps earlier versions, so links already emailed keep working until they expire.</p>
                 <div className="stack" style={{ gap: 8, paddingTop: 10, borderTop: '1px solid var(--line, rgba(255,255,255,.1))' }}>
-                  <Field label="…or use a Google Drive file" hint="Paste the file’s share link (set sharing to “Anyone with the link”). Buyers never see this link: they get a new, expiring link of your own site’s for each purchase.">
+                  <Field label="…or use a Google Drive file" hint="Paste the file’s share link (sharing: “Anyone with the link”). The file is copied once into your private storage: buyers get a new, expiring link of your own site’s and never reach your Drive. After it says “Private copy”, you can stop sharing it on Drive.">
                     <div className="row"><input type="url" inputMode="url" value={driveUrl} onChange={e => setDriveUrl(e.target.value)} placeholder="https://drive.google.com/file/d/…/view" autoComplete="off" spellCheck={false} />
                       <AsyncButton className="btn" disabled={!driveUrl.trim()} onClick={async () => {
                         const r = await put<{ product: Product }>(`/products/${id}/drive-file`, { url: driveUrl.trim() });
-                        refresh(r); setDriveUrl(''); toast.show('Google Drive file linked', { tone: 'success' });
-                      }}>Use this file</AsyncButton></div>
+                        refresh(r); setDriveUrl('');
+                        toast.show(r.product.file?.source === 'drive' ? 'Linked: this file is streamed from Google Drive (too large to copy without a known size)' : 'Copied from Google Drive into your private storage', { tone: 'success' });
+                      }}>Copy this file</AsyncButton></div>
                   </Field>
                 </div>
               </section>

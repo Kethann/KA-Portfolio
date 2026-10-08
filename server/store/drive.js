@@ -10,7 +10,7 @@
 // files); without it the public download endpoint is used.
 import { env } from '../core/env.js';
 import { HttpError } from '../core/http.js';
-import { hmacHex, safeEqual } from '../core/crypto.js';
+import { hmacHex, safeEqual, randomToken } from '../core/crypto.js';
 
 let driveFetch = (url, init) => fetch(url, init);
 /** tests (and nothing else) swap the network out */
@@ -87,6 +87,24 @@ export async function probeDrive(id){
   const filename = dispositionName(res.headers.get('content-disposition')) || 'download';
   await res.body?.cancel?.();
   return { filename, bytes };
+}
+
+// ---- a private copy: the file is fetched from Drive once and kept in this site's private storage --------------------
+// After that, downloads never touch Google Drive (the owner can even stop sharing it on Drive).
+export function storageName(filename){
+  const dot = filename.lastIndexOf('.');
+  const ext = dot > 0 ? filename.slice(dot + 1).replace(/[^A-Za-z0-9]/g, '').slice(0, 10) : '';
+  const base = (dot > 0 ? filename.slice(0, dot) : filename).normalize('NFKD').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'download';
+  return ext ? `${base}.${ext}` : base;
+}
+export async function importDrive(id, storage, { filename } = {}){
+  const res = await openDrive(id);
+  const name = String(filename || dispositionName(res.headers.get('content-disposition')) || 'download').replace(/[\r\n"\\]/g, '').slice(0, 160) || 'download';
+  const length = res.headers.get('content-encoding') ? 0 : Number(res.headers.get('content-length')) || 0;
+  const path = `files/${randomToken(12)}/${storageName(name)}`;
+  const bytes = await storage.putStream('deliverables', path, res.body, length, res.headers.get('content-type') || 'application/octet-stream');
+  if (!bytes) throw new HttpError(502, 'Drive sent an empty file. Check the link and try again.');
+  return { path, filename: name, bytes };
 }
 
 // ---- our own short-lived link to the streamed file ----------------------------------------------------------

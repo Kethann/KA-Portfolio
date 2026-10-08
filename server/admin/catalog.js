@@ -10,7 +10,7 @@ import { audit } from './auth.js';
 import { getSetting, getSettingWithRevision, setSetting } from '../core/settings.js';
 import { sendEmail, DEFAULT_TEMPLATES } from '../core/email.js';
 import { loadSiteDocument } from '../handlers/public.js';
-import { parseDriveId, probeDrive, signedFileUrl } from '../store/drive.js';
+import { parseDriveId, probeDrive, signedFileUrl, importDrive } from '../store/drive.js';
 import { termsFor } from '../store/delivery.js';
 
 const IMAGE_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/avif': 'avif', 'image/gif': 'gif' };
@@ -88,7 +88,7 @@ export function isOwnMediaUrl(u){
 const LIST_SELECT = `select p.*, c.name as category_name, c.slug as category_slug, l.name as license_name, l.key as license_key, l.summary as license_summary,
   (select json_group_array(json_object('id', m.id, 'url', m.url, 'alt', m.alt, 'width', m.width, 'height', m.height))
      from (select * from product_media m where m.product_id = p.id order by m.sort, m.id) m) as media,
-  (select json_object('id', f.id, 'filename', f.filename, 'bytes', f.bytes, 'licenseVersion', f.license_version, 'createdAt', f.created_at, 'source', f.source) from product_files f where f.product_id = p.id and f.is_current) as file,
+  (select json_object('id', f.id, 'filename', f.filename, 'bytes', f.bytes, 'licenseVersion', f.license_version, 'createdAt', f.created_at, 'source', f.source, 'fromDrive', f.drive_id is not null) from product_files f where f.product_id = p.id and f.is_current) as file,
   (select count(*) from order_items i join orders o on o.id = i.order_id where i.product_id = p.id and o.status in ('paid','delivered')) as sales
   from products p left join categories c on c.id = p.category_id left join licenses l on l.id = p.license_id`;
 
@@ -378,17 +378,45 @@ export async function setDriveFile(ctx){
   const b = await readJson(ctx.request, 4 * 1024);
   const driveId = parseDriveId(b.url);
   if (!driveId) throw new HttpError(400, 'Paste the share link of a single Google Drive file (not a folder).');
-  const info = await probeDrive(driveId);
-  const filename = (str(b.filename, { name: 'File name', max: 160, required: false }) || info.filename || 'download').replace(/["\\\r\n]/g, '');
   const db = await getDb();
   if (!(await db.maybeOne('select 1 from products where id = $1', [id]))) throw new HttpError(404, 'Product not found.');
+  return linkDriveFile(ctx, id, driveId, { mode: b.mode === 'stream' ? 'stream' : 'copy', filename: str(b.filename, { name: 'File name', max: 160, required: false }) });
+}
+
+// The current Drive-streamed file of a product becomes a private copy (downloads stop touching Drive).
+export async function copyDriveFile(ctx){
+  const id = vUuid(ctx.params.id, 'Product');
+  const db = await getDb();
+  const f = await db.maybeOne(`select drive_id, filename from product_files where product_id = $1 and is_current and source = 'drive'`, [id]);
+  if (!f || !f.drive_id) throw new HttpError(404, 'This product’s file isn’t streamed from Google Drive.');
+  return linkDriveFile(ctx, id, f.drive_id, { mode: 'copy', filename: f.filename });
+}
+
+// copy (default): fetch the file once into private storage — buyers' downloads never reach Drive again.
+// stream: keep only the id and stream from Drive on each download (used when a copy isn't possible).
+async function linkDriveFile(ctx, id, driveId, { mode, filename }){
+  const db = await getDb();
+  let row;
+  if (mode === 'copy'){
+    try {
+      const c = await importDrive(driveId, getStorage(), { filename });
+      row = { path: c.path, filename: c.filename, bytes: c.bytes, source: 'upload', copied: true };
+    } catch (e){
+      if (e && e.code !== 'too_large') throw e;   // not shared, missing... the owner has to fix that
+      mode = 'stream';                              // too big to copy without a known size: stream it instead
+    }
+  }
+  if (!row){
+    const info = await probeDrive(driveId);
+    row = { path: `drive/${driveId}`, filename: (filename || info.filename || 'download').replace(/["\\\r\n]/g, ''), bytes: info.bytes || 0, source: 'drive', copied: false };
+  }
   await db.batch([
     ['update product_files set is_current = 0 where product_id = $1 and is_current = 1', [id]],
-    [`insert into product_files (product_id, storage_path, filename, bytes, sha256, source, drive_id) values ($1,$2,$3,$4,'', 'drive', $5)`,
-      [id, `drive/${driveId}`, filename, info.bytes || 0, driveId]],
+    [`insert into product_files (product_id, storage_path, filename, bytes, sha256, source, drive_id) values ($1,$2,$3,$4,'', $5, $6)`,
+      [id, row.path, row.filename, row.bytes, row.source, driveId]],
     ['update products set updated_at = now() where id = $1', [id]],
   ]);
-  await audit(ctx, 'product_file_set', id, { filename, bytes: info.bytes, source: 'drive' });
+  await audit(ctx, 'product_file_set', id, { filename: row.filename, bytes: row.bytes, source: row.copied ? 'drive-copy' : 'drive' });
   return getProduct({ ...ctx, params: { id } });
 }
 
@@ -600,6 +628,7 @@ export function registerCatalog(route){
   route('DELETE', '/api/admin/products/:id/media/:mediaId', deleteMedia, a);
   route('PUT', '/api/admin/products/:id/file', setFile, a);
   route('PUT', '/api/admin/products/:id/drive-file', setDriveFile, a);
+  route('POST', '/api/admin/products/:id/drive-file/copy', copyDriveFile, a);
   route('GET', '/api/admin/products/:id/delivery', getDelivery, a);
   route('PUT', '/api/admin/products/:id/delivery', saveDelivery, a);
   route('POST', '/api/admin/products/:id/delivery/test', testDelivery, a);

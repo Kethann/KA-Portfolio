@@ -6,12 +6,27 @@
 // Local development and tests: files under .data/storage, served by the dev server.
 import { env, localDataDir } from './env.js';
 import { hmacHex, safeEqual } from './crypto.js';
-import { mkdir, writeFile, readFile, rm, stat, readdir } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, rm, stat, readdir, open as openFile } from 'node:fs/promises';
 import { dirname, sep } from 'node:path';
 
 const at = (...parts) => parts.join(sep);
 
 export const BUCKETS = { media: { public: true }, deliverables: { public: false }, backups: { public: false } };
+
+// reads a stream into memory, refusing more than `limit` bytes (only for bodies whose length isn't known)
+async function readAll(stream, limit){
+  const reader = stream.getReader(), parts = []; let total = 0;
+  for (;;){
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > limit){ try { await reader.cancel(); } catch {} throw Object.assign(new Error('The file is too large to copy without a known size.'), { code: 'too_large' }); }
+    parts.push(value);
+  }
+  const out = new Uint8Array(total); let o = 0; for (const p of parts){ out.set(p, o); o += p.byteLength; }
+  return out;
+}
+const UNKNOWN_LENGTH_LIMIT = 95 * 1024 * 1024;
 
 function assertPath(bucket, path){
   if (!BUCKETS[bucket]) throw new Error('Unknown bucket.');
@@ -38,6 +53,18 @@ export function r2Storage(r2, secret){
     kind: 'r2',
     r2,
     async put(bucket, path, bytes, contentType){ await r2.put(key(bucket, path), bytes, { httpMetadata: { contentType: contentType || 'application/octet-stream' } }); },
+    /** stores a stream (e.g. a file fetched from Google Drive) and returns its size; a known length streams straight into R2 */
+    async putStream(bucket, path, stream, length, contentType){
+      const k = key(bucket, path), meta = { httpMetadata: { contentType: contentType || 'application/octet-stream' } };
+      if (length > 0 && typeof FixedLengthStream === 'function'){
+        const fixed = new FixedLengthStream(length);
+        await Promise.all([stream.pipeTo(fixed.writable), r2.put(k, fixed.readable, meta)]);
+        return length;
+      }
+      const bytes = await readAll(stream, UNKNOWN_LENGTH_LIMIT);
+      await r2.put(k, bytes, meta);
+      return bytes.byteLength;
+    },
     async get(bucket, path){
       const obj = await r2.get(key(bucket, path));
       if (!obj) throw Object.assign(new Error('Not found in storage.'), { status: 404 });
@@ -84,6 +111,13 @@ export function localStorage(dataDir){
     kind: 'local',
     root,
     async put(bucket, path, bytes){ const f = file(bucket, path); await mkdir(dirname(f), { recursive: true }); await writeFile(f, bytes); },
+    async putStream(bucket, path, stream){
+      const f = file(bucket, path); await mkdir(dirname(f), { recursive: true });
+      const fh = await openFile(f, 'w'); let total = 0;
+      try { const reader = stream.getReader(); for (;;){ const { done, value } = await reader.read(); if (done) break; await fh.write(value); total += value.byteLength; } }
+      finally { await fh.close(); }
+      return total;
+    },
     async get(bucket, path){ return readFile(file(bucket, path)); },
     async remove(bucket, paths){ for (const p of paths) await rm(file(bucket, p), { force: true }); },
     publicUrl(bucket, path){ assertPath(bucket, path); if (!BUCKETS[bucket].public) throw new Error('This bucket is private.'); return `/__storage/${bucket}/${path}`; },

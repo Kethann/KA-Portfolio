@@ -6,7 +6,7 @@ import { email as vEmail, currency as vCurrency, str } from '../core/validate.js
 import { getDb } from '../core/db.js';
 import * as orders from '../store/orders.js';
 import { cleanHolder } from '../store/license.js';
-import { downloadPage, redeem, resendLinks, rate } from '../store/delivery.js';
+import { downloadPage, downloadStatus, redeem, resendLinks, rate } from '../store/delivery.js';
 import { verifyFileUrl, streamDriveFile } from '../store/drive.js';
 import { onDaily } from '../jobs/hooks.js';
 
@@ -97,6 +97,12 @@ export async function razorpayWebhook(ctx){
   return json(result);
 }
 
+// the live counter on the download page: time left and downloads left, never counts one
+export async function downloadStatusGet(ctx){
+  await rateLimit(`dl-status:${ctx.ip}`, 120, 10 * 60);
+  return downloadStatus(ctx.params.token);
+}
+
 export async function downloadGet(ctx){
   await rateLimit(`dl-view:${ctx.ip}`, 60, 10 * 60);
   return downloadPage(ctx.params.token, siteUrl(ctx.request), { rated: ctx.url.searchParams.get('rated') === '1' });
@@ -132,7 +138,8 @@ export async function downloadPost(ctx){
     token = (await readJson(ctx.request, 16 * 1024)).turnstileToken || '';
   }
   await verifyTurnstileLenient(token, ctx.ip);
-  return redeem({ token: ctx.params.token, ip: ctx.ip, country: ctx.geo?.country || null, userAgent: ctx.request.headers.get('user-agent'), siteUrl: siteUrl(ctx.request) });
+  const asJson = (ctx.request.headers.get('accept') || '').includes('application/json');   // the live download page
+  return redeem({ token: ctx.params.token, ip: ctx.ip, country: ctx.geo?.country || null, userAgent: ctx.request.headers.get('user-agent'), siteUrl: siteUrl(ctx.request), asJson });
 }
 
 export async function resend(ctx){
@@ -158,6 +165,7 @@ export function registerCheckout(route){
   route('POST', '/api/checkout/demo-pay', demoPay);
   route('POST', '/api/webhooks/razorpay', razorpayWebhook, { access: 'webhook' });
   route('GET', '/api/file/:id', fileGet);
+  route('GET', '/api/download/:token/status', downloadStatusGet);
   route('GET', '/api/download/:token', downloadGet);
   route('POST', '/api/download/:token', downloadPost, { nullOrigin: true });   // the link itself is the credential; the page's form sends Origin: null
   route('POST', '/api/download/:token/rate', ratePost, { nullOrigin: true });

@@ -137,3 +137,48 @@ test('the human check on the download button never blocks a buyer: no secret, no
     await assert.rejects(verifyTurnstileLenient('tok', ip(), fetchAns({ success: false })), /verification check failed/, 'an answered "no" is still refused');
   } finally { setEnvSource(app.vars); }
 });
+
+test('the download page counts down live and the button downloads without leaving the page (JSON), with the meter updated', async () => {
+  const id = await freeProduct('live-kit', { delivery_custom: 1, max_downloads: 2, link_ttl_hours: 5 });
+  await withUploadedFile(id);
+  const token = await claim(id, 'live@example.com');
+  const page = await app.call('GET', `/api/download/${token}`, { ip: ip() });
+  assert.match(page.text, /id="dl-time">0?4:5\d:\d\d<\/b>/, 'about 5 hours left, shown as a countdown');
+  assert.match(page.text, /id="dl-left">2<\/b> of <span id="dl-max">2<\/span> downloads left/);
+  const nonce = /<script nonce="([A-Za-z0-9_-]+)">/.exec(page.text)?.[1];
+  assert.ok(nonce, 'the live script is inline with a nonce');
+  const csp = page.headers.get('content-security-policy');
+  assert.match(csp, new RegExp(`script-src[^;]*'nonce-${nonce}'`)); assert.match(csp, /connect-src 'self'/);
+  // status: never counts
+  const s1 = await app.call('GET', `/api/download/${token}/status`, { ip: ip() });
+  assert.equal(s1.status, 200); assert.deepEqual([s1.json.state, s1.json.used, s1.json.max, s1.json.left], ['ok', 0, 2, 2]);
+  assert.equal(s1.headers.get('cache-control'), 'no-store');
+  const json = { accept: 'application/json', origin: 'null' };
+  const d1 = await post(token, json);
+  assert.equal(d1.status, 200); assert.equal(d1.json.ok, true); assert.match(d1.json.url, /^\/__storage\/deliverables\//); assert.deepEqual([d1.json.used, d1.json.max, d1.json.left], [1, 2, 1]);
+  assert.equal((await app.call('GET', `/api/download/${token}/status`, { ip: ip() })).json.left, 1, 'the meter sees the new count');
+  assert.equal((await post(token, json)).json.left, 0);
+  const d3 = await post(token, json);
+  assert.equal(d3.status, 410); assert.equal(d3.json.state, 'limit'); assert.match(d3.json.message, /maximum number of times/);
+  assert.equal((await app.call('GET', `/api/download/${token}/status`, { ip: ip() })).json.state, 'limit');
+  assert.equal((await app.call('GET', '/api/download/not-a-token/status', { ip: ip() })).status, 404);
+});
+
+test('a Google Drive link becomes a private copy: downloads never touch Drive afterwards', async () => {
+  const { setStorage } = await import('../server/core/storage.js');
+  void setStorage;
+  const id = await freeProduct('copied-kit', { delivery_custom: 1 });
+  const { importDrive } = await import('../server/store/drive.js');
+  const before = driveCalls.length;
+  const c = await importDrive(DRIVE_ID, app.storage);
+  assert.equal(c.filename, 'Brush Pack.zip'); assert.equal(c.bytes, 26); assert.match(c.path, /^files\/[A-Za-z0-9_-]{16}\/Brush-Pack\.zip$/);
+  assert.equal((await app.storage.get('deliverables', c.path)).toString(), 'FILE-FROM-DRIVE-0123456789', 'the bytes are in our own private storage');
+  await app.pg.query(`insert into product_files (product_id, storage_path, filename, bytes, source, drive_id) values ($1, $2, $3, $4, 'upload', $5)`, [id, c.path, c.filename, c.bytes, DRIVE_ID]);
+  const token = await claim(id, 'copied@example.com');
+  const called = driveCalls.length;
+  const d = await post(token, { accept: 'application/json', origin: 'null' });
+  assert.equal(d.status, 200); assert.match(d.json.url, /^\/__storage\/deliverables\/files\//, 'served from our storage, not from Drive');
+  assert.ok(!d.json.url.includes(DRIVE_ID));
+  assert.equal(driveCalls.length, called, 'Drive is not contacted for the download');
+  assert.ok(called > before, 'Drive was only read once, when the copy was made');
+});

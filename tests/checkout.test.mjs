@@ -103,7 +103,7 @@ test('success: signature + webhook -> paid -> delivered, receipt numbered, one-t
   // the download itself
   const link = linkIn(mails[0]), token = link.split('/').pop();
   const page = await app.call('GET', `/api/download/${token}`, { ip: ip() });
-  assert.equal(page.status, 200); assert.match(page.text, /3 downloads left/); assert.match(page.headers.get('content-security-policy'), /default-src 'none'/);
+  assert.equal(page.status, 200); assert.match(page.text, /id="dl-left">3<\/b> of <span id="dl-max">3<\/span> downloads left/); assert.match(page.headers.get('content-security-policy'), /default-src 'none'/);
   const dl = await app.call('POST', `/api/download/${token}`, { body: '', raw: true, headers: { 'content-type': 'application/x-www-form-urlencoded' }, ip: '203.0.113.50' });
   assert.equal(dl.status, 303); assert.match(dl.headers.get('location'), /^\/__storage\/deliverables\/.+\?exp=\d+&sig=[0-9a-f]+&download=file.zip$/);
   const ev = (await app.pg.query(`select e.ip from download_events e join orders o on o.id = e.order_id where o.public_id = $1`, [o.orderId])).rows;

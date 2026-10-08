@@ -4,6 +4,7 @@
 //   POST  (Turnstile + rate limit) counts one download atomically, logs it, and redirects to a
 //         60-second signed storage URL. No permanent public file URL ever exists.
 import { getDb } from '../core/db.js';
+import { json } from '../core/http.js';
 import { env } from '../core/env.js';
 import { getSetting } from '../core/settings.js';
 import { randomToken, sha256hex } from '../core/crypto.js';
@@ -119,17 +120,19 @@ export async function sendReceipt(order, items){
 }
 
 // ---- download confirmation page (server-rendered, no scripts except Turnstile) ----------------
-function page(status, title, bodyHtml, { turnstile = false } = {}){
+function page(status, title, bodyHtml, { turnstile = false, script = '' } = {}){
   const siteKey = env('TURNSTILE_SITE_KEY');
   const withTs = turnstile && siteKey;
+  const nonce = script ? randomToken(16) : '';
+  const scriptSrc = [withTs ? 'https://challenges.cloudflare.com' : '', nonce ? `'nonce-${nonce}'` : ''].filter(Boolean).join(' ') || "'none'";
   const csp = [
     "default-src 'none'", "style-src 'unsafe-inline'", "img-src 'self' data:", "base-uri 'none'", "frame-ancestors 'none'",
     "form-action 'self'",   // files are served from this same site (R2 through the Worker)
-    withTs ? "script-src https://challenges.cloudflare.com" : "script-src 'none'",
+    `script-src ${scriptSrc}`,
     withTs ? "frame-src https://challenges.cloudflare.com" : "frame-src 'none'",
-    withTs ? "connect-src https://challenges.cloudflare.com" : "connect-src 'none'"
+    `connect-src 'self'${withTs ? ' https://challenges.cloudflare.com' : ''}`   // the live counter asks this site for the link's status
   ].join('; ');
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><link rel="icon" type="image/png" href="/images/favicon-32.png">
 <title>${escapeHtml(title)}</title>
 <style>
 :root{color-scheme:dark}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#050506;color:#edebe8;font:16px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:20px;box-sizing:border-box}
@@ -143,10 +146,11 @@ button:focus-visible,a:focus-visible{outline:3px solid #ff9438;outline-offset:3p
 .stars label{font-size:32px;line-height:1;color:rgba(255,255,255,.22);cursor:pointer;transition:color .15s}
 .stars input:checked~label,.stars label:hover,.stars label:hover~label{color:#ffb35c}.stars input:focus-visible+label{outline:2px solid #ff9438;border-radius:4px}
 .rate textarea,.rate input[name=name]{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(0,0,0,.25);color:#edebe8;font:inherit}
+.live{margin:18px 0 16px;padding:16px 16px 14px;border-radius:16px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.1)}.live .row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}.live .label{font:600 11px/1.4 ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:rgba(237,235,232,.6)}.live .time{font:600 22px/1.1 ui-monospace,monospace;font-variant-numeric:tabular-nums;color:#ffd9b8;letter-spacing:.02em}.meter{position:relative;height:8px;margin:12px 0 10px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}.meter i{position:absolute;inset:0 auto 0 0;border-radius:inherit;background:linear-gradient(90deg,#ff9438,#ffc795);transition:width .6s cubic-bezier(.2,.8,.2,1)}.live.low .meter i{background:linear-gradient(90deg,#ff6a3d,#ff9438)}.live.low .time{color:#ffb08a}.live.dead{opacity:.7}.live.dead .meter i{background:rgba(255,255,255,.25)}.live b.n{color:#fff;font-size:18px}.note{min-height:1.4em;margin:12px 0 0;font-size:14px}.note.ok{color:#9fe0b0}.note.bad{color:#ffb0a0}button.busy{opacity:.75;cursor:progress}button:disabled{opacity:.5;cursor:not-allowed}@media (prefers-reduced-motion:reduce){.meter i{transition:none}}
 .seal{display:block;width:150px;margin:24px auto 6px}.seal svg{display:block;width:100%;height:auto}.seal-code{text-align:center;margin:0}
 button.ghost{background:transparent;border-color:rgba(255,255,255,.25);justify-self:start}.ts{margin:0 0 16px}.brand{font:600 11px/1 ui-monospace,monospace;letter-spacing:.14em;color:#c9864f;margin-bottom:18px;display:block}
 </style>${withTs ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>' : ''}</head>
-<body><main class="card"><span class="brand">${escapeHtml(env('SITE_NAME', 'KETHAN ARTZZ').toUpperCase())}</span>${bodyHtml.replace('{{TURNSTILE}}', withTs ? `<div class="ts cf-turnstile" data-sitekey="${escapeHtml(siteKey)}" data-theme="dark"></div>` : '')}</main></body></html>`;
+<body><main class="card"><span class="brand">${escapeHtml(env('SITE_NAME', 'KETHAN ARTZZ').toUpperCase())}</span>${bodyHtml.replace('{{TURNSTILE}}', withTs ? `<div class="ts cf-turnstile" data-sitekey="${escapeHtml(siteKey)}" data-theme="dark"></div>` : '')}</main>${nonce ? `<script nonce="${nonce}">${script}</script>` : ''}</body></html>`;
   return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': csp,
     'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'X-Robots-Tag': 'noindex, nofollow' } });   // same-origin: the page's own form posts keep a normal Origin, and nothing is sent to other sites
 }
@@ -221,31 +225,106 @@ export async function downloadPage(token, siteUrl, { rated = false } = {}){
   const code = await ensureLicenseCode(await getDb(), t.order_id);
   const seal = code ? `<a class="seal" href="${escapeHtml(licenseUrl(siteUrl, code))}" aria-label="Your license ${escapeHtml(code)}: open the license check page">${sealSvg({ url: licenseUrl(siteUrl, code), code, issuer: env('SITE_NAME', 'Kethan Artzz') })}</a>
 <p class="seal-code"><small>Your license seal · ${escapeHtml(code)}</small></p>` : '';
+  const ms = new Date(t.expires_at).getTime() - Date.now();
+  const pct = t.max_downloads ? Math.round(left / t.max_downloads * 100) : 0;
+  const expiresIso = new Date(t.expires_at).toISOString();
   return page(200, `Download ${t.product_title}`, `<h1>${escapeHtml(t.product_title)}</h1>
-<p>Order ${escapeHtml(t.public_id)} · ${left} download${left === 1 ? '' : 's'} left · link valid until ${escapeHtml(fmtDate(t.expires_at))}</p>
-<form method="post">{{TURNSTILE}}<button type="submit">Download</button></form>${seal}${rateHtml}`, { turnstile: true });
+<p>Order ${escapeHtml(t.public_id)}</p>
+<section class="live${left <= 1 || ms < 3600e3 ? ' low' : ''}" id="dl" data-token="${escapeHtml(token)}" data-expires="${expiresIso}" data-used="${t.download_count}" data-max="${t.max_downloads}" aria-label="Your download link">
+<div class="row"><span class="label">Link expires in</span><b class="time" id="dl-time">${escapeHtml(spanText(ms))}</b></div>
+<div class="meter" id="dl-meter" role="meter" aria-label="Downloads left" aria-valuemin="0" aria-valuemax="${t.max_downloads}" aria-valuenow="${left}"><i id="dl-bar" style="width:${pct}%"></i></div>
+<div class="row"><span><b class="n" id="dl-left">${left}</b> of <span id="dl-max">${t.max_downloads}</span> downloads left</span><small>until ${escapeHtml(fmtDate(t.expires_at))}</small></div>
+</section>
+<form method="post" id="dl-form">{{TURNSTILE}}<button type="submit" id="dl-btn">Download</button></form>
+<p class="note" id="dl-note" role="status" aria-live="polite"></p>${seal}${rateHtml}`, { turnstile: true, script: LIVE_SCRIPT });
+}
+
+function spanText(ms){
+  if (ms <= 0) return 'Expired';
+  let s = Math.floor(ms / 1000); const d = Math.floor(s / 86400); s %= 86400;
+  const h = Math.floor(s / 3600); s %= 3600; const m = Math.floor(s / 60); s %= 60;
+  const two = (n) => String(n).padStart(2, '0');
+  return `${d ? `${d}d ` : ''}${two(h)}:${two(m)}:${two(s)}`;
+}
+// counts down to the expiry every second, refreshes the downloads-left meter, and downloads without leaving the page
+const LIVE_SCRIPT = `(function(){
+var el=document.getElementById('dl'),form=document.getElementById('dl-form'),btn=document.getElementById('dl-btn'),note=document.getElementById('dl-note');
+if(!el||!form||!btn)return;
+var token=el.getAttribute('data-token'),exp=Date.parse(el.getAttribute('data-expires')),used=+el.getAttribute('data-used'),max=+el.getAttribute('data-max'),state='ok',busy=false;
+function $(id){return document.getElementById(id)}
+function two(n){return(n<10?'0':'')+n}
+function span(ms){if(ms<=0)return'Expired';var s=Math.floor(ms/1000),d=Math.floor(s/86400);s%=86400;var h=Math.floor(s/3600);s%=3600;var m=Math.floor(s/60);s%=60;return(d?d+'d ':'')+two(h)+':'+two(m)+':'+two(s)}
+function paint(){
+  var ms=exp-Date.now(),rem=Math.max(0,max-used);
+  $('dl-time').textContent=span(ms);$('dl-left').textContent=rem;$('dl-max').textContent=max;
+  $('dl-bar').style.width=(max?Math.round(rem/max*100):0)+'%';
+  var m=$('dl-meter');m.setAttribute('aria-valuenow',rem);m.setAttribute('aria-valuemax',max);
+  el.classList.toggle('low',rem<=1||(ms>0&&ms<3600e3));
+  var dead=ms<=0?'expired':rem<=0?'limit':state!=='ok'?state:'';
+  if(dead){btn.disabled=true;btn.textContent=dead==='expired'?'Link expired':dead==='limit'?'No downloads left':'Unavailable';el.classList.add('dead');}
+}
+function refresh(){
+  fetch('/api/download/'+token+'/status',{cache:'no-store',headers:{Accept:'application/json'}}).then(function(r){return r.json()}).then(function(s){
+    if(!s||!s.max)return;used=s.used;max=s.max;exp=Date.parse(s.expiresAt);state=s.state||'ok';paint();
+  }).catch(function(){});
+}
+paint();setInterval(paint,1000);
+setInterval(function(){if(!document.hidden)refresh()},15000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)refresh()});
+form.addEventListener('submit',function(e){
+  if(!window.fetch||!window.URLSearchParams||!window.FormData)return;
+  e.preventDefault();if(busy||btn.disabled)return;
+  busy=true;btn.classList.add('busy');btn.textContent='Preparing your file…';note.textContent='';note.className='note';
+  fetch(location.pathname,{method:'POST',body:new URLSearchParams(new FormData(form)),headers:{Accept:'application/json'},credentials:'same-origin'})
+  .then(function(r){return r.json().then(function(j){return{ok:r.ok,j:j||{}}},function(){return{ok:false,j:{}}})})
+  .then(function(x){
+    var j=x.j;
+    if(x.ok&&j.url){
+      used=j.used;max=j.max;exp=Date.parse(j.expiresAt);paint();
+      var rem=Math.max(0,max-used);
+      note.textContent='Your download has started. '+rem+' of '+max+' download'+(max===1?'':'s')+' left on this link.';note.className='note ok';
+      var a=document.createElement('a');a.href=j.url;a.rel='noopener';a.style.display='none';document.body.appendChild(a);a.click();setTimeout(function(){a.remove()},1000);
+    }else{
+      if(j.state){state=j.state}
+      note.textContent=j.message||j.error||'Something went wrong. Please try again.';note.className='note bad';refresh();
+    }
+  })
+  .catch(function(){note.textContent='No connection. Check your internet and try again.';note.className='note bad'})
+  .then(function(){busy=false;btn.classList.remove('busy');if(!btn.disabled)btn.textContent='Download again';if(window.turnstile){try{window.turnstile.reset()}catch(err){}}paint()});
+});
+})();`;
+
+/** what the live counter on the download page polls: never counts a download */
+export async function downloadStatus(token){
+  const { t, error } = await lookup(token);
+  if (!t) return json({ state: 'invalid' }, 404, { 'Cache-Control': 'no-store' });
+  return json({ state: error || 'ok', used: t.download_count, max: t.max_downloads, left: Math.max(0, t.max_downloads - t.download_count),
+    expiresAt: new Date(t.expires_at).toISOString(), product: t.product_title }, 200, { 'Cache-Control': 'no-store' });
 }
 
 // Counts one download (atomic: never above the limit) and redirects to a short-lived signed URL.
-export async function redeem({ token, ip, country, userAgent, siteUrl }){
+export async function redeem({ token, ip, country, userAgent, siteUrl, asJson = false }){
+  const fail = (kind) => asJson ? json({ ok: false, state: kind, message: MESSAGES[kind][1] }, kind === 'invalid' ? 404 : 410, { 'Cache-Control': 'no-store' }) : errorPage(kind, siteUrl);
   const pre = await lookup(token);
-  if (pre.error) return errorPage(pre.error, siteUrl);
+  if (pre.error) return fail(pre.error);
   const db = await getDb();
   const file = await db.maybeOne('select id, storage_path, filename, source from product_files where product_id = $1 and is_current', [pre.t.product_id]);
-  if (!file) return errorPage('missing', siteUrl);
+  if (!file) return fail('missing');
   // one atomic statement: counted only while the link is live, under its limit and the order is still paid
   const counted = await db.maybeOne(`update download_tokens set download_count = download_count + 1
     where token_hash = $1 and revoked_at is null and expires_at > now() and download_count < max_downloads
       and exists (select 1 from orders o where o.id = download_tokens.order_id and o.status in ('paid','delivered'))
-    returning id, order_id, product_id`, [sha256hex(token)]);
+    returning id, order_id, product_id, download_count, max_downloads, expires_at`, [sha256hex(token)]);
   if (!counted){
     const again = await lookup(token);   // why not: refunded/revoked, expired, or the limit was just reached
-    return errorPage(again.error === 'revoked' ? 'revoked' : again.error === 'expired' ? 'expired' : 'limit', siteUrl);
+    return fail(again.error === 'revoked' ? 'revoked' : again.error === 'expired' ? 'expired' : 'limit');
   }
   await db.query('insert into download_events (token_id, order_id, product_id, ip, country, user_agent) values ($1,$2,$3,$4,$5,$6)',
     [counted.id, counted.order_id, counted.product_id, ip, country, String(userAgent || '').slice(0, 300)]).catch(() => {});   // the log never blocks a download
   // a Google Drive file is streamed by this server through a link of our own: the Drive address is never handed out
   const url = file.source === 'drive' ? signedFileUrl(file.id, SIGNED_URL_SECONDS) : await getStorage().signedUrl('deliverables', file.storage_path, SIGNED_URL_SECONDS, file.filename);
+  if (asJson) return json({ ok: true, url, used: counted.download_count, max: counted.max_downloads, left: Math.max(0, counted.max_downloads - counted.download_count),
+    expiresAt: new Date(counted.expires_at).toISOString() }, 200, { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
   return new Response(null, { status: 303, headers: { Location: url, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
 }
 
