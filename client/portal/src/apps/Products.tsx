@@ -15,8 +15,8 @@ type Product = {
   id: string; kind: 'artzz' | 'artifacts'; slug: string; title: string; summary: string; description: string; categoryId: string | null; category: string | null;
   tags: string[]; techTags: string[]; version: string; status: 'draft' | 'published' | 'archived'; sellable: boolean; isFree: boolean;
   priceInr: number | null; priceUsd: number | null; salePriceInr: number | null; salePriceUsd: number | null; saleStartsAt: string | null; saleEndsAt: string | null;
-  licenseId: string | null; license: string | null; demoUrl: string; previewUrl: string; maxDownloads: number; linkTtlHours: number; refundAfterDownload: boolean;
-  sort: number; media: Media[]; file: { id: string; filename: string; bytes: number; licenseVersion: number | null; createdAt: string } | null; sales: number; updatedAt: string; publishedAt: string | null;
+  licenseId: string | null; license: string | null; demoUrl: string; previewUrl: string; maxDownloads: number; linkTtlHours: number; deliveryCustom: boolean; refundAfterDownload: boolean;
+  sort: number; media: Media[]; file: { id: string; filename: string; bytes: number; licenseVersion: number | null; createdAt: string; source?: 'upload' | 'drive' } | null; sales: number; updatedAt: string; publishedAt: string | null;
 };
 type Kind = 'all' | 'artzz' | 'artifacts' | 'archived';
 
@@ -160,6 +160,8 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
       toast.show(`Category “${name}” added`, { tone: 'success' });
     } catch (err){ toast.error(err); }
   };
+  const store = useLoad<{ value: { downloadLinkHours: number; downloadMaxDownloads: number } }>('/settings/store');
+  const [driveUrl, setDriveUrl] = useState('');
   const lic = useLoad<{ licenses: { id: string; key: string; name: string; summary: string; body_md: string; version: number }[] }>('/licenses');
   // Server-owned parts (uploaded media/file, sales count) follow the server even while fields are being
   // edited; the version stamp (updatedAt) stays the one this edit started from.
@@ -311,9 +313,14 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
                 <div className="form-grid">
                   <Field label="License"><select value={p.licenseId || ''} onChange={e => set('licenseId', e.target.value || null)}>
                     <option value="">Choose a license</option>{lic.data?.licenses.map(l => <option key={l.id} value={l.id}>{l.name} (v{l.version})</option>)}</select></Field>
-                  <Field label="Downloads per purchase" hint="1 to 100"><IntInput label="Downloads per purchase" value={p.maxDownloads} min={1} max={100} onChange={v => set('maxDownloads', v)} /></Field>
-                  <Field label="Link works for" hint="Hours, 1 to 168 (7 days)"><IntInput label="Link lifetime in hours" value={p.linkTtlHours} min={1} max={168} onChange={v => set('linkTtlHours', v)} /></Field>
                 </div>
+                <Switch checked={!p.deliveryCustom} onChange={v => set('deliveryCustom', !v)}
+                  label={`Use the store’s download-link rules${store.data ? ` (${store.data.value.downloadLinkHours} h · ${store.data.value.downloadMaxDownloads} downloads)` : ''}`} />
+                <p className="field-hint" style={{ margin: 0 }}>{p.deliveryCustom ? 'This product has its own rules below.' : 'Change the store default in Settings → Store & tax → Download links.'}</p>
+                {p.deliveryCustom && <div className="form-grid">
+                  <Field label="Downloads per purchase" hint="1 to 100"><IntInput label="Downloads per purchase" value={p.maxDownloads} min={1} max={100} onChange={v => set('maxDownloads', v)} /></Field>
+                  <Field label="Link works for" hint="Hours, 1 to 720 (30 days)"><IntInput label="Link lifetime in hours" value={p.linkTtlHours} min={1} max={720} onChange={v => set('linkTtlHours', v)} /></Field>
+                </div>}
                 <Switch checked={p.refundAfterDownload} onChange={v => set('refundAfterDownload', v)} label="Allow refunds after the file was downloaded" />
               </>}
               <div className="form-grid">
@@ -328,7 +335,7 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
                   <div className="file-row">
                     <Icon name="zip" size={22} />
                     <div className="grow" style={{ minWidth: 0 }}><div className="truncate" style={{ fontWeight: 600 }}>{p.file.filename}</div>
-                      <div className="faint" style={{ fontSize: 12 }}>{bytes(p.file.bytes)} · uploaded {ago(p.file.createdAt)}{p.file.licenseVersion ? ` · LICENSE.txt v${p.file.licenseVersion} inside` : ''}</div></div>
+                      <div className="faint" style={{ fontSize: 12 }}>{p.file.source === 'drive' ? `Google Drive${p.file.bytes ? ` · ${bytes(p.file.bytes)}` : ''}` : bytes(p.file.bytes)} · {p.file.source === 'drive' ? 'linked' : 'uploaded'} {ago(p.file.createdAt)}{p.file.licenseVersion ? ` · LICENSE.txt v${p.file.licenseVersion} inside` : ''}</div></div>
                     <AsyncButton className="btn sm" onClick={async () => { const r = await get<{ url: string }>(`/products/${id}/file`); window.open(r.url, '_blank', 'noopener'); }}><Icon name="downloads" /> Download</AsyncButton>
                   </div>
                 ) : <p className="muted">No file yet. A for-sale item can’t be published without one.</p>}
@@ -337,6 +344,15 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
                   Any size (big files upload in parts). Stored privately; buyers only get expiring links.
                 </Uploader>
                 <p className="field-hint">Replacing keeps earlier versions, so links already emailed keep working until they expire.</p>
+                <div className="stack" style={{ gap: 8, paddingTop: 10, borderTop: '1px solid var(--line, rgba(255,255,255,.1))' }}>
+                  <Field label="…or use a Google Drive file" hint="Paste the file’s share link (set sharing to “Anyone with the link”). Buyers never see this link: they get a new, expiring link of your own site’s for each purchase.">
+                    <div className="row"><input type="url" inputMode="url" value={driveUrl} onChange={e => setDriveUrl(e.target.value)} placeholder="https://drive.google.com/file/d/…/view" autoComplete="off" spellCheck={false} />
+                      <AsyncButton className="btn" disabled={!driveUrl.trim()} onClick={async () => {
+                        const r = await put<{ product: Product }>(`/products/${id}/drive-file`, { url: driveUrl.trim() });
+                        refresh(r); setDriveUrl(''); toast.show('Google Drive file linked', { tone: 'success' });
+                      }}>Use this file</AsyncButton></div>
+                  </Field>
+                </div>
               </section>
             )}
             {p.sellable && <DeliveryEmailCard id={id} />}

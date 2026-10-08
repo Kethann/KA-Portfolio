@@ -158,7 +158,7 @@ export async function testTemplate(ctx){
 
 // ---- settings (store, upscaler, messages, assistant, reports) --------------------------------------
 const EDITABLE = ['store', 'upscaler', 'messages', 'assistant', 'reports', 'visitors'];
-const RANGES = { taxRateBp: [0, 5000], orderExpiryMinutes: [10, 120], dailyBudgetMicros: [0, 50_000_000], retentionDays: [0, 3650] };
+const RANGES = { taxRateBp: [0, 5000], orderExpiryMinutes: [10, 120], downloadLinkHours: [1, 720], downloadMaxDownloads: [1, 100], dailyBudgetMicros: [0, 50_000_000], retentionDays: [0, 3650] };
 // Coerces input to the default's shape: same keys and types, strings bounded, numbers clamped.
 export function coerce(def, input, path = ''){
   if (def === null || def === undefined) return undefined;

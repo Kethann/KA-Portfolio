@@ -66,7 +66,7 @@ const linkIn = (mail) => /http:\/\/shop\.test\/api\/download\/[A-Za-z0-9_-]{43}/
 const [lic] = (await app.pg.query(`insert into licenses (key, name, summary, body_md) values ('personal','Personal','Own use','**No resale.** Use in your own projects.') returning id`)).rows;
 const [cat] = (await app.pg.query(`insert into categories (kind, name, slug) values ('artifacts','Kits','kits') returning id`)).rows;
 async function product(slug, over = {}){
-  const p = { kind: 'artifacts', slug, title: slug.replace(/-/g, ' '), status: 'published', sellable: true, price_inr: 49900, price_usd: 999, license_id: lic.id, category_id: cat.id, max_downloads: 3, link_ttl_hours: 48, ...over };
+  const p = { kind: 'artifacts', slug, title: slug.replace(/-/g, ' '), status: 'published', sellable: true, price_inr: 49900, price_usd: 999, license_id: lic.id, category_id: cat.id, max_downloads: 3, link_ttl_hours: 48, delivery_custom: 1, ...over };
   const cols = Object.keys(p);
   const [r] = (await app.pg.query(`insert into products (${cols}) values (${cols.map((_, i) => '$' + (i + 1))}) returning id`, Object.values(p))).rows;
   await app.storage.put('deliverables', `products/${r.id}/file.zip`, Buffer.from('ZIPDATA'));

@@ -12,13 +12,24 @@ import { getStorage } from '../core/storage.js';
 import { markdownToText } from '../core/markdown.js';
 import { formatMoney } from './pricing.js';
 import { ensureLicenseCode, licenseUrl, sealSvg } from './license.js';
+import { signedFileUrl } from './drive.js';
 
 export const SIGNED_URL_SECONDS = 60;
 const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
 
+/** the link lifetime (hours) and download limit that apply to a product: the store-wide default from the portal, unless the product set its own */
+export function termsFor(product, store){
+  if (product.delivery_custom) return { hours: product.link_ttl_hours, max: product.max_downloads };
+  return { hours: Number(store.downloadLinkHours) || product.link_ttl_hours || 48, max: Number(store.downloadMaxDownloads) || product.max_downloads || 5 };
+}
+export async function productTerms(db, productId){
+  const [p, store] = await Promise.all([db.one('select link_ttl_hours, max_downloads, delivery_custom from products where id = $1', [productId]), getSetting('store')]);
+  return termsFor(p, store);
+}
+
 export async function issueToken(orderId, productId, channel, siteUrl){
   const db = await getDb();
-  const p = await db.one('select link_ttl_hours, max_downloads from products where id = $1', [productId]);
+  const p = await productTerms(db, productId).then(t => ({ link_ttl_hours: t.hours, max_downloads: t.max }));
   const token = randomToken(32);
   await db.query(`insert into download_tokens (order_id, product_id, token_hash, expires_at, max_downloads, channel)
     values ($1, $2, $3, strftime('%Y-%m-%dT%H:%M:%fZ','now','+' || $4 || ' hours'), $5, $6)`, [orderId, productId, sha256hex(token), p.link_ttl_hours, p.max_downloads, channel]);
@@ -59,7 +70,8 @@ export async function deliveryExtras(productId){
 
 export async function sendDeliveryEmails(order, siteUrl){
   const db = await getDb();
-  const items = await db.query(`select i.*, p.title as product_title, p.summary as product_summary, p.version as product_version, p.link_ttl_hours, p.max_downloads, l.name as license_name, l.body_md as license_body
+  const store = await getSetting('store');
+  const items = await db.query(`select i.*, p.title as product_title, p.summary as product_summary, p.version as product_version, p.link_ttl_hours, p.max_downloads, p.delivery_custom, l.name as license_name, l.body_md as license_body
     from order_items i join products p on p.id = i.product_id left join licenses l on l.key = i.license_key where i.order_id = $1 order by i.id`, [order.id]);
   let ok = true;
   const code = await ensureLicenseCode(db, order.id);
@@ -69,10 +81,11 @@ export async function sendDeliveryEmails(order, siteUrl){
     const license = it.license_name ? { name: it.license_name, body_md: it.license_body } : null;
     const text = licenseFile({ license, product: { title: it.product_title }, order: licensed, verifyUrl: code ? licenseUrl(siteUrl, code) : '' });
     const extra = await deliveryExtras(it.product_id);
+    const terms = termsFor(it, store);
     const res = await sendEmail({
       to: order.email, template: 'order_delivery', subjectOverride: extra.subject || undefined,
-      vars: { order_id: order.public_id, product_title: it.product_title, download_url: url, expires: fmtDate(Date.now() + it.link_ttl_hours * 3600000),
-        max_downloads: it.max_downloads, license_name: license ? license.name : 'Personal', license_text: text, extra_note: extra.note,
+      vars: { order_id: order.public_id, product_title: it.product_title, download_url: url, expires: fmtDate(Date.now() + terms.hours * 3600000),
+        max_downloads: terms.max, license_name: license ? license.name : 'Personal', license_text: text, extra_note: extra.note,
         product_summary: it.product_summary || '', product_version: it.product_version || '' },
       attachments: [{ name: 'LICENSE.txt', content: Buffer.from(text, 'utf8') }, ...extra.files]
     });
@@ -135,7 +148,7 @@ button.ghost{background:transparent;border-color:rgba(255,255,255,.25);justify-s
 </style>${withTs ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>' : ''}</head>
 <body><main class="card"><span class="brand">${escapeHtml(env('SITE_NAME', 'KETHAN ARTZZ').toUpperCase())}</span>${bodyHtml.replace('{{TURNSTILE}}', withTs ? `<div class="ts cf-turnstile" data-sitekey="${escapeHtml(siteKey)}" data-theme="dark"></div>` : '')}</main></body></html>`;
   return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': csp,
-    'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex, nofollow' } });
+    'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'X-Robots-Tag': 'noindex, nofollow' } });   // same-origin: the page's own form posts keep a normal Origin, and nothing is sent to other sites
 }
 
 const RESEND_HINT = (site) => `<p><small>Need a new link? Use “Email me my download links” on the <a href="${escapeHtml(site)}/?page=store" style="color:#ffc795">store page</a>.</small></p>`;
@@ -218,7 +231,7 @@ export async function redeem({ token, ip, country, userAgent, siteUrl }){
   const pre = await lookup(token);
   if (pre.error) return errorPage(pre.error, siteUrl);
   const db = await getDb();
-  const file = await db.maybeOne('select storage_path, filename from product_files where product_id = $1 and is_current', [pre.t.product_id]);
+  const file = await db.maybeOne('select id, storage_path, filename, source from product_files where product_id = $1 and is_current', [pre.t.product_id]);
   if (!file) return errorPage('missing', siteUrl);
   // one atomic statement: counted only while the link is live, under its limit and the order is still paid
   const counted = await db.maybeOne(`update download_tokens set download_count = download_count + 1
@@ -231,7 +244,8 @@ export async function redeem({ token, ip, country, userAgent, siteUrl }){
   }
   await db.query('insert into download_events (token_id, order_id, product_id, ip, country, user_agent) values ($1,$2,$3,$4,$5,$6)',
     [counted.id, counted.order_id, counted.product_id, ip, country, String(userAgent || '').slice(0, 300)]).catch(() => {});   // the log never blocks a download
-  const url = await getStorage().signedUrl('deliverables', file.storage_path, SIGNED_URL_SECONDS, file.filename);
+  // a Google Drive file is streamed by this server through a link of our own: the Drive address is never handed out
+  const url = file.source === 'drive' ? signedFileUrl(file.id, SIGNED_URL_SECONDS) : await getStorage().signedUrl('deliverables', file.storage_path, SIGNED_URL_SECONDS, file.filename);
   return new Response(null, { status: 303, headers: { Location: url, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
 }
 
@@ -244,11 +258,10 @@ export async function resendLinks(email, siteUrl){
     where o.email = $1 and o.status in ('paid','delivered') order by o.created_at desc limit 20`, [email]);
   if (!items.length) return { sent: false };
   const lines = [];
-  let ttl = 48;
+  let ttl = 720;
   for (const it of items){
     const url = await issueToken(it.order_id, it.product_id, 'resend', siteUrl);
-    const p = await db.one('select link_ttl_hours from products where id = $1', [it.product_id]);
-    ttl = Math.min(ttl, p.link_ttl_hours);
+    ttl = Math.min(ttl, (await productTerms(db, it.product_id)).hours);
     lines.push(`${it.title} (order ${it.public_id}):\n${url}`);
   }
   await sendEmail({ to: email, template: 'resend_link', vars: { links: lines.join('\n\n'), expires: fmtDate(Date.now() + ttl * 3600000) } });

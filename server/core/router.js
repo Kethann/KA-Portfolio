@@ -15,7 +15,7 @@ export function createRouter(){
   function route(method, pattern, handler, options = {}){
     const keys = [];
     const regex = new RegExp('^' + pattern.replace(/\/:([a-zA-Z_]+)/g, (_, k) => { keys.push(k); return '/([^/]+)'; }) + '/?$');
-    routes.push({ method, pattern, regex, keys, handler, access: options.access || 'public', maxAge: options.maxAge });
+    routes.push({ method, pattern, regex, keys, handler, access: options.access || 'public', maxAge: options.maxAge, nullOrigin: !!options.nullOrigin });
   }
   async function dispatch(request, platform){
     const url = new URL(request.url);
@@ -29,7 +29,7 @@ export function createRouter(){
       r.keys.forEach((k, i) => { try { params[k] = decodeURIComponent(m[i + 1]); } catch { params[k] = m[i + 1]; } });
       const ctx = { request, url, params, platform, ip: platform.clientIp(request), geo: platform.geo(request), route: r };
       try {
-        if (r.access === 'public' && request.method !== 'GET' && request.method !== 'HEAD') assertSameOrigin(request, allowedOrigins());
+        if (r.access === 'public' && request.method !== 'GET' && request.method !== 'HEAD') assertSameOrigin(request, allowedOrigins(), { allowNullOrigin: r.nullOrigin });
         if (r.access === 'cron') assertCron(request);
         if (r.access === 'admin'){
           if (!guards.admin) throw new HttpError(503, 'Not available.');
@@ -65,8 +65,12 @@ async function withEtag(request, res){
   return new Response(request.method === 'HEAD' ? null : body, { status: res.status, headers });
 }
 
+// extra origins that may call the public API: ALLOWED_ORIGINS, plus this site's own public address (PUBLIC_SITE_URL), so
+// a request that reaches the Worker through a different host name (www / apex, a proxy) is still recognised as ours
 function allowedOrigins(){
-  return (env('ALLOWED_ORIGINS') || '').split(',').map(s => s.trim()).filter(Boolean);
+  const list = (env('ALLOWED_ORIGINS') || '').split(',').map(s => s.trim().replace(/\/+$/, '')).filter(Boolean);
+  try { const pub = env('PUBLIC_SITE_URL'); if (pub) list.push(new URL(pub).origin); } catch { /* not a URL */ }
+  return list;
 }
 
 function assertCron(request){

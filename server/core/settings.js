@@ -13,6 +13,8 @@ export const DEFAULTS = {
     taxInclusive: true,               // true: prices already include tax (tax shown as a part of the total)
     sellerName: '', sellerAddress: '', sellerTaxId: '',
     orderExpiryMinutes: 45,
+    downloadLinkHours: 48,            // how long a buyer's download link works (hours) unless a product sets its own
+    downloadMaxDownloads: 5,          // how many times a buyer can download with one link unless a product sets its own
     showRatings: true,                // star ratings + reviews on the store (only buyers can rate)
     showDownloads: true               // "N downloads" on the store
   },

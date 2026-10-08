@@ -131,6 +131,8 @@ function uaLabel(ua: string | null){
   return `${b}${o ? ' on ' + o : ''}`;
 }
 
+const hoursLabel = (h: number) => h % 24 === 0 && h >= 24 ? `${h / 24} day${h === 24 ? '' : 's'}` : `${h} hour${h === 1 ? '' : 's'}`;
+
 function StoreSettings(){
   const { s, v, setV, dirty, save } = useSettingsDoc<any>('store');
   if (s.error && !s.data) return <ErrorState message={s.error} retry={s.reload} />;
@@ -146,6 +148,23 @@ function StoreSettings(){
       {v.international !== false && <p className="field-hint" style={{ margin: 0 }}>Razorpay only charges foreign cards once <b>International payments</b> is activated on your Razorpay account (Dashboard → Account &amp; Settings). Give every paid item a USD price too.</p>}
       {v.international === false && <p className="field-hint" style={{ margin: 0 }}>Everyone sees and pays prices in ₹ INR. Free downloads still work worldwide.</p>}
       <Field label={`Unpaid orders expire after ${v.orderExpiryMinutes} minutes`}><input type="range" min={10} max={120} step={5} value={v.orderExpiryMinutes} onChange={e => set('orderExpiryMinutes', Number(e.target.value))} /></Field>
+    </Section>
+    <Section title="Download links" desc="Every buyer gets a new link of your own site's, made for that purchase. It stops working after the time below, and after the download limit. Your Google Drive link is never shown to buyers.">
+      <Field label={`Link works for · ${hoursLabel(v.downloadLinkHours)}`} hint="1 hour to 30 days. Applies to every product that doesn’t set its own.">
+        <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
+          {([[1, '1 hour'], [6, '6 hours'], [24, '1 day'], [48, '2 days'], [72, '3 days'], [168, '7 days'], [720, '30 days']] as [number, string][]).map(([h, l]) =>
+            <button key={h} type="button" className={'btn sm ' + (v.downloadLinkHours === h ? 'primary' : 'ghost')} aria-pressed={v.downloadLinkHours === h} onClick={() => set('downloadLinkHours', h)}>{l}</button>)}
+        </div>
+        <div className="row" style={{ marginTop: 8 }}>
+          <input type="range" min={1} max={720} step={1} value={v.downloadLinkHours} aria-label="Link lifetime in hours" onChange={e => set('downloadLinkHours', Number(e.target.value))} />
+          <input type="number" min={1} max={720} value={v.downloadLinkHours} aria-label="Hours" style={{ width: 84 }} onChange={e => set('downloadLinkHours', Math.min(720, Math.max(1, Math.round(Number(e.target.value) || 1))))} />
+          <span className="faint">hours</span>
+        </div>
+      </Field>
+      <Field label={`Downloads per purchase · ${v.downloadMaxDownloads}`} hint="How many times one link can be used, 1 to 100.">
+        <div className="row"><input type="range" min={1} max={100} step={1} value={v.downloadMaxDownloads} aria-label="Downloads per purchase" onChange={e => set('downloadMaxDownloads', Number(e.target.value))} />
+          <input type="number" min={1} max={100} value={v.downloadMaxDownloads} aria-label="Downloads" style={{ width: 84 }} onChange={e => set('downloadMaxDownloads', Math.min(100, Math.max(1, Math.round(Number(e.target.value) || 1))))} /></div>
+      </Field>
     </Section>
     <Section title="Tax (GST)" desc="Check with your accountant before charging tax. Rates apply to the price after discounts.">
       <Switch checked={v.taxEnabled} onChange={x => set('taxEnabled', x)} label="Charge tax" />

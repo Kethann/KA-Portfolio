@@ -75,7 +75,8 @@ export function openStudio(options: StudioOptions = {}){
 
 // Hides the rest of the page while the studio is open, so the site's live space background
 // (#nebula-bg) shows through behind the drawing.
-const PAGE_CSS = `html.ka-studio-open{overflow:hidden!important}
+const PAGE_CSS = `html.ka-studio-open{overflow:hidden!important;overscroll-behavior:none!important}
+html.ka-studio-open body{overscroll-behavior:none!important;-webkit-touch-callout:none}
 html.ka-studio-open body > *:not(#nebula-bg):not(.ka-studio-host):not(script):not(style):not(link){visibility:hidden!important}`;
 
 class Studio {
@@ -132,7 +133,15 @@ class Studio {
     this.bindInput();
     this.resize();
     this.applyToolbarState();
-    this.on(window, 'resize', () => this.resize());
+    let lastW = window.innerWidth, lastH = window.innerHeight, resizeFrame = 0;
+    const settle = () => {
+      resizeFrame = 0;
+      if (this.current){ resizeFrame = requestAnimationFrame(settle); return; }   // not while a line is being drawn
+      if (window.innerWidth === lastW && window.innerHeight === lastH) return;
+      lastW = window.innerWidth; lastH = window.innerHeight; this.resize();
+    };
+    this.on(window, 'resize', () => { if (!resizeFrame) resizeFrame = requestAnimationFrame(settle); });
+    if (window.visualViewport) this.on(window.visualViewport as unknown as EventTarget, 'resize', () => { if (!resizeFrame) resizeFrame = requestAnimationFrame(settle); });
     this.on(document, 'visibilitychange', () => { if (document.hidden) this.stopLoop(); else this.kick(); });
     this.on(document, 'fullscreenchange', () => this.syncFullscreen());
     (this.root.querySelector('[data-act="brush-menu"]') as HTMLElement).focus();
@@ -257,7 +266,7 @@ class Studio {
       this.closePanels();
       if (session.tool === 'text'){ e.preventDefault(); this.placeText(e); return; }
       e.preventDefault();
-      c.setPointerCapture(e.pointerId);
+      try { c.setPointerCapture(e.pointerId); } catch { /* some in-app web views refuse capture: drawing works without it */ }
       this.begin(e);
     }) as EventListener);
     this.on(c, 'pointermove', ((e: PointerEvent) => {
@@ -276,6 +285,15 @@ class Studio {
     this.on(c, 'pointerup', end); this.on(c, 'pointercancel', end);
     this.on(c, 'pointerleave', ((e: PointerEvent) => { if (this.pointerId === null && this.current) this.finish(); void e; }) as EventListener);
     this.on(c, 'contextmenu', ((e: Event) => e.preventDefault()) as EventListener);
+    // In-app browsers (Snapchat, Instagram, TikTok...) own the touch gestures of their page: a drag can scroll or pull the
+    // page and cancel the pointer mid-stroke, which showed up as short broken lines. Claiming the touches on the canvas (and on
+    // the studio generally, except inside its scrollable panels) keeps the stroke going.
+    const claim = ((e: TouchEvent) => { if (e.cancelable) e.preventDefault(); }) as EventListener;
+    this.on(c, 'touchstart', claim, { passive: false }); this.on(c, 'touchmove', claim, { passive: false });
+    this.on(this.host, 'touchmove', ((e: TouchEvent) => {
+      const inside = e.composedPath().some(n => n instanceof Element && (n.classList.contains('fx-dock') || n.classList.contains('panel') || n.classList.contains('rare') || n.classList.contains('site-menu') || n.tagName === 'TEXTAREA' || n.tagName === 'SELECT'));
+      if (!inside && e.cancelable) e.preventDefault();
+    }) as EventListener, { passive: false });
   }
   begin(e: PointerEvent, hover = false){
     if (totalPoints(session.items) > MAX_POINTS){ this.toast('The canvas is full. Clear some strokes or export first.'); return; }

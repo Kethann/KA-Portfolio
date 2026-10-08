@@ -7,6 +7,7 @@ import { getDb } from '../core/db.js';
 import * as orders from '../store/orders.js';
 import { cleanHolder } from '../store/license.js';
 import { downloadPage, redeem, resendLinks, rate } from '../store/delivery.js';
+import { verifyFileUrl, streamDriveFile } from '../store/drive.js';
 import { onDaily } from '../jobs/hooks.js';
 
 function productIdFrom(body){
@@ -102,6 +103,18 @@ export async function downloadGet(ctx){
 }
 
 // "Rate it" on the download page (a plain form post; the link itself proves the purchase)
+// Streams a Google Drive-backed file through this server. The link is ours, signed, and valid for about a minute (it is only
+// handed out by a counted download); the Drive address is never part of it.
+export async function fileGet(ctx){
+  const exp = ctx.url.searchParams.get('exp'), sig = ctx.url.searchParams.get('sig');
+  if (!/^[0-9a-f-]{36}$/.test(ctx.params.id) || !verifyFileUrl(ctx.params.id, exp, sig)) throw new HttpError(403, 'This download link has expired. Open your download link again.');
+  await rateLimit(`file:${ctx.ip}`, 60, 10 * 60);
+  const db = await getDb();
+  const f = await db.maybeOne(`select filename, drive_id from product_files where id = $1 and source = 'drive'`, [ctx.params.id]);
+  if (!f || !f.drive_id) throw new HttpError(404, 'File not found.');
+  return streamDriveFile({ driveId: f.drive_id, filename: f.filename, request: ctx.request });
+}
+
 export async function ratePost(ctx){
   await rateLimit(`rate:${ctx.ip}`, 20, 60 * 60);
   const form = new URLSearchParams((await readBody(ctx.request, 8 * 1024)).toString('utf8'));
@@ -144,8 +157,9 @@ export function registerCheckout(route){
   route('POST', '/api/checkout/cancel', cancel);
   route('POST', '/api/checkout/demo-pay', demoPay);
   route('POST', '/api/webhooks/razorpay', razorpayWebhook, { access: 'webhook' });
+  route('GET', '/api/file/:id', fileGet);
   route('GET', '/api/download/:token', downloadGet);
-  route('POST', '/api/download/:token', downloadPost);
-  route('POST', '/api/download/:token/rate', ratePost);
+  route('POST', '/api/download/:token', downloadPost, { nullOrigin: true });   // the link itself is the credential; the page's form sends Origin: null
+  route('POST', '/api/download/:token/rate', ratePost, { nullOrigin: true });
   route('POST', '/api/downloads/resend', resend);
 }

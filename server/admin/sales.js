@@ -8,7 +8,7 @@ import { sendEmail, escapeHtml } from '../core/email.js';
 import { str, int, bool, uuid as vUuid } from '../core/validate.js';
 import { formatMoney } from '../store/pricing.js';
 import { refundOrder } from '../store/orders.js';
-import { issueToken, sendReceipt } from '../store/delivery.js';
+import { issueToken, sendReceipt, productTerms } from '../store/delivery.js';
 import { onDaily, onWeekly } from '../jobs/hooks.js';
 import { mapDbError } from './catalog.js';
 import { audit } from './auth.js';
@@ -154,7 +154,7 @@ export async function resendOrder(ctx){
   const base = siteUrl(ctx.request);
   const lines = [];
   for (const it of items) lines.push(`${it.title}:\n${await issueToken(o.id, it.product_id, 'portal', base)}`);
-  const ttl = Math.min(...items.map(i => i.link_ttl_hours));
+  const ttl = Math.min(...(await Promise.all(items.map(i => productTerms(db, i.product_id)))).map(t => t.hours));
   const expires = new Intl.DateTimeFormat('en-IN', { timeZone: TZ, day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(Date.now() + ttl * 3600e3)) + ' IST';
   const res = await sendEmail({ to: o.email, template: 'resend_link', vars: { links: lines.join('\n\n'), expires } });
   await db.query('insert into order_events (order_id, type, data) values ($1, $2, $3)', [o.id, res.ok ? 'links_resent' : 'links_resend_failed', {}]);
