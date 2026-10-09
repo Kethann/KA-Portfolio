@@ -456,7 +456,9 @@ export async function deleteCategory(ctx){
 }
 export async function listLicenses(){
   const db = await getDb();
-  return json({ licenses: await db.query('select id, key, name, summary, body_md, version, updated_at from licenses order by key') });
+  const { LICENSE_TEMPLATES } = await import('../content/license-templates.js');
+  return json({ licenses: await db.query('select id, key, name, summary, body_md, version, updated_at from licenses order by key'),
+    templates: Object.entries(LICENSE_TEMPLATES).map(([key, t]) => ({ key, ...t })) });
 }
 export async function saveLicense(ctx){
   const b = await readJson(ctx.request, 64 * 1024);
@@ -592,7 +594,7 @@ export async function saveDelivery(ctx){
 export async function testDelivery(ctx){
   const id = vUuid(ctx.params.id, 'Product');
   const db = await getDb();
-  const p = await db.maybeOne(`select p.title, p.summary, p.version, p.max_downloads, p.link_ttl_hours, p.delivery_custom, l.name as license_name, l.body_md as license_body,
+  const p = await db.maybeOne(`select p.title, p.summary, p.version, p.max_downloads, p.link_ttl_hours, p.delivery_custom, l.name as license_name, l.body_md as license_body, l.summary as license_summary,
     (select m.url from product_media m where m.product_id = p.id order by m.sort, m.id limit 1) as thumb
     from products p left join licenses l on l.id = p.license_id where p.id = $1`, [id]);
   if (!p) throw new HttpError(404, 'Product not found.');
@@ -602,7 +604,7 @@ export async function testDelivery(ctx){
   const site = (env('PUBLIC_SITE_URL') || new URL(ctx.request.url).origin).replace(/\/+$/, '');
   // a sample order in the signed-in person's name: the email looks exactly like a buyer's
   const order = { public_id: 'KA-TEST0000', email: ctx.admin.email, license_holder: ctx.admin.name || ctx.admin.email, license_code: 'KA-TEST0-SAMPLE' };
-  const license = p.license_name ? { name: p.license_name, body_md: p.license_body } : null;
+  const license = p.license_name ? { name: p.license_name, body_md: p.license_body, summary: p.license_summary } : null;
   const licenseText = licenseFile({ license, product: { title: p.title }, order, verifyUrl: '' });
   const mail = deliveryMail({ siteUrl: site, order, item: { product_title: p.title, product_summary: p.summary, product_version: p.version, product_thumb: p.thumb },
     license, code: 'KA-TEST0-SAMPLE', terms, url: `${site}/api/download/this-is-a-test-link`, licenseText, note: extra.note });

@@ -72,7 +72,7 @@ export async function deliveryExtras(productId){
 export async function sendDeliveryEmails(order, siteUrl){
   const db = await getDb();
   const store = await getSetting('store');
-  const items = await db.query(`select i.*, p.title as product_title, p.summary as product_summary, p.version as product_version, p.link_ttl_hours, p.max_downloads, p.delivery_custom, l.name as license_name, l.body_md as license_body,
+  const items = await db.query(`select i.*, p.title as product_title, p.summary as product_summary, p.version as product_version, p.link_ttl_hours, p.max_downloads, p.delivery_custom, l.name as license_name, l.body_md as license_body, l.summary as license_summary,
     (select m.url from product_media m where m.product_id = p.id order by m.sort, m.id limit 1) as product_thumb
     from order_items i join products p on p.id = i.product_id left join licenses l on l.key = i.license_key where i.order_id = $1 order by i.id`, [order.id]);
   let ok = true;
@@ -80,7 +80,7 @@ export async function sendDeliveryEmails(order, siteUrl){
   const licensed = { ...order, license_code: code };
   for (const it of items){
     const url = await issueToken(order.id, it.product_id, 'email', siteUrl);
-    const license = it.license_name ? { name: it.license_name, body_md: it.license_body } : null;
+    const license = it.license_name ? { name: it.license_name, body_md: it.license_body, summary: it.license_summary } : null;
     const text = licenseFile({ license, product: { title: it.product_title }, order: licensed, verifyUrl: code ? licenseUrl(siteUrl, code) : '' });
     const extra = await deliveryExtras(it.product_id);
     const terms = termsFor(it, store);
@@ -104,7 +104,7 @@ export async function sendDeliveryEmails(order, siteUrl){
 export function deliveryMail({ siteUrl, order, item, license, code, terms, url, licenseText, note = '' }){
   const expires = fmtDate(Date.now() + terms.hours * 3600000), licName = license ? license.name : 'Personal';
   const verify = code ? licenseUrl(siteUrl, code) : '';
-  const keyTerms = license ? markdownToText(license.body_md || '').trim() : '';
+  const keyTerms = license ? (String(license.summary || '').trim() || markdownToText(license.body_md || '').trim().slice(0, 600)) : '';
   return {
     template: 'order_delivery',
     hero: { eyebrow: 'Order confirmed', title: 'Your download is ready', subtitle: `Order ${order.public_id} · ${fmtDay(order.paid_at || order.created_at || Date.now())}` },
@@ -115,7 +115,7 @@ export function deliveryMail({ siteUrl, order, item, license, code, terms, url, 
       link_terms: tilesHtml([{ label: 'Downloads', value: `${terms.max} allowed` }, { label: 'Link valid for', value: lifeLabel(terms.hours) }, { label: 'Expires', value: fmtShort(Date.now() + terms.hours * 3600000), note: 'India time (IST)' }]),
       license_text: panelHtml({ eyebrow: 'License certificate', mono: ['License code'],
         rows: [['Licensed to', order.license_holder || order.email], ['License', `${licName} license`], ['Item', item.product_title], ['Order', order.public_id], ['License code', code || ''], ['Issued', fmtDay(Date.now())]],
-        note: keyTerms ? escapeHtml(keyTerms).replace(/\n/g, '<br>') : '',
+        note: keyTerms ? `${escapeHtml(keyTerms).replace(/\n/g, '<br>')}<br><br>The full license is attached to this email as LICENSE.txt.` : '',
         foot: verify ? button('Verify this license', verify, { primary: false }) : '' })
     },
     preheader: `${item.product_title} is ready to download. Your link works until ${expires}.`,

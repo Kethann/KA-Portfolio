@@ -11,7 +11,7 @@ export const DEFAULTS = {
     taxLabel: 'GST',
     taxRateBp: 0,                     // basis points (1800 = 18%), applied to the discounted amount
     taxInclusive: true,               // true: prices already include tax (tax shown as a part of the total)
-    sellerName: '', sellerAddress: '', sellerTaxId: '',
+    sellerName: '', sellerAddress: '', sellerTaxId: '', supportEmail: '',   // business details: receipts, invoices and the legal pages
     orderExpiryMinutes: 45,
     downloadLinkHours: 48,            // how long a buyer's download link works (hours) unless a product sets its own
     downloadMaxDownloads: 5,          // how many times a buyer can download with one link unless a product sets its own

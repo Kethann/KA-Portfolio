@@ -174,9 +174,10 @@ function StoreSettings(){
         <Field label="Prices"><Segmented label="Tax mode" value={v.taxInclusive ? 'in' : 'ex'} onChange={x => set('taxInclusive', x === 'in')} options={[{ value: 'in', label: 'Include tax' }, { value: 'ex', label: 'Tax added at checkout' }]} /></Field>
       </div>}
     </Section>
-    <Section title="On invoices" desc="Shown on receipts and printable invoices.">
+    <Section title="Business details" desc="Shown on receipts, invoices and the legal pages (Terms, Privacy, Refunds, Delivery).">
       <div className="form-grid">
         <Field label="Business name"><input value={v.sellerName} onChange={e => set('sellerName', e.target.value)} maxLength={120} /></Field>
+        <Field label="Support email" hint="Where buyers can reach you; shown on the legal pages"><input type="email" value={v.supportEmail || ''} onChange={e => set('supportEmail', e.target.value)} maxLength={120} /></Field>
         <Field label="Tax ID (GSTIN)" hint="Optional"><input value={v.sellerTaxId} onChange={e => set('sellerTaxId', e.target.value)} maxLength={30} className="mono" /></Field>
       </div>
       <Field label="Address"><textarea rows={3} value={v.sellerAddress} onChange={e => set('sellerAddress', e.target.value)} maxLength={400} /></Field>
