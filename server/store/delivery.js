@@ -8,7 +8,7 @@ import { json } from '../core/http.js';
 import { env } from '../core/env.js';
 import { getSetting } from '../core/settings.js';
 import { randomToken, sha256hex } from '../core/crypto.js';
-import { sendEmail, escapeHtml } from '../core/email.js';
+import { sendEmail, escapeHtml, button, tilesHtml, panelHtml } from '../core/email.js';
 import { getStorage } from '../core/storage.js';
 import { markdownToText } from '../core/markdown.js';
 import { formatMoney } from './pricing.js';
@@ -85,14 +85,8 @@ export async function sendDeliveryEmails(order, siteUrl){
     const extra = await deliveryExtras(it.product_id);
     const terms = termsFor(it, store);
     const res = await sendEmail({
-      card: { badge: 'Ready to download', title: it.product_title, subtitle: it.product_summary || '', image: absImage(siteUrl, it.product_thumb),
-        rows: [['Order', order.public_id], ['License', `${license ? license.name : 'Personal'}${code ? ` · ${code}` : ''}`]],
-        stats: [{ value: `${terms.max}`, label: terms.max === 1 ? 'download' : 'downloads' }, { value: lifeLabel(terms.hours), label: `until ${fmtDate(Date.now() + terms.hours * 3600000)}` }],
-        cta: { label: 'Download', url } },
-      to: order.email, template: 'order_delivery', subjectOverride: extra.subject || undefined,
-      vars: { order_id: order.public_id, product_title: it.product_title, download_url: url, expires: fmtDate(Date.now() + terms.hours * 3600000),
-        max_downloads: terms.max, license_name: license ? license.name : 'Personal', license_text: text, extra_note: extra.note,
-        product_summary: it.product_summary || '', product_version: it.product_version || '' },
+      ...deliveryMail({ siteUrl, order, item: it, license, code, terms, url, licenseText: text, note: extra.note }),
+      to: order.email, subjectOverride: extra.subject || undefined,
       attachments: [{ name: 'LICENSE.txt', content: Buffer.from(text, 'utf8') }, ...extra.files]
     });
     ok = ok && res.ok;
@@ -105,6 +99,39 @@ export async function sendDeliveryEmails(order, siteUrl){
   return ok;
 }
 
+/** The purchase email for one item: header, item card, download button, link terms and license certificate. Also used by
+ *  the portal's "send a test" button, so the owner sees exactly what buyers get. */
+export function deliveryMail({ siteUrl, order, item, license, code, terms, url, licenseText, note = '' }){
+  const expires = fmtDate(Date.now() + terms.hours * 3600000), licName = license ? license.name : 'Personal';
+  const verify = code ? licenseUrl(siteUrl, code) : '';
+  const keyTerms = license ? markdownToText(license.body_md || '').trim() : '';
+  return {
+    template: 'order_delivery',
+    hero: { eyebrow: 'Order confirmed', title: 'Your download is ready', subtitle: `Order ${order.public_id} · ${fmtDay(order.paid_at || order.created_at || Date.now())}` },
+    card: { label: 'Your item', title: item.product_title, subtitle: item.product_summary || '', image: absImage(siteUrl, item.product_thumb),
+      chips: [`${licName} license`, item.product_version ? `Version ${item.product_version}` : ''] },
+    blocks: {
+      download_url: `<div style="margin:2px 0 18px">${button(`Download ${item.product_title}`, url, { full: true })}</div>`,
+      link_terms: tilesHtml([{ label: 'Downloads', value: `${terms.max} allowed` }, { label: 'Link valid for', value: lifeLabel(terms.hours) }, { label: 'Expires', value: fmtShort(Date.now() + terms.hours * 3600000), note: 'India time (IST)' }]),
+      license_text: panelHtml({ eyebrow: 'License certificate', mono: ['License code'],
+        rows: [['Licensed to', order.license_holder || order.email], ['License', `${licName} license`], ['Item', item.product_title], ['Order', order.public_id], ['License code', code || ''], ['Issued', fmtDay(Date.now())]],
+        note: keyTerms ? escapeHtml(keyTerms).replace(/\n/g, '<br>') : '',
+        foot: verify ? button('Verify this license', verify, { primary: false }) : '' })
+    },
+    preheader: `${item.product_title} is ready to download. Your link works until ${expires}.`,
+    vars: { order_id: order.public_id, product_title: item.product_title, download_url: url, expires,
+      max_downloads: terms.max, license_name: licName, license_text: licenseText, extra_note: note,
+      link_terms: `This link works until ${expires} and allows ${terms.max} download${terms.max === 1 ? '' : 's'}.`,
+      customer_name: firstName(order.license_holder),
+      product_summary: item.product_summary || '', product_version: item.product_version || '' }
+  };
+}
+/** "Asha Rao" -> "Asha"; nobody -> "there" */
+function firstName(name){ const f = String(name || '').trim().split(/\s+/)[0]; return f && f.length <= 40 ? f : 'there'; }
+/** 11 Oct, 9:44 am */
+function fmtShort(d){ return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(d)); }
+/** 9 Oct 2026 */
+function fmtDay(d){ return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(d)); }
 /** how long a link lasts, in words: "48 hours", "7 days" */
 function lifeLabel(h){ return h % 24 === 0 && h >= 48 ? `${h / 24} days` : `${h} hour${h === 1 ? '' : 's'}`; }
 /** a picture for an email must be an absolute https address */
@@ -125,13 +152,19 @@ export async function sendReceipt(order, items){
     taxLabel = `${taxLabel} included (${store.taxRateBp / 100}%)`; tax = formatMoney(afterDiscount - net, cur);
   } else if (!store.taxEnabled){ taxLabel = `${taxLabel}`; tax = formatMoney(0, cur); }
   const seller = [store.sellerName, store.sellerAddress, store.sellerTaxId ? `Tax ID: ${store.sellerTaxId}` : ''].filter(Boolean).join('\n');
+  const inv = `INV-${String(order.invoice_number).padStart(6, '0')}`, date = fmtDate(order.paid_at || order.created_at);
+  const v = { invoice_number: inv, date, order_id: order.public_id, email: order.email,
+    lines, subtotal: formatMoney(order.subtotal, cur), discount: formatMoney(order.discount, cur), tax_label: taxLabel, tax, total: formatMoney(order.total, cur),
+    payment_id: order.razorpay_payment_id || '—', seller_block: seller ? `Sold by:\n${seller}` : '' };
+  v.receipt = `${lines}\n\nSubtotal: ${v.subtotal}\nDiscount: ${v.discount}\n${taxLabel}: ${tax}\nTotal paid: ${v.total}\n\nInvoice ${inv} · ${date}\nOrder ${order.public_id} · billed to ${order.email}\nPayment reference ${v.payment_id}`;
+  const itemRows = items.map(i => [i.product_title || i.title, formatMoney(i.unit_price, cur)]);
+  const receiptHtml = panelHtml({ eyebrow: 'Summary', rows: [...itemRows, ['Subtotal', v.subtotal], order.discount ? ['Discount', `−${v.discount}`] : null, store.taxEnabled ? [taxLabel, tax] : null, ['!Total paid', v.total]] })
+    + panelHtml({ eyebrow: 'Payment details', mono: ['Order', 'Invoice', 'Payment reference'], rows: [['Invoice', inv], ['Date', date], ['Order', order.public_id], ['Billed to', order.email], ['Payment reference', v.payment_id]] });
+  const sellerHtml = seller ? `<p style="margin:0 0 16px;color:#7d736b;font:12.5px/1.6 -apple-system,'Segoe UI',Roboto,Arial,sans-serif">Sold by<br>${escapeHtml(seller).replace(/\n/g, '<br>')}</p>` : '';
   return sendEmail({
-    card: { badge: 'Paid', title: `Receipt INV-${String(order.invoice_number).padStart(6, '0')}`, subtitle: items.map(i => i.product_title || i.title).join(', '),
-      rows: [['Order', order.public_id], ['Date', fmtDate(order.paid_at || order.created_at)], ['Total paid', formatMoney(order.total, cur)]] },
-    to: order.email, template: 'order_receipt',
-    vars: { invoice_number: `INV-${String(order.invoice_number).padStart(6, '0')}`, date: fmtDate(order.paid_at || order.created_at), order_id: order.public_id, email: order.email,
-      lines, subtotal: formatMoney(order.subtotal, cur), discount: formatMoney(order.discount, cur), tax_label: taxLabel, tax, total: formatMoney(order.total, cur),
-      payment_id: order.razorpay_payment_id || '—', seller_block: seller ? `\nSold by:\n${seller}` : '' }
+    hero: { eyebrow: 'Payment received', title: `Receipt ${inv}`, subtitle: `${v.total} paid on ${fmtDay(order.paid_at || order.created_at)}` },
+    blocks: { receipt: receiptHtml, ...(sellerHtml ? { seller_block: sellerHtml } : {}) },
+    to: order.email, template: 'order_receipt', vars: v
   });
 }
 
@@ -386,15 +419,17 @@ export async function resendLinks(email, siteUrl){
     join order_items i on i.order_id = o.id join products p on p.id = i.product_id
     where o.email = $1 and o.status in ('paid','delivered') order by o.created_at desc limit 20`, [email]);
   if (!items.length) return { sent: false };
-  const lines = [];
+  const lines = [], rowsHtml = [];
   let ttl = 720;
   for (const it of items){
     const url = await issueToken(it.order_id, it.product_id, 'resend', siteUrl);
     ttl = Math.min(ttl, (await productTerms(db, it.product_id)).hours);
     lines.push(`${it.title} (order ${it.public_id}):\n${url}`);
+    rowsHtml.push(`<tr><td style="padding:14px 0;border-top:1px solid #2c221d"><div style="color:#f3ede6;font:600 15px/1.35 -apple-system,'Segoe UI',Roboto,Arial,sans-serif">${escapeHtml(it.title)}</div><div style="margin-top:3px;color:#7d736b;font:12.5px/1.4 -apple-system,'Segoe UI',Roboto,Arial,sans-serif">Order ${escapeHtml(it.public_id)}</div></td><td align="right" style="padding:14px 0 14px 12px;border-top:1px solid #2c221d">${button('Download', url)}</td></tr>`);
   }
-  await sendEmail({ to: email, template: 'resend_link', vars: { links: lines.join('\n\n'), expires: fmtDate(Date.now() + ttl * 3600000) },
-    card: { badge: 'Fresh links', title: 'Your download links', subtitle: `${items.length} item${items.length === 1 ? '' : 's'} · links work until ${fmtDate(Date.now() + ttl * 3600000)}` },
-    buttons: Object.fromEntries(lines.map(l => [l.split('\n').pop(), 'Download'])) });
+  const until = fmtDate(Date.now() + ttl * 3600000);
+  await sendEmail({ to: email, template: 'resend_link', vars: { links: lines.join('\n\n'), expires: until },
+    hero: { eyebrow: 'Fresh links', tone: 'neutral', title: 'Your download links', subtitle: `${items.length} item${items.length === 1 ? '' : 's'} ready to download` },
+    blocks: { links: `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;border-bottom:1px solid #2c221d">${rowsHtml.join('')}</table>` } });
   return { sent: true };
 }

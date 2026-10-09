@@ -435,7 +435,8 @@ test('delivery email: the owner\'s message, subject and attachments for a produc
   assert.equal(res.status, 201); await pay(res.json);
   const mail = mailsTo('guided@example.com')[0];
   assert.equal(mail.subject, 'Welcome to guided kit');
-  assert.match(mail.text, /Start with Setup-guide\.pdf, then run the installer\./); assert.match(mail.text, /link works until .+, for up to 3 downloads/);
+  assert.match(mail.text, /Start with Setup-guide\.pdf, then run the installer\./); assert.match(mail.text, /link works until .+ and allows 3 downloads/);
+  assert.match(mail.html, /License certificate/); assert.match(mail.html, /Download guided kit/); assert.doesNotMatch(mail.html, /@@KA-BLOCK-/, 'every designed block is filled in');
   assert.ok(!/\n{3,}/.test(mail.text), 'no stretches of blank lines');
   assert.deepEqual(mail.attachments.map(a => a.name), ['LICENSE.txt', 'Setup-guide.pdf']);
   assert.equal(Buffer.from(mail.attachments[1].content).toString(), 'PDFDATA');

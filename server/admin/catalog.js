@@ -592,17 +592,22 @@ export async function saveDelivery(ctx){
 export async function testDelivery(ctx){
   const id = vUuid(ctx.params.id, 'Product');
   const db = await getDb();
-  const p = await db.maybeOne('select p.title, p.summary, p.version, p.max_downloads, p.link_ttl_hours, p.delivery_custom, l.name as license_name from products p left join licenses l on l.id = p.license_id where p.id = $1', [id]);
+  const p = await db.maybeOne(`select p.title, p.summary, p.version, p.max_downloads, p.link_ttl_hours, p.delivery_custom, l.name as license_name, l.body_md as license_body,
+    (select m.url from product_media m where m.product_id = p.id order by m.sort, m.id limit 1) as thumb
+    from products p left join licenses l on l.id = p.license_id where p.id = $1`, [id]);
   if (!p) throw new HttpError(404, 'Product not found.');
-  const { deliveryExtras } = await import('../store/delivery.js');
+  const { deliveryExtras, deliveryMail, licenseFile } = await import('../store/delivery.js');
   const extra = await deliveryExtras(id);
   const terms = termsFor(p, await getSetting('store'));
   const site = (env('PUBLIC_SITE_URL') || new URL(ctx.request.url).origin).replace(/\/+$/, '');
-  const res = await sendEmail({ to: ctx.admin.email, template: 'order_delivery', subjectOverride: extra.subject ? `[Test] ${extra.subject}` : `[Test] ${DEFAULT_TEMPLATES.order_delivery.subject}`,
-    vars: { order_id: 'KA-TEST0000', product_title: p.title, product_summary: p.summary, product_version: p.version, download_url: `${site}/api/download/this-is-a-test-link`,
-      expires: new Date(Date.now() + terms.hours * 3600e3).toDateString(), max_downloads: terms.max, license_name: p.license_name || 'Personal',
-      license_text: 'The key points of the license appear here, as written for this product.', extra_note: extra.note },
-    attachments: extra.files });
+  // a sample order in the signed-in person's name: the email looks exactly like a buyer's
+  const order = { public_id: 'KA-TEST0000', email: ctx.admin.email, license_holder: ctx.admin.name || ctx.admin.email, license_code: 'KA-TEST0-SAMPLE' };
+  const license = p.license_name ? { name: p.license_name, body_md: p.license_body } : null;
+  const licenseText = licenseFile({ license, product: { title: p.title }, order, verifyUrl: '' });
+  const mail = deliveryMail({ siteUrl: site, order, item: { product_title: p.title, product_summary: p.summary, product_version: p.version, product_thumb: p.thumb },
+    license, code: 'KA-TEST0-SAMPLE', terms, url: `${site}/api/download/this-is-a-test-link`, licenseText, note: extra.note });
+  const res = await sendEmail({ ...mail, to: ctx.admin.email, subjectOverride: extra.subject ? `[Test] ${extra.subject}` : `[Test] ${DEFAULT_TEMPLATES.order_delivery.subject}`,
+    attachments: [{ name: 'LICENSE.txt', content: Buffer.from(licenseText, 'utf8') }, ...extra.files] });
   if (!res.ok) throw new HttpError(502, 'The test email could not be sent. Check Settings > System status (email).');
   return json({ ok: true, to: ctx.admin.email, attached: extra.files.length });
 }
