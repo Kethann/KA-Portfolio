@@ -81,7 +81,7 @@ export async function reply(ctx){
   // contact messages get a link to the conversation on the site (the reply also pops up on the device they wrote from)
   const onSite = m.source === 'contact' && (await getSetting('messages')).replyOnSite !== false;
   const vars = { subject: m.subject || 'your message', body, name: m.name || 'there', thread_url: onSite ? threadUrl(siteUrl(ctx.request), m.id) : '' };
-  const res = await sendEmail({ to: m.email, template: 'reply', vars, bodyOverride: onSite ? undefined : `Hi {{name}},
+  const res = await sendEmail({ to: m.email, template: 'reply', vars, buttons: onSite ? { [vars.thread_url]: 'Read the conversation on the site' } : undefined, bodyOverride: onSite ? undefined : `Hi {{name}},
 
 {{body}}
 

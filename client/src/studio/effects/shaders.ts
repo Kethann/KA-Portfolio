@@ -19,6 +19,22 @@ float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f
 float fbm(vec2 p){ float v = 0.0, a = 0.5; mat2 m = mat2(1.6, 1.2, -1.2, 1.6); for (int i = 0; i < 5; i++){ v += a * noise(p); p = m * p; a *= 0.5; } return v; }
 float fbm3(vec2 p){ float v = 0.0, a = 0.5; mat2 m = mat2(1.6, 1.2, -1.2, 1.6); for (int i = 0; i < 3; i++){ v += a * noise(p); p = m * p; a *= 0.5; } return v; }
 vec3 glowAt(vec2 p, vec2 c, float r, vec3 col){ float d = length(p - c); return col * exp(-d * d / (r * r)); }
+// black body: the colour of fire by temperature 0..1
+vec3 fireRamp(float t){
+  vec3 c = mix(vec3(0.0), vec3(0.5, 0.04, 0.01), smoothstep(0.0, 0.25, t));
+  c = mix(c, vec3(1.0, 0.3, 0.03), smoothstep(0.2, 0.5, t));
+  c = mix(c, vec3(1.0, 0.7, 0.18), smoothstep(0.45, 0.75, t));
+  return mix(c, vec3(1.0, 0.96, 0.84), smoothstep(0.75, 1.0, t));
+}
+// a lightning bolt hanging from the clouds: its x follows a jagged path down; returns its brightness
+float boltAt(vec2 p, float x0, float seed, float len){
+  float y = 0.5 - p.y;   // 0 at the top of the frame
+  float yy = clamp(y, 0.0, len);
+  float px = x0 + (fbm3(vec2(yy * 6.0, seed)) - 0.5) * 0.35 + (noise(vec2(yy * 40.0, seed * 3.0)) - 0.5) * 0.03;
+  float d = length(vec2(p.x - px, y - yy));                 // past the tip, the distance to the tip: the glow fades out round
+  float core = smoothstep(0.004, 0.0, d) * step(0.0, y) * step(y, len);
+  return core * 1.4 + exp(-d * 60.0) * 0.6 + exp(-d * 12.0) * 0.18;
+}
 // falling rain: hair-thin, slightly slanted streaks of different lengths and speeds
 // Three depth layers (near drops are longer, brighter and faster), one wind slant for all, and every column has its
 // own speed and phase, so drops never line up in rows. Each streak has a bright leading head and a fading tail.
@@ -56,6 +72,36 @@ void main(){
 }`;
 
 export const SHADERS: Record<string, string> = {
+  // ---------------------------------------------------------------- snow: a moonlit winter night with snowfall in depth
+  snow: `vec3 flakes(vec2 p, float scale, float speed, float size, float blur, float t, float dens){
+    vec2 q = vec2(p.x + sin(p.y * 3.0 + t * 0.4 + scale) * 0.03 + t * 0.02 * speed, p.y + t * speed) * scale;
+    vec2 id = floor(q), f = fract(q) - 0.5; float h = hash(id + scale);
+    if (h > dens) return vec3(0.0);
+    vec2 o = (hash2(id) - 0.5) * 0.7;
+    float d = length(f - o), r = size * (0.6 + 0.6 * hash(id + 2.0));
+    return vec3(smoothstep(r + blur, r - blur * 0.5, d));
+  }
+  vec3 scene(vec2 uv, vec2 p){
+    float t = uTime;
+    vec3 sky = mix(mix(uBg, vec3(0.1, 0.16, 0.3), 0.55), mix(uBg, vec3(0.02, 0.03, 0.08), 0.7), uv.y);
+    vec2 moon = vec2(0.5, 0.36); float md = length(p - moon);
+    vec3 col = sky + vec3(0.8, 0.86, 1.0) * (smoothstep(0.032, 0.029, md) * (0.85 - 0.15 * fbm3(p * 60.0)) + exp(-md * 9.0) * 0.22 + exp(-md * 2.5) * 0.06);
+    float far = fbm3(vec2(p.x * 2.2, 3.0)) * 0.16 - 0.14;
+    col = mix(col, mix(sky, vec3(0.5, 0.58, 0.76), 0.4), smoothstep(far + 0.004, far, p.y));   // distant snowy hills
+    // a line of pines: each a narrow triangle of a random height along a rolling ridge
+    float ridge = fbm3(vec2(p.x * 3.0 + 9.0, 1.0)) * 0.12 - 0.3;
+    float cell = p.x * 26.0, ci = floor(cell), cx = fract(cell) - 0.5;
+    float th = 0.05 + 0.09 * hash(vec2(ci, 4.0));
+    float pine = step(abs(cx) * 2.0 * th, ridge + th - p.y) * step(ridge - 0.02, p.y);
+    col = mix(col, uBg * 0.2 + vec3(0.015, 0.03, 0.05), max(pine, smoothstep(ridge + 0.004, ridge, p.y)));
+    float ground = -0.36 + fbm3(vec2(p.x * 2.0, 5.0)) * 0.05;
+    col = mix(col, vec3(0.72, 0.8, 0.95) * (0.75 + 0.25 * fbm(p * 8.0)), smoothstep(ground + 0.004, ground, p.y));   // snow on the ground
+    col += vec3(0.6, 0.7, 0.9) * fbm(p * 1.5 + vec2(t * 0.02, 0.0)) * 0.12 * smoothstep(0.2, -0.4, p.y);   // low mist
+    col += flakes(p, 60.0, 0.05, 0.07, 0.02, t, 0.45) * 0.5;
+    col += flakes(p + 3.0, 28.0, 0.08, 0.07, 0.04, t, 0.22) * 0.7 * (0.5 + uI);
+    col += flakes(p + 7.0, 11.0, 0.13, 0.06, 0.09, t, 0.06) * 0.5 * (0.4 + uI);
+    return col;
+  }`,
   // ---------------------------------------------------------------- cinema: haze, god rays from a key light, anamorphic streak, letterbox
   cinema: `vec3 scene(vec2 uv, vec2 p){
     float t = uTime;
@@ -89,34 +135,34 @@ export const SHADERS: Record<string, string> = {
     col += uA1 * 0.1 * smoothstep(0.35, 0.0, uv.y);
     return col;
   }`,
-  // ---------------------------------------------------------------- rain on glass, refracting blurred city lights
-  rain: `vec3 city(vec2 p, float t){
-    vec3 c = mix(uBg * 0.3, mix(uBg, uA2, 0.35), 0.5 + p.y * 0.4);
-    c += bokeh(p, 4.0, 0.0, uA1, uGlow, 0.35) * 0.45 * smoothstep(0.35, -0.4, p.y);
-    c += bokeh(p + 3.1, 8.0, 0.0, uGlow, uA2, 0.3) * 0.3 * smoothstep(0.25, -0.45, p.y);
+  // ---------------------------------------------------------------- rain: a city at night, wet street reflections, rain in depth
+  rain: `vec3 city(vec2 p){
+    vec3 c = mix(uBg * 0.25, mix(uBg, uA2, 0.3), 0.5 + p.y * 0.5);
+    c += bokeh(p, 4.0, 0.0, uA1, uGlow, 0.35) * 0.55 * smoothstep(0.4, -0.2, p.y);
+    c += bokeh(p + 3.1, 7.0, 0.0, uGlow, uA2, 0.3) * 0.4 * smoothstep(0.35, -0.2, p.y);
     return c;
   }
   vec3 scene(vec2 uv, vec2 p){
-    float t = uTime;
-    vec2 off = vec2(0.0);
-    // static droplets
-    vec2 g = p * 9.0; vec2 id = floor(g); vec2 f = fract(g) - 0.5; float h = hash(id);
-    vec2 o = (hash2(id) - 0.5) * 0.6; float r = 0.1 + 0.18 * h; vec2 dd = f - o;
-    float drop = smoothstep(r, r * 0.8, length(dd)) * step(0.62, h);
-    off -= dd * drop * 1.2;
-    // drops sliding down
-    vec2 g2 = vec2(p.x * 5.0, p.y * 2.0 + t * 0.35 * (0.5 + hash(vec2(floor(p.x * 5.0), 3.0)))); vec2 id2 = floor(g2); vec2 f2 = fract(g2) - 0.5;
-    float h2 = hash(id2); vec2 d2 = (f2 - vec2((hash(id2 + 5.0) - 0.5) * 0.5, 0.0)) * vec2(1.0, 2.5);
-    float slide = smoothstep(0.16, 0.12, length(d2)) * step(0.6, h2);
-    off += d2 * slide * 0.5;
-    vec3 col = city(p + off * 0.35, t);
-    col += vec3(0.85, 0.9, 1.0) * (drop * smoothstep(0.0, r, length(dd - vec2(-0.03, 0.04))) * 0.05 + slide * 0.04);
-    // fine falling rain beyond the glass
-    col += vec3(0.75, 0.8, 0.9) * rainStreaks(p, t) * 0.35 * (0.5 + uI);
-    float flash = pow(max(0.0, sin(t * 0.37 + 1.0)), 400.0);
-    col += uGlow * flash * 0.5 * uI;
+    float t = uTime, hz = -0.18;
+    vec3 col;
+    if (p.y > hz) col = city(p);
+    else {
+      // the wet street mirrors the lights, stretched and broken up by ripples
+      vec2 rp = vec2(p.x + (noise(vec2(p.x * 30.0, p.y * 80.0 + t * 3.0)) - 0.5) * 0.02, 2.0 * hz - p.y);
+      col = city(vec2(rp.x, hz + (hz - p.y) * 0.35)) * 0.55 * (0.7 + 0.3 * noise(vec2(p.x * 3.0, p.y * 40.0)));
+      col += uBg * 0.05;
+      vec2 g = vec2(p.x * 14.0, p.y * 30.0); vec2 id = floor(g); float ph = fract(t * 1.4 + hash(id) * 9.0);
+      float ring = smoothstep(0.05, 0.0, abs(length((fract(g) - 0.5) * vec2(1.0, 2.2)) - ph * 0.45)) * (1.0 - ph) * step(0.7, hash(id + 1.0));
+      col += vec3(0.6, 0.7, 0.85) * ring * 0.35;
+    }
+    col += vec3(0.7, 0.75, 0.85) * rainStreaks(p, t) * 0.45 * (0.5 + uI);
+    col += vec3(0.55, 0.6, 0.7) * rainStreaks(p * 0.6 + 2.0, t * 0.8) * 0.25;
+    float flash = pow(max(0.0, sin(t * 0.31 + 1.0)), 600.0) + pow(max(0.0, sin(t * 0.31 + 1.06)), 600.0) * 0.6;
+    col += vec3(0.75, 0.8, 1.0) * flash * 0.5 * uI;
+    col += vec3(0.5, 0.55, 0.65) * fbm(p * 2.0 + vec2(t * 0.05, 0.0)) * 0.08;   // mist
     return col;
   }`,
+  // ---------------------------------------------------------------- storm: heavy clouds lit from inside, forked lightning, rain
   storm: `vec3 scene(vec2 uv, vec2 p){
     float t = uTime;
     // a strike every ~7 s: a bright stroke, a short dark gap, a second weaker return stroke, then a fading afterglow
@@ -138,7 +184,7 @@ export const SHADERS: Record<string, string> = {
     col += vec3(0.92, 0.95, 1.0) * (channel * 2.2 + halo * 0.6) * clamp(exp(-k * 9.0) + 0.7 * step(0.16, k) * exp(-(k - 0.16) * 12.0), 0.0, 1.0) * uI;
     // rain catches the flash
     col += vec3(0.72, 0.78, 0.9) * rainStreaks(p, t) * (0.28 + lit * 0.6);
-    return col;
+    return col * (1.0 - 0.3 * length(p));   // darker towards the edges
   }`,
   // ---------------------------------------------------------------- frozen: frosted glass crystals, cold light, glints
   ice: `vec3 scene(vec2 uv, vec2 p){

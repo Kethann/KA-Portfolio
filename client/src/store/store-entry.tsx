@@ -24,6 +24,7 @@ function CheckoutHost(){
 function shadowHost(container: HTMLElement){
   const host = document.createElement('div');
   host.className = 'ka-store-host';
+  host.setAttribute('data-ka-shadow', '');
   container.replaceChildren(host);
   const shadow = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
@@ -36,6 +37,7 @@ function shadowHost(container: HTMLElement){
 /** a small shadow root (with the store's styles) for the Artzz / Artifacts switch beside the page title */
 function tabsHost(){
   const slot = document.getElementById('store-tabs'); if (!slot) return null;
+  slot.setAttribute('data-ka-shadow', '');
   const shadow = slot.shadowRoot || slot.attachShadow({ mode: 'open' });
   const style = document.createElement('style'); style.textContent = storeCss;
   const target = document.createElement('div');

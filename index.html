@@ -33,6 +33,16 @@ if (KA_WALLPAPER){
     try { Object.defineProperty(window, "devicePixelRatio", { configurable: true, get: function(){ return 1; } }); } catch(e){}
   })();
 }
+// "Lite" mode: in-app browsers (Snapchat, Instagram, Facebook, TikTok, LinkedIn...) and weak or data-saving devices get the same
+// site with the most expensive extras toned down (lighter glass blur, no looping tile light), so scrolling stays smooth.
+(function(){
+  var ua = navigator.userAgent || "", c = navigator.connection || {};
+  var inApp = /Snapchat|Instagram|FBAN|FBAV|FB_IAB|TikTok|musical_ly|Bytedance|LinkedInApp|Line\/|Twitter|Pinterest|MicroMessenger/i.test(ua);
+  var weak = (navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2) || c.saveData === true || /(^|slow-)2g/.test(c.effectiveType || "");
+  window.kaLite = !!(inApp || weak);
+  window.kaInApp = inApp;
+  if (window.kaLite) document.documentElement.classList.add("ka-lite");
+})();
 function kaApiUrl(path){ return KA_API_BASE + path; }
 // [pinch-zoom fix] iOS Safari reports the ZOOMED visual viewport through window.innerWidth/innerHeight,
 // so every pinch shrank the WebGL canvas/camera (logo got smaller) while the DOM (nav, chat) zoomed
@@ -64,6 +74,87 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
      every @media(max-width:600px) rule in this file silently never applies on a real device,
      and everything renders zoomed out (tiny nav/hamburger/chat bubble) until pinch-zoomed. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+// ==================================================================== IMAGE PROTECTION ==
+// On by default (the portal can switch it off: Studio > Banner & nav > Image protection). Images can't be right-clicked,
+// saved, dragged or long-pressed; save / print / view-source / developer-tools shortcuts are blocked; images blur the
+// instant the page loses focus (screenshot tools, app switching, developer tools) or a screenshot key is pressed, and they
+// never print. The same rules reach the store and gallery, which render in their own shadow roots. Never inside the
+// portal's live preview. No web page can stop a phone screenshot or a camera: this is a deterrent, not a lock.
+(function(){
+  var preview = window.parent !== window || /[?&]preview=1(&|$)/.test(location.search);
+  var root = document.documentElement, on = !preview, shieldTimer = 0;
+  var SHADOW_CSS = ":host(.ka-protect) img,:host(.ka-protect) video,:host(.ka-protect) canvas,:host(.ka-protect) picture{-webkit-user-drag:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}"
+    + ":host(.ka-shield) img,:host(.ka-shield) video,:host(.ka-shield) canvas,:host(.ka-shield) picture,:host(.ka-shield) [style*='background-image']{filter:blur(30px) brightness(.55)!important;transition:none!important}"
+    + ":host(.ka-unshield) img,:host(.ka-unshield) video,:host(.ka-unshield) canvas,:host(.ka-unshield) picture,:host(.ka-unshield) [style*='background-image']{transition:filter .28s ease-out!important}"
+    + "@media print{:host(.ka-protect) img,:host(.ka-protect) video,:host(.ka-protect) canvas,:host(.ka-protect) picture{visibility:hidden!important}}";
+  var ZONE = '#section-gallery, #section-portfolio, #section-store, #section-tips, #lightbox, [data-ka-shadow]';
+  function inZone(e){ var p = e.composedPath ? e.composedPath() : [e.target]; for (var i = 0; i < p.length; i++){ if (p[i].nodeType === 1 && p[i].matches && p[i].matches(ZONE)) return true; } return false; }
+  function hosts(){ return document.querySelectorAll('[data-ka-shadow]'); }
+  function dress(h){
+    if (h.shadowRoot && !h.shadowRoot.__kaProt){ var st = document.createElement('style'); st.textContent = SHADOW_CSS; h.shadowRoot.appendChild(st); h.shadowRoot.__kaProt = 1; }
+    h.classList.toggle('ka-protect', on);
+  }
+  function sync(){ root.classList.toggle('ka-protect', on); Array.prototype.forEach.call(hosts(), dress); apply(); }
+  // One timing model for every trigger: images are shielded while ANY reason holds (a screenshot-key hold that hasn't
+  // run out, the page having lost focus, the page being hidden). A returning focus can't cut a hold short, and every part
+  // of the page (light DOM and shadow roots) blurs in the same frame and clears together with the same short fade.
+  var HOLD = 3000, ARM = 1500, holdUntil = 0, away = false, shown = false, fadeTimer = 0;
+  function want(){ return on && (Date.now() < holdUntil || away || document.hidden); }
+  function setShield(v){
+    var all = [root].concat(Array.prototype.slice.call(hosts()));
+    clearTimeout(fadeTimer);
+    all.forEach(function(h){ if (h !== root) dress(h); h.classList.toggle('ka-shield', v); h.classList.toggle('ka-unshield', !v); });
+    if (!v) fadeTimer = setTimeout(function(){ all.forEach(function(h){ h.classList.remove('ka-unshield'); }); }, 320);
+    shown = v;
+  }
+  function apply(){
+    var v = want();
+    if (v !== shown) setShield(v);
+    clearTimeout(shieldTimer);
+    if (v && holdUntil > Date.now()) shieldTimer = setTimeout(apply, holdUntil - Date.now() + 16);
+  }
+  function hold(ms){ if (!on) return; holdUntil = Math.max(holdUntil, Date.now() + ms); apply(); }
+  function wipeClipboard(){ try { navigator.clipboard && navigator.clipboard.writeText('').catch(function(){}); } catch(err){} }
+  var editable = function(t){ return t && t.closest && t.closest('input, textarea, select, [contenteditable="true"], .ka-allow-menu'); };
+  // right-click / long-press menus and dragging (shadow content included: the event's path is checked)
+  document.addEventListener('contextmenu', function(e){ if (!on) return; var t = e.composedPath ? e.composedPath()[0] : e.target; if (editable(t) || !inZone(e)) return; e.preventDefault(); }, true);
+  document.addEventListener('dragstart', function(e){ if (!on) return; var t = e.composedPath ? e.composedPath()[0] : e.target; if (t && /^(IMG|CANVAS|VIDEO|PICTURE)$/.test(t.tagName || '') && inZone(e)) e.preventDefault(); }, true);
+  document.addEventListener('keydown', function(e){
+    if (!on) return;
+    var k = (e.key || '').toLowerCase(), mod = e.ctrlKey || e.metaKey;
+    if (k === 'printscreen'){ hold(HOLD); wipeClipboard(); return; }
+    if (e.metaKey && e.shiftKey && /^[3456s]$/.test(k)){ hold(HOLD); return; }               // macOS / Windows screenshot shortcuts
+    // arm early: the Windows / Command key (or Shift with it) starts every screenshot and recorder chord (Win+Shift+S,
+    // Win+Alt+R, Cmd+Shift+3/4/5), so images are already blurred before the last key is pressed and the screen freezes
+    if (k === 'meta' || k === 'os' || e.metaKey){ hold(ARM); }
+    if (k === 'f12' || (mod && e.shiftKey && /^[ijc]$/.test(k)) || (mod && /^[sup]$/.test(k) && !e.shiftKey && !editable(e.target))){ e.preventDefault(); }
+  }, true);
+  document.addEventListener('keyup', function(e){ if (on && (e.key || '').toLowerCase() === 'printscreen'){ hold(HOLD); wipeClipboard(); } }, true);
+  // losing focus (a screenshot tool takes over, another app, developer tools): blur in the same moment, until the page is
+  // back. Focus moving into one of our own frames (Razorpay, the human check) is not "away": that is undone at once.
+  window.addEventListener('blur', function(){
+    if (!on) return;
+    var a = document.activeElement; if (a && a.tagName === 'IFRAME') return;
+    away = true; apply();
+    setTimeout(function(){ var b = document.activeElement; if (b && b.tagName === 'IFRAME'){ away = false; apply(); } }, 0);
+  });
+  window.addEventListener('focus', function(){ away = false; apply(); });
+  document.addEventListener('visibilitychange', apply);
+  // the store and gallery mount later: dress their shadow roots as they appear
+  if (window.MutationObserver) new MutationObserver(function(list){ for (var i = 0; i < list.length; i++){ var n = list[i].addedNodes; for (var j = 0; j < n.length; j++){ var el = n[j]; if (el.nodeType !== 1) continue; if (el.hasAttribute && el.hasAttribute('data-ka-shadow')) setTimeout(function(h){ return function(){ dress(h); }; }(el), 0); else if (el.querySelectorAll){ var inner = el.querySelectorAll('[data-ka-shadow]'); for (var q = 0; q < inner.length; q++) setTimeout(function(h){ return function(){ dress(h); }; }(inner[q]), 0); } } } }).observe(document.documentElement, { childList: true, subtree: true });
+  window.kaSetProtection = function(v){ on = !!v && !preview; sync(); };
+  sync();
+})();
+</script>
+<style>
+/* only the gallery, portfolio, store and poster viewer are protected; the rest of the page records normally */
+html.ka-protect #section-gallery img, html.ka-protect #section-gallery video, html.ka-protect #section-gallery canvas, html.ka-protect #section-gallery picture, html.ka-protect #section-portfolio img, html.ka-protect #section-portfolio video, html.ka-protect #section-portfolio canvas, html.ka-protect #section-portfolio picture, html.ka-protect #section-store img, html.ka-protect #section-store video, html.ka-protect #section-store canvas, html.ka-protect #section-store picture, html.ka-protect #section-tips img, html.ka-protect #section-tips video, html.ka-protect #section-tips canvas, html.ka-protect #section-tips picture, html.ka-protect #lightbox img, html.ka-protect #lightbox video, html.ka-protect #lightbox canvas, html.ka-protect #lightbox picture{ -webkit-user-drag:none; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+html.ka-shield #section-gallery img, html.ka-shield #section-gallery video, html.ka-shield #section-gallery picture, html.ka-shield #section-gallery canvas, html.ka-shield #section-gallery .folder-card, html.ka-shield #section-gallery [style*="background-image"], html.ka-shield #section-portfolio img, html.ka-shield #section-portfolio video, html.ka-shield #section-portfolio picture, html.ka-shield #section-portfolio canvas, html.ka-shield #section-portfolio .folder-card, html.ka-shield #section-portfolio [style*="background-image"], html.ka-shield #section-store img, html.ka-shield #section-store video, html.ka-shield #section-store picture, html.ka-shield #section-store canvas, html.ka-shield #section-store .folder-card, html.ka-shield #section-store [style*="background-image"], html.ka-shield #section-tips img, html.ka-shield #section-tips video, html.ka-shield #section-tips picture, html.ka-shield #section-tips canvas, html.ka-shield #section-tips .folder-card, html.ka-shield #section-tips [style*="background-image"], html.ka-shield #lightbox img, html.ka-shield #lightbox video, html.ka-shield #lightbox picture, html.ka-shield #lightbox canvas, html.ka-shield #lightbox .folder-card, html.ka-shield #lightbox [style*="background-image"]{ filter:blur(30px) brightness(.55) !important; transition:none !important; }
+html.ka-unshield #section-gallery img, html.ka-unshield #section-gallery video, html.ka-unshield #section-gallery picture, html.ka-unshield #section-gallery canvas, html.ka-unshield #section-gallery .folder-card, html.ka-unshield #section-gallery [style*="background-image"], html.ka-unshield #section-portfolio img, html.ka-unshield #section-portfolio video, html.ka-unshield #section-portfolio picture, html.ka-unshield #section-portfolio canvas, html.ka-unshield #section-portfolio .folder-card, html.ka-unshield #section-portfolio [style*="background-image"], html.ka-unshield #section-store img, html.ka-unshield #section-store video, html.ka-unshield #section-store picture, html.ka-unshield #section-store canvas, html.ka-unshield #section-store .folder-card, html.ka-unshield #section-store [style*="background-image"], html.ka-unshield #section-tips img, html.ka-unshield #section-tips video, html.ka-unshield #section-tips picture, html.ka-unshield #section-tips canvas, html.ka-unshield #section-tips .folder-card, html.ka-unshield #section-tips [style*="background-image"], html.ka-unshield #lightbox img, html.ka-unshield #lightbox video, html.ka-unshield #lightbox picture, html.ka-unshield #lightbox canvas, html.ka-unshield #lightbox .folder-card, html.ka-unshield #lightbox [style*="background-image"]{ transition:filter .28s ease-out !important; }
+@media print{ html.ka-protect #section-gallery img, html.ka-protect #section-gallery video, html.ka-protect #section-gallery canvas, html.ka-protect #section-gallery picture, html.ka-protect #section-portfolio img, html.ka-protect #section-portfolio video, html.ka-protect #section-portfolio canvas, html.ka-protect #section-portfolio picture, html.ka-protect #section-store img, html.ka-protect #section-store video, html.ka-protect #section-store canvas, html.ka-protect #section-store picture, html.ka-protect #section-tips img, html.ka-protect #section-tips video, html.ka-protect #section-tips canvas, html.ka-protect #section-tips picture, html.ka-protect #lightbox img, html.ka-protect #lightbox video, html.ka-protect #lightbox canvas, html.ka-protect #lightbox picture{ visibility:hidden !important; } }
+</style>
+
 <!-- the first rel="icon" is the one the Creator Portal's favicon setting replaces (applyFavicon) -->
 <link rel="icon" type="image/png" sizes="64x64" href="images/favicon-64.png">
 <link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32.png">
@@ -98,7 +189,9 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
      picks it, without a page reload. Google Fonts only actually downloads a family's font files
      once something on the page is rendered in it, so having unused choices listed costs one small
      CSS response, not extra font-file bytes. -->
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Poppins:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400..700&family=Sora:wght@400..700&display=swap" rel="stylesheet">
+<!-- fonts load without blocking the first paint (display=swap shows the text at once in a fallback font) -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Poppins:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400..700&family=Sora:wght@400..700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Poppins:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400..700&family=Sora:wght@400..700&display=swap"></noscript>
 <style>
 :root{
   --ground:#050506;
@@ -737,6 +830,10 @@ p, li{ text-wrap:pretty; }
 }
 
 /* ============================================================ FOOTER ======================== */
+/* hidden while pages swap (see switchSection), then faded back in: no jump while the page height changes */
+html.ka-page-switching footer.site-footer{ visibility:hidden; opacity:0; }
+footer.site-footer{ transition:opacity .35s ease; }
+@media (prefers-reduced-motion: reduce){ footer.site-footer{ transition:none; } }
 footer.site-footer{
   position:relative; z-index:10; padding:48px clamp(20px,5vw,64px) 56px;
   display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:14px;
@@ -784,20 +881,43 @@ footer.site-footer{
   backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur); overflow:hidden; }
 .about-stat::after{ content:""; position:absolute; left:18%; right:18%; bottom:0; height:2px; border-radius:2px;
   background:linear-gradient(90deg, transparent, rgba(255,148,56,.75), transparent); opacity:.7; }
+/* thin shiny gradient edge in the tile's own colours (glass white + the accent): a 1px ring cut out with a mask, its light slowly sliding round */
+/* lite mode (in-app browsers, weak devices): a light blur and no looping effects */
+html.ka-lite{ --glass-blur: blur(5px); }
+html.ka-lite .about-stat::before{ background:linear-gradient(135deg, rgba(255,255,255,.4), rgba(255,148,56,.55) 50%, rgba(255,255,255,.12)); }
+/* phones and tablets: a lighter blur on every glass surface (same look, far less GPU work while scrolling) */
+@media (pointer:coarse), (max-width:900px){ :root{ --glass-blur: blur(10px) saturate(125%); } }
+.about-stat::before{ content:""; position:absolute; inset:0; border-radius:inherit; padding:1px; pointer-events:none;
+  /* the edge is a conic light: --ang is driven by the pointer, the scroll and a slow spin (see the stat-edge script), and its colours are the page's own (glass white, the accent, the timeline's violet and sky) */
+  background:conic-gradient(from var(--ang, 0deg) at 50% 50%, rgba(255,255,255,.62), rgba(255,148,56,.7) 14%, rgba(255,255,255,.05) 30%, rgba(214,164,255,.5) 46%, rgba(255,255,255,.05) 58%, rgba(127,212,255,.5) 72%, rgba(255,148,56,.7) 86%, rgba(255,255,255,.62));
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+/* a soft reflection on the glass that follows the pointer (--mx / --my) */
+.about-stat{ background:radial-gradient(120% 90% at var(--mx, 50%) var(--my, 0%), rgba(255,196,140,.12), transparent 60%), var(--glass-bg); }
 .about-stat-num{ display:block; font-family:var(--font-heading), ui-serif, Georgia, serif; font-weight:var(--heading-weight, 500);
   font-size:clamp(30px, 4.4vw, 48px); line-height:1; letter-spacing:-0.02em; color:var(--ink); font-variant-numeric:tabular-nums; }
 .about-stat-num .sfx{ color:var(--amber); margin-left:2px; }
 .about-stat-label{ display:block; margin-top:10px; font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10.5px;
   letter-spacing:0.14em; text-transform:uppercase; color:var(--ink-dim); }
-@media (max-width:520px){ .about-stats{ grid-template-columns:repeat(2, 1fr); } }
-/* wide screens: the numbers sit beside the headline, journey and bio (a 2 x 2 column on the right) instead of leaving
-   that side empty; below 1100px they stay under the bio. If the owner switches them off, the bio takes the full width. */
+@media (max-width:1099px){ .about-bio-text{ margin-bottom:28px; } }
+.about-wrap > .about-stats{ margin-top:0; }
+.about-bio-text{ margin-bottom:clamp(8px, 2vw, 24px); }
+@media (max-width:640px){ .about-stats{ grid-template-columns:repeat(2, minmax(0, 1fr)); width:100%; gap:10px; } .about-stat{ padding:16px 10px; } .about-stat-label{ font-size:9.5px; letter-spacing:.1em; } }   /* phones: two by two, in order */
+/* tablet (portrait): the Since badge sits centred above the line so the five steps get the full width and stop wrapping,
+   the paragraph spans the same width as the timeline and the tiles, and the blocks get an even rhythm */
+@media (min-width:761px) and (max-width:1099px){
+  .about-bio > .about-headline{ margin-bottom:10px; }
+  .about-bio > .about-tagline{ max-width:none; margin-bottom:6px; }
+  .about-wrap .about-journey{ grid-template-columns:minmax(0, 1fr); row-gap:26px; padding-top:0; margin-top:30px; margin-bottom:40px; }
+  .about-wrap .journey-since{ margin:0 auto; }
+  .about-wrap .about-bio-text{ max-width:none; margin-bottom:12px; }
+  .about-wrap > .about-caption{ margin-top:44px; }
+}
+/* the caption and the four number tiles sit centred, directly above Skills, on every screen size */
 @media (min-width:1100px){
-  .about-wrap{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(260px, 360px); column-gap:clamp(36px, 4vw, 72px); align-items:start; max-width:min(1320px, 94vw); }
-  .about-wrap > *{ grid-column:1 / -1; }
-  .about-wrap > .about-bio{ grid-column:1; grid-row:1; min-width:0; }
-  .about-wrap > .about-stats{ grid-column:2; grid-row:1; align-self:center; width:auto; margin:0; grid-template-columns:repeat(2, minmax(0, 1fr)); }
-  .about-wrap > .about-block#about-skills-block{ grid-row:2; }
+  .about-wrap{ max-width:min(1320px, 94vw); }
+  /* one shared column: name, tagline, timeline, paragraph, caption and tiles all share the same width and edges */
+  .about-bio > .about-headline, .about-bio > .about-tagline, .about-bio > .about-bio-text{ width:min(100%, 960px); max-width:none; margin-left:auto; margin-right:auto; }
 }
 
 /* ============================================================ IMAGE UPSCALER: coming-soon dialog only == */
@@ -1518,12 +1638,15 @@ html.ka-wallpaper #stage{ opacity:1 !important; }
 
 /* ---- headline / bio ---- */
 .about-headline{
-  font-size:var(--step-3); line-height:1.08; margin:0 0 20px; max-width:16ch;
+  font-size:var(--step-3); line-height:1.08; margin:0 0 8px; max-width:none; white-space:normal;
   opacity:0; transform:translateY(18px);
 }
-#section-about .about-headline{ max-width:none; }
-#section-about .about-headline .about-name{ display:block; }
-#section-about .about-headline .about-tagline{ display:block; margin-top:.16em; font-size:.52em; line-height:1.2; letter-spacing:.015em; font-weight:500; }
+ .about-tagline{ margin:0 0 10px; max-width:34ch; font-family:var(--font-sub), ui-serif, Georgia, serif; font-style:italic; font-weight:400;
+  font-size:clamp(1rem, .92rem + .55vw, 1.4rem); line-height:1.3; letter-spacing:0; color:rgba(237,235,232,.86); }
+.about-caption{ margin:0 0 26px; }
+.about-wrap > .about-caption{ text-align:center; margin:clamp(28px, 4vw, 48px) 0 14px; }
+.about-caption[hidden]{ display:none; }
+[data-ka-indent] *{ text-indent:0; }   /* only the first line of the paragraph itself is indented, never each word, letter or line piece inside it */
 .about-bio-text{
   font-size:var(--step-0); line-height:1.7; color:var(--ink-dim); max-width:62ch; margin:0 0 64px;
   opacity:0; transform:translateY(14px);
@@ -1543,7 +1666,7 @@ html.ka-wallpaper #stage{ opacity:1 !important; }
 .about-block .gallery-head{ margin-bottom:28px; }
 
 /* ---- About: journey since a year (points on a line; fast, letter-by-letter text) ---- */
-.about-journey{ margin:0 0 34px; max-width:min(100%, 940px); }
+.about-journey{ margin:0 auto 34px; width:min(100%, 960px); max-width:min(100%, 960px); display:grid; grid-template-columns:auto minmax(0,1fr); column-gap:clamp(14px, 2vw, 24px); align-items:start; padding-top:12px; }
 .about-journey[hidden]{ display:none; }
 .about-journey{ display:flex; flex-direction:column; align-items:center; }
 .journey-since{ display:inline-flex; align-items:baseline; gap:10px; padding:8px 18px 8px 16px; border-radius:999px;
@@ -1551,7 +1674,9 @@ html.ka-wallpaper #stage{ opacity:1 !important; }
   font-family:var(--font-mono, monospace); font-size:11px; letter-spacing:.24em; color:#ffd9b8;
   box-shadow:0 0 0 1px rgba(255,255,255,.03) inset, 0 8px 28px -12px rgba(255,148,56,.45); }
 .journey-since b{ font-size:20px; letter-spacing:.06em; font-weight:700; color:#fff; font-variant-numeric:tabular-nums; min-width:4ch; display:inline-block; }
-.journey-line{ list-style:none; width:100%; box-sizing:border-box; margin:22px 0 0; padding:0 26px 0 0; display:grid; grid-template-columns:repeat(var(--n, 5), minmax(0,1fr)); position:relative; }
+.journey-since{ align-self:start; height:36px; margin-top:-11px; align-items:center; line-height:1; }
+.journey-since b{ line-height:1; }
+.journey-line{ list-style:none; margin:0; padding:0 26px 0 0; display:grid; grid-template-columns:repeat(var(--n, 5), minmax(0,1fr)); position:relative; }
 /* the track and its glowing fill; the line carries on past the last point and ends in an arrow, because the journey is not over */
 .journey-line::before, .journey-line::after{ content:""; position:absolute; top:6px; left:7px; right:8px; height:2px; border-radius:2px; }
 .journey-line::before{ background:linear-gradient(90deg, rgba(255,255,255,.18), rgba(255,255,255,.08) 72%, rgba(255,255,255,.04)); }
@@ -1596,6 +1721,8 @@ html.ka-wallpaper #stage{ opacity:1 !important; }
 .journey-line li.now strong{ color:#fff; }
 .journey-line li:not(.on) strong, .journey-line li:not(.on) span.jt{ opacity:0; }
 @media (max-width:760px){
+  .about-journey{ grid-template-columns:1fr; padding-top:0; }
+  .journey-since{ margin:0 auto 18px; }
   .journey-line{ grid-template-columns:1fr; padding:0 0 30px 0; }
   .journey-line::before, .journey-line::after{ top:7px; bottom:8px; left:6px; right:auto; width:2px; height:auto; }
   .journey-line::before{ background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.05)); }
@@ -1853,17 +1980,17 @@ html.ka-wallpaper #stage{ opacity:1 !important; }
   <!-- starts finished (transparent): About is the landing page, so this full-screen overlay must not
        cover the hero on load. playAboutIntro() replays it on later visits to About. -->
   <div class="poster-wall-intro pw-done" id="poster-wall-intro" aria-hidden="true">
-    <img class="pw-thumb pw-1" src="images/tiger-blue-480.webp" alt="">
-    <img class="pw-thumb pw-2" src="images/devara-11-days-480.webp" alt="">
-    <img class="pw-thumb pw-3" src="images/devara-14-days-480.webp" alt="">
-    <img class="pw-thumb pw-4" src="images/vara-23-days-480.webp" alt="">
-    <img class="pw-thumb pw-5" src="images/wa-00-40-18-480.webp" alt="">
+    <img class="pw-thumb pw-1" src="images/tiger-blue-480.webp" alt="" decoding="async">
+    <img class="pw-thumb pw-2" src="images/devara-11-days-480.webp" alt="" decoding="async">
+    <img class="pw-thumb pw-3" src="images/devara-14-days-480.webp" alt="" decoding="async">
+    <img class="pw-thumb pw-4" src="images/vara-23-days-480.webp" alt="" decoding="async">
+    <img class="pw-thumb pw-5" src="images/wa-00-40-18-480.webp" alt="" decoding="async">
   </div>
 
   <div class="about-wrap">
     <div class="about-bio">
-      <h1 class="about-headline" id="about-headline"><span class="about-name">Kethan Artzz</span><span class="about-tagline">Visual Storyteller for the Big Screen</span></h1>
-      <p class="about-caption">IMAGINE &middot; CREATE &middot; EVOLVE</p>
+      <h1 class="about-headline" id="about-headline">Kethan Artzz</h1>
+      <p class="about-tagline" id="about-tagline">Visual Storyteller for the Big Screen</p>
       <div class="about-journey" id="about-journey" aria-label="My journey">
         <span class="journey-since"><span>SINCE</span><b id="journey-year">2021</b></span>
         <ol class="journey-line" id="journey-steps"></ol>
@@ -1872,6 +1999,7 @@ html.ka-wallpaper #stage{ opacity:1 !important; }
     </div>
 
     <!-- About numbers (Projects, Delivered, ...): filled from the portal (Content > Site text), count up when seen -->
+    <p class="about-caption" id="about-caption">IMAGINE &middot; CREATE &middot; EVOLVE</p>
     <div class="about-stats" id="about-stats" role="list" aria-label="In numbers" hidden></div>
 
     <!-- Skills: filled by renderSkills() from the site document (portal: Content > Site text > Skills).
@@ -7005,6 +7133,8 @@ function focusSectionHeading(section){
 // focusTarget: move keyboard focus to the destination's heading (used by the menu).
 function kaCoarse(){ return !!(window.matchMedia && matchMedia("(pointer: coarse)").matches); }
 function switchSection(name, focusTarget){
+  // the old standalone Gallery page was folded into About > Portfolio; old links (?page=gallery) land there instead of an empty page
+  if (name === "gallery") name = "portfolio";
   var page = navPage(name);
   var incoming = pageSections(page);
   if (!incoming.length) return;
@@ -7033,6 +7163,9 @@ function switchSection(name, focusTarget){
   movePill();
 
   showing.forEach(function(section){ section.classList.add("fading-out"); });
+  // while one page leaves and the next arrives the page is briefly short, which pulled the footer up into view and then
+  // pushed it back down (a visible jump). The footer sits out the swap and fades back in once the new page is in place.
+  document.documentElement.classList.add("ka-page-switching");
   sectionSwitching = true; pendingScroll = { el:scrollTarget, focus:focusTarget };
   var outMs = reducedMotion ? 150 : 300;
   sectionTimer = setTimeout(function(){
@@ -7064,12 +7197,13 @@ function switchSection(name, focusTarget){
     sectionTimer = setTimeout(function(){
       incoming.forEach(function(section){ section.classList.remove("fading-in"); });
       document.documentElement.removeAttribute("data-nav-dir");
+      document.documentElement.classList.remove("ka-page-switching");
     }, reducedMotion ? 150 : 430);
   }, outMs);
 }
 
 // other bundles (the Typography studio's page menu) jump to a page this way
-window.kaGoTo = function(name){ if (name === "portfolio") switchSection("skills", true); else if (sections[name] || PAGE_SECTIONS[name]) switchSection(name, true); };
+window.kaGoTo = function(name){ if (name === "portfolio" || name === "gallery") switchSection("skills", true); else if (sections[name] || PAGE_SECTIONS[name]) switchSection(name, true); };
 function navGo(name){
   if (name === "typography"){ movePill(); openTypographyStudio(); return; }
   switchSection(name);
@@ -8647,11 +8781,11 @@ function applyPortfolioData(data){
   if (data.details){
     if(data.details.creatorName)document.title=data.details.creatorName+' · '+data.details.portfolioTitle;
     var aboutHeading=document.getElementById('about-headline');
-    if(aboutHeading&&data.details.creatorName){
-      var aboutName=aboutHeading.querySelector('.about-name'), aboutTagline=aboutHeading.querySelector('.about-tagline');
-      if(aboutName&&aboutTagline){ aboutName.textContent=data.details.creatorName; aboutTagline.textContent=data.details.tagline||''; }
-      else aboutHeading.textContent=data.details.creatorName+' — '+(data.details.tagline||'');
-    }
+    if(aboutHeading&&data.details.creatorName)aboutHeading.textContent=data.details.creatorName;
+    var aboutCap=document.getElementById('about-caption');
+    if(aboutCap){ var capText=data.details.aboutCaption||'IMAGINE · CREATE · EVOLVE'; if(aboutCap.textContent!==capText)aboutCap.textContent=capText; }
+    var aboutTag=document.getElementById('about-tagline');
+    if(aboutTag&&data.details.tagline)aboutTag.textContent=data.details.tagline;
     var copyright=document.querySelector('.footer-copyright');
     if(copyright&&data.details.creatorName)copyright.textContent='© '+new Date().getFullYear()+' '+data.details.creatorName;
     if(data.details.contactButton)contactForm.querySelector('.contact-submit').textContent=data.details.contactButton;
@@ -8726,6 +8860,14 @@ function applyElementStyles(styles){
     var style = (styles && styles[id]) || {};
     el.style.fontFamily = style.font ? "'" + style.font + "'" : "";
     el.style.color = style.color || "";
+    el.style.fontWeight = style.weight ? String(style.weight) : "";
+    el.style.textAlign = style.align || "";
+    // text-indent is inherited, so the effect's per-word / per-letter / per-line pieces would each indent themselves; the flag below resets them (see [data-ka-indent] in the styles)
+    var ind = typeof style.indent === "number" && style.indent > 0;
+    el.style.textIndent = ind ? style.indent + "em" : "";
+    if (ind) el.setAttribute("data-ka-indent", ""); else el.removeAttribute("data-ka-indent");
+    el.style.letterSpacing = typeof style.spacing === "number" ? style.spacing + "em" : "";
+    el.style.lineHeight = typeof style.lineHeight === "number" ? String(style.lineHeight) : "";
   });
 }
 // ---- per-element entrance animation (Creator Portal "Text animation" panel + the live-preview
@@ -8822,7 +8964,11 @@ function renderAboutStats(stats, projectCount){
   var box = document.getElementById("about-stats");
   if (!box) return;
   var items = stats && stats.enabled !== false && Array.isArray(stats.items) ? stats.items.filter(function(x){ return x && x.label; }) : [];
+  // fixed order: years, clients, projects, delivered (anything else follows, in the order it was given)
+  var rank = function(l){ l = String(l).toLowerCase(); return /year/.test(l) ? 0 : /client/.test(l) ? 1 : /project/.test(l) ? 2 : /deliver/.test(l) ? 3 : 4; };
+  items = items.map(function(x, i){ return { x: x, i: i, r: rank(x.label) }; }).sort(function(a, b){ return a.r - b.r || a.i - b.i; }).map(function(o){ return o.x; });
   box.hidden = !items.length;
+  var capEl = document.getElementById("about-caption"); if (capEl && capEl !== box) capEl.hidden = !items.length;
   if (box.classList) box.classList.toggle("is-off", !items.length);   // switched off: the bio takes the full width (see .about-wrap)
   var fmt = function(n){ try { return Math.round(n).toLocaleString("en-IN"); } catch(e){ return String(Math.round(n)); } };
   box.replaceChildren.apply(box, items.map(function(x){
@@ -8845,9 +8991,11 @@ function renderAboutStats(stats, projectCount){
   var state = window.__kaStats || (window.__kaStats = { box: null, queued: false, completed: false, running: false, frame: 0 });
   state.box = box; state.completed = false; state.running = false; state.frame++;
   var paint = function(p){
-    var eased = 1 - Math.pow(1 - p, 3);
+    // a gentle ease-out (not the steep cubic, which leapt several numbers per frame at the start); the text is only touched when the whole number changes
+    var eased = p >= 1 ? 1 : 1 - Math.pow(1 - p, 2.2);
     box.querySelectorAll(".about-stat-num > span:first-child").forEach(function(el){
-      el.textContent = fmt((Number(el.dataset.target) || 0) * eased);
+      var n = Math.round((Number(el.dataset.target) || 0) * eased);
+      if (el.__n !== n){ el.__n = n; el.textContent = fmt(n); }
     });
   };
   if (reduce){ state.completed = true; paint(1); return; }
@@ -8859,7 +9007,7 @@ function renderAboutStats(stats, projectCount){
     if (!r.height || r.bottom <= 0 || r.top >= vh){ if (state.completed || state.running){ state.frame++; state.running = false; state.completed = false; paint(0); } return; }
     if (state.completed || state.running) return;
     state.running = true;
-    var frame = state.frame, start = 0, duration = 900;
+    var frame = state.frame, start = 0, duration = 700;
     var step = function(now){
       if (frame !== state.frame || state.box !== b) return;
       if (!start) start = now || 1;
@@ -8929,6 +9077,7 @@ function applySiteAppearance(data){
     noticeEl.hidden = true;
   }
   if (typeof window !== "undefined"){
+    if (window.kaSetProtection) window.kaSetProtection(!data.visibility || data.visibility.protectImages !== false);
     window.KA_DL_CONFIG = Object.assign(window.KA_DL_CONFIG || {}, { format: data.visibility && data.visibility.downloadFormat === "jpeg" ? "jpeg" : "png" });
     window.kaPassCard = data.passCard || null;   // the checkout pass design (Studio > Checkout pass)
     // load the pass's fonts now (the browser would only fetch a font when it is first drawn, so the signature would flash in the wrong font)
@@ -8961,7 +9110,8 @@ function applySiteAppearance(data){
 // [fix] 'replay' was removed after discovering there's no actual <button id="replay"> in the
 // page any more -- only dormant CSS and a JS variable that always resolves to null. See the
 // identical note on server/creator.js's DRAGGABLE_IDS.
-var PREVIEW_DRAGGABLE_IDS = ["assistant-launcher", "site-notice", "portfolio-title", "portfolio-intro", "contact-title", "contact-intro"];
+var PREVIEW_DRAGGABLE_IDS = ["assistant-launcher", "site-notice", "portfolio-title", "portfolio-intro", "contact-title", "contact-intro", "about-headline", "about-tagline", "about-caption", "about-journey", "about-bio-text", "about-stats"];
+var PREVIEW_TEXT_IDS = ["portfolio-title", "portfolio-intro", "contact-title", "contact-intro", "about-headline", "about-tagline", "about-caption", "about-bio-text"];
 function currentLayoutBreakpoint(){
   return kaLayoutW() <= 760 ? "mobile" : kaLayoutW() <= 1024 ? "tablet" : "desktop";
 }
@@ -8980,8 +9130,51 @@ function applyLayoutOverrides(data){
     var pos = overrides[id];
     el.style.translate = pos ? pos.x + "px " + pos.y + "px" : "";
     el.style.scale = pos && pos.scale ? String(pos.scale) : "";
+    // a text box can also be made wider or narrower (its own setting, separate from the scale), for this screen size only
+    if (PREVIEW_TEXT_IDS.indexOf(id) !== -1){
+      if (pos && pos.width){ el.style.width = pos.width + "px"; el.style.maxWidth = "none"; }
+      else { el.style.width = ""; el.style.maxWidth = ""; }
+    }
   });
 }
+// ---- About number tiles: the edge light turns toward the pointer, drifts with the scroll and spins slowly on its own; the
+// glass carries a soft reflection that follows the pointer. One rAF loop, only while the tiles are on screen.
+(function(){
+  var box = document.getElementById("about-stats");
+  if (!box || window.kaLite || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
+  var px = 0, py = 0, moved = -1e9, spin = 0, sv = 0, lastY = window.scrollY, vis = false, raf = 0, last = 0;
+  var st = new WeakMap();
+  function wrap(d){ return ((d + 540) % 360) - 180; }
+  window.addEventListener("pointermove", function(e){ px = e.clientX; py = e.clientY; moved = performance.now(); }, { passive: true });
+  window.addEventListener("scroll", function(){ var y = window.scrollY; sv = Math.max(-40, Math.min(40, sv + (y - lastY) * 0.06)); lastY = y; }, { passive: true });
+  function frame(now){
+    raf = 0;
+    if (!vis) return;
+    var dt = Math.min(64, now - (last || now)); last = now;
+    spin = (spin + dt * 0.014 + sv * 0.6) % 360; sv *= Math.pow(0.9, dt / 16);
+    var live = Math.max(0, 1 - (now - moved) / 1800);           // the pointer's pull fades out once it rests
+    Array.prototype.forEach.call(box.children, function(t){
+      var r = t.getBoundingClientRect(), s = st.get(t);
+      if (!s){ s = { a: spin, mx: 50, my: 0 }; st.set(t, s); }
+      var cx = r.left + r.width / 2, cy = r.top + r.height / 2, dx = px - cx, dy = py - cy, dist = Math.hypot(dx, dy);
+      var w = live * Math.max(0, 1 - dist / 900);
+      var toward = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+      var tgt = spin + w * wrap(toward - spin);
+      s.a = (s.a + wrap(tgt - s.a) * Math.min(1, dt / 90) + 360) % 360;
+      var tx = r.width ? Math.max(0, Math.min(100, (px - r.left) / r.width * 100)) : 50, ty = r.height ? Math.max(0, Math.min(100, (py - r.top) / r.height * 100)) : 0;
+      if (w < 0.02){ tx = 50; ty = 0; }
+      s.mx += (tx - s.mx) * Math.min(1, dt / 120); s.my += (ty - s.my) * Math.min(1, dt / 120);
+      t.style.setProperty("--ang", s.a.toFixed(1) + "deg");
+      t.style.setProperty("--mx", s.mx.toFixed(1) + "%"); t.style.setProperty("--my", s.my.toFixed(1) + "%");
+    });
+    raf = requestAnimationFrame(frame);
+  }
+  function start(){ if (!raf && vis){ last = 0; raf = requestAnimationFrame(frame); } }
+  var inView = false;
+  function sync(){ vis = inView && !document.hidden; start(); }
+  if ("IntersectionObserver" in window) new IntersectionObserver(function(en){ inView = en[0].isIntersecting; sync(); }, { threshold: 0 }).observe(box);
+  document.addEventListener("visibilitychange", sync);
+})();
 loadPortfolioFromAPI();
 // ---- live updates: what's published in the portal appears on open pages without a reload.
 // /api/live is a tiny version number that moves after every portal change. It's checked every 15s
@@ -9028,7 +9221,7 @@ window.addEventListener("resize", function(){
 // registered for it, i.e. a harmless no-op. Nothing here can be triggered by a visitor: entering
 // edit mode requires a postMessage the studio itself sends, and the studio only runs behind the
 // authenticated /creator login.
-var kaPreviewEditMode = false, kaPreviewOutline = null, kaPreviewHandle = null, kaPreviewSelectedEl = null;
+var kaPreviewEditMode = false, kaPreviewOutline = null, kaPreviewHandle = null, kaPreviewWidthHandle = null, kaPreviewSelectedEl = null;
 function kaPreviewEnsureOutline(){
   if (kaPreviewOutline) return kaPreviewOutline;
   kaPreviewOutline = document.createElement("div");
@@ -9038,6 +9231,11 @@ function kaPreviewEnsureOutline(){
   kaPreviewHandle = document.createElement("div");
   kaPreviewHandle.style.cssText = "position:fixed;z-index:100000;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#FF9438;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:none;cursor:nwse-resize;";
   kaPreviewHandle.addEventListener("pointerdown", kaPreviewResizePointerDown);
+  // a second handle on the right edge widens or narrows a text box (its width, not its scale)
+  kaPreviewWidthHandle = document.createElement("div");
+  kaPreviewWidthHandle.style.cssText = "position:fixed;z-index:100000;width:12px;height:30px;margin:-15px 0 0 -6px;border-radius:7px;background:#fff;border:2px solid #FF9438;box-shadow:0 1px 4px rgba(0,0,0,.4);display:none;cursor:ew-resize;touch-action:none;";
+  kaPreviewWidthHandle.addEventListener("pointerdown", kaPreviewWidthPointerDown);
+  document.documentElement.appendChild(kaPreviewWidthHandle);
   document.documentElement.appendChild(kaPreviewOutline);
   document.documentElement.appendChild(kaPreviewHandle);
   return kaPreviewOutline;
@@ -9045,13 +9243,15 @@ function kaPreviewEnsureOutline(){
 function kaPreviewShowOutline(el){
   var o = kaPreviewEnsureOutline();
   kaPreviewSelectedEl = el;
-  if (!el){ o.style.display = "none"; kaPreviewHandle.style.display = "none"; return; }
+  if (!el){ o.style.display = "none"; kaPreviewHandle.style.display = "none"; kaPreviewWidthHandle.style.display = "none"; return; }
   var r = el.getBoundingClientRect();
   o.style.display = "block";
   o.style.left = (r.left - 4) + "px"; o.style.top = (r.top - 4) + "px";
   o.style.width = (r.width + 8) + "px"; o.style.height = (r.height + 8) + "px";
   kaPreviewHandle.style.display = "block";
   kaPreviewHandle.style.left = (r.right + 4) + "px"; kaPreviewHandle.style.top = (r.bottom + 4) + "px";
+  if (PREVIEW_TEXT_IDS.indexOf(el.id) !== -1){ kaPreviewWidthHandle.style.display = "block"; kaPreviewWidthHandle.style.left = (r.right + 4) + "px"; kaPreviewWidthHandle.style.top = (r.top + r.height / 2) + "px"; }
+  else kaPreviewWidthHandle.style.display = "none";
 }
 function kaPreviewSetEditMode(enabled){
   kaPreviewEditMode = enabled;
@@ -9066,7 +9266,7 @@ function kaPreviewSetEditMode(enabled){
 // comment above for why these are the standalone CSS properties, not `transform`.
 function kaPreviewReadPos(el){
   var m = /(-?[\d.]+)px\s+(-?[\d.]+)px/.exec(el.style.translate || "");
-  return { x: m ? parseFloat(m[1]) : 0, y: m ? parseFloat(m[2]) : 0, scale: parseFloat(el.style.scale) || 1 };
+  return { x: m ? parseFloat(m[1]) : 0, y: m ? parseFloat(m[2]) : 0, scale: parseFloat(el.style.scale) || 1, width: parseFloat(el.style.width) || 0 };
 }
 function kaPreviewPointerDown(e){
   if (!kaPreviewEditMode) return;
@@ -9091,7 +9291,28 @@ function kaPreviewPointerDown(e){
     window.removeEventListener("pointerup", onUp);
     var x = base.x + (ev.clientX - startX), y = base.y + (ev.clientY - startY);
     try {
-      window.parent.postMessage({ type: "ka-preview-moved", id: id, breakpoint: currentLayoutBreakpoint(), x: x, y: y, scale: base.scale }, window.location.origin);
+      window.parent.postMessage({ type: "ka-preview-moved", id: id, breakpoint: currentLayoutBreakpoint(), x: x, y: y, scale: base.scale, width: base.width }, window.location.origin);
+    } catch(err){}
+  }
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+}
+// Dragging the right-edge handle changes a text box's width, so the words can take more (or less) room and re-wrap.
+function kaPreviewWidthPointerDown(e){
+  if (!kaPreviewEditMode || !kaPreviewSelectedEl) return;
+  e.preventDefault(); e.stopPropagation();
+  var el = kaPreviewSelectedEl, id = el.id, base = kaPreviewReadPos(el);
+  var sc = base.scale || 1, startX = e.clientX, w0 = el.getBoundingClientRect().width / sc;
+  function widthFor(ev){ return Math.round(Math.min(2400, Math.max(120, w0 + (ev.clientX - startX) / sc))); }
+  function onMove(ev){
+    el.style.width = widthFor(ev) + "px"; el.style.maxWidth = "none";
+    kaPreviewShowOutline(el);
+  }
+  function onUp(ev){
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    try {
+      window.parent.postMessage({ type: "ka-preview-moved", id: id, breakpoint: currentLayoutBreakpoint(), x: base.x, y: base.y, scale: base.scale, width: widthFor(ev) }, window.location.origin);
     } catch(err){}
   }
   window.addEventListener("pointermove", onMove);
@@ -9119,7 +9340,7 @@ function kaPreviewResizePointerDown(e){
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
     try {
-      window.parent.postMessage({ type: "ka-preview-moved", id: id, breakpoint: currentLayoutBreakpoint(), x: base.x, y: base.y, scale: scaleFor(ev) }, window.location.origin);
+      window.parent.postMessage({ type: "ka-preview-moved", id: id, breakpoint: currentLayoutBreakpoint(), x: base.x, y: base.y, scale: scaleFor(ev), width: base.width }, window.location.origin);
     } catch(err){}
   }
   window.addEventListener("pointermove", onMove);
@@ -9136,6 +9357,28 @@ document.addEventListener("DOMContentLoaded", function(){
     if (el) el.addEventListener("pointerdown", kaPreviewPointerDown);
   });
 });
+// The selection box is position:fixed, so it has to follow its element while the preview scrolls or resizes, and it
+// goes away when you tap anywhere that is not a selectable element (or press Escape).
+(function(){
+  var queued = false;
+  function follow(){
+    queued = false;
+    if (!kaPreviewEditMode || !kaPreviewSelectedEl) return;
+    if (!kaPreviewSelectedEl.isConnected) kaPreviewShowOutline(null); else kaPreviewShowOutline(kaPreviewSelectedEl);
+  }
+  function queue(){ if (!queued && kaPreviewSelectedEl){ queued = true; requestAnimationFrame(follow); } }
+  window.addEventListener("scroll", queue, { passive: true });
+  window.addEventListener("resize", queue, { passive: true });
+  document.addEventListener("pointerdown", function(e){
+    if (!kaPreviewEditMode || !kaPreviewSelectedEl) return;
+    var t = e.target;
+    if (t === kaPreviewHandle || t === kaPreviewWidthHandle) return;
+    for (var n = t; n && n !== document; n = n.parentNode){ if (n.id && PREVIEW_DRAGGABLE_IDS.indexOf(n.id) !== -1) return; }
+    kaPreviewShowOutline(null);
+    try { window.parent.postMessage({ type: "ka-preview-deselected" }, window.location.origin); } catch(err){}
+  }, true);
+  document.addEventListener("keydown", function(e){ if (e.key === "Escape" && kaPreviewEditMode && kaPreviewSelectedEl) kaPreviewShowOutline(null); });
+})();
 window.addEventListener("message", function(e){
   if (window.parent === window || e.source !== window.parent || e.origin !== window.location.origin) return;
   var msg = e.data;
@@ -9147,7 +9390,7 @@ window.addEventListener("message", function(e){
     kaPreviewSetEditMode(!!msg.enabled);
   } else if (msg.type === "ka-preview-reset-position"){
     var target = document.getElementById(msg.id);
-    if (target){ target.style.translate = ""; target.style.scale = ""; kaPreviewShowOutline(target); }
+    if (target){ target.style.translate = ""; target.style.scale = ""; target.style.width = ""; target.style.maxWidth = ""; kaPreviewShowOutline(target); }
   }
 });
 if (window.parent !== window){
@@ -11284,7 +11527,7 @@ html{ font-size:calc(100% * var(--text-scale, 1) * var(--screen-scale, 1)); }
     letterSpan: 0.5,        // random reveal: how long (of the whole 0..1) each letter takes to unblur
     blurPx: 7,              // strength of the blur each letter starts from
     inkSelector: ".gallery-head h2, #contact-title, #about-headline, #portfolio-title, #skills-title, #reel-h, #store-title, #tips-title",
-    emergeSelector: ".gallery-head p, .fav-filter, #contact-intro, .about-caption, .about-bio-text, #portfolio-intro, #skills-intro, #skills-meta, #reel-intro, #store-intro, #tips-intro",
+    emergeSelector: ".gallery-head p, .fav-filter, #contact-intro, .about-caption, .about-tagline, .about-bio-text, #portfolio-intro, #skills-intro, #skills-meta, #reel-intro, #store-intro, #tips-intro",
     ghostLabelSelector: ".contact-form label",
     twoLineSelector: "#contact-intro",
     ghostBoxSelector: ".contact-form input:not(.hp-field):not([type=checkbox]), .contact-form textarea, .contact-form .contact-submit",
@@ -11406,7 +11649,9 @@ html{ font-size:calc(100% * var(--text-scale, 1) * var(--screen-scale, 1)); }
       // small text: random word-by-word (or letter-by-letter for short labels); rich markup stays whole
       it.text = el.textContent;
       if (el.children.length){ it.mode = "whole"; el.style.opacity = "0"; }
-      else { it.mode = "units"; wrapUnits(it, el, it.text, true, el.matches(CFG.twoLineSelector)); }   // every small text: each LETTER has its own random moment
+      // short texts: each LETTER has its own random moment; a long paragraph (the bio) goes word by word instead: the same
+      // haze, about six times fewer pieces to animate, so the page stays smooth on phones and in in-app browsers
+      else { it.mode = "units"; wrapUnits(it, el, it.text, it.text.length <= 220 && !window.kaLite, el.matches(CFG.twoLineSelector)); }
     }
     it.delay = it.kind === "ink" ? 0 : (it.kind === "ghost" || it.kind === "box" ? 160 + it.order * 110 : 260);
     it.r = 0;

@@ -15,7 +15,7 @@ import { SCENES } from './effects/scenes';
 import { baselineIn } from './effects/typing/handwriting';
 import { FINISHES, paintFinish } from './effects/finish';
 import { THEMES, THEME_GROUPS } from './effects/themes';
-import { MATERIALS, LEGACY_FILL } from './effects/materials';
+import { MATERIALS, LEGACY_FILL, isShaded } from './effects/materials';
 import type { Palette } from './effects/types';
 import { TYPING } from './effects/typing';
 import { DECORATIONS } from './effects/decorations';
@@ -75,7 +75,8 @@ export function openStudio(options: StudioOptions = {}){
 
 // Hides the rest of the page while the studio is open, so the site's live space background
 // (#nebula-bg) shows through behind the drawing.
-const PAGE_CSS = `html.ka-studio-open{overflow:hidden!important}
+const PAGE_CSS = `html.ka-studio-open{overflow:hidden!important;overscroll-behavior:none!important}
+html.ka-studio-open body{overscroll-behavior:none!important;-webkit-touch-callout:none}
 html.ka-studio-open body > *:not(#nebula-bg):not(.ka-studio-host):not(script):not(style):not(link){visibility:hidden!important}`;
 
 class Studio {
@@ -132,7 +133,15 @@ class Studio {
     this.bindInput();
     this.resize();
     this.applyToolbarState();
-    this.on(window, 'resize', () => this.resize());
+    let lastW = window.innerWidth, lastH = window.innerHeight, resizeFrame = 0;
+    const settle = () => {
+      resizeFrame = 0;
+      if (this.current){ resizeFrame = requestAnimationFrame(settle); return; }   // not while a line is being drawn
+      if (window.innerWidth === lastW && window.innerHeight === lastH) return;
+      lastW = window.innerWidth; lastH = window.innerHeight; this.resize();
+    };
+    this.on(window, 'resize', () => { if (!resizeFrame) resizeFrame = requestAnimationFrame(settle); });
+    if (window.visualViewport) this.on(window.visualViewport as unknown as EventTarget, 'resize', () => { if (!resizeFrame) resizeFrame = requestAnimationFrame(settle); });
     this.on(document, 'visibilitychange', () => { if (document.hidden) this.stopLoop(); else this.kick(); });
     this.on(document, 'fullscreenchange', () => this.syncFullscreen());
     (this.root.querySelector('[data-act="brush-menu"]') as HTMLElement).focus();
@@ -274,7 +283,7 @@ class Studio {
       this.closePanels();
       if (session.tool === 'text'){ e.preventDefault(); this.placeText(e); return; }
       e.preventDefault();
-      try { c.setPointerCapture(e.pointerId); } catch { /* already released */ }
+      try { c.setPointerCapture(e.pointerId); } catch { /* some in-app web views refuse capture: drawing works without it */ }
       this.begin(e);
     }) as EventListener);
     const lift = ((e: PointerEvent) => { touches.delete(e.pointerId); if (e.pointerType === 'pen') penAt = e.timeStamp; }) as EventListener;
@@ -296,6 +305,15 @@ class Studio {
     this.on(c, 'pointerup', end); this.on(c, 'pointercancel', end);
     this.on(c, 'pointerleave', ((e: PointerEvent) => { if (this.pointerId === null && this.current) this.finish(); void e; }) as EventListener);
     this.on(c, 'contextmenu', ((e: Event) => e.preventDefault()) as EventListener);
+    // In-app browsers (Snapchat, Instagram, TikTok...) own the touch gestures of their page: a drag can scroll or pull the
+    // page and cancel the pointer mid-stroke, which showed up as short broken lines. Claiming the touches on the canvas (and on
+    // the studio generally, except inside its scrollable panels) keeps the stroke going.
+    const claim = ((e: TouchEvent) => { if (e.cancelable) e.preventDefault(); }) as EventListener;
+    this.on(c, 'touchstart', claim, { passive: false }); this.on(c, 'touchmove', claim, { passive: false });
+    this.on(this.host, 'touchmove', ((e: TouchEvent) => {
+      const inside = e.composedPath().some(n => n instanceof Element && (n.classList.contains('fx-dock') || n.classList.contains('panel') || n.classList.contains('rare') || n.classList.contains('site-menu') || n.tagName === 'TEXTAREA' || n.tagName === 'SELECT'));
+      if (!inside && e.cancelable) e.preventDefault();
+    }) as EventListener, { passive: false });
   }
   begin(e: PointerEvent, hover = false){
     if (totalPoints(session.items) > MAX_POINTS){ this.toast('The canvas is full. Clear some strokes or export first.'); return; }
@@ -689,6 +707,13 @@ class Studio {
         case 'do-export': this.runExport(); break;
       }
     }) as EventListener);
+    // tapping the words on the stage edits them: focus the "Your words" box (always visible at the top of the panel)
+    this.on(this.$('.fx-stage'), 'click', (() => {
+      const ta = this.$('textarea[name="fxText"]') as HTMLTextAreaElement;
+      if (this.$('.panel[data-panel="fx"]').hidden) return;
+      ta.closest('.fx-dock')?.scrollTo({ top: 0, behavior: 'smooth' });
+      ta.focus({ preventScroll: true }); ta.select();
+    }) as EventListener);
     this.on(r, 'input', ((e: Event) => this.onControl(e.target as HTMLInputElement)) as EventListener);
     this.on(r, 'change', ((e: Event) => this.onControl(e.target as HTMLInputElement)) as EventListener);
     this.on(r, 'keydown', ((e: KeyboardEvent) => this.onKey(e)) as EventListener);
@@ -819,7 +844,7 @@ class Studio {
     this.$('[data-act="brush-menu"] .label').textContent = b.name;
     this.$('[data-act="brush-menu"]').setAttribute('aria-pressed', String(session.tool === 'brush'));
     this.$('[data-act="eraser"]').setAttribute('aria-pressed', String(session.tool === 'eraser'));
-    this.$('[data-act="text"]').setAttribute('aria-pressed', String(session.tool === 'text'));
+    this.root.querySelector('[data-act="text"]')?.setAttribute('aria-pressed', String(session.tool === 'text'));
     this.$('.text-options').hidden = session.tool !== 'text';
     this.root.querySelectorAll<HTMLElement>('.brush-opt').forEach(el => el.setAttribute('aria-checked', String(el.dataset.brush === session.settings.brush)));
     this.stage.dataset.tool = session.tool;
@@ -848,7 +873,7 @@ class Studio {
     const t = THEMES.find(x => x.id === id); if (!t) return;
     Object.assign(fxState, { theme: t.id, font: fontStack(t.font), typing: t.typing, decoration: t.decoration, palette: t.palette, scene: t.scene, finish: t.finish,
       fill: t.fill || 'solid', glow: t.glow ?? 0, depth: t.depth ?? 0.6, light: t.light ?? 225, camera: t.camera || 'drift',
-      look: t.look || (t.fill && t.fill !== 'solid' && t.fill !== 'gradient' && t.fill !== 'outline' ? '3d' : '2d'), textCase: t.textCase || 'as-typed', tracking: t.tracking ?? 0, speed: t.speed ?? 1, density: t.density ?? 0.6,
+      look: t.look || fxState.look || '2d', textCase: t.textCase || 'as-typed', tracking: t.tracking ?? 0, speed: t.speed ?? 1, density: t.density ?? 0.6,
       sceneIntensity: t.sceneIntensity ?? 0.6, caret: t.caret || 'bar', colors: {}, decoSize: 1, sceneSpeed: 1, finishAmount: 0.6 });
     if (!fxTextEdited) fxState.text = t.sample;
     this.fxSyncInputs(); this.fxCompose();
@@ -865,7 +890,7 @@ class Studio {
   fxSync(){
     const r = this.root;
     r.querySelectorAll<HTMLElement>('[data-act="fx-theme"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === fxState.theme)));
-    r.querySelectorAll<HTMLElement>('[data-act="fx-look"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === (fxState.look || '3d'))));
+    r.querySelectorAll<HTMLElement>('[data-act="fx-look"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === (fxState.look || '2d'))));
     const lh = r.querySelector('.fx-look-hint'); if (lh) lh.textContent = fxState.look === '2d' ? 'Flat illustration, crisp and light' : 'Lit materials, depth, real light';
     const base = PALETTES.find(p => p.id === fxState.palette) || PALETTES[0], pal = { ...base, ...fxState.colors };
     for (const k of ['bg', 'text', 'accent1', 'accent2', 'glow'] as const){ const el = r.querySelector<HTMLInputElement>(`[name="fxC_${k}"]`); if (el) el.value = pal[k]; }
@@ -886,7 +911,7 @@ class Studio {
   }
   /** how many sections start open: everything on a laptop, the first two on a tablet, only Themes on a phone */
   fxSections(){
-    const dev = this.$('.studio').dataset.device || 'laptop', keep = dev === 'laptop' ? 99 : dev === 'tablet' ? 2 : 1;
+    const dev = this.$('.studio').dataset.device || 'laptop', keep = dev === 'laptop' ? 99 : dev === 'tablet' ? 3 : 2;
     this.root.querySelectorAll<HTMLElement>('.fx-sec').forEach((sec, i) => { const open = i < keep; sec.classList.toggle('is-shut', !open); sec.querySelector('.fx-sec-h')?.setAttribute('aria-expanded', String(open)); });
   }
   toggleFx(trigger: HTMLElement){
@@ -924,7 +949,9 @@ class Studio {
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     const stage = ctrl.stage, sr = stage.getBoundingClientRect(), pal = ctrl.palette || PALETTES[0];
     const font = getComputedStyle(ctrl.textEl).font, ls = getComputedStyle(ctrl.textEl).letterSpacing;
-    const chars = Array.from(ctrl.textEl.querySelectorAll<HTMLElement>('.fx-char')).map(c => ({ ch: c.dataset.ch || c.textContent || '', r: c.getBoundingClientRect(), art: c.querySelector<HTMLCanvasElement>('canvas.fx-mat') }));
+    const chars = Array.from(ctrl.textEl.querySelectorAll<HTMLElement>('.fx-char')).map(c => ({ ch: c.dataset.ch || c.textContent || '', r: c.getBoundingClientRect() }));
+    // the GPU layer: 3D letters (when a 3D material is on) and the elements; drawn into the file as one picture
+    const gpuOn = !ctrl.gpu.canvas.hidden, gpuLetters = gpuOn && isShaded(fxState.fill || 'solid') && fxState.look !== '2d';
     const svgText = new XMLSerializer().serializeToString(ctrl.svg);
     const fill = fxState.fill || 'solid', stops = fillStops(fill, pal), glow = fill === 'outline-glow' ? Math.max(0.6, fxState.glow ?? 0) : (fxState.glow ?? 0);
     const outline = fill === 'outline' || fill === 'outline-glow', strokeCol = fill === 'outline' ? pal.text : pal.accent1;
@@ -937,8 +964,8 @@ class Studio {
       if (fmt === 'svg'){
         const fam = font.replace(/^.*?\d+px\s*/, '').replace(/"/g, "'"), px = parseFloat(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] || '64');
         const m = document.createElement('canvas').getContext('2d')!; m.font = font;
-        const arts = chars.filter(c => c.art).map(c => { const ap = Number(c.art!.dataset.pad || 0); return `<image href="${c.art!.toDataURL('image/png')}" x="${(c.r.left - sr.left - ap).toFixed(1)}" y="${(c.r.top - sr.top - ap).toFixed(1)}" width="${(c.r.width + ap * 2).toFixed(1)}" height="${(c.r.height + ap * 2).toFixed(1)}"/>`; }).join('');
-        const texts = chars.filter(c => !c.art).map(c => `<text x="${(c.r.left - sr.left).toFixed(1)}" y="${(c.r.top - sr.top + baselineIn(m, c.ch, c.r.height)).toFixed(1)}">${c.ch.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>`).join('');
+        const arts = gpuOn ? `<image href="${layerUrl(x => ctrl.gpu.paintInto(x, W, H, 2))}" width="${W}" height="${H}"/>` : '';
+        const texts = chars.filter(() => !gpuLetters).map(c => `<text x="${(c.r.left - sr.left).toFixed(1)}" y="${(c.r.top - sr.top + baselineIn(m, c.ch, c.r.height)).toFixed(1)}">${c.ch.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>`).join('');
         const gid = 'fxfill';
         const grad = stops ? `<defs><linearGradient id="${gid}" gradientUnits="userSpaceOnUse" ${stops.angle === 'h' ? `x1="${bx0}" y1="0" x2="${bx1}" y2="0"` : stops.angle === 'v-up' ? `x1="0" y1="${by1}" x2="0" y2="${by0}"` : `x1="0" y1="${by0}" x2="0" y2="${by1}"`}>${stops.stops.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join('')}</linearGradient></defs>` : '';
         const paint = outline ? `fill="none" stroke="${strokeCol}" stroke-width="${Math.max(1.5, px * 0.03).toFixed(1)}"` : `fill="${stops ? `url(#${gid})` : pal.text}"`;
@@ -960,9 +987,10 @@ class Studio {
           for (const [o, col] of stops.stops) g.addColorStop(o, col); x.fillStyle = g;
         } else x.fillStyle = pal.text;
         x.strokeStyle = strokeCol; x.lineWidth = Math.max(1.5, parseFloat(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] || '64') * 0.03);
-        const drawText = () => { for (const ch of chars){ if (ch.art){ const ap = Number(ch.art.dataset.pad || 0); x.drawImage(ch.art, ch.r.left - sr.left - ap, ch.r.top - sr.top - ap, ch.r.width + ap * 2, ch.r.height + ap * 2); continue; } const yy = ch.r.top - sr.top + baselineIn(x, ch.ch, ch.r.height); if (outline) x.strokeText(ch.ch, ch.r.left - sr.left, yy); else x.fillText(ch.ch, ch.r.left - sr.left, yy); } };
+        const drawText = () => { if (gpuLetters) return; for (const ch of chars){ const yy = ch.r.top - sr.top + baselineIn(x, ch.ch, ch.r.height); if (outline) x.strokeText(ch.ch, ch.r.left - sr.left, yy); else x.fillText(ch.ch, ch.r.left - sr.left, yy); } };
         if (glow > 0){ x.save(); x.shadowColor = pal.glow; x.shadowBlur = 6 + glow * 18; drawText(); x.shadowColor = pal.accent1; x.shadowBlur = 18 + glow * 30; drawText(); x.restore(); }
         drawText();
+        if (gpuOn) ctrl.gpu.paintInto(x, W, H, scale);
         if (withBg) paintFinish(x, fxState.finish || 'none', W, H, fxState.finishAmount ?? 0.6, pal, t);
         const blob: Blob | null = await new Promise(r => c.toBlob(r, 'image/png'));
         if (blob) this.download(blob, `ka-text-effect-${stamp()}-${c.width}x${c.height}.png`);
@@ -1023,7 +1051,6 @@ class Studio {
     if (/^[0-9]$/.test(k)){ const i = (Number(k) + 9) % 10; this.setBrush(BRUSHES[i].id); }
     else if (k === 'b') this.setTool('brush');
     else if (k === 'e') this.setTool('eraser');
-    else if (k === 't') this.setTool('text');
     else if (k === 'l') this.toggleTrail();
     else if (k === '[') { s.size = Math.max(1, s.size - (s.size > 10 ? 2 : 1)); this.syncControls(); }
     else if (k === ']') { s.size = Math.min(80, s.size + (s.size >= 10 ? 2 : 1)); this.syncControls(); }
@@ -1090,13 +1117,13 @@ const TEMPLATE = `
 <div class="topbar"><div class="tb-history" role="group" aria-label="History"></div><div class="tb-hide"></div></div>
   <div class="panel fx-panel fx-dock" data-panel="fx" hidden aria-label="Text effects">
     <div class="fx-look" role="group" aria-label="Look"><span>Look</span><button type="button" class="fx-look-b" data-act="fx-look" data-v="2d" aria-pressed="true">2D</button><button type="button" class="fx-look-b" data-act="fx-look" data-v="3d" aria-pressed="false">3D</button><small class="fx-look-hint">Flat illustration, crisp and light</small></div>
+    <label class="fx-field fx-words"><span>Your words <em>tap the text on screen to edit it</em></span><textarea name="fxText" rows="2" maxlength="120" enterkeyhint="done" autocapitalize="sentences" aria-label="Your words"></textarea></label>
     <section class="fx-sec" data-sec="themes"><button type="button" class="fx-sec-h" data-act="fx-sec" aria-expanded="true"><span>Themes</span><small class="fx-sum" data-sum="themes"></small><i aria-hidden="true"></i></button><div class="fx-sec-b">
       <div class="fx-tabs" role="group" aria-label="Theme groups"></div>
       <div class="fx-themes"></div>
       <p class="hint fx-theme-hint">A theme sets everything below at once. Change any part after.</p>
     </div></section>
     <section class="fx-sec" data-sec="text"><button type="button" class="fx-sec-h" data-act="fx-sec" aria-expanded="true"><span>Text &amp; font</span><small class="fx-sum" data-sum="text"></small><i aria-hidden="true"></i></button><div class="fx-sec-b">
-      <label class="fx-field"><span>Your words</span><textarea name="fxText" rows="2" maxlength="120"></textarea></label>
       <div class="fx-two">
         <label class="fx-field"><span>Font</span><select name="fxFont"></select></label>
         <label class="fx-field"><span>Material</span><select name="fxFill"><optgroup label="Flat"><option value="solid">Flat colour</option><option value="gradient">Gradient</option><option value="outline">Outline</option></optgroup><optgroup label="3D, lit"><option value="chrome">Chrome</option><option value="gold">Gold</option><option value="rosegold">Rose gold</option><option value="steel">Brushed steel</option><option value="glass">Glass</option><option value="ice">Ice</option><option value="neon">Neon tube</option><option value="lava">Lava</option><option value="stone">Stone</option><option value="carved">Carved stone</option><option value="marble">Marble</option><option value="bone">Bone</option><option value="candy">Glossy candy</option><option value="foil">Foil balloon</option><option value="extrude">Block extrude</option><option value="emboss">Letterpress</option><option value="satin">Satin</option></optgroup></select></label>
@@ -1256,7 +1283,6 @@ const TEMPLATE = `
     <div class="group">
       <button type="button" data-act="brush-menu" aria-haspopup="menu" aria-expanded="false" aria-pressed="true" title="Brushes (1–0)">${icon(I.pen)}<span class="label">Round pen</span></button>
       <button type="button" data-act="eraser" aria-pressed="false" aria-label="Eraser (E)" title="Eraser (E)">${icon(I.eraser)}</button>
-      <button type="button" data-act="text" aria-pressed="false" aria-label="Text (T)" title="Text (T)">${icon(I.text)}</button>
       <button type="button" data-act="trail" aria-pressed="false" title="Fading cursor trail (L)">${icon(I.trail)}<span class="label">Trail</span></button>
     </div>
     <div class="group colors">

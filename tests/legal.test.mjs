@@ -10,15 +10,30 @@ const setup = await app.call('POST', '/api/admin/setup', { body: { email: 'owner
 const S = { cookie: setup.headers.get('set-cookie').split(';')[0], csrf: setup.json.csrf };
 const admin = (method, path, body) => app.call(method, path, { body, headers: { cookie: S.cookie, ...(method !== 'GET' ? { 'x-csrf-token': S.csrf, origin: 'http://shop.test' } : {}) }, ip: '198.51.103.9' });
 
-test('legal: the portal starts from drafts with blanks; nothing is public until published', async () => {
+test('legal: the portal starts from the formal texts (no blanks); nothing is public until published', async () => {
   const list = (await admin('GET', '/api/admin/legal')).json.pages;
   assert.deepEqual(list.map(p => p.slug).sort(), ['delivery', 'privacy', 'refunds', 'terms']);
-  for (const p of list){ assert.equal(p.published, false); assert.equal(p.isDraftText, true); assert.equal(p.hasBlanks, true); assert.ok(p.body.length > 200, p.slug); }
+  for (const p of list){ assert.equal(p.published, false); assert.equal(p.isDraftText, true); assert.equal(p.hasBlanks, false); assert.ok(p.body.length > 800, p.slug); assert.equal(p.draft, p.body); }
   const pub = await app.call('GET', '/legal/terms');
   assert.equal(pub.status, 200);
   assert.match(pub.headers.get('content-type'), /text\/html/);
   assert.match(pub.text, /being updated/);
-  assert.ok(!pub.text.includes('YOUR FULL NAME'), 'draft text is never shown publicly');
+  assert.ok(!pub.text.includes('Grievance officer'), 'unpublished text is never shown publicly');
+});
+
+test('legal: published pages fill in the business details from Settings › Store', async () => {
+  const s = await admin('GET', '/api/admin/settings/store');
+  await admin('PUT', '/api/admin/settings/store', { value: { ...s.json.value, sellerName: 'Asha Prints', sellerAddress: '12 MG Road\nBengaluru 560001', supportEmail: 'help@asha.test' }, revision: s.json.revision });
+  const draft = (await admin('GET', '/api/admin/legal')).json.pages.find(p => p.slug === 'privacy');
+  await admin('PUT', '/api/admin/legal/privacy', { title: 'Privacy Policy', body: draft.draft, published: true });
+  const page = await app.call('GET', '/legal/privacy');
+  assert.match(page.text, /Asha Prints, 12 MG Road, Bengaluru 560001/);
+  assert.match(page.text, /help@asha\.test/);
+  assert.match(page.text, /Digital Personal Data Protection Act, 2023/);
+  assert.ok(!/\{\{/.test(page.text), 'every placeholder is filled');
+  const bad = await admin('PUT', '/api/admin/settings/store', { value: { ...s.json.value, supportEmail: 'not-an-email' }, revision: (await admin('GET', '/api/admin/settings/store')).json.revision });
+  assert.equal(bad.status, 400);
+  await admin('PUT', '/api/admin/legal/privacy', { title: 'Privacy Policy', body: draft.draft, published: false });
 });
 
 test('legal: published text renders as safe HTML with the page list; unknown pages 404', async () => {

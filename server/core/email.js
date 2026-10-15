@@ -84,120 +84,173 @@ export function escapeHtml(s){
 export function fill(template, vars){
   return String(template).replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, k) => (vars[k] === undefined || vars[k] === null ? '' : String(vars[k])));
 }
-// ---- the HTML version. Templates stay plain text (easy to edit in the portal); the layout reads their shape:
-//   a paragraph that is only a link          -> a button (the line above it, when short, is the button's label)
-//   a short first line over more text         -> a small section heading
-//   lines like "Total paid: ₹499"             -> a tidy two-column table
-//   the signature line ("— Name")             -> a signed footer
-const INK = '#1d1a1c', DIM = '#6f6660', ACCENT = '#c9864f', LINE = '#efe6de';
-const FONT = `-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
-const linkify = (esc) => esc.replace(/https:\/\/[^\s<]+/g, (u) => `<a href="${u}" style="color:${ACCENT};text-decoration:underline;word-break:break-all">${u}</a>`);
-const isUrl = (line) => /^https:\/\/\S+$/.test(line.trim());
-const isLabel = (line) => line.length <= 40 && !/[.!?:,]$/.test(line.trim()) && !isUrl(line);
-const KV = /^([A-Z][^:\n]{0,30}):\s+(.+)$/;
-function button(url, label){
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 20px"><tr><td style="border-radius:999px;background:${ACCENT};background-image:linear-gradient(135deg,#e0a066,#b8703c)">`
-    + `<a href="${url}" style="display:inline-block;padding:13px 26px;font:600 15px/1 ${FONT};color:#fff;text-decoration:none;border-radius:999px">${label} &rarr;</a></td></tr></table>`
-    + `<p style="margin:-10px 0 18px;font:12px/1.5 ${FONT};color:${DIM}">Or open this link: ${linkify(url)}</p>`;
+// ---- the email design: the site's dark, warm look (like the license page), in tables and inline styles so it holds up
+// in Gmail, Outlook, Apple Mail and phone apps. The owner's text (templates) is kept word for word and set in this style;
+// a link that sits on its own line becomes a button.
+const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif", SERIF = "Georgia,'Times New Roman',serif", MONO = "'SFMono-Regular',Menlo,Consolas,'Courier New',monospace";
+// warm near-black, like the site and the license page; one amber accent; green only for "done" states
+const C = { bg: '#0b0908', card: '#14100e', inner: '#1c1613', line: '#2c221d', rule: '#3b2e26', ink: '#f3ede6', body: '#cdc3b9', dim: '#a39890', faint: '#7d736b',
+  gold: '#d9a066', goldSoft: '#3a2a1c', link: '#f2b98a', good: '#86d9a6', goodSoft: '#16291e', bad: '#ff9a8a', badSoft: '#2e1714' };
+/** a button that survives Outlook: a table cell with a background colour, the link fills it */
+export function button(label, url, { primary = true, full = false } = {}){
+  const bg = primary ? '#d08a52' : 'transparent', fg = primary ? '#1a0f08' : C.ink, bd = primary ? '#e7a16b' : C.rule;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0"${full ? ' width="100%"' : ''} style="border-collapse:separate"><tr>
+<td align="center" bgcolor="${primary ? bg : ''}" style="border-radius:12px;border:1px solid ${bd};${primary ? `background:${bg};background-image:linear-gradient(135deg,#f0b27c,#c97a43);` : ''}">
+<a href="${escapeHtml(url)}" style="display:block;padding:${full ? '16px 24px' : '12px 22px'};color:${fg};font:700 ${full ? 15 : 13}px/1.2 ${FONT};letter-spacing:.02em;text-decoration:none;border-radius:12px">${escapeHtml(label)}</a>
+</td></tr></table>`;
 }
-export function textToHtml(body){
-  const out = [];
-  for (const raw of String(body ?? '').split(/\n{2,}/)){
-    const lines = raw.split('\n').map(l => l.replace(/\s+$/, '')).filter(l => l.trim());
-    if (!lines.length) continue;
-    const esc = lines.map(escapeHtml);
-    // a lone link, optionally under its label
-    if (lines.length <= 2 && isUrl(lines[lines.length - 1]) && (lines.length === 1 || isLabel(lines[0]))){
-      out.push(button(esc[esc.length - 1], lines.length === 2 ? esc[0] : 'Open'));
-      continue;
-    }
-    // the signature
-    if (lines.length === 1 && /^[—–-]\s/.test(lines[0])){
-      out.push(`<p style="margin:22px 0 4px;font:italic 500 16px/1.4 Georgia,'Times New Roman',serif;color:${INK}">${esc[0]}</p>`);
-      continue;
-    }
-    // key: value rows (receipts, order details)
-    if (lines.length >= 2 && lines.filter(l => KV.test(l)).length >= Math.max(2, lines.length - 1)){
-      const rows = lines.map((l, i) => {
-        const m = KV.exec(l);
-        if (!m) return `<tr><td colspan="2" style="padding:10px 0 6px;font:600 13px/1.4 ${FONT};color:${INK}">${esc[i]}</td></tr>`;
-        const strong = /^total/i.test(m[1]);
-        return `<tr><td style="padding:7px 12px 7px 0;border-top:1px solid ${LINE};font:13px/1.4 ${FONT};color:${DIM}">${escapeHtml(m[1])}</td>`
-          + `<td align="right" style="padding:7px 0;border-top:1px solid ${LINE};font:${strong ? 700 : 500} ${strong ? 15 : 13}px/1.4 ${FONT};color:${INK}">${linkify(escapeHtml(m[2]))}</td></tr>`;
-      }).join('');
-      out.push(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 20px;border-bottom:1px solid ${LINE}">${rows}</table>`);
-      continue;
-    }
-    // a short heading over its text
-    let head = '';
-    if (lines.length >= 2 && isLabel(lines[0]) && lines[0].length <= 32 && !KV.test(lines[0])){ head = esc.shift(); }
-    if (head) out.push(`<p style="margin:8px 0 6px;font:700 11px/1.4 ${FONT};letter-spacing:.14em;text-transform:uppercase;color:${ACCENT}">${head}</p>`);
-    if (esc.length) out.push(`<p style="margin:0 0 16px;font:15px/1.65 ${FONT};color:${INK}">${linkify(esc.join('<br>'))}</p>`);
-  }
-  return out.join('\n');
+const P = (inner, extra = '') => `<p style="margin:0 0 16px;color:${C.body};font:15px/1.7 ${FONT};${extra}">${inner}</p>`;
+const BLOCK = (k) => `@@KA-BLOCK-${k}@@`;
+// Plain text -> HTML in the theme: escaped paragraphs, line breaks, clickable https links; a URL alone on its line is a
+// button; a {{block}} placeholder (download button, link terms, license certificate…) becomes its designed HTML.
+export function textToHtml(body, buttons = {}, blocks = {}){
+  let src = String(body);
+  for (const k of Object.keys(blocks)) src = src.split(BLOCK(k)).join(`\n\n${BLOCK(k)}\n\n`);
+  return src.split(/\n{2,}/).map(p => p.trim()).filter(Boolean).map(p => {
+    const b = /^@@KA-BLOCK-([a-z0-9_]+)@@$/.exec(p);
+    if (b) return blocks[b[1]] || '';
+    const lines = p.split('\n').map(line => {
+      const t = line.trim();
+      if (/^https:\/\/\S+$/.test(t)) return `</p><div style="margin:4px 0 18px">${button(buttons[t] || 'Open link', t)}</div><p style="margin:0 0 16px;color:${C.body};font:15px/1.7 ${FONT}">`;
+      return escapeHtml(line).replace(/https:\/\/[^\s<]+/g, (u) => `<a href="${u}" style="color:${C.link};text-decoration:underline">${u}</a>`);
+    });
+    return P(lines.join('<br>')).replace(/<p[^>]*><\/p>/g, '').replace(/<br><\/p>/g, '</p>').replace(/(<p[^>]*>)<br>/g, '$1');
+  }).join('');
 }
-function layout(inner, siteName, { title = '', preheader = '', site = '' } = {}){
-  const name = escapeHtml(siteName), initials = escapeHtml(String(siteName).split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || 'KA');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><title>${escapeHtml(title || siteName)}</title></head>
-<body style="margin:0;padding:0;background:#f3eee9">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${escapeHtml(preheader)}&#8203;&nbsp;&#8203;&nbsp;&#8203;&nbsp;</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3eee9"><tr><td align="center" style="padding:28px 14px 36px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px">
-<tr><td style="border-radius:18px 18px 0 0;background:#16121a;background-image:radial-gradient(120% 140% at 0% 0%,#3a2516 0%,#16121a 55%),linear-gradient(135deg,#1d1620,#120e14);padding:26px 30px 24px">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-    <td width="44" valign="middle"><div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#f0b37c,#b8703c);font:800 15px/40px ${FONT};color:#1b130d;text-align:center;letter-spacing:.04em">${initials}</div></td>
-    <td valign="middle" style="padding-left:12px;font:700 12px/1.3 ${FONT};letter-spacing:.2em;text-transform:uppercase;color:#f3dcc6">${name}</td>
-  </tr></table>
-  ${title ? `<h1 style="margin:22px 0 0;font:600 25px/1.25 Georgia,'Times New Roman',serif;color:#fff7ef;letter-spacing:-.01em">${escapeHtml(title)}</h1>` : ''}
+/** an eyebrow, a headline and a line under it: what this email is, at a glance */
+function heroHtml(hero){
+  if (!hero) return '';
+  const tone = hero.tone === 'bad' ? [C.bad, C.badSoft] : hero.tone === 'neutral' ? [C.gold, C.goldSoft] : [C.good, C.goodSoft];
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="padding:0 0 22px">
+${hero.eyebrow ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td style="background:${tone[1]};border-radius:999px;padding:6px 12px;color:${tone[0]};font:700 11px/1 ${FONT};letter-spacing:.12em;text-transform:uppercase">&#9679;&nbsp; ${escapeHtml(hero.eyebrow)}</td></tr></table>` : ''}
+<h1 style="margin:16px 0 8px;color:${C.ink};font:400 30px/1.2 ${SERIF};letter-spacing:-.01em">${escapeHtml(hero.title || '')}</h1>
+${hero.subtitle ? `<div style="color:${C.dim};font:14px/1.6 ${FONT}">${escapeHtml(hero.subtitle)}</div>` : ''}
+</td></tr></table>`;
+}
+/** the item: picture, title, a line under it, small chips */
+function cardHtml(card){
+  if (!card) return '';
+  const chips = (card.chips || []).filter(Boolean).map(c => `<span style="display:inline-block;margin:0 6px 6px 0;padding:5px 10px;border-radius:999px;border:1px solid ${C.rule};color:${C.dim};font:600 12px/1 ${FONT}">${escapeHtml(c)}</span>`).join('');
+  const rows = (card.rows || []).filter(r => r && r[1] !== undefined && r[1] !== null && r[1] !== '').map(([k, v]) =>
+    `<tr><td style="padding:7px 0;border-top:1px solid ${C.line};color:${C.faint};font:13px/1.4 ${FONT}">${escapeHtml(k)}</td><td align="right" style="padding:7px 0;border-top:1px solid ${C.line};color:${C.ink};font:600 13px/1.4 ${FONT}">${escapeHtml(v)}</td></tr>`).join('');
+  const img = card.image ? `<td width="96" valign="top" style="padding:0 18px 0 0"><img src="${escapeHtml(card.image)}" width="96" alt="" style="display:block;width:96px;height:auto;border-radius:10px;border:1px solid ${C.line}"></td>` : '';
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;background:${C.inner};border:1px solid ${C.line};border-radius:16px">
+<tr><td style="padding:18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${img}<td valign="top">
+<div style="color:${C.faint};font:700 11px/1 ${FONT};letter-spacing:.12em;text-transform:uppercase">${escapeHtml(card.label || 'Your item')}</div>
+<div style="margin:8px 0 6px;color:${C.ink};font:400 21px/1.25 ${SERIF}">${escapeHtml(card.title || '')}</div>
+${card.subtitle ? `<div style="margin:0 0 10px;color:${C.dim};font:14px/1.55 ${FONT}">${escapeHtml(card.subtitle)}</div>` : ''}
+${chips ? `<div>${chips}</div>` : ''}
+</td></tr></table>
+${rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px">${rows}</table>` : ''}
+</td></tr></table>`;
+}
+/** detail tiles in one row: a small label, then the value */
+export function tilesHtml(tiles){
+  if (!Array.isArray(tiles) || !tiles.length) return '';
+  const w = Math.floor(100 / tiles.length);
+  const cells = tiles.map((t, i) => `<td class="ka-tile" width="${w}%" valign="top" style="padding:0 ${i < tiles.length - 1 ? 8 : 0}px 0 0">
+<div style="background:${C.inner};border:1px solid ${C.line};border-radius:12px;padding:12px 14px">
+<div style="color:${C.faint};font:700 10.5px/1.2 ${FONT};letter-spacing:.1em;text-transform:uppercase">${escapeHtml(t.label)}</div>
+<div style="margin-top:6px;color:${C.ink};font:600 15px/1.3 ${FONT}">${escapeHtml(t.value)}</div>
+${t.note ? `<div style="margin-top:2px;color:${C.faint};font:12px/1.4 ${FONT}">${escapeHtml(t.note)}</div>` : ''}</div></td>`).join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px"><tr>${cells}</tr></table>`;
+}
+/** a bordered panel with a title and label/value rows: the license certificate, the receipt totals */
+export function panelHtml({ eyebrow, rows = [], foot = '', note = '', mono = [] }){
+  const body = rows.filter(r => r && r[1] !== undefined && r[1] !== null && r[1] !== '').map(([k, v], i) => {
+    const strong = typeof k === 'string' && k.startsWith('!'), key = strong ? k.slice(1) : k;
+    return `<tr><td style="padding:9px 0;${i ? `border-top:1px solid ${C.line};` : ''}color:${strong ? C.ink : C.faint};font:${strong ? 600 : 400} 14px/1.4 ${FONT}">${escapeHtml(key)}</td>
+<td align="right" style="padding:9px 0;${i ? `border-top:1px solid ${C.line};` : ''}color:${C.ink};font:${strong ? '700 16px' : '600 14px'}/1.4 ${mono.includes(key) ? MONO : FONT}">${escapeHtml(v)}</td></tr>`;
+  }).join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 24px;border:1px solid ${C.rule};border-radius:16px;background:${C.inner}">
+<tr><td style="padding:18px 20px 8px">
+${eyebrow ? `<div style="color:${C.gold};font:700 11px/1 ${FONT};letter-spacing:.14em;text-transform:uppercase;padding-bottom:8px">${escapeHtml(eyebrow)}</div>` : ''}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${body}</table>
+${note ? `<div style="margin:10px 0 6px;padding-top:12px;border-top:1px solid ${C.line};color:${C.dim};font:13px/1.65 ${FONT}">${note}</div>` : ''}
+${foot ? `<div style="padding:10px 0 10px">${foot}</div>` : ''}
+</td></tr></table>`;
+}
+function layout(inner, siteName, { card, hero, site, preheader = '', owner = false } = {}){
+  const store = site && !owner ? `${site}/?page=store` : '';
+  const year = new Date().getFullYear();
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark">
+<title>${escapeHtml(siteName)}</title>
+<style>@media (max-width:520px){.ka-pad{padding:26px 20px 10px!important}.ka-h1 h1{font-size:26px!important}.ka-tile{display:block!important;width:100%!important;padding:0 0 8px!important}}</style></head>
+<body style="margin:0;padding:0;background:${C.bg};-webkit-text-size-adjust:100%">
+${preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${C.bg}">${escapeHtml(preheader)}&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;</div>` : ''}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.bg}" style="background:${C.bg};background-image:radial-gradient(ellipse 80% 40% at 50% 0,#2a1a12 0,${C.bg} 70%)">
+<tr><td align="center" style="padding:36px 12px 40px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px">
+<tr><td align="center" style="padding:0 0 22px">
+<div style="color:${C.ink};font:400 17px/1 ${SERIF};letter-spacing:.34em;text-transform:uppercase">${escapeHtml(siteName)}</div>
+<div style="width:36px;height:1px;margin:14px auto 0;background:${C.gold};line-height:1px;font-size:1px">&nbsp;</div>
 </td></tr>
-<tr><td style="height:4px;background:linear-gradient(90deg,#e0a066,#b8703c 55%,#7d4a8f);font-size:0;line-height:0">&nbsp;</td></tr>
-<tr><td style="background:#ffffff;border:1px solid #ebe1d8;border-top:0;border-radius:0 0 18px 18px;padding:30px 30px 22px">
-${inner}
+<tr><td class="ka-pad ka-h1" style="background:${C.card};border:1px solid ${C.line};border-radius:20px;padding:34px 32px 14px">
+${heroHtml(hero)}${cardHtml(card)}${inner}
 </td></tr>
-<tr><td align="center" style="padding:18px 20px 0;font:12px/1.6 ${FONT};color:#8b817a">
-  ${site ? `<a href="${escapeHtml(site)}" style="color:#8b817a;text-decoration:none;font-weight:600">${escapeHtml(site.replace(/^https?:\/\//, ''))}</a><br>` : ''}
-  You’re getting this because of something you did on ${name}. Reply to this email any time.
-</td></tr>
+${owner ? '' : `<tr><td align="center" style="padding:26px 10px 0;color:${C.dim};font:13px/1.6 ${FONT}">Questions? Reply to this email and I’ll help.</td></tr>`}
+${store ? `<tr><td align="center" style="padding:14px 0 0">${button('Explore the store', store, { primary: false })}</td></tr>` : ''}
+<tr><td align="center" style="padding:22px 10px 0;color:${C.faint};font:12px/1.6 ${FONT}">&copy; ${year} ${escapeHtml(siteName)}${site ? ` &middot; <a href="${escapeHtml(site)}" style="color:${C.faint};text-decoration:underline">${escapeHtml(site.replace(/^https?:\/\//, ''))}</a>` : ''}</td></tr>
 </table></td></tr></table></body></html>`;
 }
 
 // Built-in templates; the portal can override subject/body per key (email_templates table).
 export const DEFAULT_TEMPLATES = {
-  contact_notify: { subject: "New message: {{subject}}", title: "You have a new message", body: "From\n{{name}} <{{email}}>\n\nRegarding\n{{subject}}\n\n{{message}}\n\nOpen it in your inbox\n{{portal_url}}" },
-  contact_autoreply: { subject: "Thanks for your message", title: "Message received", body: "Hi {{name}},\n\nThank you for getting in touch. Your message has reached me and I read every one personally, so you’ll hear back from me soon.\n\nWhen I reply, it will arrive in this inbox and also pop up on the site, on the device you wrote from.\n\n{{signature}}" },
-  notify_confirm: { subject: "You’re on the list", title: "You’re on the list", body: "Thanks for signing up. You’ll get one email, the moment {{topic_name}} launches. Nothing else, no newsletters.\n\n{{signature}}" },
-  order_delivery: { subject: "Your download is ready: {{product_title}} (order {{order_id}})", title: "Your download is ready", body: "Hello,\n\nThank you for your purchase. Your order {{order_id}} is confirmed and {{product_title}} is ready to download.\n\nDownload your files\n{{download_url}}\n\nThis secure link works until {{expires}} and allows up to {{max_downloads}} downloads. Please save the files somewhere safe once they have downloaded.\n\n{{extra_note}}\n\nYour license\n{{license_name}} license. The full terms are attached to this email as LICENSE.txt, and the key points are below.\n\n{{license_text}}\n\nYour receipt follows in a separate email. If the link expires, you can request a new one at any time from the store with \"Email me my download links\", using this email address.\n\nIf anything does not work as expected, just reply to this email and we will help.\n\n{{signature}}" },
-  order_receipt: { subject: "Receipt {{invoice_number}} for order {{order_id}}", title: "Payment received, thank you", body: "Receipt {{invoice_number}}\nDate: {{date}}\nOrder: {{order_id}}\nBilled to: {{email}}\n\n{{lines}}\n\nSubtotal: {{subtotal}}\nDiscount: {{discount}}\n{{tax_label}}: {{tax}}\nTotal paid: {{total}}\n\nPayment reference: {{payment_id}}\n{{seller_block}}\n\n{{signature}}" },
-  resend_link: { subject: "Your download links", title: "Fresh download links", body: "Here are fresh download links for your orders:\n\n{{links}}\n\nEach link works until {{expires}}.\n\n{{signature}}" },
-  report: { subject: "{{period}} sales report", title: "{{period}} sales report", body: "{{summary}}\n\nOpen the portal\n{{portal_url}}" },
-  alert: { subject: "Alert: {{title}}", title: "{{title}}", body: "{{body}}" },
-  reply: { subject: "Re: {{subject}}", title: "A reply to your message", body: "Hi {{name}},\n\n{{body}}\n\nRead this conversation on the site\n{{thread_url}}\n\nYou can also simply reply to this email.\n\n{{signature}}" },
-  launch: { subject: "{{topic_title}} is live", title: "{{topic_title}} is live", body: "Hi,\n\nYou asked to hear when {{topic_name}} launches. It’s ready now.\n\nTake a look\n{{link}}\n\n{{message}}\n\nYou got this one email because you signed up on the site; you won’t get more about it.\n\n{{signature}}" },
-  store_access: { subject: "Your early access to the store", title: "You’re on the guest list", body: "Hi,\n\nThe store is closed to the public right now, but you have special access. Open the link below on the device you want to shop from, and the store opens for you.\n\nOpen the store\n{{link}}\n\nThe link is personal to you, so please don’t share it.\n\n{{signature}}" }
+  contact_notify: { subject: 'New message: {{subject}}', body: 'From {{name}} <{{email}}>\n\n{{message}}\n\nReply from the inbox:\n{{portal_url}}' },
+  contact_autoreply: { subject: 'Thanks for writing, {{name}}', body: 'Hi {{name}},\n\nThank you for getting in touch. Your message is with me, and I’ll reply personally, usually within a day or two.\n\n{{signature}}' },
+  notify_confirm: { subject: 'You’re on the list', body: 'You’re on the list.\n\nYou’ll get exactly one email when {{topic_name}} launches. Nothing else.\n\n{{signature}}' },
+  order_delivery: { subject: 'Your download is ready: {{product_title}}', body: 'Hi {{customer_name}},\n\nThank you for your order. {{product_title}} is ready to download.\n\n{{download_url}}\n\n{{link_terms}}\n\n{{extra_note}}\n\n{{license_text}}\n\nYour license is also attached as LICENSE.txt. Please keep this email as your proof of purchase. If the link expires, you can request a fresh one from the store with “Email me my download links”, using this email address.\n\n{{signature}}' },
+  order_receipt: { subject: 'Receipt {{invoice_number}} · order {{order_id}}', body: 'Thank you for your payment. Here is your receipt for your records.\n\n{{receipt}}\n\n{{seller_block}}\n\n{{signature}}' },
+  resend_link: { subject: 'Your download links', body: 'Here are fresh download links for your purchases.\n\n{{links}}\n\nThese links work until {{expires}}. If you need anything, just reply to this email.\n\n{{signature}}' },
+  report: { subject: '{{period}} sales report', body: '{{summary}}\n\nOpen the portal:\n{{portal_url}}' },
+  alert: { subject: 'Alert: {{title}}', body: '{{body}}' },
+  reply: { subject: 'Re: {{subject}}', body: 'Hi {{name}},\n\n{{body}}\n\n{{thread_url}}\n\nYou can also simply reply to this email.\n\n{{signature}}' },
+  store_access: { subject: 'Your early access to the store', body: 'Hi,\n\nThe store is closed to the public right now, but you have special access. Open the link below on the device you want to shop from, and the store opens for you.\n\n{{link}}\n\nThe link is personal to you, so please don’t share it.\n\n{{signature}}' },
+  launch: { subject: '{{topic_title}} is live', body: 'Hi,\n\n{{topic_name}} is live, and you asked to be the first to know.\n\n{{link}}\n\n{{message}}\n\nThis was the one email you signed up for. There won’t be more about it.\n\n{{signature}}' }
 };
+
+// The header of each email when the sender doesn't set one: what it is, at a glance. Placeholders are filled.
+const HEROES = {
+  contact_autoreply: { eyebrow: 'Message received', tone: 'neutral', title: 'Thanks for getting in touch', subtitle: 'I read every message and reply personally.' },
+  notify_confirm: { eyebrow: 'Confirmed', title: 'You’re on the list', subtitle: 'One email when {{topic_name}} launches. Nothing else.' },
+  launch: { eyebrow: 'Now live', tone: 'neutral', title: '{{topic_title}} is live' },
+  resend_link: { eyebrow: 'Fresh links', tone: 'neutral', title: 'Your download links', subtitle: 'They work until {{expires}}.' },
+  contact_notify: { eyebrow: 'New message', tone: 'neutral', title: '{{subject}}', subtitle: 'From {{name}}' },
+  report: { eyebrow: 'Sales report', tone: 'neutral', title: '{{period}} report' },
+  alert: { eyebrow: 'Alert', tone: 'bad', title: '{{title}}' },
+  reply: { eyebrow: 'A reply to your message', tone: 'neutral', title: 'Re: {{subject}}', subtitle: 'It also pops up on the site, on the device you wrote from.' },
+  store_access: { eyebrow: 'Special access', title: 'You’re on the guest list', subtitle: 'The store is open for you while it is closed to everyone else.' }
+};
+// emails to the owner: no "Questions about your order?" footer or store button
+const OWNER_TEMPLATES = new Set(['contact_notify', 'report', 'alert']);
 
 export async function loadTemplate(key){
   const db = await getDb();
   const row = await db.maybeOne('select subject, body_md from email_templates where key = $1', [key]);
   const def = DEFAULT_TEMPLATES[key];
   if (!row && !def) throw new Error(`Unknown email template ${key}.`);
-  return row ? { subject: row.subject, body: row.body_md, title: def?.title || '' } : { ...def };
+  return row ? { subject: row.subject, body: row.body_md } : { ...def };
 }
 
 // Sends one email. Returns {ok, id} and never throws for provider failures (they are logged in
 // email_log and surfaced in the portal), so a slow or broken provider can't break a checkout.
-export async function sendEmail({ to, template, vars = {}, replyTo, attachments, subjectOverride, bodyOverride }){
+// `blocks`: placeholders whose HTML is a designed piece (download button, license certificate, receipt table); the
+// plain-text part still gets the placeholder's text from `vars`. `hero` and `card` sit at the top of the HTML.
+export async function sendEmail({ to, template, vars = {}, replyTo, attachments, subjectOverride, bodyOverride, card, hero, blocks = {}, buttons, preheader }){
   const db = await getDb();
   const siteName = env('SITE_NAME', 'Kethan Artzz');
   const from = { email: env('MAIL_FROM', 'no-reply@localhost'), name: env('MAIL_FROM_NAME', siteName) };
   const tpl = await loadTemplate(template);
-  const allVars = { signature: env('MAIL_SIGNATURE', `— ${siteName}`), ...vars };
+  const allVars = { signature: env('MAIL_SIGNATURE', `— ${siteName}`), customer_name: 'there', ...vars };
   const subject = fill(subjectOverride ?? tpl.subject, allVars).replace(/[\r\n]+/g, ' ').slice(0, 200);
-  const text = fill(bodyOverride ?? tpl.body, allVars).replace(/\n{3,}/g, '\n\n');   // an empty placeholder never leaves a gap
-  const title = fill(tpl.title || '', allVars).replace(/[\r\n]+/g, ' ').slice(0, 120) || subject;
-  // the grey line inbox lists show under the subject
-  const preheader = text.replace(/^Hi [^,\n]*,?\s*/, '').replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim().slice(0, 110);
-  const html = layout(textToHtml(text), siteName, { title, preheader, site: env('PUBLIC_SITE_URL', '') });
+  const body = bodyOverride ?? tpl.body;
+  const text = fill(body, allVars).replace(/\n{3,}/g, '\n\n').trim() + '\n';   // an empty placeholder never leaves a gap
+  const htmlVars = { ...allVars }; for (const k of Object.keys(blocks)) if (blocks[k]) htmlVars[k] = BLOCK(k);
+  const htmlText = fill(body, htmlVars).replace(/\n{3,}/g, '\n\n');
+  const site = (env('PUBLIC_SITE_URL') || '').replace(/\/+$/, '');
+  const h = hero || (HEROES[template] ? Object.fromEntries(Object.entries(HEROES[template]).map(([k, v]) => [k, k === 'tone' ? v : fill(v, allVars)])) : null);
+  const html = layout(textToHtml(htmlText, buttons || (card?.cta ? { [card.cta.url]: card.cta.label } : {}), blocks), siteName,
+    { card, hero: h, site: /^https?:\/\//.test(site) ? site : '', preheader: preheader || h?.subtitle || '', owner: OWNER_TEMPLATES.has(template) });
   try {
     const res = await getTransport().send({ from, to, replyTo, subject, text, html, attachments });
     await db.query('insert into email_log (to_email, subject, template, status, provider_id) values ($1,$2,$3,$4,$5)', [to, subject, template, 'sent', res.id || null]);

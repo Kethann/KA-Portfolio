@@ -16,8 +16,10 @@ export const SOCIAL_ICONS = ['behance', 'instagram', 'x', 'linkedin', 'youtube',
 export const ANIM_PRESETS = ['fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'scale-in', 'pop'];
 export const ANIM_EASINGS = ['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out', 'bounce'];
 export const ANIM_TRIGGERS = ['load', 'scroll'];
-export const DRAGGABLE_IDS = ['assistant-launcher', 'site-notice', 'portfolio-title', 'portfolio-intro', 'contact-title', 'contact-intro'];
-const TEXT_DRAGGABLE_IDS = ['portfolio-title', 'portfolio-intro', 'contact-title', 'contact-intro'];
+export const DRAGGABLE_IDS = ['assistant-launcher', 'site-notice', 'portfolio-title', 'portfolio-intro', 'contact-title', 'contact-intro', 'about-headline', 'about-tagline', 'about-caption', 'about-journey', 'about-bio-text', 'about-stats'];
+const TEXT_DRAGGABLE_IDS = ['portfolio-title', 'portfolio-intro', 'contact-title', 'contact-intro', 'about-headline', 'about-tagline', 'about-caption', 'about-bio-text'];
+export const TEXT_WEIGHTS = [300, 400, 500, 600, 700, 800];
+export const TEXT_ALIGNS = ['left', 'center', 'right'];
 export const LAYOUT_BREAKPOINTS = ['mobile', 'tablet', 'desktop'];
 export const DETAIL_FIELDS = { creatorName: 80, tagline: 160, portfolioTitle: 100, portfolioIntro: 500, contactTitle: 100, contactIntro: 1000, openLabel: 60, closeLabel: 60, projectLabel: 60, contactButton: 60 };
 
@@ -83,7 +85,7 @@ export const SKILLS_DEFAULT = {
       sk('Email (SMTP)', '@', '#9AA3AF', 3, 'Receipts, alerts and auto-replies'), sk('ipstack', 'IP', '#38BDF8', 3, 'IP geolocation for visitor insights') ] },
     { name: 'DevOps & tools', icon: 'tools', items: [
       sk('Docker', 'Dk', '#2496ED', 3, 'Containers, images and compose setups'), sk('Kubernetes', 'K8', '#326CE5', 2, 'Deployments, services and scaling'),
-      sk('CI/CD pipelines', 'CI', '#22C55E', 3, 'Automated build, test and deploy'), sk('Linux', 'Lx', '#FCC624', 3, 'Shell, servers and administration'),
+      sk('CI/CD pipelines', 'CI', '#22C55E', 3, 'Automated build, test and deploy'), sk('Playwright', 'Pw', '#45BA4B', 3, 'End-to-end browser testing across Chromium, Firefox and WebKit'), sk('Linux', 'Lx', '#FCC624', 3, 'Shell, servers and administration'),
       sk('Networking', 'Nw', '#38BDF8', 3, 'TCP/IP, DNS, HTTP and routing'), sk('Git', 'Gt', '#F05032', 4, 'Version control, branching and merges'),
       sk('GitHub', 'GH', '#E6EDF3', 4, 'Repositories, pull requests and Actions'),
       sk('Cloudflared', 'Cf', '#F38020', 3, 'Secure tunnels from local servers to the web') ] },
@@ -128,7 +130,7 @@ function httpUrl(u){ try { return ['https:', 'http:'].includes(new URL(u).protoc
 // `current` is the stored document, `seed` the shipped one: an image without its own upload must be
 // one of the site's exported originals (known widths), found in either.
 /** skills added to sites that already have their own list (once each, by name; see handlers/public.js) */
-export const SKILLS_ADDITIONS = { id: 'skills-2026-10i',
+export const SKILLS_ADDITIONS = { id: 'skills-2026-10j',
   categories: [
     { name: 'Design', icon: 'design', items: SKILLS_DEFAULT.categories.find(c => c.name === 'Design').items.filter(i => i.name === 'Blender') },
     SKILLS_DEFAULT.categories.find(c => c.name === 'DevOps & tools'),
@@ -169,6 +171,7 @@ export function validateSiteDocument(input, current, seed){
     if (!isFontUrl(url)) throw bad('Upload this font before saving.');
     customFonts.push({ family, url });
   }
+  details.aboutCaption = text(input.details?.aboutCaption, 80);   // optional: blank = the built-in line
   details.customFonts = customFonts;
   const allowedFonts = [...FONT_CHOICES, ...customFonts.map(f => f.family)];
   details.headingFont = allowedFonts.includes(input.details?.headingFont) ? input.details.headingFont : 'Fraunces';
@@ -191,6 +194,13 @@ export function validateSiteDocument(input, current, seed){
       const clean = {};
       if (style.font){ if (!allowedFonts.includes(style.font)) throw bad(`Unknown font for ${id}.`); clean.font = style.font; }
       if (style.color){ const c = text(style.color, 20); if (!/^#[0-9a-fA-F]{6}$/.test(c)) throw bad('Colours must be a 6-digit hex value.'); clean.color = c; }
+      const weight = Number(style.weight), spacing = Number(style.spacing), lh = Number(style.lineHeight);
+      if (TEXT_WEIGHTS.includes(weight)) clean.weight = weight;
+      if (TEXT_ALIGNS.includes(style.align)) clean.align = style.align;
+      const indent = Number(style.indent);
+      if (style.indent !== undefined && style.indent !== '' && Number.isFinite(indent)) clean.indent = Math.min(6, Math.max(0, Math.round(indent * 10) / 10));   // first-line indent, in em
+      if (style.spacing !== undefined && style.spacing !== '' && Number.isFinite(spacing)) clean.spacing = Math.min(0.4, Math.max(-0.1, Math.round(spacing * 100) / 100));
+      if (style.lineHeight !== undefined && style.lineHeight !== '' && Number.isFinite(lh)) clean.lineHeight = Math.min(2.6, Math.max(0.9, Math.round(lh * 100) / 100));
       if (style.animation && typeof style.animation === 'object' && ANIM_PRESETS.includes(style.animation.preset)){
         const d = Number(style.animation.duration), dl = Number(style.animation.delay);
         clean.animation = {
@@ -234,7 +244,7 @@ export function validateSiteDocument(input, current, seed){
     style: n.style === 'banner' ? 'banner' : 'tab', side: n.side === 'left' ? 'left' : 'right', title: text(n.title, 40) || 'Announcement',
     autoClose: Number.isFinite(autoClose) ? Math.min(30, Math.max(0, Math.round(autoClose))) : 6, linkLabel: text(n.linkLabel, 30), linkUrl: noticeLink };
   if (notice.enabled && !notice.text) throw bad('Add announcement text before turning it on, or turn it off.');
-  const visibility = { navGallery: input.visibility?.navGallery !== false, navAbout: input.visibility?.navAbout !== false, autoFullscreen: input.visibility?.autoFullscreen === true, downloadFormat: input.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png' };
+  const visibility = { navGallery: input.visibility?.navGallery !== false, navAbout: input.visibility?.navAbout !== false, autoFullscreen: input.visibility?.autoFullscreen === true, downloadFormat: input.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png', protectImages: input.visibility?.protectImages !== false };
 
   const layoutOverrides = {};
   for (const bp of LAYOUT_BREAKPOINTS){
@@ -246,7 +256,13 @@ export function validateSiteDocument(input, current, seed){
         const x = Number(pos?.x), y = Number(pos?.y), s = pos?.scale === undefined ? 1 : Number(pos.scale);
         if (!Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > bound || Math.abs(y) > bound) throw bad('Layout position out of range.');
         if (!Number.isFinite(s) || s < 0.5 || s > 2.5) throw bad('Layout scale out of range.');
-        clean[id] = { x, y, scale: s };
+        const entry = { x, y, scale: s };
+        if (TEXT_DRAGGABLE_IDS.includes(id) && pos?.width !== undefined && pos.width !== null && pos.width !== ''){
+          const w = Number(pos.width);
+          if (!Number.isFinite(w) || w < 120 || w > 2400) throw bad('Text width out of range.');
+          entry.width = Math.round(w);
+        }
+        clean[id] = entry;
       }
     }
     layoutOverrides[bp] = clean;

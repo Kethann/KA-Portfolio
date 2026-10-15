@@ -246,11 +246,7 @@ export const handwriting: Effect = {
       const cw = c.rect.width + sk.pad * 2, ch = c.rect.height + sk.pad * 2;
       const img = document.createElement('canvas'); img.width = Math.ceil(cw * dpr); img.height = Math.ceil(ch * dpr);
       const x = img.getContext('2d')!; x.scale(dpr, dpr); x.font = font; x.textBaseline = 'alphabetic';
-      const art = c.el.querySelector<HTMLCanvasElement>('canvas.fx-mat');
-      if (art){
-        // a 3D material letter: the very same picture the page shows
-        const ap = Number(art.dataset.pad || 0); x.drawImage(art, sk.pad - ap, sk.pad - ap, c.rect.width + ap * 2, c.rect.height + ap * 2);
-      } else {
+      {   // the ink is the letter's own paint (3D letters take over, lit, the moment the pen lifts)
         if (paint?.stops){
           const st = paint.stops, g = st.angle === 'h' ? x.createLinearGradient(bx0 - ox, 0, bx1 - ox, 0) : st.angle === 'v-up' ? x.createLinearGradient(0, by1 - oy, 0, by0 - oy) : x.createLinearGradient(0, by0 - oy, 0, by1 - oy);
           for (const [o, col] of st.stops) g.addColorStop(o, col); x.fillStyle = g;
@@ -260,7 +256,7 @@ export const handwriting: Effect = {
         else x.fillText(c.char, sk.pad, by);
       }
       const mask = document.createElement('canvas'); mask.width = Math.ceil(cw); mask.height = Math.ceil(ch);
-      plans.push({ c, sk, img, mask, ox, oy, t0: 0, t1: 0, spans: [], drawn: 0, total: sk.strokes.reduce((s, q) => s + q.len, 0), extra: art ? Number(art.dataset.extra || 0) : 0 });
+      plans.push({ c, sk, img, mask, ox, oy, t0: 0, t1: 0, spans: [], drawn: 0, total: sk.strokes.reduce((s, q) => s + q.len, 0), extra: 0 });
     }
     ctx.penAt = (time: number) => penAt(time).p;
   },

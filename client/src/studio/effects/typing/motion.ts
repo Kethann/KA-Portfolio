@@ -37,14 +37,15 @@ export const decode = letterwise('decode', 'Decode', 'Letters scramble through r
     const real = c.char, d = 0.55 / sp(ctx), r = ctx.rng, seq = Array.from({ length: 7 }, () => GLYPHS[Math.floor(r() * GLYPHS.length)]);
     c.el.style.width = c.rect.width + 'px'; c.el.style.textAlign = 'center';   // a scrambled glyph never shifts the line
     const own = c.el.style.color;   // a gradient / outline fill keeps its transparent colour
-    tl.set(c.el, { opacity: 1, color: own === 'transparent' && !c.el.querySelector('canvas.fx-mat') ? own : ctx.palette.accent1 }, at);
-    const node = Array.from(c.el.childNodes).find(n => n.nodeType === 3) as Text | undefined, art = c.el.querySelector<HTMLElement>('canvas.fx-mat');
+    // while scrambling the symbols are painted by the page (a GPU 3D letter only draws its real glyph): gradient and outline
+    // fills keep their own paint, 3D letters show the symbols in the accent colour, then the lit letter locks in
+    const keepOwn = own === 'transparent' && !!(c.el.style.backgroundImage || c.el.style.getPropertyValue('-webkit-text-stroke'));
+    tl.set(c.el, { opacity: 1, color: keepOwn ? own : ctx.palette.accent1 }, at);
+    const node = Array.from(c.el.childNodes).find(n => n.nodeType === 3) as Text | undefined;
     const show = (g: string) => { if (node) node.nodeValue = g; else c.el.textContent = g; };
-    if (art){ tl.set(art, { visibility: 'hidden' }, at); tl.set(c.el, { color: ctx.palette.accent1 }, at); }
     seq.forEach((g, k) => tl.call(show, [g], at + (k / seq.length) * d));
     tl.call(show, [real], at + d);
     tl.set(c.el, { color: own }, at + d);
-    if (art) tl.set(art, { visibility: 'visible' }, at + d);
     tl.call(show, [real], 0);
     return at + d;
   }, { description: 'Letters scramble through random symbols before locking in.' });

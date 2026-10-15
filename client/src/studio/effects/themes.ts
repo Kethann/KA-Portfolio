@@ -18,6 +18,7 @@ export const THEMES: Theme[] = [
 
   { id: 'molten', name: 'Molten', group: 'Elements', sample: 'Forged', font: 'Archivo Black', typing: 'burn', decoration: 'none', palette: 'inferno', scene: 'lava', finish: 'vignette', fill: 'lava', glow: 0.35, depth: 0.8 },
   { id: 'frozen', name: 'Frozen', group: 'Elements', sample: 'Stay\ncool', font: 'Unbounded', typing: 'blur-in', decoration: 'frost', palette: 'glacier', scene: 'ice', finish: 'vignette', fill: 'ice', glow: 0.25, depth: 0.6 },
+  { id: 'snowfall', name: 'Snowfall', group: 'Elements', sample: 'Let it\nsnow', font: 'Playfair Display', typing: 'blur-in', decoration: 'frost', palette: 'glacier', scene: 'snow', finish: 'grain', fill: 'satin', density: 0.75, depth: 0.6, camera: 'drift' },
   { id: 'rain', name: 'Rainy night', group: 'Elements', sample: 'After the\nrain', font: 'Cormorant Garamond', typing: 'ink-bleed', decoration: 'ripples', palette: 'storm', scene: 'rain', finish: 'grain', fill: 'glass', glow: 0.1, depth: 0.5 },
   { id: 'thunder', name: 'Thunderstorm', group: 'Elements', sample: 'STRIKE', font: 'Big Shoulders Display', typing: 'glitch', decoration: 'lightning', palette: 'storm', scene: 'storm', finish: 'vignette', fill: 'chrome', textCase: 'upper', tracking: 0.1, glow: 0.3, depth: 0.8, camera: 'dramatic' },
 

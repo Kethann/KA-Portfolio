@@ -33,7 +33,7 @@ export function productDto(p, now = new Date(), show = { ratings: true, download
     license: p.license_key ? { key: p.license_key, name: p.license_name, summary: p.license_summary } : null,
     demoUrl: p.demo_url || '', previewUrl: p.preview_url || '',
     media: Array.isArray(p.media) ? p.media : [],
-    delivery: { linkHours: p.link_ttl_hours, maxDownloads: p.max_downloads },
+    delivery: p.delivery_custom || !show.terms ? { linkHours: p.link_ttl_hours, maxDownloads: p.max_downloads } : { linkHours: show.terms.hours, maxDownloads: show.terms.max },
     downloads: show.downloads ? Number(p.downloads || 0) : null,
     rating: show.ratings && Number(p.rating_count) > 0 ? { avg: Number(p.rating_avg), count: Number(p.rating_count) } : null
   };
@@ -60,7 +60,7 @@ export async function product(ctx){
 
 async function showFlags(){
   const s = await getSetting('store');
-  return { ratings: s.showRatings !== false, downloads: s.showDownloads !== false };
+  return { ratings: s.showRatings !== false, downloads: s.showDownloads !== false, terms: { hours: Number(s.downloadLinkHours) || 48, max: Number(s.downloadMaxDownloads) || 5 } };
 }
 
 // The latest visible reviews of a published item (name is optional and never includes the buyer's email).

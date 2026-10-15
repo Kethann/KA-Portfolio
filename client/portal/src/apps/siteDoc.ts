@@ -22,8 +22,8 @@ export const featuredDefaults = (d: SiteDoc): FeaturedShow => ({ enabled: true, 
 export type SiteDoc = {
   featuredShow?: FeaturedShow | null;
   revision: number; details: Record<string, any> & { customFonts: { family: string; url: string }[] }; folders: string[]; images: SiteImage[];
-  notice: Announcement; visibility: { navGallery: boolean; navAbout: boolean; autoFullscreen?: boolean; downloadFormat?: 'png' | 'jpeg' };
-  stacks: { loop: boolean; loops?: Record<string, boolean>; covers: Record<string, string>; featured?: string[] }; layoutOverrides: Record<string, Record<string, { x: number; y: number; scale: number }>>;
+  notice: Announcement; visibility: { navGallery: boolean; navAbout: boolean; autoFullscreen?: boolean; downloadFormat?: 'png' | 'jpeg'; protectImages?: boolean };
+  stacks: { loop: boolean; loops?: Record<string, boolean>; covers: Record<string, string>; featured?: string[] }; layoutOverrides: Record<string, Record<string, { x: number; y: number; scale: number; width?: number }>>;
   branding: { enabled: boolean; logoUrl: string }; elementStyles: Record<string, any>; socialLinks: { label: string; url: string; icon: string }[];
   passCard: PassDraft;
   stats: StatsDraft;
@@ -70,7 +70,7 @@ export async function loadSite(force = false){
   } catch (e: any){ emit({ error: e.message, loading: false }); }
 }
 function withDefaults(d: SiteDoc): SiteDoc {
-  return { ...d, notice: { ...ANNOUNCEMENT_DEFAULTS, ...(d.notice || {}) }, visibility: { navGallery: d.visibility?.navGallery ?? true, navAbout: d.visibility?.navAbout ?? true, autoFullscreen: d.visibility?.autoFullscreen ?? false, downloadFormat: d.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png' },
+  return { ...d, notice: { ...ANNOUNCEMENT_DEFAULTS, ...(d.notice || {}) }, visibility: { protectImages: d.visibility?.protectImages ?? true, navGallery: d.visibility?.navGallery ?? true, navAbout: d.visibility?.navAbout ?? true, autoFullscreen: d.visibility?.autoFullscreen ?? false, downloadFormat: d.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png' },
     stacks: d.stacks || { loop: true, covers: {} }, layoutOverrides: d.layoutOverrides || { mobile: {}, tablet: {}, desktop: {} }, branding: d.branding || { enabled: false, logoUrl: '' },
     elementStyles: d.elementStyles || {}, socialLinks: d.socialLinks || [], passCard: { ...PASS_DRAFT_DEFAULTS, ...(d.passCard || {}) }, stats: d.stats ? { enabled: d.stats.enabled !== false, items: d.stats.items || [] } : STATS_DEFAULTS,
     intro: { version: d.intro?.version || 'v1' },

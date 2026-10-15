@@ -90,11 +90,20 @@ export function serializeCookie(name, value, { maxAge, httpOnly = true, secure =
 
 // Browser-originated writes must come from this site. Server-to-server calls (webhooks, cron)
 // carry no Origin and are authenticated separately by their own signatures/secrets.
-export function assertSameOrigin(request, allowedOrigins){
+//   - the browser itself says so: Sec-Fetch-Site same-origin / none is this site, whatever Origin says. (A page sent with
+//     "Referrer-Policy: no-referrer", like the download page, makes browsers send "Origin: null" on its own form posts;
+//     in-app browsers such as Snapchat's do the same.)
+//   - same-site / cross-site: only from an origin on the allow list (this site's own public address is on it for public routes).
+//   - no Sec-Fetch-Site (older browsers and in-app web views): the Origin must be this site or on the list. `allowNullOrigin`
+//     is for the token-protected download routes only, where the unguessable link in the URL is the authority.
+export function assertSameOrigin(request, allowedOrigins = [], { allowNullOrigin = false } = {}){
+  const refuse = () => { throw new HttpError(403, 'This request must come from this website.'); };
   const site = request.headers.get('sec-fetch-site');
-  if (site && site !== 'same-origin' && site !== 'none') throw new HttpError(403, 'This request must come from this website.');
+  if (site === 'same-origin' || site === 'none') return;
   const origin = request.headers.get('origin');
-  if (!origin) return;
   const self = new URL(request.url).origin;
-  if (origin !== self && !allowedOrigins.includes(origin)) throw new HttpError(403, 'This request must come from this website.');
+  const known = (o) => o === self || allowedOrigins.includes(o);
+  if (origin && origin !== 'null') { if (known(origin)) return; refuse(); }
+  if (origin === 'null') { if (allowNullOrigin && (!site || site === 'same-site')) return; refuse(); }
+  if (site) refuse();   // same-site / cross-site without an origin we know
 }

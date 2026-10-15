@@ -11,6 +11,17 @@ export async function rateLimit(key, max, windowSeconds){
 
 // Turnstile. Fails closed in production when the secret is missing; outside production it can be
 // switched off with TURNSTILE_DISABLED=1 so local development works without Cloudflare keys.
+// For the download button only. The download link is itself a 256-bit secret, redeeming it is rate-limited, and an email scanner can
+// only open the page (it never presses the button), so the human check is a bonus, never a gate: a missing secret, a widget that
+// couldn't load (in-app browsers block it), or Cloudflare being unreachable must not stop a buyer from getting what they paid for.
+// A check that was answered "no" is still refused.
+export async function verifyTurnstileLenient(token, ip, fetchImpl = fetch){
+  const secret = env('TURNSTILE_SECRET_KEY');
+  if (!secret || typeof token !== 'string' || !token) return true;
+  try { return await verifyTurnstile(token, ip, fetchImpl); }
+  catch (e){ if (e instanceof HttpError && e.status === 400) throw e; return true; }
+}
+
 export async function verifyTurnstile(token, ip, fetchImpl = fetch){
   const secret = env('TURNSTILE_SECRET_KEY');
   if (!secret){

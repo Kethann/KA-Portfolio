@@ -2538,3 +2538,21 @@ Only one file was created by this task: `FEATURE_GUIDE.md` (shown as untracked, 
 - **Skills logos (home/about):** the floating logos keep animating while you scroll. Phones fire a resize event when the address bar slides, which used to restart the field; now only a real change of width does.
 - **Typography studio on phones (screens up to 700 px wide, and landscape phones):** undo and redo sit top left, a Hide button top centre (it hides everything; one tap on Tools brings it back), close top right. At the bottom: Save (always bottom right), a strip with the rare buttons (Replay, Fullscreen, Clear, Help) that you swipe, then colour, gradient and size, then the main tools (brush, eraser, text, trail, effects, background). On larger screens the toolbar is unchanged.
 - **Portal:** deletes and hides are sent at once; Products has an Archived view with Restore; Visitors can group by visitor, star, delete a visit or visitor, and clear history.
+
+## Download links and Google Drive files
+
+**How a buyer gets a file.** After payment they receive a link of your own site's (`/api/download/<token>`), made for that purchase.
+It works for the time you set and for the number of downloads you set, then stops. The page asks them to press **Download**; that press
+counts one download and starts the file through a second link that lives for about a minute.
+
+**Where the file comes from.** In *Products → (a product) → File buyers download* you can either upload the file, or paste a
+**Google Drive share link** under *…or use a Google Drive file*. For Drive files the buyer never sees, receives or can guess your
+Drive link: only the file's id is kept on the server, and the file is streamed through your site. Share the file in Drive as
+**Anyone with the link** (viewer). Optional: set `GOOGLE_API_KEY` (Drive API) on the server for more reliable big-file downloads.
+
+**Link lifetime and download limit.** *Settings → Store & tax → Download links* sets the default for every product (1 hour to 30 days,
+1 to 100 downloads). A product follows that default unless you switch off *Use the store's download-link rules* in its *Selling*
+section and give it its own numbers.
+
+**If a download shows "This request must come from this website".** That was the browser sending `Origin: null` on the download
+button (in-app browsers and some privacy settings do this). It is fixed on the server, so the server must be restarted / redeployed to pick it up.

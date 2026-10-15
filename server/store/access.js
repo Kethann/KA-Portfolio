@@ -79,7 +79,8 @@ export async function requestEmailPass(ctx){
 }
 function passLink(p, base){ return `${base.replace(/\/+$/, '')}/?page=store&pass=${encodeURIComponent(passToken(p.id))}`; }
 async function sendPassEmail(p, base){
-  return sendEmail({ to: p.email, template: 'store_access', vars: { link: passLink(p, base), label: p.label || p.email } });
+  const link = passLink(p, base);
+  return sendEmail({ to: p.email, template: 'store_access', vars: { link, label: p.label || p.email }, buttons: { [link]: 'Open the store' } });
 }
 
 // ---- portal --------------------------------------------------------------------------------------------------

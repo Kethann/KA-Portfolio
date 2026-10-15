@@ -1,12 +1,13 @@
 // Checkout, payment verification, webhooks, downloads and link resends.
 import { json, readJson, readBody, HttpError } from '../core/http.js';
 import { siteUrl } from '../core/env.js';
-import { rateLimit, verifyTurnstile } from '../core/guard.js';
+import { rateLimit, verifyTurnstile, verifyTurnstileLenient } from '../core/guard.js';
 import { email as vEmail, currency as vCurrency, str } from '../core/validate.js';
 import { getDb } from '../core/db.js';
 import * as orders from '../store/orders.js';
 import { cleanHolder } from '../store/license.js';
-import { downloadPage, redeem, resendLinks, rate } from '../store/delivery.js';
+import { downloadPage, downloadStatus, redeem, resendLinks, rate } from '../store/delivery.js';
+import { verifyFileUrl, streamDriveFile } from '../store/drive.js';
 import { onDaily } from '../jobs/hooks.js';
 import { storeState } from '../store/access.js';
 
@@ -110,12 +111,30 @@ export async function razorpayWebhook(ctx){
   return json(result);
 }
 
+// the live counter on the download page: time left and downloads left, never counts one
+export async function downloadStatusGet(ctx){
+  await rateLimit(`dl-status:${ctx.ip}`, 120, 10 * 60);
+  return downloadStatus(ctx.params.token);
+}
+
 export async function downloadGet(ctx){
   await rateLimit(`dl-view:${ctx.ip}`, 60, 10 * 60);
   return downloadPage(ctx.params.token, siteUrl(ctx.request), { rated: ctx.url.searchParams.get('rated') === '1' });
 }
 
 // "Rate it" on the download page (a plain form post; the link itself proves the purchase)
+// Streams a Google Drive-backed file through this server. The link is ours, signed, and valid for about a minute (it is only
+// handed out by a counted download); the Drive address is never part of it.
+export async function fileGet(ctx){
+  const exp = ctx.url.searchParams.get('exp'), sig = ctx.url.searchParams.get('sig');
+  if (!/^[0-9a-f-]{36}$/.test(ctx.params.id) || !verifyFileUrl(ctx.params.id, exp, sig)) throw new HttpError(403, 'This download link has expired. Open your download link again.');
+  await rateLimit(`file:${ctx.ip}`, 60, 10 * 60);
+  const db = await getDb();
+  const f = await db.maybeOne(`select filename, drive_id from product_files where id = $1 and source = 'drive'`, [ctx.params.id]);
+  if (!f || !f.drive_id) throw new HttpError(404, 'File not found.');
+  return streamDriveFile({ driveId: f.drive_id, filename: f.filename, request: ctx.request });
+}
+
 export async function ratePost(ctx){
   await rateLimit(`rate:${ctx.ip}`, 20, 60 * 60);
   const form = new URLSearchParams((await readBody(ctx.request, 8 * 1024)).toString('utf8'));
@@ -132,8 +151,9 @@ export async function downloadPost(ctx){
   } else if (type.startsWith('application/json')){
     token = (await readJson(ctx.request, 16 * 1024)).turnstileToken || '';
   }
-  await verifyTurnstile(token, ctx.ip);
-  return redeem({ token: ctx.params.token, ip: ctx.ip, country: ctx.geo?.country || null, userAgent: ctx.request.headers.get('user-agent'), siteUrl: siteUrl(ctx.request) });
+  await verifyTurnstileLenient(token, ctx.ip);
+  const asJson = (ctx.request.headers.get('accept') || '').includes('application/json');   // the live download page
+  return redeem({ token: ctx.params.token, ip: ctx.ip, country: ctx.geo?.country || null, userAgent: ctx.request.headers.get('user-agent'), siteUrl: siteUrl(ctx.request), asJson });
 }
 
 export async function resend(ctx){
@@ -158,8 +178,10 @@ export function registerCheckout(route){
   route('POST', '/api/checkout/cancel', cancel);
   route('POST', '/api/checkout/demo-pay', demoPay);
   route('POST', '/api/webhooks/razorpay', razorpayWebhook, { access: 'webhook' });
+  route('GET', '/api/file/:id', fileGet);
+  route('GET', '/api/download/:token/status', downloadStatusGet);
   route('GET', '/api/download/:token', downloadGet);
-  route('POST', '/api/download/:token', downloadPost);
-  route('POST', '/api/download/:token/rate', ratePost);
+  route('POST', '/api/download/:token', downloadPost, { nullOrigin: true });   // the link itself is the credential; the page's form sends Origin: null
+  route('POST', '/api/download/:token/rate', ratePost, { nullOrigin: true });
   route('POST', '/api/downloads/resend', resend);
 }

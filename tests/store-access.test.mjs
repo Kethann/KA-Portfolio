@@ -149,10 +149,10 @@ test('the announcement tab and the Featured Work showcase are validated and save
   assert.throws(() => validateFeaturedShow({ rows: [{ folder: 'Missing' }] }, [folder], doc.images), /existing folder/);
 });
 
-test('emails: links become buttons, receipts become tables, and everything stays escaped', () => {
-  const html = textToHtml('Hi <b>Alex</b>,\n\nDownload your files\nhttps://shop.test/d/abc?x=1&y=2\n\nSubtotal: ₹999\nTotal paid: ₹899');
+test('emails: a link on its own line becomes a labelled button, and everything stays escaped', () => {
+  const url = 'https://shop.test/?thread=abc&x=1';
+  const html = textToHtml(`Hi <b>Alex</b>,\n\n${url}\n\nThanks`, { [url]: 'Read the conversation on the site' });
   assert.ok(html.includes('&lt;b&gt;Alex&lt;/b&gt;'));
-  assert.ok(html.includes('href="https://shop.test/d/abc?x=1&amp;y=2"'));
-  assert.ok(html.includes('Download your files &rarr;'));
-  assert.ok(/<table[^>]*>.*Total paid/s.test(html));
+  assert.ok(html.includes('href="https://shop.test/?thread=abc&amp;x=1"'));
+  assert.ok(html.includes('Read the conversation on the site'));
 });

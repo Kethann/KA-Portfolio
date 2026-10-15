@@ -3,7 +3,9 @@
 // JavaScript). Only published text is ever shown; an unpublished page says it's being updated.
 import { getDb } from '../core/db.js';
 import { renderMarkdown } from '../core/markdown.js';
-import { LEGAL_TITLES } from '../content/legal-drafts.js';
+import { LEGAL_TITLES, fillLegal } from '../content/legal-drafts.js';
+import { getSetting } from '../core/settings.js';
+import { env } from '../core/env.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -41,7 +43,9 @@ async function legalPage(ctx){
   const db = await getDb();
   const row = await db.maybeOne('select title, body_md, published, updated_at from legal_pages where slug = $1 and published', [slug]);
   if (!row || !row.body_md.trim()) return page(LEGAL_TITLES[slug], `<h1>${esc(LEGAL_TITLES[slug])}</h1><p class="note">This page is being updated. If you have a question in the meantime, please use the <a href="/?page=contact">Contact page</a>.</p>${nav(slug)}`);
-  return page(row.title, `<h1>${esc(row.title)}</h1>${renderMarkdown(row.body_md)}${nav(slug)}`);
+  const [store, visitors] = await Promise.all([getSetting('store'), getSetting('visitors')]);
+  const body = fillLegal(row.body_md, { store, visitors, siteName: env('SITE_NAME', 'Kethan Artzz'), siteUrl: env('PUBLIC_SITE_URL') || new URL(ctx.request.url).origin, updatedAt: row.updated_at });
+  return page(row.title, `<h1>${esc(row.title)}</h1>${renderMarkdown(body)}${nav(slug)}`);
 }
 
 export function registerLegal(route){

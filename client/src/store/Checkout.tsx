@@ -2,6 +2,7 @@
 // and the email. Real payment details are entered in Razorpay's own secure window (cards, UPI,
 // net banking, wallets): this site never sees, sends, stores or logs card numbers or CVV.
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useFocusTrap, useMedia } from './hooks';
 import { postJson, publicConfig, formatPrice, ApiError, type Currency, type Product } from './api';
 import { reduce, initialState, stepOf, isStage, type Quote, type OrderResult, type Success, type PaymentMethod, type LicenseRef } from './checkout/machine';
@@ -105,6 +106,10 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
   const [codes, setCodes] = useState<string[]>([]);
   const [codeError, setCodeError] = useState('');
   const [codeBusy, setCodeBusy] = useState(false);
+  /** the last code that went through: the field turns green and says what it saved */
+  const [codeOk, setCodeOk] = useState('');
+  /** a code that makes a paid item free: a short celebration with the old price struck through */
+  const [freeWin, setFreeWin] = useState<{ was: string; now: string } | null>(null);
   const [flipped, setFlipped] = useState(false);
   const [holderError, setHolderError] = useState('');
   const holderRef = useRef<HTMLInputElement>(null);
@@ -178,14 +183,34 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
   const applyCode = async () => {
     const c = code.trim().toUpperCase();
     if (!c || codeBusy) return;
-    setCodeError(''); setCodeBusy(true);
-    try { const next = [...codes.filter(x => x !== c), c]; dispatch({ type: 'QUOTED', quote: await requestQuote(next, email.trim()) }); setCodes(next); setCode(''); sfx('store.coupon'); }
+    setCodeError(''); setCodeOk(''); setCodeBusy(true);
+    try {
+      const next = [...codes.filter(x => x !== c), c], q = await requestQuote(next, email.trim());
+      dispatch({ type: 'QUOTED', quote: q }); setCodes(next); setCode(''); sfx('store.coupon');
+      setCodeOk(q.discount > 0 ? `${c} applied: you save ${formatPrice(q.discount, q.currency)}` : `${c} applied`);
+      if (q.total === 0 && q.subtotal > 0) celebrateFree(formatPrice(q.subtotal, q.currency), formatPrice(0, q.currency));
+    }
     catch (e){ setCodeError((e as Error).message); sfx('store.failed'); }
     finally { setCodeBusy(false); }
   };
+  // a paid item just became free: a popup for about two seconds, with confetti and a little buzz
+  const freeTimer = useRef(0);
+  const celebrateFree = (was: string, now: string) => {
+    setFreeWin({ was, now }); buzz([20, 50, 20, 50, 30]); sfx('store.paid');
+    clearTimeout(freeTimer.current); freeTimer.current = window.setTimeout(() => setFreeWin(null), reduced ? 1600 : 2300);
+    if (!reduced) import('./checkout/confetti').then(m => {
+      // the confetti goes in the popup itself, so it flies in front of the blur
+      const modal = cardRef.current?.closest('.kas-modal') as HTMLElement | null;
+      const host = (modal?.querySelector('.kco-free') as HTMLElement | null) || modal || document.body;
+      m.burst(host, { x: innerWidth / 2, y: innerHeight * 0.42 });
+      setTimeout(() => m.burst(host, { x: innerWidth * 0.32, y: innerHeight * 0.5 }), 180);
+      setTimeout(() => m.burst(host, { x: innerWidth * 0.68, y: innerHeight * 0.5 }), 320);
+    }).catch(() => {});
+  };
+  useEffect(() => () => clearTimeout(freeTimer.current), []);
   const removeCode = async (c: string) => {
     const next = codes.filter(x => x !== c);
-    setCodes(next); setCodeBusy(true);
+    setCodes(next); setCodeBusy(true); setCodeOk('');
     try { dispatch({ type: 'QUOTED', quote: await requestQuote(next, email.trim()) }); } catch (e){ setCodeError((e as Error).message); } finally { setCodeBusy(false); }
   };
   const validateEmail = () => { const ok = EMAIL.test(email.trim()); setEmailError(ok || !email ? '' : 'Enter a valid email address.'); return ok; };
@@ -270,6 +295,14 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
   const lines = STATUS_LINES[s.phase === 'paying' && (quote?.currency || currency) === 'USD' ? 'payingUSD' : s.phase];
   const usd = (quote?.currency || currency) === 'USD';
   return <div className={`kco kas-modal-card ${stage ? 'is-stage' : ''}`} data-phase={s.phase}>
+    {freeWin && createPortal(<div className="kco-free" role="status" aria-live="assertive" onClick={() => setFreeWin(null)}>
+      <div className="kco-free-card">
+        <span className="kco-free-gift" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 11h16v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M3 7h18v4H3z"/><path d="M12 7v14"/><path d="M12 7c-1.5-3.5-6-3.5-6-1s3 1 6 1c3 0 6 1.5 6-1s-4.5-2.5-6 1z"/></svg></span>
+        <strong>It’s free!</strong>
+        <span className="kco-free-sub">Your code turned this paid item free.</span>
+        <span className="kco-free-price"><s>{freeWin.was}</s><b>{freeWin.now}</b></span>
+      </div>
+    </div>, (cardRef.current?.closest('.kas-modal') as HTMLElement | null) || document.body)}
     <header className="kco-head">
       <ol className="kco-steps" style={{ ['--step' as string]: step } as React.CSSProperties} aria-label="Checkout progress">
         {['Details', 'Payment', 'Done'].map((label, i) => <li key={label} aria-current={i === step ? 'step' : undefined} className={i < step ? 'is-done' : ''}>{label}</li>)}
@@ -301,7 +334,8 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
               ? <>A download link{s.success.free ? '' : ' and your receipt'} {s.success.free ? 'was' : 'were'} sent to <strong>{email.trim()}</strong>.</>
               : <>Your download link{s.success.free ? '' : ' and receipt'} will be emailed to <strong>{email.trim()}</strong> shortly. Use “Download now” to get it right away.</>}</p>
             <div className="kas-co-actions">
-              {s.success.downloadUrl && <a className="kas-buy" href={s.success.downloadUrl}>Download now</a>}
+              {s.success.downloadUrl && <a className="kas-buy kco-dl" href={s.success.downloadUrl} onClick={e => { const a = e.currentTarget; a.classList.remove('is-going'); void a.offsetWidth; a.classList.add('is-going'); }}>
+                <svg className="kco-dl-ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19.5h14" /></svg>Download now</a>}
               {s.success.license && <a className="kas-btn is-ghost" href={s.success.license.url} target="_blank" rel="noopener">View your license<span className="kas-sr"> {s.success.license.code} (opens in a new tab)</span></a>}
               <button type="button" className={s.success.downloadUrl ? 'kas-btn is-ghost' : 'kas-buy'} onClick={onClose}>Continue browsing</button>
             </div>
@@ -336,15 +370,16 @@ function Buy({ product, currency, onClose, onBusy }: { product: Product; currenc
         <label className="kco-remember"><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} /> Remember my email and name on this device for receipts</label>
         {quote && !quote.free ? <div className="kco-code">
           {!codeOpen ? <button type="button" className="kas-link" onClick={() => setCodeOpen(true)}>Have a discount code?</button> : <>
-            <div className="kco-code-row">
-              <div className={`kco-field ${codeError ? 'is-error' : ''}`}>
-                <input id="kco-code" value={code} placeholder=" " onChange={e => { setCode(e.target.value); setCodeError(''); }} autoCapitalize="characters" spellCheck={false} maxLength={32}
+            <div className={`kco-code-row ${codeError ? 'is-rejected' : codeOk || codes.length ? 'is-applied' : ''}`} key={codeError ? 'rejected-' + codeError : 'row'}>
+              <div className={`kco-field ${codeError ? 'is-error' : codeOk || codes.length ? 'is-ok' : ''}`}>
+                <input id="kco-code" value={code} placeholder=" " onChange={e => { setCode(e.target.value); setCodeError(''); setCodeOk(''); }} autoCapitalize="characters" spellCheck={false} maxLength={32}
                   onKeyDown={e => { if (e.key === 'Enter'){ e.preventDefault(); applyCode(); } }} aria-describedby="kco-code-err" autoFocus />
                 <label htmlFor="kco-code">Discount code</label>
               </div>
               <button type="button" className="kas-btn" onClick={applyCode} disabled={codeBusy || !code.trim()}>{codeBusy ? '…' : 'Apply'}</button>
             </div>
             <span id="kco-code-err" className="kco-err" role={codeError ? 'alert' : undefined}>{codeError}</span>
+            <span className="kco-okmsg" role={codeOk ? 'status' : undefined}>{codeOk && <><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" /></svg>{codeOk}</>}</span>
             {codes.length > 0 && <ul className="kas-co-codes">{codes.map(c => <li key={c}>{c}<button type="button" onClick={() => removeCode(c)} aria-label={`Remove ${c}`}>×</button></li>)}</ul>}
           </>}
         </div> : null}

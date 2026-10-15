@@ -90,7 +90,7 @@ export async function listLegal(){
     const r = rows.find(x => x.slug === slug);
     // never written yet: start from the draft (still unpublished until the owner publishes it)
     const body = r?.body_md || LEGAL_DRAFTS[slug];
-    return { slug, title: r?.title || title, body, published: !!r?.published, updatedAt: r?.updated_at || null, isDraftText: !r?.body_md, hasBlanks: hasBlanks(body) };
+    return { slug, title: r?.title || title, body, published: !!r?.published, updatedAt: r?.updated_at || null, isDraftText: !r?.body_md, hasBlanks: hasBlanks(body), draft: LEGAL_DRAFTS[slug] };
   }) });
 }
 export async function saveLegal(ctx){
@@ -159,7 +159,7 @@ export async function testTemplate(ctx){
 
 // ---- settings (store, upscaler, messages, assistant, reports) --------------------------------------
 const EDITABLE = ['store', 'upscaler', 'messages', 'assistant', 'reports', 'visitors'];
-const RANGES = { taxRateBp: [0, 5000], orderExpiryMinutes: [10, 120], dailyBudgetMicros: [0, 50_000_000], retentionDays: [0, 3650] };
+const RANGES = { taxRateBp: [0, 5000], orderExpiryMinutes: [10, 120], downloadLinkHours: [1, 720], downloadMaxDownloads: [1, 100], dailyBudgetMicros: [0, 50_000_000], retentionDays: [0, 3650] };
 // Coerces input to the default's shape: same keys and types, strings bounded, numbers clamped.
 export function coerce(def, input, path = ''){
   if (def === null || def === undefined) return undefined;
@@ -196,6 +196,7 @@ export async function saveSettings(ctx){
   if (!EDITABLE.includes(key)) throw new HttpError(404, 'Unknown settings.');
   const b = await readJson(ctx.request, 64 * 1024);
   const value = coerce(DEFAULTS[key], b.value);
+  if (key === 'store' && value.supportEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value.supportEmail)) throw new HttpError(400, 'Support email must be an email address.');
   if (key === 'messages' || key === 'reports'){
     for (const [p, v] of [['notifyEmail', value.notifyEmail], ['email', value.email]]) if (v && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) throw new HttpError(400, `${p} must be an email address.`);
     if (key === 'messages') for (const t of [value.businessHours.start, value.businessHours.end]) if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) throw new HttpError(400, 'Use 24-hour times like 09:30.');
