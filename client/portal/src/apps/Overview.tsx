@@ -7,6 +7,7 @@ import { useLoad, usePref } from '../hooks';
 import { Chart, Empty, ErrorState, Segmented, Skeleton, Badge } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
+import { StoreQuickToggle } from './StoreStatus';
 import { money, moneyCompact, num, ago, todayIST } from '../format';
 import { CurrencyMark, MASK, Money, Sparkline, useCountUp, useMoneyHidden } from '../money';
 
@@ -72,6 +73,7 @@ export default function Overview({ active, open }: AppProps){
       <div className="hello">
         <div><h2>{greet}, Kethan</h2><p>{d ? `${num(d.counts.paid)} paid orders and ${num(d.visitors)} visits in the last ${range} days.` : <Skeleton w={280} />}</p></div>
         <div className="row">
+          <StoreQuickToggle />
           <button type="button" className="btn" onClick={() => open('products', 'new')}><Icon name="plus" /> Product</button>
           <button type="button" className="btn" onClick={() => open('coupons', 'new')}><Icon name="coupons" /> Coupon</button>
           <button type="button" className="btn primary" onClick={() => open('orders')}><Icon name="orders" /> Orders</button>

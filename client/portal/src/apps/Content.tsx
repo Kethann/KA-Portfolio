@@ -16,8 +16,9 @@ import type { SiteImage, StatItem, SkillCategory, SkillItem, AboutDraft, Journey
 import { ABOUT_LIMITS, aboutDefaults, updateSiteLive } from './siteDoc';
 import { ago, dateTime } from '../format';
 import { SKILL_LOGO_LIST, skillLogoFor, type SkillLogo } from '../../../../shared/skill-logos.js';
+import Featured from './Featured';
 
-type Tab = 'portfolio' | 'text' | 'upscaler' | 'emails';
+type Tab = 'portfolio' | 'featured' | 'text' | 'upscaler' | 'emails';
 const TEXT_FIELDS: [string, string, number, boolean?][] = [
   ['creatorName', 'Your name', 80], ['tagline', 'Tagline', 160], ['portfolioTitle', 'Portfolio heading', 100], ['portfolioIntro', 'Portfolio intro', 500, true],
   ['contactTitle', 'Contact heading', 100], ['contactIntro', 'Contact intro', 1000, true], ['openLabel', '“Open” button', 60], ['closeLabel', '“Close” button', 60],
@@ -45,20 +46,20 @@ export function SiteSaveBar(){
 }
 
 export default function Content({ route, go, active }: AppProps){
-  const tab: Tab = (['portfolio', 'text', 'upscaler', 'emails'] as Tab[]).includes(route.split('/')[0] as Tab) ? route.split('/')[0] as Tab : route === 'notify' ? 'upscaler' : 'portfolio';
+  const tab: Tab = (['portfolio', 'featured', 'text', 'upscaler', 'emails'] as Tab[]).includes(route.split('/')[0] as Tab) ? route.split('/')[0] as Tab : route === 'notify' ? 'upscaler' : 'portfolio';
   const site = useSite();
   const toast = useToast();
   useEffect(() => { void loadSite(); }, []);
-  useSaveKey(active && (tab === 'portfolio' || tab === 'text'), () => { if (site.dirty) saveSite().then(() => toast.show('Site updated', { tone: 'success' })).catch(toast.error); });
+  useSaveKey(active && (tab === 'portfolio' || tab === 'featured' || tab === 'text'), () => { if (site.dirty) saveSite().then(() => toast.show('Site updated', { tone: 'success' })).catch(toast.error); });
   return (
     <div className="app">
-      <WinTools>{(tab === 'portfolio' || tab === 'text') && <SiteSaveBar />}</WinTools>
+      <WinTools>{(tab === 'portfolio' || tab === 'featured' || tab === 'text') && <SiteSaveBar />}</WinTools>
       <div className="tabs" role="tablist" aria-label="Content sections">
-        {([['portfolio', 'Portfolio'], ['text', 'Site text'], ['upscaler', 'Upscaler & list'], ['emails', 'Emails']] as [Tab, string][]).map(([k, l]) => (
+        {([['portfolio', 'Portfolio'], ['featured', 'Featured Work'], ['text', 'Site text'], ['upscaler', 'Upscaler & list'], ['emails', 'Emails']] as [Tab, string][]).map(([k, l]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => go(k)}>{l}</button>
         ))}
       </div>
-      {tab === 'emails' ? <Emails /> : tab === 'upscaler' ? <Upscaler /> : site.error && !site.doc ? <ErrorState message={site.error} retry={() => loadSite(true)} /> : !site.doc ? <div className="pad"><SkeletonRows rows={8} /></div> : tab === 'text' ? <SiteText /> : <Portfolio />}
+      {tab === 'emails' ? <Emails /> : tab === 'upscaler' ? <Upscaler /> : site.error && !site.doc ? <ErrorState message={site.error} retry={() => loadSite(true)} /> : !site.doc ? <div className="pad"><SkeletonRows rows={8} /></div> : tab === 'text' ? <SiteText /> : tab === 'featured' ? <Featured /> : <Portfolio />}
     </div>
   );
 }
@@ -355,13 +356,14 @@ function Portfolio(){
     if (!name || name === folder) return;
     if (doc!.folders.includes(name)) return toast.show('That folder already exists.', { tone: 'error' });
     updateSite(d => ({ ...d, folders: d.folders.map(f => f === folder ? name : f), images: d.images.map(i => i.cat === folder ? { ...i, cat: name } : i),
+      featuredShow: d.featuredShow ? { ...d.featuredShow, rows: d.featuredShow.rows.map(r => r.folder === folder ? { ...r, folder: name } : r) } : d.featuredShow,
       stacks: { ...d.stacks, featured: (d.stacks.featured || []).map(k => k === folder ? name : k), covers: Object.fromEntries(Object.entries(d.stacks.covers).map(([k, v]) => [k === folder ? name : k, v])), loops: Object.fromEntries(Object.entries(d.stacks.loops || {}).map(([k, v]) => [k === folder ? name : k, v])) } }));
     setFolder(name);
   };
   const removeFolder = async () => {
     if (images.length){ toast.show('Move or remove this folder’s images first.', { tone: 'error' }); return; }
     if (doc!.folders.length <= 1) return toast.show('Keep at least one folder.', { tone: 'error' });
-    if (await confirm({ title: `Remove the “${folder}” folder?`, confirm: 'Remove', danger: true })) updateSite(d => ({ ...d, folders: d.folders.filter(f => f !== folder) }));
+    if (await confirm({ title: `Remove the “${folder}” folder?`, confirm: 'Remove', danger: true })) updateSite(d => ({ ...d, folders: d.folders.filter(f => f !== folder), featuredShow: d.featuredShow ? { ...d.featuredShow, rows: d.featuredShow.rows.filter(r => r.folder !== folder) } : d.featuredShow }));
   };
   const uploaded = (u: { publicUrl: string | null; file: File; width?: number; height?: number }) => {
     const base = u.file.name.replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'image';

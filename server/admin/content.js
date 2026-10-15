@@ -110,7 +110,8 @@ export async function saveLegal(ctx){
 const TEMPLATE_INFO = {
   contact_notify: 'To you: a new contact message', contact_autoreply: 'To visitors: contact auto-reply', notify_confirm: 'To visitors: notify-me confirmation',
   order_delivery: 'To buyers: download link', order_receipt: 'To buyers: receipt', resend_link: 'To buyers: fresh download links',
-  report: 'To you: scheduled report', alert: 'To you: alerts', reply: 'To visitors: your inbox replies', launch: 'To the notify list: launch announcement'
+  report: 'To you: scheduled report', alert: 'To you: alerts', reply: 'To visitors: your inbox replies', launch: 'To the notify list: launch announcement',
+  store_access: 'To guests: store access while closed'
 };
 export async function listTemplates(){
   const db = await getDb();
@@ -147,7 +148,7 @@ export async function testTemplate(ctx){
   if (!DEFAULT_TEMPLATES[key]) throw new HttpError(404, 'Unknown template.');
   const b = await readJson(ctx.request, 64 * 1024);
   const sample = { name: 'Alex', email: 'alex@example.com', subject: 'Hello', message: 'A sample message.', topic_name: 'the Image Upscaler', topic_title: 'Image Upscaler',
-    order_id: 'KA-SAMPLE', product_title: 'Sample Pack', download_url: 'https://example.com/download/sample', expires: 'tomorrow', max_downloads: '5',
+    thread_url: 'https://example.com/?thread=sample', order_id: 'KA-SAMPLE', product_title: 'Sample Pack', download_url: 'https://example.com/download/sample', expires: 'tomorrow', max_downloads: '5',
     license_name: 'Personal', license_text: '(license text)', links: 'Sample Pack:\nhttps://example.com/download/sample', period: 'Weekly', summary: '(report summary)',
     portal_url: 'https://example.com/portal/', title: 'Sample alert', body: 'Sample text.', link: 'https://example.com', invoice_number: 'INV-000001', date: 'today',
     lines: 'Sample Pack — ₹499.00', subtotal: '₹499.00', discount: '₹0.00', tax_label: 'GST', tax: '₹0.00', total: '₹499.00', payment_id: 'pay_sample', seller_block: '' };

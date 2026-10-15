@@ -19,6 +19,20 @@
 // origin than this page -- browsers never send/accept cookies cross-origin without it, with or
 // without CORS headers. See server/app.js for the matching Access-Control-Allow-* response side.
 var KA_API_BASE = "";
+// ?wallpaper=1 inside the portal (Wallpaper app): only the intro is shown, rendered sharper, and its frames stay
+// readable so the portal can record them as a live wallpaper. Never active on its own, outside the portal.
+var KA_WALLPAPER = /[?&]wallpaper=1(&|$)/.test(location.search) && window.parent !== window;
+if (KA_WALLPAPER){
+  document.documentElement.classList.add("ka-wallpaper");
+  (function(){
+    var getContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function(type, attrs){
+      if (/^(webgl2?|experimental-webgl)$/.test(type)) attrs = Object.assign({}, attrs || {}, { preserveDrawingBuffer: true });
+      return getContext.call(this, type, attrs);
+    };
+    try { Object.defineProperty(window, "devicePixelRatio", { configurable: true, get: function(){ return 1; } }); } catch(e){}
+  })();
+}
 function kaApiUrl(path){ return KA_API_BASE + path; }
 // [pinch-zoom fix] iOS Safari reports the ZOOMED visual viewport through window.innerWidth/innerHeight,
 // so every pinch shrank the WebGL canvas/camera (logo got smaller) while the DOM (nav, chat) zoomed
@@ -783,8 +797,7 @@ footer.site-footer{
   .about-wrap > *{ grid-column:1 / -1; }
   .about-wrap > .about-bio{ grid-column:1; grid-row:1; min-width:0; }
   .about-wrap > .about-stats{ grid-column:2; grid-row:1; align-self:center; width:auto; margin:0; grid-template-columns:repeat(2, minmax(0, 1fr)); }
-  .about-wrap:has(> .about-stats:not(.is-off)) > .about-bio{ grid-row:1 / span 2; }
-  .about-wrap > .about-block:first-of-type{ grid-row:2; }
+  .about-wrap > .about-block#about-skills-block{ grid-row:2; }
 }
 
 /* ============================================================ IMAGE UPSCALER: coming-soon dialog only == */
@@ -1355,6 +1368,12 @@ html.ka-modal-open{ overflow:hidden; }
   </div>
 </nav>
 
+<style>
+/* wallpaper mode (portal > Wallpaper): nothing but the intro's two layers */
+html.ka-wallpaper, html.ka-wallpaper body{ overflow:hidden !important; cursor:none; background:#050506; }
+html.ka-wallpaper body > :not(#nebula-bg):not(#stage):not(script):not(style){ display:none !important; }
+html.ka-wallpaper #stage{ opacity:1 !important; }
+</style>
 <div id="nebula-bg" aria-hidden="true"></div>
 <div id="top-fade" aria-hidden="true"></div>
 <div id="stage"></div>
@@ -1398,10 +1417,14 @@ html.ka-modal-open{ overflow:hidden; }
           <input type="email" id="contact-email" name="email" autocomplete="email" required maxlength="254" placeholder="you@example.com" aria-describedby="err-email">
           <span class="field-error" id="err-email"></span>
         </label>
-        <label class="field-full" for="contact-subject">Regarding
-          <input type="text" id="contact-subject" name="subject" autocomplete="off" required minlength="2" maxlength="180" placeholder="What's this about?" aria-describedby="err-subject">
+        <fieldset class="field-full contact-topics" id="contact-topics" aria-describedby="err-subject">
+          <legend>Regarding <small>TICK ALL THAT APPLY</small></legend>
+          <div class="topic-grid" id="topic-grid" role="group" aria-label="What is this about?"></div>
+          <div class="topic-other" id="topic-other"><div>
+            <input type="text" id="contact-subject" name="subject" autocomplete="off" maxlength="120" placeholder="Tell me what it's about" aria-label="Other: what is it about?" aria-describedby="err-subject" tabindex="-1">
+          </div></div>
           <span class="field-error" id="err-subject"></span>
-        </label>
+        </fieldset>
         <label class="field-full" for="contact-message">Message
           <textarea id="contact-message" name="message" autocomplete="off" required minlength="5" maxlength="8000" placeholder="Tell me a bit more..." aria-describedby="err-message"></textarea>
           <span class="field-error" id="err-message"></span>
@@ -1498,6 +1521,9 @@ html.ka-modal-open{ overflow:hidden; }
   font-size:var(--step-3); line-height:1.08; margin:0 0 20px; max-width:16ch;
   opacity:0; transform:translateY(18px);
 }
+#section-about .about-headline{ max-width:none; }
+#section-about .about-headline .about-name{ display:block; }
+#section-about .about-headline .about-tagline{ display:block; margin-top:.16em; font-size:.52em; line-height:1.2; letter-spacing:.015em; font-weight:500; }
 .about-bio-text{
   font-size:var(--step-0); line-height:1.7; color:var(--ink-dim); max-width:62ch; margin:0 0 64px;
   opacity:0; transform:translateY(14px);
@@ -1519,12 +1545,13 @@ html.ka-modal-open{ overflow:hidden; }
 /* ---- About: journey since a year (points on a line; fast, letter-by-letter text) ---- */
 .about-journey{ margin:0 0 34px; max-width:min(100%, 940px); }
 .about-journey[hidden]{ display:none; }
+.about-journey{ display:flex; flex-direction:column; align-items:center; }
 .journey-since{ display:inline-flex; align-items:baseline; gap:10px; padding:8px 18px 8px 16px; border-radius:999px;
   border:1px solid rgba(255,148,56,.38); background:linear-gradient(135deg, rgba(255,148,56,.16), rgba(255,148,56,.03));
   font-family:var(--font-mono, monospace); font-size:11px; letter-spacing:.24em; color:#ffd9b8;
   box-shadow:0 0 0 1px rgba(255,255,255,.03) inset, 0 8px 28px -12px rgba(255,148,56,.45); }
 .journey-since b{ font-size:20px; letter-spacing:.06em; font-weight:700; color:#fff; font-variant-numeric:tabular-nums; min-width:4ch; display:inline-block; }
-.journey-line{ list-style:none; margin:30px 0 0; padding:0 26px 0 0; display:grid; grid-template-columns:repeat(var(--n, 5), minmax(0,1fr)); position:relative; }
+.journey-line{ list-style:none; width:100%; box-sizing:border-box; margin:22px 0 0; padding:0 26px 0 0; display:grid; grid-template-columns:repeat(var(--n, 5), minmax(0,1fr)); position:relative; }
 /* the track and its glowing fill; the line carries on past the last point and ends in an arrow, because the journey is not over */
 .journey-line::before, .journey-line::after{ content:""; position:absolute; top:6px; left:7px; right:8px; height:2px; border-radius:2px; }
 .journey-line::before{ background:linear-gradient(90deg, rgba(255,255,255,.18), rgba(255,255,255,.08) 72%, rgba(255,255,255,.04)); }
@@ -1835,7 +1862,7 @@ html.ka-modal-open{ overflow:hidden; }
 
   <div class="about-wrap">
     <div class="about-bio">
-      <h1 class="about-headline" id="about-headline">Kethan Artzz — Visual Storyteller for the Big Screen</h1>
+      <h1 class="about-headline" id="about-headline"><span class="about-name">Kethan Artzz</span><span class="about-tagline">Visual Storyteller for the Big Screen</span></h1>
       <p class="about-caption">IMAGINE &middot; CREATE &middot; EVOLVE</p>
       <div class="about-journey" id="about-journey" aria-label="My journey">
         <span class="journey-since"><span>SINCE</span><b id="journey-year">2021</b></span>
@@ -1984,12 +2011,17 @@ html.ka-modal-open{ overflow:hidden; }
   var configPromise = null;
   window.kaPublicConfig = function(){
     if (!configPromise){
-      configPromise = fetch(kaApiUrl("/api/public-config"), { headers:{ "Accept":"application/json" } })
+      var headers = { "Accept":"application/json" }, pass = null;
+      try { pass = localStorage.getItem("ka_store_pass"); } catch(e){}
+      if (pass) headers["X-KA-Pass"] = pass;   // special access while the store is closed (portal: Settings > Store status)
+      configPromise = fetch(kaApiUrl("/api/public-config"), { headers:headers, cache:"no-store" })
         .then(function(res){ return res.ok ? res.json() : {}; })
         .catch(function(){ return {}; });
     }
     return configPromise;
   };
+  // the store can be opened or closed from the portal at any time: live updates read the config again
+  window.kaPublicConfig.refresh = function(){ configPromise = null; };
   var scriptPromise = null;
   function loadTurnstile(){
     if (window.turnstile) return Promise.resolve(window.turnstile);
@@ -6352,6 +6384,7 @@ function renderLightbox(){
   if (!lbDownload.__kaDl){
     lbDownload.__kaDl = true;
     lbDownload.addEventListener("click", function(e){
+      if (window.kaInApp && window.kaInApp.is){ e.preventDefault(); window.kaInApp.nudge("download", lbDownload.href); return; }
       if (!window.createImageBitmap || !window.fetch) return;   // an old browser: the plain link downloads the original
       e.preventDefault();
       var url = lbDownload.href, f = kaDlFormat(), name = (lbDownload.dataset.slug || "image") + "." + f.ext;
@@ -7017,6 +7050,7 @@ function switchSection(name, focusTarget){
     // [contact card] "pop up" materialize -- layered on top of the section's own cross-fade,
     // triggered fresh every time Contact becomes the active section (not just once ever).
     if (page === "store" || page === "tips") loadStorePage(page);
+    try { document.dispatchEvent(new CustomEvent("ka-page", { detail: { page: page } })); } catch(e){}
     if (page === "contact"){
       var card = document.getElementById("contact-card");
       card.classList.remove("in");
@@ -7156,7 +7190,7 @@ window.kaFullscreen = (function(){
   function request(){ return (root.requestFullscreen || root.webkitRequestFullscreen).call(root, { navigationUI: "hide" }); }
   function toggle(){
     if (active()){ (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
-    if (!supported()){ guide(); return; }
+    if (!supported()){ if (window.kaInApp && window.kaInApp.is){ window.kaInApp.nudge("fullscreen"); return; } guide(); return; }
     try {
       var r = request();
       if (r && r.catch) r.catch(function(){ window.kaToast && window.kaToast("This browser blocked full screen. Try again, or use its own menu.", "error"); });
@@ -8400,7 +8434,9 @@ var CONTACT_RULES = {
   email: { el: document.getElementById("contact-email"), err: document.getElementById("err-email"),
     test: function(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }, msg: "Enter a valid email address." },
   subject: { el: document.getElementById("contact-subject"), err: document.getElementById("err-subject"),
-    test: function(v){ return v.length >= 2; }, msg: "Let me know what this is regarding." },
+    test: function(v){ var t = kaTopics(); return t.other ? v.length >= 2 : t.picked.length > 0; },
+    target: function(){ return kaTopics().other ? CONTACT_RULES.subject.el : (document.querySelector("#topic-grid input") || CONTACT_RULES.subject.el); },
+    msg: "Tick what this is about (or choose Other and say a few words)." },
   message: { el: document.getElementById("contact-message"), err: document.getElementById("err-message"),
     test: function(v){ return v.length >= 5; }, msg: "Add a little more detail to your message." },
 };
@@ -8409,11 +8445,46 @@ CONTACT_RULES.name.el.addEventListener("input", function(){
   var cleaned = this.value.replace(/[^A-Za-z ]/g, "");
   if (cleaned !== this.value) this.value = cleaned;
 });
+// The Regarding ticks (set in the portal: Settings > Messages & contact form). "Other" opens a box to type in.
+var KA_TOPICS_DEFAULT = ["A new project", "Commission / poster design", "Store order or download", "License question", "Collaboration", "Just saying hi"];
+function kaTopics(){
+  var picked = [], other = false;
+  document.querySelectorAll("#topic-grid input:checked").forEach(function(i){ if (i.value === "__other") other = true; else picked.push(i.value); });
+  return { picked: picked, other: other };
+}
+function kaTopicsSubject(){
+  var t = kaTopics(), o = CONTACT_RULES.subject.el.value.trim(), parts = t.picked.slice();
+  if (t.other && o) parts.push(o);
+  return parts.join(", ").slice(0, 180);
+}
+function renderContactTopics(list){
+  var grid = document.getElementById("topic-grid"); if (!grid) return;
+  var was = kaTopics();
+  grid.replaceChildren();
+  (list && list.length ? list : KA_TOPICS_DEFAULT).concat(["__other"]).forEach(function(t, i){
+    var chip = document.createElement("span"); chip.className = "topic-chip";
+    var input = document.createElement("input"); input.type = "checkbox"; input.value = t; input.id = "topic-" + i; input.name = "topic";
+    input.checked = t === "__other" ? was.other : was.picked.indexOf(t) >= 0;
+    var text = document.createElement("span"); text.textContent = t === "__other" ? "Other" : t; text.setAttribute("aria-hidden", "true");
+    input.setAttribute("aria-label", t === "__other" ? "Other" : t);
+    chip.append(input, text); grid.appendChild(chip);
+  });
+}
+renderContactTopics(null);
+if (window.kaPublicConfig) window.kaPublicConfig().then(function(c){ if (c && c.contact && Array.isArray(c.contact.topics) && c.contact.topics.length) renderContactTopics(c.contact.topics); });
+document.getElementById("topic-grid").addEventListener("change", function(e){
+  var other = document.getElementById("topic-other"), input = CONTACT_RULES.subject.el, open = kaTopics().other;
+  other.classList.toggle("is-open", open);
+  input.tabIndex = open ? 0 : -1;
+  if (open && e.target.value === "__other") setTimeout(function(){ input.focus({ preventScroll: true }); }, 200);
+  validateContactField("subject"); updateContactSubmitState();
+});
 function validateContactField(key){
   var rule = CONTACT_RULES[key];
   var value = rule.el.value.trim();
   var valid = rule.test(value);
   rule.el.setAttribute("aria-invalid", valid ? "false" : "true");
+  if (rule.target){ rule.target().setAttribute("aria-invalid", valid ? "false" : "true"); document.getElementById("contact-topics").setAttribute("aria-invalid", valid ? "false" : "true"); }
   rule.err.textContent = valid ? "" : rule.msg;
   rule.err.classList.toggle("show", !valid);
   return valid;
@@ -8456,7 +8527,8 @@ contactForm.addEventListener("submit", function(e){
   var payload = {
     name: (data.get("name") || "").toString().trim(),
     email: (data.get("email") || "").toString().trim(),
-    subject: (data.get("subject") || "").toString().trim(),
+    subject: kaTopicsSubject(),
+    topics: kaTopics().picked.concat(kaTopics().other ? ["Other"] : []),
     message: (data.get("message") || "").toString().trim(),
     website: (data.get("website") || "").toString(), // honeypot -- left empty by real visitors
     turnstileToken: contactTurnstile ? contactTurnstile.token() : ""
@@ -8467,7 +8539,8 @@ contactForm.addEventListener("submit", function(e){
   if (!allValid){
     contactStatus.textContent = "Please fix the highlighted fields above.";
     contactStatus.dataset.state = "error";
-    CONTACT_RULES.name.el.form.querySelector('[aria-invalid="true"]').focus();
+    var bad = CONTACT_RULES.name.el.form.querySelector('input[aria-invalid="true"]:not([tabindex="-1"]), textarea[aria-invalid="true"]');
+    if (bad) bad.focus();
     return;
   }
   contactSending = true;
@@ -8487,7 +8560,9 @@ contactForm.addEventListener("submit", function(e){
     return res.json().then(function(body){ return { ok: res.ok, body: body }; });
   }).then(function(result){
     if (!result.ok) throw new Error((result.body && result.body.error) || "Something went wrong -- please try again.");
-    return { ok: true, message: "Thanks for reaching out -- I'll get back to you soon." };
+    // this device keeps the conversation, so the reply pops up here too
+    if (result.body && result.body.thread && window.kaRememberThread) window.kaRememberThread(result.body.thread, payload.subject);
+    return { ok: true, message: "Thanks for reaching out -- I'll get back to you soon. My reply will also pop up here, on this device." };
   }).catch(function(err){
     var message = (err && err.name === "AbortError") ? "The request took too long -- please try again." :
       ((err && err.message) || "Something went wrong -- please try again, or reach out via Behance.");
@@ -8513,6 +8588,8 @@ contactForm.addEventListener("submit", function(e){
 // Result-face button: "Send another message" (after success) / "Try again" (after an error) turns the card back to the form.
 function resetContactForm(){
   contactForm.reset();
+  document.getElementById("topic-other").classList.remove("is-open"); CONTACT_RULES.subject.el.tabIndex = -1;
+  document.getElementById("contact-topics").removeAttribute("aria-invalid");
   Object.keys(CONTACT_RULES).forEach(function(key){
     CONTACT_RULES[key].el.removeAttribute("aria-invalid");
     CONTACT_RULES[key].err.classList.remove("show");
@@ -8570,7 +8647,11 @@ function applyPortfolioData(data){
   if (data.details){
     if(data.details.creatorName)document.title=data.details.creatorName+' · '+data.details.portfolioTitle;
     var aboutHeading=document.getElementById('about-headline');
-    if(aboutHeading&&data.details.creatorName)aboutHeading.textContent=data.details.creatorName+' — '+data.details.tagline;
+    if(aboutHeading&&data.details.creatorName){
+      var aboutName=aboutHeading.querySelector('.about-name'), aboutTagline=aboutHeading.querySelector('.about-tagline');
+      if(aboutName&&aboutTagline){ aboutName.textContent=data.details.creatorName; aboutTagline.textContent=data.details.tagline||''; }
+      else aboutHeading.textContent=data.details.creatorName+' — '+(data.details.tagline||'');
+    }
     var copyright=document.querySelector('.footer-copyright');
     if(copyright&&data.details.creatorName)copyright.textContent='© '+new Date().getFullYear()+' '+data.details.creatorName;
     if(data.details.contactButton)contactForm.querySelector('.contact-submit').textContent=data.details.contactButton;
@@ -8742,7 +8823,7 @@ function renderAboutStats(stats, projectCount){
   if (!box) return;
   var items = stats && stats.enabled !== false && Array.isArray(stats.items) ? stats.items.filter(function(x){ return x && x.label; }) : [];
   box.hidden = !items.length;
-  box.classList.toggle("is-off", !items.length);   // switched off: the bio takes the full width (see .about-wrap)
+  if (box.classList) box.classList.toggle("is-off", !items.length);   // switched off: the bio takes the full width (see .about-wrap)
   var fmt = function(n){ try { return Math.round(n).toLocaleString("en-IN"); } catch(e){ return String(Math.round(n)); } };
   box.replaceChildren.apply(box, items.map(function(x){
     var tile = document.createElement("div"); tile.className = "about-stat"; tile.setAttribute("role", "listitem");
@@ -8827,7 +8908,9 @@ function applySiteAppearance(data){
   applyElementAnimations(data.elementStyles);
   var noticeEl = document.getElementById("site-notice");
   var noticeText = document.getElementById("site-notice-text");
-  if (data.notice && data.notice.enabled && data.notice.text){
+  var announced = false;
+  try { announced = !!(window.kaAnnounce && window.kaAnnounce(data.notice)); } catch(e){}
+  if (!announced && data.notice && data.notice.enabled && data.notice.text){
     // one dismissal per distinct notice message -- editing the text (or re-enabling it later)
     // shows it again, rather than a dismissal from weeks ago silently suppressing new content.
     var dismissKey = "ka_notice_dismissed";
@@ -9648,6 +9731,591 @@ function sendMessage(text){
 </script>
 
 <style>
+/* ==================================================================== SITE EXTRAS ==
+   Store status (the closed board + the panda), the side announcement tab, the Featured Work showcase,
+   the contact form's Regarding ticks, replies popping up on the visitor's device, and the in-app browser helper. */
+
+/* ---- store closed: a sign hanging from a thread, swinging gently; the store behind it rests (blurred, not usable) ---- */
+#section-store{ position:relative; }
+.shop-root.is-locked{ filter:blur(6px) saturate(.6); opacity:.35; pointer-events:none; user-select:none; transition:filter .6s ease, opacity .6s ease; }
+.store-closed{ position:relative; z-index:3; display:grid; justify-items:center; gap:18px; margin:6px auto 42px; padding:0 16px; text-align:center; max-width:620px;
+  opacity:0; transform:translateY(-14px); transition:opacity .7s cubic-bezier(.22,.8,.24,1), transform .7s cubic-bezier(.22,.8,.24,1); }
+.store-closed.is-in{ opacity:1; transform:none; }
+.store-closed[hidden]{ display:none; }
+.sc-hang{ position:relative; display:grid; justify-items:center; transform-origin:50% 0; animation:sc-swing 5.2s cubic-bezier(.45,0,.55,1) infinite; padding-top:46px; }
+.sc-hang::before, .sc-hang::after{ content:""; position:absolute; top:0; width:2px; height:56px; background:linear-gradient(#efdab9aa, #c89a6a); border-radius:2px; }
+.sc-hang::before{ left:calc(50% - 70px); transform:rotate(14deg); transform-origin:50% 0; }
+.sc-hang::after{ right:calc(50% - 70px); transform:rotate(-14deg); transform-origin:50% 0; }
+.sc-nail{ position:absolute; top:-6px; left:50%; width:12px; height:12px; margin-left:-6px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #fff3, #8a6a4a 40%, #3a2a1c); box-shadow:0 2px 6px #0008; }
+.sc-sign{ position:relative; min-width:min(360px, 84vw); padding:22px 30px 20px; border-radius:18px;
+  background:linear-gradient(160deg, #3a2a1e 0%, #22180f 60%, #1a120c 100%); border:2px solid #8a6038;
+  box-shadow:0 0 0 6px rgba(138,96,56,.18), 0 22px 50px -10px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,214,170,.18); }
+.sc-sign::before{ content:""; position:absolute; inset:7px; border-radius:12px; border:1px dashed rgba(255,190,130,.28); pointer-events:none; }
+.sc-lock{ position:absolute; top:-20px; left:50%; width:40px; height:40px; margin-left:-20px; display:grid; place-items:center; border-radius:12px;
+  background:linear-gradient(160deg, #ffcf8a, #c27a2c); color:#2a1a0c; box-shadow:0 8px 18px -6px #000c, inset 0 1px 0 #fff8; }
+.sc-lock svg{ width:20px; height:20px; }
+.sc-word{ display:block; margin:14px 0 6px; font:800 clamp(30px, 6vw, 46px)/1 var(--font-heading, serif); letter-spacing:.2em; padding-left:.2em; color:#ffb877;
+  text-shadow:0 0 18px rgba(255,148,56,.45), 0 2px 0 #5a3416; }
+.sc-title{ display:block; font:600 clamp(16px, 2.2vw, 20px)/1.3 var(--font-heading, serif); color:#fbe9d6; }
+.sc-emoji[hidden]{ display:none; }
+.sc-emoji{ display:block; font-size:44px; line-height:1; margin:10px 0 2px; animation:sc-sob 2.6s ease-in-out infinite; }
+.sc-msg{ margin:0; max-width:52ch; color:var(--ink-dim); font-size:15px; line-height:1.65; }
+.sc-when{ display:inline-flex; gap:8px; align-items:center; padding:8px 16px; border-radius:999px; border:1px solid rgba(255,148,56,.35); background:rgba(255,148,56,.1);
+  font:600 12px/1 var(--font-mono, monospace); letter-spacing:.08em; color:#ffd9b8; }
+.sc-when b{ font-variant-numeric:tabular-nums; color:#fff; }
+.sc-zz{ position:absolute; left:calc(62% + 22px); top:-62px; font:700 14px/1 var(--font-mono, monospace); color:#cfe3ff; opacity:0; pointer-events:none; }
+.store-closed.has-panda .sc-zz{ animation:sc-zz 3.4s ease-in-out infinite; }
+.sc-access{ display:grid; gap:10px; justify-items:center; width:100%; }
+.sc-access-toggle{ background:none; border:0; color:#ffcf9e; font:600 13px/1.4 var(--font-body, sans-serif); text-decoration:underline; text-underline-offset:3px; cursor:pointer; padding:6px; }
+.sc-access-form{ display:flex; gap:8px; width:min(420px, 100%); }
+.sc-access-form[hidden]{ display:none; }
+.sc-access-form input{ flex:1; min-width:0; height:42px; padding:0 14px; border-radius:12px; border:1px solid rgba(255,255,255,.16); background:rgba(0,0,0,.35); color:var(--ink); font:15px var(--font-body, sans-serif); }
+.sc-btn{ height:42px; padding:0 18px; border-radius:12px; border:1px solid rgba(255,148,56,.55); background:linear-gradient(135deg, rgba(255,148,56,.35), rgba(255,148,56,.14)); color:#fff; font:600 14px var(--font-body, sans-serif); cursor:pointer; white-space:nowrap; }
+.sc-btn:hover{ background:linear-gradient(135deg, rgba(255,148,56,.5), rgba(255,148,56,.2)); }
+.sc-note{ min-height:1.4em; margin:0; font-size:13px; color:var(--ink-dim); }
+@keyframes sc-swing{ 0%,100%{ transform:rotate(-1.8deg); } 50%{ transform:rotate(1.8deg); } }
+@keyframes sc-sob{ 0%,100%{ transform:translateY(0) rotate(-4deg); } 50%{ transform:translateY(3px) rotate(4deg); } }
+@keyframes sc-zz{ 0%{ opacity:0; transform:translate(0,8px) scale(.7); } 30%{ opacity:.9; } 100%{ opacity:0; transform:translate(16px,-26px) scale(1.15); } }
+@media (prefers-reduced-motion: reduce){ .sc-hang, .sc-emoji, .store-closed.has-panda .sc-zz{ animation:none; } .store-closed{ transition:none; } }
+
+/* ---- the announcement: a tab on the side that slides open, then tucks away ---- */
+.ka-announce{ position:fixed; top:50%; z-index:72; display:flex; align-items:stretch; translate:0 -50%; max-width:min(380px, calc(100vw - 24px));
+  transition:transform .75s cubic-bezier(.22,.8,.24,1); pointer-events:none; }
+.ka-announce[hidden]{ display:none; }
+.ka-announce[data-side="right"]{ right:0; flex-direction:row; transform:translateX(calc(100% - 30px)); }
+.ka-announce[data-side="left"]{ left:0; flex-direction:row-reverse; transform:translateX(calc(-100% + 30px)); }
+.ka-announce.is-open{ transform:none; }
+/* the tucked-away announcement is just a small round megaphone peeking from the edge */
+.ka-ann-tab{ pointer-events:auto; flex:none; align-self:center; position:relative; width:30px; height:30px; display:grid; place-items:center; padding:0; border:var(--glass-border); border-width:1px 0 1px 1px;
+  border-radius:15px 0 0 15px; background:var(--glass-bg-heavy); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur); color:var(--ann, #ff9438); cursor:pointer; box-shadow:var(--glass-shadow);
+  transition:width .25s ease, background .25s ease; }
+.ka-ann-tab:hover{ background:color-mix(in srgb, var(--ann, #ff9438) 18%, var(--glass-bg-heavy)); }
+.ka-ann-tab svg{ width:14px; height:14px; }
+.ka-ann-tab .sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+.ka-announce[data-side="left"] .ka-ann-tab{ border-width:1px 1px 1px 0; border-radius:0 15px 15px 0; }
+.ka-ann-tab i{ position:absolute; top:5px; right:5px; width:5px; height:5px; border-radius:50%; background:var(--ann, #ff9438); box-shadow:0 0 0 0 var(--ann, #ff9438); animation:ann-ping 2.4s ease-out infinite; }
+.ka-announce.is-open .ka-ann-tab i{ display:none; }
+.ka-ann-panel{ pointer-events:auto; position:relative; padding:18px 20px 16px; min-width:0; width:min(336px, calc(100vw - 68px)); border:var(--glass-border); border-right:0;
+  background:var(--glass-bg-heavy); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur); box-shadow:var(--glass-highlight), var(--glass-shadow); color:var(--ink); }
+.ka-announce[data-side="left"] .ka-ann-panel{ border-right:var(--glass-border); border-left:0; }
+.ka-ann-panel::before{ content:""; position:absolute; inset:0 auto 0 0; width:3px; background:var(--ann, #ff9438); }
+.ka-ann-head{ display:flex; align-items:center; gap:8px; margin:0 0 8px; font:700 11px/1 var(--font-mono, monospace); letter-spacing:.18em; text-transform:uppercase; color:var(--ann, #ff9438); }
+.ka-ann-head span{ flex:1; }
+.ka-ann-head button{ width:28px; height:28px; display:grid; place-items:center; border:0; border-radius:8px; background:transparent; color:var(--ink-dim); cursor:pointer; }
+.ka-ann-head button:hover, .ka-ann-head button[aria-pressed="true"]{ background:rgba(255,255,255,.08); color:var(--ink); }
+.ka-ann-head svg{ width:15px; height:15px; }
+.ka-ann-text{ margin:0; font:15px/1.6 var(--font-body, sans-serif); color:var(--ink); }
+.ka-ann-link{ display:inline-flex; margin-top:12px; padding:9px 16px; border-radius:999px; border:1px solid color-mix(in srgb, var(--ann, #ff9438) 60%, transparent); color:#fff; text-decoration:none;
+  font:600 13px/1 var(--font-body, sans-serif); background:color-mix(in srgb, var(--ann, #ff9438) 22%, transparent); }
+.ka-ann-time{ position:absolute; left:0; right:0; bottom:0; height:2px; background:var(--ann, #ff9438); transform-origin:left; transform:scaleX(0); opacity:.7; }
+.ka-announce.is-counting .ka-ann-time{ animation:ann-time var(--ann-s, 6s) linear forwards; }
+.ka-announce[data-tone="warning"]{ --ann:#ffb347; } .ka-announce[data-tone="success"]{ --ann:#6fe0a8; } .ka-announce[data-tone="offer"]{ --ann:#ff7eb6; } .ka-announce[data-tone="info"]{ --ann:#ff9438; }
+@keyframes ann-ping{ 0%{ box-shadow:0 0 0 0 color-mix(in srgb, var(--ann, #ff9438) 70%, transparent); } 80%,100%{ box-shadow:0 0 0 9px transparent; } }
+@keyframes ann-time{ to{ transform:scaleX(1); } }
+@media (max-width:600px){
+  .ka-announce{ top:auto; bottom:110px; translate:none; }
+  /* an even smaller button on phones, so the tucked tab hardly covers the page */
+  .ka-announce[data-side="right"]{ transform:translateX(calc(100% - 26px)); } .ka-announce[data-side="left"]{ transform:translateX(calc(-100% + 26px)); }
+  .ka-announce.is-open{ transform:none; }
+  .ka-ann-tab{ width:26px; height:26px; }
+  .ka-ann-tab svg{ width:12px; height:12px; }
+  .ka-ann-panel{ width:min(320px, calc(100vw - 44px)); }
+}
+@media (prefers-reduced-motion: reduce){ .ka-announce{ transition:none; } .ka-ann-tab i{ animation:none; } }
+
+/* ---- Featured Work showcase: rows down the page, zig-zag; pictures cross-fade in place (no sliding) ---- */
+.fw-show{ display:grid; gap:clamp(48px, 7vw, 96px); margin-top:clamp(24px, 4vw, 44px); }
+.fw-show[hidden]{ display:none; }
+.fw-row{ container-type:inline-size; display:grid; grid-template-columns:var(--fw-img, 48%) 1fr; gap:clamp(22px, 4.5vw, 64px); align-items:center;
+  opacity:0; transform:translateY(-26px); transition:opacity .9s cubic-bezier(.22,.8,.24,1), transform .9s cubic-bezier(.22,.8,.24,1); }
+.fw-row.is-in{ opacity:1; transform:none; }
+.fw-row[data-size="s"]{ --fw-img:38%; } .fw-row[data-size="m"]{ --fw-img:46%; } .fw-row[data-size="a"]{ --fw-img:52%; } .fw-row[data-size="l"]{ --fw-img:60%; }
+/* a frame never grows taller than the screen: the picture is framed to fit instead */
+.fw-frame{ max-height:min(84vh, 900px); }
+.fw-row[data-side="right"]{ grid-template-columns:1fr var(--fw-img, 48%); }
+.fw-row[data-side="right"] .fw-frame{ order:2; }
+.fw-frame{ position:relative; margin:0; border-radius:20px; overflow:hidden; background:#0d0b10; cursor:zoom-in; isolation:isolate;
+  box-shadow:0 30px 70px -28px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,.07); transition:height .9s cubic-bezier(.45,0,.55,1); }
+.fw-frame::after{ content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none; box-shadow:inset 0 1px 0 rgba(255,255,255,.08); background:radial-gradient(120% 80% at 50% 120%, rgba(0,0,0,.35), transparent 55%); }
+.fw-slide{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transform:scale(1.001); will-change:opacity;
+  transition:opacity var(--fw-fade, 1.6s) cubic-bezier(.45,0,.55,1), transform calc(var(--fw-hold, 5s) + var(--fw-fade, 1.6s)) linear; }
+.fw-slide.is-on{ opacity:1; }
+.fw-show.has-zoom .fw-slide.is-on{ transform:scale(1.06); }
+.fw-copy{ min-width:0; display:grid; gap:clamp(8px, 2.2cqi, 16px); align-content:center; }
+.fw-eyebrow{ margin:0; font:600 clamp(10px, 1.6cqi, 12px)/1.3 var(--font-mono, monospace); letter-spacing:.22em; text-transform:uppercase; color:#e7c5a0; }
+.fw-title{ margin:0; font-family:var(--font-heading), serif; font-size:clamp(26px, 6.2cqi, 54px); line-height:1.04; letter-spacing:-.02em; text-wrap:balance; }
+.fw-desc{ margin:0; max-width:56ch; color:var(--ink-dim); font-size:clamp(14px, 2.15cqi, 17px); line-height:1.7; text-wrap:pretty; }
+.fw-caption{ margin:0; min-height:1.5em; font:italic 400 clamp(14px, 2.1cqi, 17px)/1.5 var(--font-sub, var(--font-heading)), serif; color:#f3dcc6; transition:opacity calc(var(--fw-fade, 1.6s) * .5) cubic-bezier(.45,0,.55,1); }
+.fw-caption.is-out{ opacity:0; }
+.fw-foot{ display:flex; flex-wrap:wrap; align-items:center; gap:14px 18px; margin-top:4px; }
+.fw-cta{ display:inline-flex; align-items:center; gap:8px; padding:11px 20px; border-radius:999px; border:1px solid rgba(255,148,56,.5); color:#fff; text-decoration:none;
+  font:600 14px/1 var(--font-body, sans-serif); background:linear-gradient(135deg, rgba(255,148,56,.3), rgba(255,148,56,.08)); cursor:pointer; transition:background .25s ease, transform .25s ease; }
+.fw-cta:hover{ background:linear-gradient(135deg, rgba(255,148,56,.46), rgba(255,148,56,.14)); transform:translateY(-1px); }
+.fw-dots{ display:flex; gap:6px; align-items:center; }
+.fw-dots i{ width:6px; height:6px; border-radius:3px; background:rgba(255,255,255,.22); transition:width .6s cubic-bezier(.45,0,.55,1), background .6s ease; }
+.fw-dots i.is-on{ width:22px; background:#ff9438; }
+.fw-count{ font:600 11px/1 var(--font-mono, monospace); letter-spacing:.14em; color:var(--ink-dim); font-variant-numeric:tabular-nums; }
+@container (max-width: 640px){ .fw-copy{ gap:10px; } }
+@media (max-width:760px){
+  .fw-row, .fw-row[data-side="right"]{ grid-template-columns:1fr; }
+  .fw-row[data-side="right"] .fw-frame{ order:0; }
+  .fw-title{ font-size:clamp(26px, 8cqi, 40px); } .fw-desc{ font-size:15px; }
+}
+@media (prefers-reduced-motion: reduce){ .fw-row{ transition:none; opacity:1; transform:none; } .fw-slide{ transition:opacity .01s; } .fw-show.has-zoom .fw-slide.is-on{ transform:none; } }
+
+/* ---- contact: Regarding as ticks, "Other" opens a box ---- */
+.contact-topics{ border:0; margin:0; padding:0; min-width:0; }
+.contact-topics legend{ padding:0; margin:0 0 10px; font:inherit; color:rgba(237,235,232,0.78); }
+.contact-topics legend small{ margin-left:8px; font-size:10px; letter-spacing:.12em; opacity:.7; }
+.topic-grid{ display:flex; flex-wrap:wrap; gap:8px; }
+.topic-chip{ position:relative; display:inline-flex; }
+.topic-chip input{ position:absolute; opacity:0; inset:0; margin:0; cursor:pointer; }
+.topic-chip span{ display:inline-flex; align-items:center; gap:7px; padding:9px 14px; border-radius:999px; border:1px solid rgba(255,255,255,.16); background:rgba(0,0,0,.35);
+  font:500 13px/1.2 var(--font-body, sans-serif); letter-spacing:0; text-transform:none; color:var(--ink); transition:background .2s ease, border-color .2s ease, transform .2s ease; }
+.topic-chip span::before{ content:""; width:15px; height:15px; flex:none; border-radius:5px; border:1.5px solid rgba(255,255,255,.4); background:transparent center/11px no-repeat; transition:background-color .2s ease, border-color .2s ease; }
+.topic-chip input:checked + span{ border-color:rgba(255,148,56,.75); background:rgba(255,148,56,.16); }
+.topic-chip input:checked + span::before{ border-color:#ff9438; background-color:#ff9438;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231a120c' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.2 4.2L19 7'/%3E%3C/svg%3E"); }
+.topic-chip input:focus-visible + span{ outline:2px solid #ff9438; outline-offset:2px; }
+.topic-chip:active span{ transform:scale(.97); }
+.topic-other{ display:grid; grid-template-rows:0fr; transition:grid-template-rows .45s cubic-bezier(.22,.8,.24,1), margin .45s ease; margin-top:0; }
+.topic-other.is-open{ grid-template-rows:1fr; margin-top:10px; }
+.topic-other > div{ overflow:hidden; }
+.contact-topics[aria-invalid="true"] .topic-chip span{ border-color:rgba(255,120,110,.5); }
+
+/* ---- a reply from Kethan, on the device that sent the message ---- */
+.ka-reply{ position:fixed; left:max(16px, env(safe-area-inset-left)); bottom:max(18px, env(safe-area-inset-bottom)); z-index:90; width:min(400px, calc(100vw - 32px)); max-height:min(70vh, 560px);
+  display:flex; flex-direction:column; border-radius:20px; border:var(--glass-border); background:var(--glass-bg-heavy); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  box-shadow:var(--glass-highlight), 0 30px 70px -20px rgba(0,0,0,.8); color:var(--ink); overflow:hidden;
+  opacity:0; transform:translateY(18px) scale(.98); transition:opacity .5s cubic-bezier(.22,.8,.24,1), transform .5s cubic-bezier(.22,.8,.24,1); }
+.ka-reply.is-in{ opacity:1; transform:none; }
+.ka-reply-head{ display:flex; align-items:center; gap:12px; padding:16px 16px 12px; border-bottom:1px solid rgba(255,255,255,.08); }
+.ka-reply-av{ width:38px; height:38px; flex:none; border-radius:12px; display:grid; place-items:center; background:linear-gradient(135deg, #f0b37c, #b8703c); color:#1b130d; font:800 13px/1 var(--font-body, sans-serif); }
+.ka-reply-head b{ display:block; font-size:14px; } .ka-reply-head > div span{ display:block; font-size:12px; color:var(--ink-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ka-reply-head > div{ flex:1; min-width:0; }
+.ka-reply-x{ width:32px; height:32px; border:0; border-radius:10px; background:transparent; color:var(--ink-dim); cursor:pointer; font-size:20px; line-height:1; }
+.ka-reply-x:hover{ background:rgba(255,255,255,.08); color:var(--ink); }
+.ka-reply-body{ padding:14px 16px; overflow:auto; display:grid; gap:10px; }
+.ka-bubble{ max-width:88%; padding:10px 13px; border-radius:16px; font:14px/1.55 var(--font-body, sans-serif); white-space:pre-wrap; overflow-wrap:anywhere; }
+.ka-bubble.me{ justify-self:end; background:rgba(255,255,255,.08); border-bottom-right-radius:5px; color:var(--ink-dim); }
+.ka-bubble.them{ justify-self:start; background:linear-gradient(135deg, rgba(255,148,56,.24), rgba(255,148,56,.1)); border:1px solid rgba(255,148,56,.3); border-bottom-left-radius:5px; }
+.ka-bubble small{ display:block; margin-top:4px; font-size:11px; opacity:.6; }
+.ka-reply-foot{ display:flex; gap:8px; padding:12px 16px 16px; }
+.ka-reply-foot button{ flex:1; height:40px; border-radius:12px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.06); color:var(--ink); font:600 13px var(--font-body, sans-serif); cursor:pointer; }
+.ka-reply-foot button.primary{ border-color:rgba(255,148,56,.55); background:linear-gradient(135deg, rgba(255,148,56,.35), rgba(255,148,56,.14)); color:#fff; }
+@media (prefers-reduced-motion: reduce){ .ka-reply{ transition:none; } }
+
+/* ---- in-app browsers (Instagram, Facebook, LinkedIn…): a helper to open the site in the real browser ---- */
+.ka-inapp{ position:fixed; left:12px; right:12px; bottom:max(12px, env(safe-area-inset-bottom)); z-index:95; margin:0 auto; max-width:460px; padding:16px 16px 14px; border-radius:20px;
+  border:var(--glass-border); background:var(--glass-bg-heavy); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur); box-shadow:0 24px 60px -18px rgba(0,0,0,.85); color:var(--ink);
+  transform:translateY(130%); transition:transform .6s cubic-bezier(.22,.8,.24,1); }
+.ka-inapp.is-in{ transform:none; }
+.ka-inapp h3{ margin:0 0 4px; font:700 15px/1.3 var(--font-body, sans-serif); }
+.ka-inapp p{ margin:0 0 12px; font-size:13.5px; line-height:1.55; color:var(--ink-dim); }
+.ka-inapp-row{ display:flex; gap:8px; }
+.ka-inapp-row a, .ka-inapp-row button{ flex:1; display:inline-flex; align-items:center; justify-content:center; gap:8px; height:44px; border-radius:12px; border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06); color:var(--ink); font:600 14px var(--font-body, sans-serif); text-decoration:none; cursor:pointer; }
+.ka-inapp-row .go{ border-color:rgba(255,148,56,.6); background:linear-gradient(135deg, rgba(255,148,56,.4), rgba(255,148,56,.16)); color:#fff; }
+.ka-inapp-hint{ margin:10px 0 0 !important; font-size:12px !important; }
+.ka-inapp-x{ position:absolute; top:8px; right:8px; width:32px; height:32px; border:0; border-radius:10px; background:transparent; color:var(--ink-dim); font-size:20px; cursor:pointer; }
+@media (prefers-reduced-motion: reduce){ .ka-inapp{ transition:none; } }
+</style>
+<script>
+// ==================================================================== SITE EXTRAS ==
+(function(){
+  "use strict";
+  var REDUCED = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function store(k, v){ try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch(e){ return null; } }
+  function sstore(k, v){ try { if (v === undefined) return sessionStorage.getItem(k); sessionStorage.setItem(k, v); } catch(e){ return null; } }
+  function el(tag, cls, text){ var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function post(path, body){
+    return fetch(kaApiUrl(path), { method:"POST", headers:{ "Content-Type":"application/json", "Accept":"application/json" }, body:JSON.stringify(body || {}) })
+      .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(b){ if (!r.ok) throw new Error(b.error || "Something went wrong."); return b; }); });
+  }
+  var params = new URLSearchParams(location.search);
+  function dropParam(name){ try { var u = new URL(location.href); u.searchParams.delete(name); history.replaceState(history.state, "", u.pathname + (u.search ? u.search : "") + u.hash); } catch(e){} }
+
+  // ---------------------------------------------------------------- in-app browsers
+  // Instagram, Facebook, Messenger, LinkedIn, Snapchat, TikTok, X, Line, Pinterest and similar apps open links in their own
+  // small browser, where downloads, full screen and some payment apps don't work. Offer the real browser: Android opens
+  // Chrome directly; iPhone tries Safari, and otherwise explains the app's own "Open in browser" menu.
+  var UA = navigator.userAgent || "";
+  var APP = /Instagram/i.test(UA) ? "Instagram" : /FBAN|FBAV|FB_IAB|FBIOS|FB4A/i.test(UA) ? (/Messenger|MESSENGER/i.test(UA) ? "Messenger" : "Facebook")
+    : /LinkedInApp/i.test(UA) ? "LinkedIn" : /Snapchat/i.test(UA) ? "Snapchat" : /musical_ly|Bytedance|TikTok/i.test(UA) ? "TikTok" : /Twitter|TwitterAndroid/i.test(UA) ? "X"
+    : /\bLine\//i.test(UA) ? "LINE" : /Pinterest/i.test(UA) ? "Pinterest" : /; wv\)/.test(UA) && /Android/.test(UA) ? "this app" : "";
+  var IOS = /iPhone|iPad|iPod/i.test(UA) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1), ANDROID = /Android/i.test(UA);
+  var inAppSheet = null;
+  function cleanUrl(){ var u = new URL(location.href); u.searchParams.delete("pass"); return u.href; }
+  function nudge(reason, extraUrl){
+    if (!APP) return false;
+    var why = reason === "download" ? "Downloads don’t work inside " + APP + "." : reason === "fullscreen" ? "Full screen isn’t available inside " + APP + "." :
+      reason === "checkout" ? "Payments work best in your browser." : "You’re viewing this inside " + APP + ".";
+    if (!inAppSheet){
+      inAppSheet = el("div", "ka-inapp"); inAppSheet.setAttribute("role", "dialog"); inAppSheet.setAttribute("aria-label", "Open in your browser");
+      inAppSheet.innerHTML = '<button type="button" class="ka-inapp-x" aria-label="Close">×</button><h3></h3><p></p><div class="ka-inapp-row"></div><p class="ka-inapp-hint"></p>';
+      document.body.appendChild(inAppSheet);
+      inAppSheet.querySelector(".ka-inapp-x").addEventListener("click", function(){ hideNudge(true); });
+    }
+    var url = cleanUrl(), row = inAppSheet.querySelector(".ka-inapp-row");
+    inAppSheet.querySelector("h3").textContent = why;
+    inAppSheet.querySelector("p").textContent = "Open the site in " + (IOS ? "Safari" : ANDROID ? "Chrome" : "your browser") + " so everything works the same: the store, downloads, full screen and the Typography studio.";
+    row.innerHTML = "";
+    var go = el("a", "go", IOS ? "Open in Safari" : ANDROID ? "Open in Chrome" : "Open in browser");
+    if (ANDROID){ var u = new URL(url); go.href = "intent://" + u.host + u.pathname + u.search + u.hash + "#Intent;scheme=" + u.protocol.replace(":", "") + ";package=com.android.chrome;S.browser_fallback_url=" + encodeURIComponent(url) + ";end"; }
+    else if (IOS) go.href = "x-safari-" + url;
+    else { go.href = url; go.target = "_blank"; go.rel = "noopener"; }
+    var copy = el("button", "", "Copy link"); copy.type = "button";
+    copy.addEventListener("click", function(){
+      var done = function(){ copy.textContent = "Link copied"; setTimeout(function(){ copy.textContent = "Copy link"; }, 2200); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function(){ window.prompt("Copy this link:", url); });
+      else window.prompt("Copy this link:", url);
+    });
+    row.append(go, copy);
+    if (reason === "download" && extraUrl){ var img = el("a", "", "Open the image"); img.href = extraUrl; img.target = "_blank"; img.rel = "noopener"; row.append(img); }
+    inAppSheet.querySelector(".ka-inapp-hint").textContent = (IOS ? "If nothing happens, tap ••• (or the share icon) and choose “Open in Safari” or “Open in external browser”." : "If nothing happens, tap ⋮ at the top and choose “Open in Chrome” or “Open in browser”.") + (reason === "download" ? " You can also press and hold the image to save it." : "");
+    requestAnimationFrame(function(){ inAppSheet.classList.add("is-in"); });
+    return true;
+  }
+  function hideNudge(remember){ if (inAppSheet) inAppSheet.classList.remove("is-in"); if (remember) sstore("ka_inapp_seen", "1"); }
+  window.kaInApp = { is: !!APP, name: APP, nudge: nudge };
+  if (APP){
+    document.documentElement.setAttribute("data-inapp", APP);
+    // once per visit, after the intro has had its moment
+    if (!sstore("ka_inapp_seen")) setTimeout(function(){ if (!sstore("ka_inapp_seen")) nudge("visit"); }, 4500);
+  }
+
+  // ---------------------------------------------------------------- store: open, closed, and special access
+  var PASS_KEY = "ka_store_pass";
+  var board = null, boardShown = false, storeState = null, countdown = 0;
+  // a ?pass= link from the owner (or the email) unlocks this browser
+  var linkPass = params.get("pass");
+  var passChecked = linkPass ? post("/api/store/pass", { pass: linkPass }).then(function(r){
+    dropParam("pass");
+    if (r.ok){ store(PASS_KEY, linkPass); if (window.kaPublicConfig && window.kaPublicConfig.refresh) window.kaPublicConfig.refresh(); setTimeout(function(){ window.kaToast && window.kaToast("Welcome! The store is open for you, even while it’s closed to everyone else.", "ok"); }, 900); }
+    else window.kaToast && window.kaToast("That access link isn’t valid any more. Ask for a new one.", "error");
+  }).catch(function(){ dropParam("pass"); }) : Promise.resolve();
+
+  function buildBoard(){
+    if (board) return board;
+    var section = document.getElementById("section-store"); if (!section) return null;
+    board = el("div", "store-closed"); board.id = "store-closed"; board.hidden = true; board.setAttribute("role", "region"); board.setAttribute("aria-label", "The store is closed");
+    board.innerHTML =
+      '<div class="sc-hang"><span class="sc-nail" aria-hidden="true"></span>' +
+        '<div class="sc-sign"><span class="sc-lock" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>' +
+        '<span class="sc-zz" aria-hidden="true">z Z</span><span class="sc-emoji" aria-hidden="true" hidden>😢</span><b class="sc-word">CLOSED</b><span class="sc-title"></span></div></div>' +
+      '<p class="sc-msg"></p><span class="sc-when" hidden>Back in <b></b></span>' +
+      '<div class="sc-access" hidden><button type="button" class="sc-access-toggle">Have special access? Get your link</button>' +
+        '<form class="sc-access-form" hidden novalidate><input type="email" required autocomplete="email" placeholder="you@example.com" aria-label="Your email"><button type="submit" class="sc-btn">Email me</button></form>' +
+        '<p class="sc-note" role="status" aria-live="polite"></p></div>';
+    var shell = section.querySelector(".shop-shell"), head = shell && shell.querySelector(".gallery-head");
+    if (head && head.nextSibling) shell.insertBefore(board, head.nextSibling); else section.appendChild(board);
+    var form = board.querySelector(".sc-access-form"), note = board.querySelector(".sc-note");
+    board.querySelector(".sc-access-toggle").addEventListener("click", function(){ form.hidden = !form.hidden; if (!form.hidden) form.querySelector("input").focus(); });
+    form.addEventListener("submit", function(e){
+      e.preventDefault();
+      var input = form.querySelector("input"), v = input.value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)){ note.textContent = "Enter the email the owner gave access to."; input.focus(); return; }
+      note.textContent = "Sending…";
+      post("/api/store/pass/email", { email: v }).then(function(){ note.textContent = "If that email has access, a link is on its way. Open it on this device."; form.hidden = true; })
+        .catch(function(err){ note.textContent = err.message || "Couldn’t send it. Try again in a moment."; });
+    });
+    return board;
+  }
+  function onStorePage(){ var s = document.getElementById("section-store"); return !!s && !s.hidden; }
+  function fmtLeft(ms){
+    var m = Math.max(0, Math.round(ms / 60000)), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mm = m % 60;
+    return d ? d + "d " + h + "h" : h ? h + "h " + mm + "m" : mm + "m";
+  }
+  function pandaTo(target){ window.__kaPandaVisit = target; if (target){ var bub = document.querySelector("#assistant-launcher .panda-bubble.show"); if (bub) bub.classList.remove("show"); } try { document.dispatchEvent(new CustomEvent("ka-panda-visit", { detail: { target: target } })); } catch(e){} }
+  function applyStore(cfg){
+    var st = cfg && cfg.store; storeState = st || null;
+    var closed = !!st && st.enabled === false && !st.access;
+    var root = document.getElementById("store-root");
+    if (!closed){
+      if (board && boardShown){ board.classList.remove("is-in"); setTimeout(function(){ if (!boardShown) board.hidden = true; }, 500); }
+      boardShown = false; clearInterval(countdown);
+      if (root){ root.classList.remove("is-locked"); root.removeAttribute("inert"); root.removeAttribute("aria-hidden"); }
+      pandaTo(null);
+      return;
+    }
+    var b = buildBoard(); if (!b) return;
+    var c = st.closed || {}, scene = c.scene === "emoji" ? "emoji" : "panda";
+    b.querySelector(".sc-title").textContent = c.title || "The store is taking a nap";
+    b.querySelector(".sc-msg").textContent = c.message || "";
+    b.querySelector(".sc-emoji").hidden = scene !== "emoji";
+    b.classList.toggle("has-panda", scene === "panda");
+    b.querySelector(".sc-access").hidden = !c.emailAccess;
+    var when = b.querySelector(".sc-when"), at = c.reopensAt ? Date.parse(c.reopensAt) : NaN;
+    clearInterval(countdown);
+    var tick = function(){ var left = at - Date.now(); when.hidden = !(left > 0); if (left > 0) when.querySelector("b").textContent = fmtLeft(left); };
+    if (!isNaN(at)){ tick(); countdown = setInterval(tick, 30000); } else when.hidden = true;
+    if (root){ root.classList.add("is-locked"); root.setAttribute("inert", ""); root.setAttribute("aria-hidden", "true"); }
+    b.hidden = false; boardShown = true;
+    requestAnimationFrame(function(){ b.classList.add("is-in"); });
+    syncPanda();
+  }
+  // the panda only leaves the chat button while the closed board is actually on screen
+  function syncPanda(){
+    if (!boardShown || !onStorePage() || !board || !board.classList.contains("has-panda")){ pandaTo(null); return; }
+    setTimeout(function(){ if (boardShown && onStorePage()) pandaTo(board.querySelector(".sc-sign")); }, REDUCED ? 0 : 650);
+  }
+  function refreshStore(){ if (!window.kaPublicConfig) return; window.kaPublicConfig().then(applyStore); }
+  document.addEventListener("ka-page", function(e){ if (e.detail && e.detail.page === "store") refreshStore(); syncPanda(); });
+  window.addEventListener("ka-content-changed", function(){ if (window.kaPublicConfig && window.kaPublicConfig.refresh) window.kaPublicConfig.refresh(); refreshStore(); });
+  window.addEventListener("ka-store-closed", function(){ if (window.kaPublicConfig && window.kaPublicConfig.refresh) window.kaPublicConfig.refresh(); refreshStore(); });
+  passChecked.then(refreshStore);
+  // checkout and downloads inside an in-app browser: suggest the real browser first
+  document.addEventListener("click", function(e){
+    if (!APP) return;
+    var t = e.target.closest && e.target.closest(".kas-buy");
+    if (t && !sstore("ka_inapp_checkout")){ sstore("ka_inapp_checkout", "1"); nudge("checkout"); }
+  }, true);
+
+  // ---------------------------------------------------------------- the announcement side tab
+  var ann = null, annTimer = 0, annPinned = false;
+  var ICON_PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/></svg>';
+  var ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+  function openAnn(auto, seconds){
+    if (!ann) return;
+    clearTimeout(annTimer);
+    ann.classList.add("is-open"); ann.querySelector(".ka-ann-tab").setAttribute("aria-expanded", "true");
+    ann.classList.remove("is-counting");
+    if (auto && seconds > 0 && !annPinned){
+      ann.style.setProperty("--ann-s", seconds + "s");
+      void ann.offsetWidth; ann.classList.add("is-counting");
+      annTimer = setTimeout(function(){ if (!annPinned) closeAnn(); }, seconds * 1000);
+    }
+  }
+  function closeAnn(){ if (!ann) return; clearTimeout(annTimer); ann.classList.remove("is-open", "is-counting"); ann.querySelector(".ka-ann-tab").setAttribute("aria-expanded", "false"); }
+  window.kaAnnounce = function(n){
+    if (!n || !n.enabled || !n.text || n.style === "banner"){ if (ann) ann.hidden = true; return false; }
+    if (!ann){
+      ann = el("aside", "ka-announce"); ann.setAttribute("aria-label", "Announcement");
+      ann.innerHTML = '<button type="button" class="ka-ann-tab" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg><i aria-hidden="true"></i><span class="ka-ann-tabtext sr"></span></button>' +
+        '<div class="ka-ann-panel"><p class="ka-ann-head"><span class="ka-ann-title"></span><button type="button" class="ka-ann-pin" aria-pressed="false" aria-label="Keep it open" title="Keep it open">' + ICON_PIN + '</button>' +
+        '<button type="button" class="ka-ann-close" aria-label="Tuck it away" title="Tuck it away">' + ICON_X + '</button></p><p class="ka-ann-text"></p><a class="ka-ann-link" hidden></a><span class="ka-ann-time" aria-hidden="true"></span></div>';
+      document.body.appendChild(ann);
+      ann.querySelector(".ka-ann-tab").addEventListener("click", function(){ ann.classList.contains("is-open") ? closeAnn() : openAnn(false); });
+      ann.querySelector(".ka-ann-close").addEventListener("click", function(){ annPinned = false; ann.querySelector(".ka-ann-pin").setAttribute("aria-pressed", "false"); closeAnn(); });
+      ann.querySelector(".ka-ann-pin").addEventListener("click", function(){ annPinned = !annPinned; this.setAttribute("aria-pressed", String(annPinned)); if (annPinned) openAnn(false); });
+      // hovering or focusing pauses the tuck-away; leaving restarts a short one
+      ann.addEventListener("pointerenter", function(){ clearTimeout(annTimer); ann.classList.remove("is-counting"); });
+      ann.addEventListener("focusin", function(){ clearTimeout(annTimer); ann.classList.remove("is-counting"); });
+      ann.addEventListener("pointerleave", function(){ if (ann.classList.contains("is-open") && !annPinned && (ann.__auto || 0) > 0) openAnn(true, 3); });
+      document.addEventListener("keydown", function(e){ if (e.key === "Escape" && ann && ann.classList.contains("is-open") && !annPinned) closeAnn(); });
+    }
+    var tone = ["warning", "success", "offer"].indexOf(n.tone) >= 0 ? n.tone : "info";
+    ann.hidden = false; ann.dataset.side = n.side === "left" ? "left" : "right"; ann.dataset.tone = tone; ann.__auto = n.autoClose;
+    ann.querySelector(".ka-ann-tabtext").textContent = n.title || "Announcement";
+    ann.querySelector(".ka-ann-title").textContent = n.title || "Announcement";
+    ann.querySelector(".ka-ann-text").textContent = n.text;
+    var link = ann.querySelector(".ka-ann-link");
+    if (n.linkUrl && n.linkLabel){ link.hidden = false; link.textContent = n.linkLabel; link.href = n.linkUrl; if (/^https?:/.test(n.linkUrl) && n.linkUrl.indexOf(location.host) < 0){ link.target = "_blank"; link.rel = "noopener noreferrer"; } else { link.removeAttribute("target"); } }
+    else link.hidden = true;
+    // slides open by itself once for each new announcement, a moment after the page settles
+    var key = "ka_ann_" + (n.title || "") + "|" + n.text, auto = n.autoClose > 0 ? n.autoClose : 0;
+    if (store("ka_ann_seen") !== key){
+      store("ka_ann_seen", key);
+      setTimeout(function(){ openAnn(true, auto || 0); if (!auto){ annPinned = true; ann.querySelector(".ka-ann-pin").setAttribute("aria-pressed", "true"); } }, REDUCED ? 300 : 2600);
+    }
+    return true;
+  };
+
+  // ---------------------------------------------------------------- Featured Work showcase
+  var fw = { el: null, rows: [], timers: [], io: null, key: "" };
+  function fwStop(){ fw.timers.forEach(clearTimeout); fw.timers = []; if (fw.io) fw.io.disconnect(); fw.io = null; }
+  function posterSrc(p, w){
+    if (p.src) return p.src;
+    var widths = (p.widths || []).slice().sort(function(a, b){ return a - b; });
+    var pick = widths.filter(function(x){ return x >= w; })[0] || widths[widths.length - 1];
+    return (typeof IMG_BASE !== "undefined" ? IMG_BASE : "images/") + p.slug + "-" + (pick || "full") + ".webp";
+  }
+  function defaultShow(data){
+    var feat = (data.stacks && data.stacks.featured || []).filter(function(f){ return (data.folders || []).indexOf(f) >= 0; });
+    if (!feat.length) feat = ["Devara Campaign", "Selected Designs"].filter(function(f){ return (data.folders || []).indexOf(f) >= 0; });
+    if (!feat.length) feat = (data.folders || []).slice(0, 2);
+    return { enabled: true, order: "sequence", interval: 5, fade: 1.6, zoom: false, captions: true, rows: feat.map(function(f){ return { folder: f, slides: [], title: "", eyebrow: "", description: "", ratio: "auto", size: "auto", side: "auto", ctaLabel: "", ctaUrl: "" }; }) };
+  }
+  window.kaRenderFeatured = function(data){
+    var host = document.getElementById("about-work-block"), stacks = document.getElementById("about-work-stacks");
+    if (!host || !data || !Array.isArray(data.images)) return;
+    var show = data.featuredShow || defaultShow(data);
+    var on = !!show && show.enabled !== false && show.rows && show.rows.length;
+    window.kaFeaturedActive = !!on;
+    if (stacks) stacks.hidden = !!on;
+    if (!fw.el){ fw.el = el("div", "fw-show"); fw.el.id = "fw-show"; host.appendChild(fw.el); }
+    var key = JSON.stringify([show, data.images.map(function(i){ return i.slug + i.cat + (i.hidden ? 1 : 0); })]);
+    if (key === fw.key) return; fw.key = key;
+    fwStop(); fw.el.replaceChildren(); fw.rows = [];
+    fw.el.hidden = !on; if (!on) return;
+    fw.el.classList.toggle("has-zoom", !!show.zoom && !REDUCED);
+    fw.el.style.setProperty("--fw-fade", show.fade + "s"); fw.el.style.setProperty("--fw-hold", show.interval + "s");
+    var visible = data.images.filter(function(i){ return i && i.hidden !== true; });
+    show.rows.forEach(function(r, idx){
+      var inFolder = visible.filter(function(i){ return i.cat === r.folder; });
+      // the pictures the owner placed in this frame (from any stack), in their order; otherwise the row's stack
+      var pics = (r.slides && r.slides.length ? r.slides.map(function(s){ return visible.filter(function(i){ return i.slug === s; })[0]; }).filter(Boolean) : inFolder).slice(0, 12);
+      if (!pics.length) return;
+      var side = r.side === "left" || r.side === "right" ? r.side : (fw.rows.length % 2 ? "right" : "left");
+      // Auto size: the frame takes the width that suits the pictures (most portrait: medium; most landscape: large; square: between)
+      var shapes = pics.map(function(p){ return p.width && p.height ? p.width / p.height : 0.8; }), avg = shapes.reduce(function(a, b){ return a + b; }, 0) / shapes.length;
+      var fixedShape = r.ratio === "free" ? [r.ratioW || 4, r.ratioH || 5] : r.ratio && r.ratio !== "auto" ? r.ratio.split(":").map(Number) : null, shape = fixedShape ? fixedShape[0] / fixedShape[1] : avg;
+      var size = r.size && r.size !== "auto" ? r.size : shape >= 1.25 ? "l" : shape <= 0.9 ? "m" : "a";
+      var row = el("article", "fw-row"); row.dataset.side = side; row.dataset.size = size;
+      if (size === "free") row.style.setProperty("--fw-img", Math.max(25, Math.min(75, r.width || 50)) + "%");   // free size: the owner's own share of the row
+      var frame = el("figure", "fw-frame"); frame.setAttribute("role", "button"); frame.tabIndex = 0; frame.setAttribute("aria-label", "Open " + (r.title || r.folder) + " in the gallery");
+      var fixed = fixedShape;
+      if (fixed) frame.style.aspectRatio = fixed[0] + " / " + fixed[1];
+      var imgs = pics.map(function(p, k){
+        var im = el("img", "fw-slide" + (k === 0 ? " is-on" : "")); im.alt = k === 0 ? (p.title || "") : ""; im.decoding = "async";
+        im.loading = k === 0 && idx === 0 ? "eager" : "lazy";
+        if (!p.src && p.widths && p.widths.length && typeof webpSet === "function"){ im.sizes = "(max-width:760px) 92vw, " + (r.size === "l" ? 60 : r.size === "s" ? 38 : 48) + "vw"; im.srcset = webpSet(p); }
+        im.src = posterSrc(p, 1080);
+        frame.appendChild(im); return im;
+      });
+      var copy = el("div", "fw-copy");
+      if (r.eyebrow) copy.appendChild(el("p", "fw-eyebrow", r.eyebrow));
+      copy.appendChild(el("h3", "fw-title", r.title || r.folder));
+      if (r.description) copy.appendChild(el("p", "fw-desc", r.description));
+      var caption = show.captions ? el("p", "fw-caption", pics[0].title || "") : null; if (caption) copy.appendChild(caption);
+      var foot = el("div", "fw-foot");
+      var cta = el(r.ctaUrl ? "a" : "button", "fw-cta", r.ctaLabel || "View the work");
+      if (r.ctaUrl){ cta.href = r.ctaUrl; if (/^https?:/.test(r.ctaUrl) && r.ctaUrl.indexOf(location.host) < 0){ cta.target = "_blank"; cta.rel = "noopener noreferrer"; } }
+      else cta.type = "button";
+      cta.insertAdjacentHTML("beforeend", '<span aria-hidden="true">→</span>');
+      foot.appendChild(cta);
+      var dots = null, count = null;
+      if (pics.length > 1){
+        dots = el("span", "fw-dots"); dots.setAttribute("aria-hidden", "true");
+        pics.forEach(function(_, k){ dots.appendChild(el("i", k === 0 ? "is-on" : "")); });
+        count = el("span", "fw-count", "01 / " + String(pics.length).padStart(2, "0"));
+        foot.append(dots, count);
+      }
+      copy.appendChild(foot);
+      row.append(frame, copy); fw.el.appendChild(row);
+      var state = { row: row, frame: frame, imgs: imgs, pics: pics, at: 0, caption: caption, dots: dots, count: count, fixed: fixed, visible: false, timer: 0, delay: idx * 1300 };
+      fw.rows.push(state);
+      var open = function(){
+        var list = pics.slice(), at = state.at;
+        if (typeof openLightbox === "function") openLightbox(list, at, frame);
+      };
+      frame.addEventListener("click", open);
+      frame.addEventListener("keydown", function(e){ if (e.key === "Enter" || e.key === " "){ e.preventDefault(); open(); } });
+      if (!r.ctaUrl) cta.addEventListener("click", open);
+      if (!fixed) fitFrame(state, 0);
+    });
+    // rows come down one after another as they reach the screen; each frame only plays while it is on screen
+    fw.io = "IntersectionObserver" in window ? new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        var s = fw.rows.filter(function(x){ return x.row === en.target; })[0]; if (!s) return;
+        s.visible = en.isIntersecting;
+        if (en.isIntersecting){ s.row.classList.add("is-in"); schedule(s, s.delay + show.interval * 1000); s.delay = 0; }
+        else { clearTimeout(s.timer); }
+      });
+    }, { threshold: 0.25 }) : null;
+    fw.rows.forEach(function(s, k){ if (fw.io) fw.io.observe(s.row); else { s.row.classList.add("is-in"); s.visible = true; schedule(s, show.interval * 1000 + k * 1300); } });
+    fw.schedule = schedule;
+    function schedule(s, ms){
+      clearTimeout(s.timer);
+      if (s.imgs.length < 2 || REDUCED) return;
+      s.timer = setTimeout(function(){ advance(s); }, ms);
+      fw.timers.push(s.timer);
+    }
+    function advance(s){
+      if (!s.visible || document.hidden){ return; }
+      var next = show.order === "random" ? (s.at + 1 + Math.floor(Math.random() * (s.imgs.length - 1))) % s.imgs.length : (s.at + 1) % s.imgs.length;
+      var img = s.imgs[next];
+      // the next picture is decoded before it starts to appear, so the fade is never interrupted by loading
+      var ready = img.complete && img.naturalWidth ? Promise.resolve() : (img.decode ? img.decode() : new Promise(function(res){ img.onload = res; img.onerror = res; }));
+      img.loading = "eager";
+      ready.catch(function(){}).then(function(){
+        s.imgs[s.at].classList.remove("is-on"); img.classList.add("is-on");
+        s.imgs.forEach(function(x, k){ x.alt = k === next ? (s.pics[k].title || "") : ""; });
+        s.at = next;
+        if (s.caption){ s.caption.classList.add("is-out"); setTimeout(function(){ s.caption.textContent = s.pics[next].title || ""; s.caption.classList.remove("is-out"); }, show.fade * 500); }
+        if (s.dots) Array.prototype.forEach.call(s.dots.children, function(d, k){ d.classList.toggle("is-on", k === next); });
+        if (s.count) s.count.textContent = String(next + 1).padStart(2, "0") + " / " + String(s.imgs.length).padStart(2, "0");
+        if (!s.fixed) fitFrame(s, next);
+        schedule(s, (show.interval + show.fade) * 1000);
+      });
+    }
+  };
+  // "Fit each picture": the frame eases to each picture's own shape, and the words beside it re-centre with it
+  function fitFrame(s, k){
+    var p = s.pics[k], w = s.frame.clientWidth || s.frame.getBoundingClientRect().width;
+    var ratio = p.width && p.height ? p.width / p.height : (s.imgs[k].naturalWidth ? s.imgs[k].naturalWidth / s.imgs[k].naturalHeight : 0.8);
+    if (!w){ s.frame.style.aspectRatio = String(ratio); return; }
+    s.frame.style.aspectRatio = ""; s.frame.style.height = Math.round(Math.min(w / ratio, window.innerHeight * 0.84, 900)) + "px";
+  }
+  var fwResize = 0;
+  window.addEventListener("resize", function(){ clearTimeout(fwResize); fwResize = setTimeout(function(){ fw.rows.forEach(function(s){ if (!s.fixed) fitFrame(s, s.at); }); }, 150); });
+  // a frame paused while the tab was hidden picks up again when it comes back
+  document.addEventListener("visibilitychange", function(){ if (!document.hidden && fw.schedule) fw.rows.forEach(function(s){ if (s.visible) fw.schedule(s, 900); }); });
+  window.addEventListener("ka-portfolio-updated", function(e){ try { window.kaRenderFeatured(e.detail); } catch(err){} });
+  if (window.__kaLastPortfolioData) try { window.kaRenderFeatured(window.__kaLastPortfolioData); } catch(err){}
+
+  // ---------------------------------------------------------------- contact: Regarding ticks + replies on this device
+  var THREADS_KEY = "ka_threads", SHOWN_KEY = "ka_replies_shown";
+  function threads(){ try { return JSON.parse(store(THREADS_KEY) || "[]").filter(function(t){ return t && typeof t.k === "string"; }); } catch(e){ return []; } }
+  function saveThreads(list){ store(THREADS_KEY, JSON.stringify(list.slice(-12))); }
+  window.kaRememberThread = function(key, subject){
+    if (!key) return;
+    var list = threads().filter(function(t){ return t.k !== key; }); list.push({ k: key, s: String(subject || "").slice(0, 120), at: Date.now() }); saveThreads(list);
+  };
+  var replyBox = null;
+  function shown(){ try { return JSON.parse(store(SHOWN_KEY) || "[]"); } catch(e){ return []; } }
+  function fmtDate(iso){ try { return new Date(iso).toLocaleString(undefined, { day:"numeric", month:"short", hour:"numeric", minute:"2-digit" }); } catch(e){ return ""; } }
+  function showThread(t, onlyNew){
+    var seen = shown(), fresh = t.replies.filter(function(r){ return seen.indexOf(r.id) < 0; });
+    if (onlyNew && !fresh.length) return false;
+    if (replyBox) replyBox.remove();
+    replyBox = el("div", "ka-reply"); replyBox.setAttribute("role", "dialog"); replyBox.setAttribute("aria-label", "A reply to your message");
+    var head = el("div", "ka-reply-head"), who = el("div");
+    head.appendChild(el("span", "ka-reply-av", "KA"));
+    who.appendChild(el("b", "", fresh.length ? "Kethan replied to your message" : "Your conversation"));
+    who.appendChild(el("span", "", t.subject || "Your message"));
+    var x = el("button", "ka-reply-x", "×"); x.type = "button"; x.setAttribute("aria-label", "Close");
+    head.append(who, x);
+    var body = el("div", "ka-reply-body");
+    var mine = el("div", "ka-bubble me", t.body || ""); mine.appendChild(el("small", "", "You · " + fmtDate(t.createdAt))); body.appendChild(mine);
+    t.replies.forEach(function(r){ var b = el("div", "ka-bubble them", r.body); b.appendChild(el("small", "", "Kethan · " + fmtDate(r.sentAt))); body.appendChild(b); });
+    var foot = el("div", "ka-reply-foot"), write = el("button", "", "Write back"), ok = el("button", "primary", "Got it");
+    write.type = ok.type = "button"; foot.append(write, ok);
+    replyBox.append(head, body, foot); document.body.appendChild(replyBox);
+    var close = function(){ replyBox.classList.remove("is-in"); var b = replyBox; setTimeout(function(){ b.remove(); }, 450); };
+    x.addEventListener("click", close); ok.addEventListener("click", close);
+    write.addEventListener("click", function(){
+      close();
+      if (window.kaGoTo) window.kaGoTo("contact");
+      setTimeout(function(){ var m = document.getElementById("contact-message"); if (m){ if (!m.value) m.value = "Re: " + (t.subject || "my message") + "\n\n"; m.focus(); } }, 700);
+    });
+    requestAnimationFrame(function(){ replyBox.classList.add("is-in"); body.scrollTop = body.scrollHeight; });
+    // seen: remembered here, and the owner's portal shows "Seen on the site"
+    store(SHOWN_KEY, JSON.stringify(seen.concat(fresh.map(function(r){ return r.id; })).slice(-200)));
+    if (fresh.length) post("/api/messages/threads/seen", { keys: [t.key] }).catch(function(){});
+    try { if (window.kaSound) window.kaSound.play("notify"); } catch(e){}
+    return true;
+  }
+  var checking = false;
+  function checkReplies(focusKey){
+    var list = threads(); if (!list.length || checking) return;
+    checking = true;
+    post("/api/messages/threads", { keys: list.map(function(t){ return t.k; }) }).then(function(r){
+      checking = false;
+      var all = (r.threads || []);
+      if (focusKey){ var f = all.filter(function(t){ return t.key === focusKey; })[0]; if (f){ showThread(f, false); return; } }
+      for (var i = all.length - 1; i >= 0; i--) if (showThread(all[i], true)) return;
+    }).catch(function(){ checking = false; });
+  }
+  // a reply link from the email: keep the conversation on this device too, and open it
+  var linkThread = params.get("thread");
+  if (linkThread && /^[0-9a-f-]{36}\.[0-9a-f]{32}$/.test(linkThread)){ window.kaRememberThread(linkThread, ""); dropParam("thread"); setTimeout(function(){ checkReplies(linkThread); }, 2400); }
+  else if (threads().length) setTimeout(checkReplies, 5000);
+  setInterval(function(){ if (!document.hidden) checkReplies(); }, 90000);
+  document.addEventListener("visibilitychange", function(){ if (!document.hidden) setTimeout(checkReplies, 800); });
+})();
+</script>
+<style>
 :root{--panda-ease:cubic-bezier(.45,0,.15,1);--panda-bounce:cubic-bezier(.22,.8,.28,1);}
 /* [Part B] 35% smaller (104x112 -> 68x73, same aspect) -- bottom offset left unchanged so the
    panda's own base/feet stay anchored at the exact same point relative to the launcher bubble,
@@ -9678,12 +10346,18 @@ async function startPanda(){
     if(current!==generation)return;
     const dispose=await mountPanda(mascot,launcher);
     if(current!==generation)dispose();else disposePanda=dispose;
-  }catch{mascot.classList.remove('is-ready');}finally{if(current===generation)pending=false;}
+  }catch{mascot.classList.remove('is-ready');retryPanda();}finally{if(current===generation)pending=false;}
 }
+// A failed load (a dropped connection, or no free graphics context yet) is retried a few times, a little later each time,
+// and again when the connection comes back; a context the browser never restores starts a fresh panda.
+let pandaTries=0,pandaRetry=0;
+function retryPanda(){if(pandaTries>=4)return;clearTimeout(pandaRetry);pandaRetry=setTimeout(()=>{pandaTries++;pending=false;startPanda();},[2500,6000,15000,30000][pandaTries]);}
+window.addEventListener('online',()=>{if(!disposePanda&&pandaQueued){pandaTries=0;startPanda();}});
+window.addEventListener('ka-panda-lost',()=>{disposePanda=null;generation++;pending=false;pandaTries=0;setTimeout(startPanda,600);});
 function schedulePanda(){if('requestIdleCallback' in window)idleHandle=requestIdleCallback(startPanda,{timeout:1800});else idleHandle=setTimeout(startPanda,400);}
 function hideWelcome(){clearTimeout(welcomeTimer);welcome.classList.remove('show');}
 function showWelcome(){
-  if(document.hidden||launcher.getAttribute('aria-expanded')==='true')return;
+  if(document.hidden||launcher.getAttribute('aria-expanded')==='true'||window.__kaPandaVisit)return;   // not while the panda naps on the closed store board
   try{if(sessionStorage.getItem('pandaWelcomeShown'))return;sessionStorage.setItem('pandaWelcomeShown','1');}catch{}
   welcome.classList.add('show');welcomeTimer=setTimeout(hideWelcome,5200);
 }
@@ -9698,8 +10372,10 @@ window.addEventListener('pageshow',event=>{if(event.persisted)schedulePanda();})
 // The panda brings its own Three.js (~600 KB): wait for the crystal intro to finish so it never competes
 // with the hero for bandwidth or frames; the timer covers a device where the intro can't run.
 let pandaQueued=false;
-function queuePanda(){if(pandaQueued)return;pandaQueued=true;welcomeWanted=true;clearTimeout(pandaFallback);schedulePanda();}
+function queuePanda(){if(pandaQueued||document.documentElement.classList.contains('ka-wallpaper'))return;pandaQueued=true;welcomeWanted=true;clearTimeout(pandaFallback);schedulePanda();}
 const pandaFallback=setTimeout(queuePanda,12000);
+// the panda's code downloads quietly in the background while the intro plays, so it appears at once afterwards
+setTimeout(()=>{try{const l=document.createElement('link');l.rel='modulepreload';l.href='./dist/assets/panda.js';document.head.appendChild(l);}catch{}},2500);
 window.addEventListener('ka-sequence-complete',queuePanda,{once:true});
 </script>
 
@@ -10065,6 +10741,7 @@ body:has(.assistant-panel.open) #site-nav,body:has(.assistant-panel.open) .site-
 <style>
 /* Softer shared glass, with a reserved perch above the chat controls. */
 .about-caption{font-size:clamp(10px,1.1vw,13px);letter-spacing:.24em;color:#e7c5a0;margin:18px 0 26px;line-height:1.8;}
+#section-about .about-caption{max-width:100%;width:max-content;margin:10px 0 24px;font-size:clamp(9px,.72vw,11px);letter-spacing:clamp(.12em,.2vw,.2em);line-height:1.5;}
 .glass-panel,.assistant-panel{color:var(--ink);text-shadow:0 1px 3px #0006;}
 footer.site-footer{border:0;box-shadow:none;flex-wrap:wrap;gap:16px 24px;background:linear-gradient(180deg,transparent,rgba(18,16,23,.3) 45%,rgba(18,16,23,.45));backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);}
 .footer-copyright{flex-basis:100%;text-align:center;margin:4px 0 0;font-size:11px;letter-spacing:.06em;color:var(--ink-dim);}
@@ -10610,7 +11287,7 @@ html{ font-size:calc(100% * var(--text-scale, 1) * var(--screen-scale, 1)); }
     emergeSelector: ".gallery-head p, .fav-filter, #contact-intro, .about-caption, .about-bio-text, #portfolio-intro, #skills-intro, #skills-meta, #reel-intro, #store-intro, #tips-intro",
     ghostLabelSelector: ".contact-form label",
     twoLineSelector: "#contact-intro",
-    ghostBoxSelector: ".contact-form input:not(.hp-field), .contact-form textarea, .contact-form .contact-submit",
+    ghostBoxSelector: ".contact-form input:not(.hp-field):not([type=checkbox]), .contact-form textarea, .contact-form .contact-submit",
     glow: { portfolio: "150,110,255", contact: "255,160,90", about: "90,190,255", other: "255,170,100" }
   };
   var clamp = function(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); };

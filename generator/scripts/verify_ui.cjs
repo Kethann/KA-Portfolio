@@ -46,7 +46,7 @@ const c=vm.createContext({console,window,document:{documentElement:new Element('
   buildPicture:()=>new Element('picture'),isPinned:()=>false,setPinned(){},sampleDominantColor:(p,cb)=>cb('#c88'),openLightbox:(p,i)=>{c.opened=i;}});
 function timersOnce(){const tasks=[...timers.values()];timers.clear();tasks.forEach(f=>f());}
 function frames(){for(let n=0;n<100&&rafs.size;n++){time+=16.667;const callbacks=[...rafs.values()];rafs.clear();callbacks.forEach(f=>f(time));}}
-for(const name of ['clamp','cubicBezier','movePill','navPage','pageSections','focusSectionHeading','switchSection','mountCoverflow','refreshNavItemRefs']) vm.runInContext(funcs.get(name),c);
+for(const name of ['kaCoarse','clamp','cubicBezier','movePill','navPage','pageSections','focusSectionHeading','switchSection','mountCoverflow','refreshNavItemRefs']) vm.runInContext(funcs.get(name),c);
 vm.runInContext('var navEase=cubicBezier(.22,.8,.24,1);',c);
 const start=script.indexOf('// Pointer capture keeps a held selection');
 vm.runInContext(script.slice(start,script.indexOf('var sectionTimer',start)),c);

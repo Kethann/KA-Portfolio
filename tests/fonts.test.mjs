@@ -27,7 +27,9 @@ test('library names are unique and build valid stacks and URLs', () => {
 
 test('the studio bundle ships the themes, scenes and new effects', () => {
   const js = readFileSync(new URL('../dist/assets/studio.js', import.meta.url), 'utf8');   // themes and effects are in the studio's own bundle
-  for (const s of ['Blockbuster', "Doctor's note", 'Command', 'Inferno', 'Frozen', 'Rainy night', 'Deep space', 'Underground', 'Bones', 'Ancient', 'Neon future',
-    'Decode', 'Cinematic blur', 'Neon flicker', 'Constellation', 'Heartbeat line', 'Targeting HUD', 'Laurel wreath', 'Film grain', 'Gold 3D', 'Chrome 3D', 'Foil balloon 3D', 'Carved stone', 'Real handwriting', 'Aurora', 'Molten lava', 'fx-look', 'Comes in', 'Goes out', 'guide-tablet'])
+  for (const s of ['Blockbuster', "Doctor's note", 'Command', 'Thunderstorm', 'Frozen', 'Rainy night', 'Medical monitor', 'Underground', 'Bones', 'Ancient', 'Neon future',
+    'Decode', 'Cinematic blur', 'Neon flicker', 'Constellation', 'Heartbeat line', 'Targeting HUD', 'Laurel wreath', 'Film grain', 'Gold 3D', 'Chrome 3D', 'Foil balloon 3D', 'Carved stone', 'Real handwriting', 'Love letter', 'Molten lava', 'fx-look', 'Comes in', 'Goes out', 'guide-tablet'])
     assert.ok(js.includes(s), s);
+  // themes taken out of the studio stay out
+  for (const s of ['Smoke show', 'Cool breeze', 'Golden hour', 'Balloons', 'Flames & embers', 'Coloured smoke']) assert.ok(!js.includes(s), s);
 });

@@ -4,7 +4,11 @@ import { getDb } from './db.js';
 
 export const DEFAULTS = {
   store: {
-    enabled: true,
+    enabled: true,                    // false = closed: visitors see the closed board and can't buy (Overview / Settings > Store status)
+    closedTitle: 'The store is taking a nap',
+    closedMessage: 'New orders are paused for a little while. Everything is safe, and the shop will be back soon.',
+    reopensAt: '',                    // optional ISO time shown on the closed board
+    closedScene: 'panda',             // 'panda' (the panda hangs the sign) or 'emoji'
     international: true,              // buyers outside India can pay in USD (international cards must also be on in Razorpay)
     allowCouponStacking: false,       // one coupon per order unless turned on
     taxEnabled: false,                // GST/tax: confirm treatment with your accountant first
@@ -27,8 +31,11 @@ export const DEFAULTS = {
     notifyEmail: '',                  // falls back to OWNER_EMAIL
     autoReply: { enabled: false, subject: 'Thanks for your message', body: 'Hi {{name}},\n\nThanks for reaching out. I read every message and will reply soon.\n\n{{signature}}' },
     businessHours: { enabled: false, days: [1, 2, 3, 4, 5], start: '10:00', end: '19:00', awayMessage: 'I’m away right now and will reply when I’m back.' },
-    spamFilter: true
+    spamFilter: true,
+    contactTopics: ['A new project', 'Commission / poster design', 'Store order or download', 'License question', 'Collaboration', 'Just saying hi'],   // the Regarding ticks on the contact form ("Other" is always offered)
+    replyOnSite: true                 // replies also pop up on the device the visitor wrote from
   },
+  storeAccess: { passes: [] },        // who may still buy while the store is closed: [{ id, kind: 'email'|'device', label, email, createdAt, lastUsedAt, uses }]
   assistant: {
     enabled: true,
     persona: 'Warm, direct and honest. Speaks on Kethan’s behalf in first person, and says so plainly when asked if it is an AI.',

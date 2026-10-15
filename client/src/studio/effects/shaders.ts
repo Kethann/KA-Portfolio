@@ -20,15 +20,21 @@ float fbm(vec2 p){ float v = 0.0, a = 0.5; mat2 m = mat2(1.6, 1.2, -1.2, 1.6); f
 float fbm3(vec2 p){ float v = 0.0, a = 0.5; mat2 m = mat2(1.6, 1.2, -1.2, 1.6); for (int i = 0; i < 3; i++){ v += a * noise(p); p = m * p; a *= 0.5; } return v; }
 vec3 glowAt(vec2 p, vec2 c, float r, vec3 col){ float d = length(p - c); return col * exp(-d * d / (r * r)); }
 // falling rain: hair-thin, slightly slanted streaks of different lengths and speeds
+// Three depth layers (near drops are longer, brighter and faster), one wind slant for all, and every column has its
+// own speed and phase, so drops never line up in rows. Each streak has a bright leading head and a fading tail.
 float rainStreaks(vec2 p, float t){
   float r = 0.0;
-  for (int i = 0; i < 2; i++){
-    float fi = float(i), sc = 60.0 + fi * 50.0;
-    vec2 q = vec2(p.x * sc + p.y * 6.0, p.y * (2.0 + fi) + t * (4.5 + fi * 2.0));
-    vec2 id = floor(q); vec2 f = fract(q); float h = hash(id + fi * 7.0);
-    float lane = smoothstep(0.09, 0.0, abs(f.x - 0.5 - (h - 0.5) * 0.6));
-    float len = smoothstep(0.0, 0.35, f.y) * smoothstep(1.0, 0.55, f.y);
-    r += lane * len * step(0.82, h) * (0.6 + 0.4 * fi);
+  for (int i = 0; i < 3; i++){
+    float fi = float(i), sc = 34.0 + fi * 30.0;
+    vec2 w = vec2(p.x + p.y * 0.16, p.y);
+    float col = floor(w.x * sc), hc = hash(vec2(col, 3.1 + fi * 13.7));
+    float y = w.y * (1.0 + fi * 0.7) + t * (2.6 - fi * 0.6) * (0.8 + hc * 0.45) + hc * 19.0;
+    float cell = floor(y), fy = fract(y), h = hash(vec2(col * 1.37, cell + fi * 31.0));
+    float fx = fract(w.x * sc) - 0.5 - (h - 0.5) * 0.55;
+    float len = 0.22 + h * 0.3 - fi * 0.05;
+    float body = smoothstep(0.0, 0.015, fy) * smoothstep(len, 0.0, fy) * step(fy, len);
+    float thin = smoothstep(0.07 + (2.0 - fi) * 0.025, 0.0, abs(fx));
+    r += thin * body * step(0.45, h) * (0.85 - fi * 0.22);
   }
   return r;
 }
@@ -50,69 +56,6 @@ void main(){
 }`;
 
 export const SHADERS: Record<string, string> = {
-  // ---------------------------------------------------------------- fire: domain-warped flames, heat colour ramp, embers
-  fire: `vec3 scene(vec2 uv, vec2 p){
-    float t = uTime;
-    vec2 q = vec2(p.x * 1.6, uv.y);
-    float w = fbm(vec2(q.x * 2.0, q.y * 2.0 - t * 0.9));
-    float n = fbm(vec2(q.x * 3.2 + w * 1.4, q.y * 3.0 - t * 1.7));
-    float h = 1.0 - uv.y;
-    float flame = h * (0.95 + 0.55 * uI) + n * 0.9 - 0.95;
-    flame = clamp(flame * 1.8, 0.0, 1.0);
-    vec3 col = mix(uBg * 0.25, uBg * 0.55, h);
-    vec3 heat = mix(uA1 * 0.5, uA1, smoothstep(0.05, 0.35, flame));
-    heat = mix(heat, vec3(1.0, 0.62, 0.16), smoothstep(0.3, 0.65, flame));
-    heat = mix(heat, vec3(1.0, 0.94, 0.72), smoothstep(0.7, 1.0, flame));
-    col = mix(col, heat, smoothstep(0.0, 0.25, flame));
-    col += uA1 * 0.25 * pow(h, 3.0);
-    vec2 g = vec2(p.x * 16.0, uv.y * 9.0 - t * 1.4); vec2 id = floor(g); vec2 f = fract(g) - 0.5;
-    float e = hash(id); vec2 o = (hash2(id) - 0.5) * 0.6 + vec2(sin(t * 2.0 + e * 6.3) * 0.15, 0.0);
-    float spark = smoothstep(0.07, 0.0, length(f - o)) * step(0.86, e) * smoothstep(1.0, 0.25, uv.y);
-    col += vec3(1.0, 0.65, 0.25) * spark * (0.8 + uI);
-    return col;
-  }`,
-  // ---------------------------------------------------------------- deep space: nebula + depth-layered twinkling stars
-  space: `vec3 stars(vec2 p, float s, float t, float k){
-    vec2 g = p * s; vec2 id = floor(g), f = fract(g) - 0.5; float h = hash(id); vec2 o = (hash2(id) - 0.5) * 0.7;
-    float d = length(f - o); float tw = 0.65 + 0.35 * sin(t * (1.0 + h * 3.0) + h * 40.0);
-    float star = smoothstep(0.05 * k, 0.0, d) + 0.25 * exp(-d * 40.0 / k);
-    return vec3(star * step(0.72, h) * tw) * mix(vec3(0.8, 0.88, 1.0), vec3(1.0, 0.9, 0.8), hash(id + 3.0));
-  }
-  vec3 scene(vec2 uv, vec2 p){
-    float t = uTime; vec2 q = p * 1.5 + vec2(t * 0.008, 0.0);
-    float n = fbm(q + fbm(q * 1.7 + t * 0.015) * 1.6);
-    float n2 = fbm(q * 2.2 - 3.7 + t * 0.01);
-    float dust = smoothstep(0.25, 0.65, fbm(q * 3.2 + 7.0));
-    vec3 neb = uA1 * pow(n, 2.6) * 1.9 + uA2 * pow(n2, 3.0) * 1.6;
-    neb *= 0.25 + 0.75 * dust;
-    vec3 col = uBg * 0.55 + neb * (0.3 + uI * 0.9);
-    col += stars(p + vec2(t * 0.002, 0.0), 70.0, t, 0.7) * 0.7;
-    col += stars(p + vec2(t * 0.004, 0.0), 32.0, t, 1.0);
-    col += stars(p + vec2(t * 0.007, 0.0) + 11.0, 13.0, t, 1.6) * 1.2;
-    return col;
-  }`,
-  // ---------------------------------------------------------------- under the sea: caustics, light shafts, plankton
-  ocean: `float caustic(vec2 p, float t){
-    vec2 i = p; float c = 1.0; float inten = 0.005;
-    for (int n = 0; n < 4; n++){
-      float tt = t * (1.0 - (3.5 / float(n + 1)));
-      i = p + vec2(cos(tt - i.x) + sin(tt + i.y), sin(tt - i.y) + cos(tt + i.x));
-      c += 1.0 / length(vec2(p.x / (sin(i.x + tt) / inten), p.y / (cos(i.y + tt) / inten)));
-    }
-    c /= 4.0; c = 1.17 - pow(c, 1.4); return pow(abs(c), 8.0);
-  }
-  vec3 scene(vec2 uv, vec2 p){
-    float t = uTime * 0.5;
-    vec3 deep = mix(uBg * 0.35, mix(uBg, uA2, 0.55), pow(uv.y, 1.4));
-    vec3 col = deep;
-    col += uGlow * caustic(p * 3.0 + vec2(0.0, t * 0.2), t) * 0.22 * uv.y * (0.4 + uI);
-    float a = atan(p.x - 0.2, 1.4 - p.y);
-    float rays = pow(fbm(vec2(a * 9.0, t * 0.3)), 2.5) * smoothstep(0.0, 1.0, uv.y);
-    col += uGlow * rays * 0.45 * (0.4 + uI);
-    vec2 g = vec2(p.x * 22.0, p.y * 22.0 + uTime * 0.6); vec2 id = floor(g); vec2 f = fract(g) - 0.5;
-    col += vec3(0.8, 0.95, 1.0) * smoothstep(0.06, 0.0, length(f - (hash2(id) - 0.5) * 0.6)) * step(0.9, hash(id)) * 0.4;
-    return col;
-  }`,
   // ---------------------------------------------------------------- cinema: haze, god rays from a key light, anamorphic streak, letterbox
   cinema: `vec3 scene(vec2 uv, vec2 p){
     float t = uTime;
@@ -176,13 +119,25 @@ export const SHADERS: Record<string, string> = {
   }`,
   storm: `vec3 scene(vec2 uv, vec2 p){
     float t = uTime;
-    float k = mod(t * 0.45, 3.2); float flash = (k < 0.12 || (k > 0.2 && k < 0.26)) ? 1.0 : 0.0;
+    // a strike every ~7 s: a bright stroke, a short dark gap, a second weaker return stroke, then a fading afterglow
+    float k = mod(t * 0.45, 3.2), n = floor(t * 0.45 / 3.2);
+    float flash = exp(-k * 22.0) + 0.65 * step(0.16, k) * exp(-(k - 0.16) * 16.0) + 0.12 * exp(-k * 3.0);
     vec2 q = p * 1.4 + vec2(t * 0.03, 0.0);
     float cl = fbm(q + fbm(q * 1.5 - t * 0.02));
-    vec3 col = mix(uBg * 0.25, mix(uBg, uA2, 0.4), cl);
-    vec2 bolt = vec2(-0.3 + hash(vec2(floor(t * 0.45 / 3.2), 1.0)) * 0.8, 0.3);
-    col += mix(uGlow, vec3(1.0), 0.5) * flash * (0.25 + 0.9 * smoothstep(0.9, 0.0, length(p - bolt))) * cl * uI * 1.6;
-    col += vec3(0.75, 0.8, 0.9) * rainStreaks(p, t) * 0.3;
+    vec3 col = mix(uBg * 0.22, mix(uBg, uA2, 0.4), cl);
+    // the bolt: a jagged channel from the cloud base down, with one fork
+    float bx = -0.45 + hash(vec2(n, 1.0)) * 0.9, end = -0.15 - hash(vec2(n, 2.0)) * 0.35;
+    float jag = (fbm(vec2(p.y * 7.0, n * 3.7)) - 0.5) * 0.32 + (noise(vec2(p.y * 28.0, n)) - 0.5) * 0.05;
+    float dist = abs(p.x - bx - jag), width = mix(0.0022, 0.0075, smoothstep(end, 0.5, p.y));   // thicker near the cloud
+    float forkY = 0.12 + hash(vec2(n, 3.0)) * 0.15, forkX = bx + (fbm(vec2(forkY * 7.0, n * 3.7)) - 0.5) * 0.32;
+    float fork = abs(p.x - forkX - (forkY - p.y) * 0.55 - (noise(vec2(p.y * 26.0, n + 9.0)) - 0.5) * 0.06) + step(forkY, p.y) * 9.0 + step(p.y, forkY - 0.22) * 9.0;
+    float channel = (smoothstep(width, 0.0, dist) + 0.5 * smoothstep(0.004, 0.0, fork)) * step(end, p.y);
+    float halo = (exp(-dist * 38.0) + 0.4 * exp(-fork * 45.0)) * step(end, p.y);
+    float lit = flash * uI;
+    col += mix(uGlow, vec3(1.0), 0.55) * lit * (0.18 + 0.85 * cl * smoothstep(1.1, 0.0, length(p - vec2(bx, 0.35))));
+    col += vec3(0.92, 0.95, 1.0) * (channel * 2.2 + halo * 0.6) * clamp(exp(-k * 9.0) + 0.7 * step(0.16, k) * exp(-(k - 0.16) * 12.0), 0.0, 1.0) * uI;
+    // rain catches the flash
+    col += vec3(0.72, 0.78, 0.9) * rainStreaks(p, t) * (0.28 + lit * 0.6);
     return col;
   }`,
   // ---------------------------------------------------------------- frozen: frosted glass crystals, cold light, glints
@@ -302,14 +257,6 @@ export const SHADERS: Record<string, string> = {
     col = mix(col, mix(uBg, uA2, 0.5), smoothstep(0.5, 0.85, b) * (0.35 + uI * 0.5));
     return col;
   }`,
-  party: `vec3 scene(vec2 uv, vec2 p){
-    float t = uTime;
-    vec3 col = uBg * 0.7 + uA1 * 0.06;
-    col += bokeh(p + vec2(0.0, t * 0.02), 3.0, 0.0, uA1, uA2, 0.6) * 0.5 * (0.5 + uI);
-    col += bokeh(p + vec2(1.3, -t * 0.03), 5.0, 0.0, uGlow, uA1, 0.55) * 0.45 * (0.5 + uI);
-    col += bokeh(p + vec2(2.7, t * 0.05), 9.0, 0.0, uA2, uGlow, 0.5) * 0.35 * (0.5 + uI);
-    return col;
-  }`,
   sakura: `vec3 petal(vec2 p, float scale, float t, float speed){
     vec2 g = p * scale + vec2(t * 0.15 * speed, t * 0.35 * speed); vec2 id = floor(g); vec2 f = fract(g) - 0.5;
     float h = hash(id); if (h < 0.55) return vec3(0.0);
@@ -329,7 +276,8 @@ export const SHADERS: Record<string, string> = {
     return sqrt(min(dot(p - vec2(0.0, 1.0), p - vec2(0.0, 1.0)), dot(p - 0.5 * max(p.x + p.y, 0.0), p - 0.5 * max(p.x + p.y, 0.0)))) * sign(p.x - p.y); }
   vec3 layer(vec2 p, float scale, float t, float blur){
     vec2 g = p * scale + vec2(0.0, -t * 0.25); vec2 id = floor(g); vec2 f = fract(g) - 0.5; float h = hash(id); if (h < 0.6) return vec3(0.0);
-    vec2 d = (f - (hash2(id) - 0.5) * 0.4) * 3.2; float s = heartSdf(d + vec2(0.0, 0.5));
+    // the heart is centred in its cell and kept well inside it (shape + blur), so no heart is ever cut off at a cell edge
+    vec2 d = (f - (hash2(id) - 0.5) * 0.2) * 3.4; float s = heartSdf(d + vec2(0.0, -0.45));
     return mix(uA1, uGlow, hash(id + 1.0)) * smoothstep(blur, -blur, s);
   }
   vec3 scene(vec2 uv, vec2 p){
@@ -346,23 +294,6 @@ export const SHADERS: Record<string, string> = {
     col += mix(uText, uGlow, 0.5) * smoothstep(0.45, 0.9, smoke) * 0.12;
     return col * (1.0 - 0.45 * length(p));
   }`,
-  // ---------------------------------------------------------------- new scenes
-  aurora: `vec3 scene(vec2 uv, vec2 p){
-    float t = uTime * 0.25;
-    vec3 col = mix(uBg * 0.2, uBg * 0.7, uv.y);
-    for (int i = 0; i < 3; i++){
-      float fi = float(i);
-      float x = p.x * (1.2 + fi * 0.4) + t * (0.3 + fi * 0.1);
-      float curtain = fbm(vec2(x * 2.0, fi * 4.0 + t * 0.4));
-      float y0 = 0.05 + fi * 0.12 + curtain * 0.35;
-      float band = smoothstep(y0 - 0.02, y0 + 0.05, p.y) * exp(-(p.y - y0) * (4.0 - fi));
-      float rays = 0.6 + 0.4 * fbm(vec2(x * 22.0, t));
-      col += mix(uA2, uA1, fi * 0.45) * band * rays * (0.35 + uI * 0.6);
-    }
-    vec2 g = p * 70.0; col += vec3(step(0.987, hash(floor(g)))) * smoothstep(0.0, 0.3, p.y) * 0.8;
-    float m = fbm3(vec2(p.x * 2.5, 1.0)) * 0.25 - 0.32; col = mix(col, uBg * 0.08, step(p.y, m));
-    return col;
-  }`,
   lava: `vec3 scene(vec2 uv, vec2 p){
     float t = uTime * 0.15;
     vec2 q = p * 2.2 + vec2(fbm(p * 2.0 + t), fbm(p * 2.0 - t + 3.0));
@@ -371,26 +302,6 @@ export const SHADERS: Record<string, string> = {
     vec3 crust = mix(vec3(0.05, 0.02, 0.015), vec3(0.16, 0.07, 0.04), fbm(q * 3.0));
     vec3 hot = mix(uA1, vec3(1.0, 0.85, 0.4), crack);
     return mix(crust, hot, clamp(crack * (0.7 + uI) + smoothstep(0.62, 0.85, n) * 0.5, 0.0, 1.0));
-  }`,
-  clouds: `vec3 scene(vec2 uv, vec2 p){
-    float t = uTime * 0.03;
-    vec3 sky = mix(mix(uA1, uGlow, 0.5), mix(uBg, uA2, 0.6), uv.y);
-    vec2 q = p * vec2(1.2, 2.4) + vec2(t, 0.0);
-    float c = fbm(q + fbm(q * 2.0 + t));
-    float dens = smoothstep(0.42, 0.75, c);
-    vec3 lit = mix(uA1 * 0.6, vec3(1.0, 0.92, 0.85), smoothstep(0.4, 0.9, fbm(q * 1.5 + vec2(0.3, -0.2))));
-    vec3 col = mix(sky, lit, dens * (0.6 + uI * 0.4));
-    col += uGlow * glowAt(p, vec2(0.0, -0.25), 0.4, vec3(0.6));
-    return col;
-  }`,
-  smoke: `vec3 scene(vec2 uv, vec2 p){
-    float t = uTime * 0.12;
-    vec2 q = p * 1.6; q += vec2(fbm(q + t), fbm(q - t + 4.0)) * 1.2;
-    float s = fbm(q * 1.4 + t);
-    vec3 col = uBg * 0.5;
-    col = mix(col, uA1 * 0.9, smoothstep(0.45, 0.85, s) * (0.4 + uI * 0.5));
-    col = mix(col, uA2 * 0.9, smoothstep(0.55, 0.95, fbm(q * 2.1 - t)) * (0.35 + uI * 0.5));
-    return col;
   }`,
   golddust: `vec3 scene(vec2 uv, vec2 p){
     float t = uTime;

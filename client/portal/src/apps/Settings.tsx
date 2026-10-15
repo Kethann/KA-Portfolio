@@ -9,10 +9,15 @@ import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, Segmented, Skeleto
 import { Icon } from '../icons';
 import { ago, bytes, dateTime } from '../format';
 import { qrMatrix, qrPath } from '../qr';
+import StoreStatusPanel from './StoreStatus';
 
-type Sec = 'security' | 'team' | 'store' | 'messages' | 'reports' | 'categories' | 'system' | 'backups' | 'audit' | 'appearance';
-const SECTIONS: [Sec, string, string][] = [['security', 'Account & security', 'shield'], ['team', 'Team', 'visitors'], ['store', 'Store & tax', 'products'], ['messages', 'Messages', 'messages'], ['reports', 'Email reports', 'reports'],
-  ['categories', 'Categories', 'tag'], ['system', 'System status', 'info'], ['backups', 'Backups', 'archive'], ['audit', 'Activity log', 'list'], ['appearance', 'Appearance', 'studio']];
+type Sec = 'security' | 'team' | 'storestatus' | 'store' | 'messages' | 'reports' | 'categories' | 'system' | 'backups' | 'audit' | 'appearance';
+// grouped by what they belong to; the group name shows above its first section
+const SECTIONS: [Sec, string, string, string][] = [
+  ['security', 'Account & security', 'shield', 'Account'], ['team', 'Team', 'visitors', 'Account'], ['appearance', 'Appearance', 'studio', 'Account'],
+  ['storestatus', 'Store status & access', 'lock', 'Store'], ['store', 'Payments & tax', 'products', 'Store'], ['categories', 'Categories', 'tag', 'Store'],
+  ['messages', 'Messages & contact form', 'messages', 'People'], ['reports', 'Email reports', 'reports', 'People'],
+  ['system', 'System status', 'info', 'System'], ['backups', 'Backups', 'archive', 'System'], ['audit', 'Activity log', 'list', 'System']];
 
 export default function Settings({ route, go }: AppProps){
   const me = useLoad<{ role: 'owner' | 'admin' }>('/account');
@@ -22,10 +27,12 @@ export default function Settings({ route, go }: AppProps){
   return (
     <div className="content-split">
       <nav className="folder-nav" aria-label="Settings sections">
-        {sections.map(([k, l, ic]) => <button key={k} type="button" className={'folder-btn' + (k === sec ? ' on' : '')} aria-current={k === sec || undefined} onClick={() => go(k)}><Icon name={ic} size={14} /><span className="grow truncate">{l}</span></button>)}
+        {sections.map(([k, l, ic, group], i) => <div key={k} className="folder-nav-item">
+          {group !== sections[i - 1]?.[3] && <div className="folder-nav-group">{group}</div>}
+          <button type="button" className={'folder-btn' + (k === sec ? ' on' : '')} aria-current={k === sec || undefined} onClick={() => go(k)}><Icon name={ic} size={14} /><span className="grow truncate">{l}</span></button></div>)}
       </nav>
       <div className="app-main"><div style={{ maxWidth: 820, width: '100%' }} className="stack-lg">
-        {sec === 'security' ? <Security /> : sec === 'team' ? <Team /> : sec === 'store' ? <StoreSettings /> : sec === 'messages' ? <MessageSettings /> : sec === 'reports' ? <ReportSettings />
+        {sec === 'security' ? <Security /> : sec === 'team' ? <Team /> : sec === 'storestatus' ? <StoreStatusPanel /> : sec === 'store' ? <StoreSettings go={go} /> : sec === 'messages' ? <MessageSettings /> : sec === 'reports' ? <ReportSettings />
           : sec === 'categories' ? <Categories /> : sec === 'system' ? <System /> : sec === 'backups' ? <Backups /> : sec === 'audit' ? <Audit /> : <Appearance />}
       </div></div>
     </div>
@@ -131,14 +138,14 @@ function uaLabel(ua: string | null){
   return `${b}${o ? ' on ' + o : ''}`;
 }
 
-function StoreSettings(){
+function StoreSettings({ go }: { go: (r: string) => void }){
   const { s, v, setV, dirty, save } = useSettingsDoc<any>('store');
   if (s.error && !s.data) return <ErrorState message={s.error} retry={s.reload} />;
   if (!v) return <SkeletonRows rows={8} />;
   const set = (k: string, x: unknown) => setV({ ...v, [k]: x });
   return <>
-    <Section title="Store">
-      <Switch checked={v.enabled} onChange={x => set('enabled', x)} label="Store open (turn off to pause all new checkouts)" />
+    <Section title="Payments">
+      <p className="field-hint" style={{ margin: 0 }}>The store is <b>{v.enabled === false ? 'closed' : 'open'}</b>. Open or close it, and choose who may still buy while it is closed, in <button type="button" className="link-btn" onClick={() => go('storestatus')}>Store status &amp; access</button>.</p>
       <Switch checked={v.allowCouponStacking} onChange={x => set('allowCouponStacking', x)} label="Allow more than one discount code per order" />
       <Switch checked={v.showRatings !== false} onChange={x => set('showRatings', x)} label="Show star ratings and reviews in the store (only buyers can rate)" />
       <Switch checked={v.showDownloads !== false} onChange={x => set('showDownloads', x)} label="Show how many times each item was downloaded" />
@@ -176,6 +183,22 @@ function MessageSettings(){
   if (!v) return <SkeletonRows rows={8} />;
   const bh = v.businessHours, ar = v.autoReply;
   return <>
+    <Section title="Contact form" desc="The “Regarding” ticks visitors choose from. They can tick several; “Other” is always there and opens a box to type their own.">
+      <ol className="topic-list">
+        {(v.contactTopics || []).map((t: string, i: number, all: string[]) => (
+          <li key={i} className="row" style={{ gap: 6 }}>
+            <span className="faint num" style={{ width: 18 }}>{i + 1}</span>
+            <input value={t} maxLength={60} aria-label={`Topic ${i + 1}`} onChange={e => setV({ ...v, contactTopics: all.map((x, k) => k === i ? e.target.value : x) })} />
+            <button type="button" className="icon-btn sm" aria-label="Move up" title="Move up" disabled={i === 0} onClick={() => { const n = all.slice(); [n[i - 1], n[i]] = [n[i], n[i - 1]]; setV({ ...v, contactTopics: n }); }}>↑</button>
+            <button type="button" className="icon-btn sm" aria-label="Move down" title="Move down" disabled={i === all.length - 1} onClick={() => { const n = all.slice(); [n[i + 1], n[i]] = [n[i], n[i + 1]]; setV({ ...v, contactTopics: n }); }}>↓</button>
+            <button type="button" className="icon-btn sm" aria-label={`Remove ${t || 'topic'}`} title="Remove" onClick={() => setV({ ...v, contactTopics: all.filter((_, k) => k !== i) })}><Icon name="trash" size={13} /></button>
+          </li>
+        ))}
+      </ol>
+      <div className="row"><button type="button" className="btn sm" disabled={(v.contactTopics || []).length >= 12} onClick={() => setV({ ...v, contactTopics: [...(v.contactTopics || []), ''] })}><Icon name="plus" /> Add a topic</button>
+        <span className="faint" style={{ fontSize: 12 }}>Up to 12. Empty ones are skipped.</span></div>
+      <Switch checked={v.replyOnSite !== false} onChange={x => setV({ ...v, replyOnSite: x })} label="When I reply, also show it on the site, on the device the visitor wrote from (and link the conversation in the email)" />
+    </Section>
     <Section title="Notifications">
       <Field label="Send new-message alerts to" hint="Empty = your owner email"><input type="email" value={v.notifyEmail} onChange={e => setV({ ...v, notifyEmail: e.target.value })} /></Field>
       <Switch checked={v.spamFilter} onChange={x => setV({ ...v, spamFilter: x })} label="Send messages matching the blocklist to Spam" />

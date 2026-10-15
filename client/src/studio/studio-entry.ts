@@ -251,21 +251,41 @@ class Studio {
   // ---- drawing input ----
   bindInput(){
     const c = this.liveC;
+    // Tablets (iPad, Android) with or without a pen: once a pen (Apple Pencil, S Pen…) has touched the canvas, fingers
+    // and a resting palm no longer draw (palm rejection) until the pen has been away for a while; a second finger
+    // coming down (a pinch or two-finger gesture) cancels the line the first finger just started.
+    let penAt = -1e9, touchStartAt = 0;
+    const touches = new Set<number>();
+    const penRecently = (t: number) => t - penAt < 4000;
     this.on(c, 'pointerdown', ((e: PointerEvent) => {
-      if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      if (e.pointerType === 'touch'){
+        touches.add(e.pointerId);
+        if (touches.size > 1){ if (this.current && this.pointerId !== null && e.timeStamp - touchStartAt < 400) this.cancelStroke(); return; }
+        if (penRecently(e.timeStamp)) return;   // palm or finger while drawing with a pen
+        touchStartAt = e.timeStamp;
+      }
+      if (e.pointerType === 'pen'){
+        penAt = e.timeStamp;
+        if (this.current && this.pointerId !== null && this.pointerId !== e.pointerId) this.cancelStroke();   // the palm landed first
+      }
+      if (!e.isPrimary && e.pointerType !== 'pen') return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (this.replay) return;
       this.closePanels();
       if (session.tool === 'text'){ e.preventDefault(); this.placeText(e); return; }
       e.preventDefault();
-      c.setPointerCapture(e.pointerId);
+      try { c.setPointerCapture(e.pointerId); } catch { /* already released */ }
       this.begin(e);
     }) as EventListener);
+    const lift = ((e: PointerEvent) => { touches.delete(e.pointerId); if (e.pointerType === 'pen') penAt = e.timeStamp; }) as EventListener;
+    this.on(c, 'pointerup', lift); this.on(c, 'pointercancel', lift);
     this.on(c, 'pointermove', ((e: PointerEvent) => {
+      if (e.pointerType === 'pen') penAt = e.timeStamp;
       if (this.pointerId === e.pointerId && this.current){
         const list = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [];
         for (const ce of (list.length ? list : [e])) this.extend(ce);
         this.kick();
-      } else if (session.hoverDraw && e.pointerType !== 'touch' && e.buttons === 0 && session.tool === 'brush' && !this.replay){
+      } else if (session.hoverDraw && e.pointerType === 'mouse' && e.buttons === 0 && session.tool === 'brush' && !this.replay){   // a hovering pen never draws
         if (!this.current) this.begin(e, true);
         this.extend(e); this.kick();
         clearTimeout(this.hoverTimer);
@@ -332,6 +352,11 @@ class Studio {
     st.pts = st.pts.slice(0, st.n * POINT_STRIDE);
     this.commit(st);
   }
+  /** throws away the line in progress (a palm, or the first finger of a pinch) */
+  cancelStroke(){
+    this.current = null; this.pointerId = null; clearTimeout(this.hoverTimer);
+    this.kick();
+  }
   commit(it: Item){
     session.items.push(it); session.undo.push({ type: 'add', item: it }); session.redo = [];
     if (this.isStatic(it)) this.bake(it); else this.animated.add(it.id);
@@ -357,8 +382,13 @@ class Studio {
       if (ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); this.commitText(); }
       else if (ev.key === 'Escape'){ ev.preventDefault(); ev.stopPropagation(); ta.remove(); this.textEditor = null; }
     });
-    ta.addEventListener('blur', () => this.commitText());
-    requestAnimationFrame(() => ta.focus());
+    // focus while the tap is still being handled: iPad and Android only open the keyboard for a focus inside the tap
+    // itself (a focus one frame later leaves it closed); the later focus covers browsers that move it again
+    ta.focus({ preventScroll: true });
+    requestAnimationFrame(() => { if (document.activeElement !== ta && this.root.activeElement !== ta) ta.focus({ preventScroll: true }); });
+    // the blur that some tablets fire as the tap ends must not close an empty box straight away
+    const born = performance.now();
+    ta.addEventListener('blur', () => { if (!ta.value.trim() && performance.now() - born < 400 && ta.isConnected){ ta.focus({ preventScroll: true }); return; } this.commitText(); });
   }
   commitText(){
     const ta = this.textEditor; if (!ta) return;

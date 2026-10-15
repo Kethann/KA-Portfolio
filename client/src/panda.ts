@@ -41,6 +41,25 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
     setTravelOpen(travel,launcher.getAttribute('aria-expanded')==='true');
   }
   let lastPerch={x:0,y:0},lastPosition={x:0,y:0},activityBlend=0;
+  // Visits: the store closes, so the panda leaves the chat button, leaps onto the "closed" board (ka-panda-visit with
+  // a target), naps on it while it scrolls, and leaps home when the board goes away (target null). The chat wins:
+  // opening it calls the panda over; it leaps back to the board afterwards.
+  const visit:{target:Element|null;stage:'idle'|'leap'|'sit'|'back';t:number;from:{x:number;y:number}}={target:null,stage:'idle',t:0,from:{x:0,y:0}};
+  const smooth=(t:number)=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
+  function visitStep(dt:number,home:{x:number;y:number},width:number,height:number){
+    const r=visit.target?.getBoundingClientRect?.();
+    // sits on the board's top edge, a little right of its centre, feet just over the rim
+    const perch=r&&r.width?{x:r.left+r.width*.62-width*.5,y:r.top-height*.78}:home;
+    if(media.matches){visit.stage=visit.target?'sit':'idle';visit.t=0;return {...(visit.target?perch:home),rotation:0};}
+    visit.t+=Math.min(.1,Math.max(0,dt));
+    const D=visit.stage==='leap'?1.15:visit.stage==='back'?.95:0;
+    if(D&&visit.t>=D){visit.t=0;visit.stage=visit.stage==='leap'?'sit':'idle';}
+    if(visit.stage==='sit')return {...perch,rotation:Math.sin(time*1.1)*1.6};
+    if(visit.stage==='idle')return {...home,rotation:0};
+    const from=visit.stage==='leap'?home:visit.from,to=visit.stage==='leap'?perch:home,p=smooth(visit.t/D);
+    const arc=Math.max(70,Math.abs(to.x-from.x)*.22+Math.abs(to.y-from.y)*.12);
+    return {x:from.x+(to.x-from.x)*p,y:from.y+(to.y-from.y)*p-arc*4*p*(1-p),rotation:(visit.stage==='leap'?-1:1)*360*smooth((visit.t/D-.15)/.7)};
+  }
   function movePanda(dt:number){
     if(!panel)return 0;
     const previousStage=travel.stage;
@@ -55,7 +74,8 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
     greeting?.classList.toggle('show',greetingAge>=0&&greetingAge<2.8);
     // Idle mascot shares the launcher's containing block, clipping and native zoom.
     // Detach only while travelling to/from the open conversation.
-    const travelling=travel.stage!=='idle';
+    const visiting=travel.stage==='idle'&&!travel.open&&visit.stage!=='idle';
+    const travelling=travel.stage!=='idle'||visiting;
     const parent=travelling?document.body:launcher;
     if(host.parentElement!==parent)parent.appendChild(host);
     host.classList.toggle('panda-traveler',travelling);
@@ -69,6 +89,14 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
       else if(b.left>=width+20)lastPerch={x:b.left-width-12,y:b.top+14};
       else{lastPerch={x:b.left+b.width/2-width/2,y:4};tucked=true;}}
     const home={x:launch.left+launch.width/2-width/2,y:launch.bottom-height-(compact?30:26)};
+    if(visiting){
+      const p=visitStep(dt,home,width,height);
+      lastPosition={x:p.x,y:p.y};
+      host.style.transform=`translate3d(${p.x}px,${p.y}px,0) rotate(${p.rotation}deg)`;
+      host.style.opacity='1';host.dataset.travel='visit-'+visit.stage;
+      if(thread)thread.style.opacity='0';
+      return 0;
+    }
     const pose=travelPose(travel,lastPerch,home,(window.visualViewport?.offsetTop||0)+(window.visualViewport?.height||innerHeight),height);
     lastPosition={x:pose.x,y:pose.y};
     host.style.transform=travelling?`translate3d(${pose.x}px,${pose.y}px,0) rotate(${pose.rotation}deg)`:'translateX(-50%)';
@@ -110,21 +138,36 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
     greetingAge=-1;greeting?.classList.remove('show');pointer.moved=false;wasNear=false;
     if(event.detail.open){tension.x=0;tension.v=0;}
     if(!event.detail.open)lastPerch={...lastPosition};
+    if(event.detail.open&&visit.target){visit.stage='leap';visit.t=0;}   // back to the board once the chat closes
     setTravelOpen(travel,event.detail.open);movePanda(0);schedule();
   }) as EventListener,{signal});
+  document.addEventListener('ka-panda-visit',((event:CustomEvent<{target:Element|null}>)=>{
+    const target=event.detail?.target||null;
+    if(target===visit.target)return;
+    visit.target=target;visit.t=0;
+    if(target)visit.stage='leap';
+    else if(visit.stage!=='idle'){visit.stage='back';visit.from={...lastPosition};}
+    movePanda(0);schedule();
+  }) as EventListener,{signal});
+  // a visit asked for before the panda finished loading (the page keeps the latest request)
+  const asked=(globalThis as unknown as {__kaPandaVisit?:Element|null}).__kaPandaVisit;
+  if(asked&&asked.isConnected){visit.target=asked;visit.stage='leap';}
   let clock=createActivityClock(crypto.getRandomValues(new Uint32Array(1))[0]);
-  function canRender(){return !disposed&&!lost&&!document.hidden&&(visible||travel.stage!=='idle')&&host.isConnected;}
+  function canRender(){return !disposed&&!lost&&!document.hidden&&(visible||travel.stage!=='idle'||visit.stage!=='idle')&&host.isConnected;}
   function draw(dt:number){
     if(!character)return;
     const climbing=movePanda(dt);
-    const gesturing=travel.stage!=='idle'||(greetingAge>=0&&greetingAge<2.8);
-    const state=media.matches||gesturing?{activity:'relaxing' as const,elapsed:0,weight:0}:clock.advance(dt);
+    const leaping=visit.stage==='leap'||visit.stage==='back';
+    const napping=visit.stage==='sit'&&travel.stage==='idle'&&!travel.open;   // resting on the closed board
+    const gesturing=travel.stage!=='idle'||(!napping&&leaping)||(greetingAge>=0&&greetingAge<2.8);
+    const nap:Activity=character.activities.includes('sleeping')?'sleeping':'relaxing';
+    const state=napping?{activity:nap,elapsed:visit.t,weight:1}:media.matches||gesturing?{activity:'relaxing' as const,elapsed:0,weight:0}:clock.advance(dt);
     look.lerp(target,1-Math.exp(-dt*4));
     activityBlend=gesturing||media.matches?0:Math.min(1,activityBlend+dt/.65);
     character.update(state.activity,state.elapsed,state.weight*activityBlend,time,look,media.matches?1:dt);
     character.climb?.(time,climbing);
     character.wave?.(greetingAge>=0&&greetingAge<2.8?greetingAge:-1);
-    contact.visible=travel.stage==='idle';
+    contact.visible=travel.stage==='idle'&&visit.stage==='idle';
     host.dataset.activity=state.activity;
     renderer.render(scene,camera);
   }
@@ -158,8 +201,12 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
   launcher.addEventListener('focus',()=>target.set(0,.5),{signal});
   launcher.addEventListener('blur',()=>target.set(0,0),{signal});
   launcher.addEventListener('click',()=>target.set(0,.6),{signal});
-  renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();lost=true;pause();host.classList.remove('is-ready');},{signal});
-  renderer.domElement.addEventListener('webglcontextrestored',()=>{lost=false;resize();host.classList.add('is-ready');schedule();},{signal});
+  // A lost graphics context usually comes back; if it doesn't within a few seconds, start over from scratch
+  // (the page listens for ka-panda-lost and mounts a fresh panda), so the panda never just disappears.
+  let lostTimer=0;
+  renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();lost=true;pause();host.classList.remove('is-ready');
+    clearTimeout(lostTimer);lostTimer=setTimeout(()=>{if(lost&&!disposed){dispose();globalThis.dispatchEvent?.(new Event('ka-panda-lost'));}},4000) as unknown as number;},{signal});
+  renderer.domElement.addEventListener('webglcontextrestored',()=>{clearTimeout(lostTimer);lost=false;resize();host.classList.add('is-ready');schedule();},{signal});
   function dispose(){
     if(disposed)return;disposed=true;pause();abort.abort();observer.disconnect();sizeObserver.disconnect();
     thread?.remove();greeting?.remove();host.classList.remove('panda-traveler');

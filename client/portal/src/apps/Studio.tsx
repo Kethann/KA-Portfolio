@@ -14,7 +14,7 @@ import { WinTools } from '../shell/Window';
 import { Uploader, useSaveKey } from './common';
 import { SiteSaveBar } from './Content';
 import { loadSite, saveSite, thumb, updateSite, useSite, PASS_DRAFT_DEFAULTS } from './siteDoc';
-import type { SiteDoc, PassDraft } from './siteDoc';
+import type { SiteDoc, PassDraft, Announcement } from './siteDoc';
 import { INTRO_VERSIONS, introVersion } from '../../../../shared/intros.js';
 import { FONT_GROUPS, FONT_LIBRARY, FONT_NAMES, fontStack, googleFontsUrl } from '../../../../shared/fonts.js';
 
@@ -25,9 +25,9 @@ const ICONS = ['behance', 'instagram', 'x', 'linkedin', 'youtube', 'website', 'e
 const ANIMS = ['', 'fade', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'scale-in', 'pop'];
 const DEVICES = { desktop: { w: 1440, h: 900, label: 'Desktop' }, tablet: { w: 820, h: 1180, label: 'Tablet' }, mobile: { w: 390, h: 844, label: 'Phone' } } as const;
 type Device = keyof typeof DEVICES;
-type Section = 'identity' | 'type' | 'notice' | 'social' | 'elements' | 'arrange' | 'pass' | 'intro';
+type Section = 'identity' | 'type' | 'notice' | 'nav' | 'social' | 'elements' | 'arrange' | 'pass' | 'intro';
 
-const SECTIONS: Section[] = ['identity', 'type', 'notice', 'social', 'elements', 'arrange', 'pass', 'intro'];
+const SECTIONS: Section[] = ['identity', 'type', 'notice', 'nav', 'social', 'elements', 'arrange', 'pass', 'intro'];
 export default function Studio({ active, route, only }: AppProps & { only?: Section }){
   const site = useSite();
   const toast = useToast();
@@ -48,7 +48,7 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
       <div className="studio">
         <div className="studio-panel">
           {!only && <div className="studio-nav" role="tablist" aria-label="Studio sections">
-            {([['identity', 'Colour'], ['type', 'Type'], ['notice', 'Banner & nav'], ['social', 'Links'], ['elements', 'Elements'], ['arrange', 'Arrange'], ['pass', 'Checkout pass'], ['intro', 'Intro']] as [Section, string][]).map(([k, l]) => (
+            {([['identity', 'Colour'], ['type', 'Type'], ['notice', 'Announcement'], ['nav', 'Nav & downloads'], ['social', 'Links'], ['elements', 'Elements'], ['arrange', 'Arrange'], ['pass', 'Checkout pass'], ['intro', 'Intro']] as [Section, string][]).map(([k, l]) => (
               <button key={k} type="button" role="tab" aria-selected={section === k} className={section === k ? 'on' : ''} onClick={() => setSection(k)}>{l}</button>
             ))}
           </div>}
@@ -77,10 +77,8 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
 
             {section === 'intro' && <IntroVersions doc={d} />}
 
-            {section === 'notice' && <>
-              <Switch checked={d.notice.enabled} onChange={v => updateSite(x => ({ ...x, notice: { ...x.notice, enabled: v } }))} label="Show a banner at the top of the site" />
-              <Field label="Banner text" hint={`${d.notice.text.length}/220 · plain text`}><textarea rows={2} maxLength={220} value={d.notice.text} onChange={e => updateSite(x => ({ ...x, notice: { ...x.notice, text: e.target.value } }))} /></Field>
-              <Field label="Tone"><Segmented label="Tone" value={d.notice.tone} onChange={v => updateSite(x => ({ ...x, notice: { ...x.notice, tone: v } }))} options={[{ value: 'info', label: 'Info' }, { value: 'warning', label: 'Warning' }]} /></Field>
+            {section === 'notice' && <AnnouncementForm />}
+            {section === 'nav' && <>
               <div className="stack"><div className="eyebrow">Navigation</div>
                 <Switch checked={d.visibility.navGallery} onChange={v => updateSite(x => ({ ...x, visibility: { ...x.visibility, navGallery: v } }))} label="Show the gallery in the nav" />
                 <Switch checked={d.visibility.navAbout} onChange={v => updateSite(x => ({ ...x, visibility: { ...x.visibility, navAbout: v } }))} label="Show About in the nav" />
@@ -117,6 +115,33 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
 const fam = (f: string) => fontStack(f);
 // The whole library's stylesheet, added once: only the fonts actually drawn (the picked ones, and options as they show) download.
 let libraryLinked = false;
+// The announcement: by default a tab on the side of the screen. It slides open on its own when a visitor arrives,
+// stays for a few seconds, then tucks back into the tab; visitors can open it again or pin it open.
+function AnnouncementForm(){
+  const { doc } = useSite();
+  if (!doc) return null;
+  const n = doc.notice;
+  const set = <K extends keyof Announcement>(k: K, v: Announcement[K]) => updateSite(x => ({ ...x, notice: { ...x.notice, [k]: v } }));
+  return <>
+    <Switch checked={n.enabled} onChange={v => set('enabled', v)} label="Show an announcement on the site" />
+    <Field label="Style"><Segmented label="Style" value={n.style} onChange={v => set('style', v)} options={[{ value: 'tab', label: 'Side tab (slides open, then tucks away)' }, { value: 'banner', label: 'Banner at the top' }]} /></Field>
+    <div className="form-grid">
+      <Field label="Title" hint="Shown on the tab"><input value={n.title} maxLength={40} onChange={e => set('title', e.target.value)} placeholder="Announcement" /></Field>
+      <Field label="Tone"><select value={n.tone} onChange={e => set('tone', e.target.value as Announcement['tone'])}><option value="info">Info</option><option value="success">Good news</option><option value="offer">Offer</option><option value="warning">Warning</option></select></Field>
+    </div>
+    <Field label="Text" hint={`${n.text.length}/220 · plain text`}><textarea rows={3} maxLength={220} value={n.text} onChange={e => set('text', e.target.value)} placeholder="e.g. New poster packs are out. 20% off this week with code LAUNCH20." /></Field>
+    <div className="form-grid">
+      <Field label="Button label" hint="Optional"><input value={n.linkLabel} maxLength={30} onChange={e => set('linkLabel', e.target.value)} placeholder="Shop now" /></Field>
+      <Field label="Button link" hint="https://… or a page like /?page=store"><input value={n.linkUrl} maxLength={300} onChange={e => set('linkUrl', e.target.value)} placeholder="/?page=store" /></Field>
+    </div>
+    {n.style === 'tab' && <div className="form-grid">
+      <Field label="Side"><Segmented label="Side" value={n.side} onChange={v => set('side', v)} options={[{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }]} /></Field>
+      <Field label={n.autoClose ? `Tucks away after ${n.autoClose} s` : 'Stays open until closed'} hint="0 keeps it open"><input type="range" min={0} max={30} step={1} value={n.autoClose} onChange={e => set('autoClose', Number(e.target.value))} /></Field>
+    </div>}
+    <p className="field-hint">Each visitor sees it slide open once per new announcement; after that it waits in the tab. Visitors can pin it open with the pin button.</p>
+  </>;
+}
+
 function linkLibraryFonts(){
   if (libraryLinked || typeof document === 'undefined') return; libraryLinked = true;
   const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = googleFontsUrl(FONT_LIBRARY.map(f => f.name)); document.head.appendChild(l);

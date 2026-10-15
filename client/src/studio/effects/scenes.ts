@@ -4,6 +4,7 @@
 // Colours come from the palette, so every scene can be recoloured; intensity sets how much is going on.
 import { seeded } from './rng';
 import { ShaderPainter, fragmentFor } from './shaders';
+import { ecgWave } from './ecg';
 import type { Palette } from './types';
 
 export interface SceneState { w: number; h: number; pal: Palette; intensity: number; seed: number; r: () => number; d: Record<string, any> }
@@ -65,15 +66,19 @@ export const SCENES: Scene[] = [
     for (let gx = (t * 6) % step; gx < s.w; gx += step){ x.moveTo(gx, 0); x.lineTo(gx, s.h); }
     for (let gy = 0; gy < s.h; gy += step){ x.moveTo(0, gy); x.lineTo(s.w, gy); }
     x.stroke();
-    // the heartbeat trace sweeps across the lower third, fading behind its head
-    const base = s.h * 0.82, head = (t * 0.22 * (0.6 + s.intensity)) % 1.2, amp = s.h * 0.08;
-    const beat = (u: number) => { const k = (u * 4) % 1; return k < 0.06 ? -k * 6 : k < 0.1 ? -0.36 + (k - 0.06) * 30 : k < 0.14 ? 0.84 - (k - 0.1) * 34 : k < 0.2 ? -0.5 + (k - 0.14) * 8.3 : 0; };
-    x.lineWidth = 2.4; x.lineCap = 'round';
-    for (let i = 0; i < 160; i++){
-      const u0 = head - i * 0.006, u1 = u0 + 0.006; if (u0 < 0 || u0 > 1) continue;
-      x.strokeStyle = rgba(s.pal.accent1, (1 - i / 160) * 0.9); x.beginPath(); x.moveTo(u0 * s.w, base - beat(u0) * amp); x.lineTo(u1 * s.w, base - beat(u1) * amp); x.stroke();
+    // the trace is written by a sweeping head, like a real monitor: everything behind the head stays on screen and
+    // slowly fades, a small gap is wiped just ahead of it, and the head glows. ~72 beats a minute, 4 beats across.
+    const base = s.h * 0.8, amp = s.h * 0.1, sweep = 3.4 / (0.7 + s.intensity * 0.6), head = (t % sweep) / sweep, beats = 4, N = Math.max(120, Math.round(s.w / 3));
+    x.lineWidth = 2.2; x.lineCap = 'round'; x.lineJoin = 'round';
+    const yAt = (u: number) => base - ecgWave(u * beats) * amp;
+    for (let i = 0; i < N; i++){
+      const u0 = i / N, u1 = (i + 1) / N;
+      const behind = ((head - u1) % 1 + 1) % 1;                 // how long ago the head passed (0..1 of a sweep)
+      if (behind > 0.94) continue;                                 // the wiped gap ahead of the head
+      x.strokeStyle = rgba(s.pal.accent1, 0.95 * Math.pow(1 - behind, 1.6) + 0.06);
+      x.beginPath(); x.moveTo(u0 * s.w, yAt(u0)); x.lineTo(u1 * s.w, yAt(u1)); x.stroke();
     }
-    if (head <= 1) glowAt(x, head * s.w, base - beat(head) * amp, 18, s.pal.glow, 0.9);
+    glowAt(x, head * s.w, yAt(head), 16, s.pal.glow, 0.9);
     // faint medical crosses
     x.fillStyle = rgba(s.pal.accent2, 0.08 + s.intensity * 0.06);
     for (const [cx, cy] of [[0.1, 0.16], [0.9, 0.2], [0.86, 0.62]] as const){ const k = 14; x.fillRect(cx * s.w - k / 3, cy * s.h - k, k / 1.5, k * 2); x.fillRect(cx * s.w - k, cy * s.h - k / 3, k * 2, k / 1.5); }
@@ -106,15 +111,6 @@ export const SCENES: Scene[] = [
       if (al > 0) glowAt(x, cx + Math.cos(ba) * br, cy + Math.sin(ba) * br, 10, s.pal.accent1, al); }
   } },
 
-  { id: 'fire', name: 'Inferno', group: 'Elements', init(s){ s.d.e = parts(s, count(s, 90)); }, draw(x, s, t){
-    fill(x, s, vgrad(x, s, [[0, mix(s.pal.bg, '#000000', 0.3)], [0.7, s.pal.bg], [1, mix(s.pal.bg, s.pal.accent1, 0.45)]]));
-    for (let i = 0; i < 5; i++) glowAt(x, s.w * (0.1 + i * 0.2) + Math.sin(t * 1.3 + i) * 20, s.h * 1.02, s.h * (0.35 + 0.08 * Math.sin(t * 2.2 + i * 1.7)) * (0.6 + s.intensity), i % 2 ? s.pal.accent1 : s.pal.glow, 0.35);
-    x.globalCompositeOperation = 'lighter';
-    for (const p of s.d.e){ const y = 1 - wrap(p.y + t * 0.07 * p.v), xx = p.x + Math.sin(t * 1.5 * p.v + p.p) * 0.03 * (1 - y);
-      const life = y; x.fillStyle = rgba(life > 0.5 ? s.pal.glow : s.pal.accent1, Math.min(1, (1 - Math.abs(life - 0.6)) * 0.9) * (0.4 + p.z * 0.6));
-      const r = 0.8 + p.z * 2.4 * (1 - y * 0.6); x.beginPath(); x.arc(xx * s.w, y * s.h, r, 0, TAU); x.fill(); }
-    x.globalCompositeOperation = 'source-over';
-  } },
   { id: 'ice', name: 'Frozen', group: 'Elements', init(s){ s.d.f = parts(s, count(s, 110)); }, draw(x, s, t){
     fill(x, s, vgrad(x, s, [[0, mix(s.pal.bg, s.pal.accent2, 0.25)], [1, s.pal.bg]]));
     glowAt(x, s.w * 0.5, 0, s.w * 0.7, s.pal.glow, 0.18);
@@ -134,27 +130,38 @@ export const SCENES: Scene[] = [
       x.strokeStyle = rgba(s.pal.text, 0.12 + p.z * 0.3); x.lineWidth = 0.6 + p.z; x.beginPath(); x.moveTo(xx * s.w, y * s.h); x.lineTo(xx * s.w - 3, y * s.h + 14 + p.z * 16); x.stroke(); }
     fill(x, s, vgrad(x, s, [[0.6, rgba(s.pal.text, 0)], [1, rgba(s.pal.text, 0.08)]]));
   } },
-  { id: 'storm', name: 'Thunderstorm', group: 'Elements', init(s){ s.d.c = parts(s, 12); }, draw(x, s, t){
+  { id: 'storm', name: 'Thunderstorm', group: 'Elements', init(s){ s.d.c = parts(s, 12); s.d.r = parts(s, count(s, 220)); }, draw(x, s, t){
     fill(x, s, vgrad(x, s, [[0, mix(s.pal.bg, '#000000', 0.3)], [1, s.pal.bg]]));
-    for (const c of s.d.c){ glowAt(x, wrap(c.x + t * 0.01 * c.v) * s.w * 1.2 - s.w * 0.1, c.y * s.h * 0.45, 140 + c.z * 160, s.pal.accent2, 0.22); }
-    const k = (t * 0.45) % 3.2, on = k < 0.12 || (k > 0.2 && k < 0.26);
-    if (on && s.intensity > 0.05){
-      fill(x, s, rgba(s.pal.glow, 0.18 * s.intensity));
-      const r = seeded(Math.floor(t * 0.45 / 3.2) + s.seed); let bx = s.w * (0.2 + r() * 0.6), by = 0;
-      x.strokeStyle = rgba('#ffffff', 0.9); x.lineWidth = 2; x.shadowColor = s.pal.glow; x.shadowBlur = 18; x.beginPath(); x.moveTo(bx, by);
-      while (by < s.h * 0.8){ bx += (r() - 0.5) * 60; by += 20 + r() * 40; x.lineTo(bx, by); } x.stroke(); x.shadowBlur = 0;
+    // a strike every ~7 s: a bright stroke, a short dark gap, a weaker return stroke, then a fading afterglow
+    const k = (t * 0.45) % 3.2, n = Math.floor(t * 0.45 / 3.2);
+    const flash = (Math.exp(-k * 22) + 0.65 * (k > 0.16 ? Math.exp(-(k - 0.16) * 16) : 0)) * s.intensity, glowL = Math.min(1, flash + 0.12 * Math.exp(-k * 3) * s.intensity);
+    for (const c of s.d.c){ glowAt(x, wrap(c.x + t * 0.01 * c.v) * s.w * 1.2 - s.w * 0.1, c.y * s.h * 0.45, 140 + c.z * 160, glowL > 0.05 ? mix(s.pal.accent2, '#ffffff', glowL * 0.6) : s.pal.accent2, 0.22 + glowL * 0.35); }
+    if (glowL > 0.02) fill(x, s, rgba(s.pal.glow, 0.16 * glowL));
+    if (flash > 0.03){
+      // the bolt: a jagged main channel with one or two forks, thinner as it goes down
+      const r = seeded(n * 7919 + s.seed), bolt = (sx: number, sy: number, ey: number, w: number) => {
+        let bx = sx, by = sy; x.lineWidth = w; x.beginPath(); x.moveTo(bx, by);
+        while (by < ey){ bx += (r() - 0.5) * s.w * 0.05; by += s.h * (0.02 + r() * 0.04); x.lineTo(bx, by); }
+        x.stroke(); return bx;
+      };
+      x.save(); x.strokeStyle = rgba('#ffffff', Math.min(1, flash * 1.4)); x.shadowColor = s.pal.glow; x.shadowBlur = 22; x.lineCap = 'round'; x.lineJoin = 'round';
+      const sx = s.w * (0.2 + r() * 0.6), ey = s.h * (0.55 + r() * 0.3);
+      bolt(sx, 0, ey, 2.4);
+      const forks = 1 + Math.floor(r() * 2);
+      for (let i = 0; i < forks; i++) bolt(sx + (r() - 0.5) * s.w * 0.08, s.h * (0.15 + r() * 0.25), s.h * (0.35 + r() * 0.2), 1.1);
+      x.restore();
+    }
+    // wind-slanted rain in three depths; near drops are longer, brighter and faster; the flash lights them up
+    x.lineCap = 'round';
+    const slant = 0.16;
+    for (const p of s.d.r){
+      const depth = p.z, sp = (0.9 + depth * 1.6) * (0.85 + p.v * 0.3), y = wrap(p.y + t * sp), len = (10 + depth * 26) * (s.h / 720);
+      const xx = wrap(p.x + y * slant) * s.w, yy = y * s.h;
+      x.strokeStyle = rgba('#d8e2f2', (0.08 + depth * 0.32) * (1 + glowL * 1.5)); x.lineWidth = 0.5 + depth * 1.1;
+      x.beginPath(); x.moveTo(xx, yy); x.lineTo(xx - len * slant, yy - len); x.stroke();
     }
   } },
 
-  { id: 'space', name: 'Deep space', group: 'Space', init(s){ s.d.st = parts(s, count(s, 260)); s.d.n = parts(s, 5); }, draw(x, s, t){
-    fill(x, s, s.pal.bg);
-    for (const n of s.d.n) glowAt(x, n.x * s.w, n.y * s.h, Math.max(s.w, s.h) * (0.25 + n.z * 0.3), n.p > 3 ? s.pal.accent1 : s.pal.accent2, 0.1 + s.intensity * 0.08);
-    for (const p of s.d.st){ const tw = 0.5 + 0.5 * Math.sin(t * (1 + p.v * 2) + p.p), xx = wrap(p.x - t * 0.004 * p.z);
-      x.fillStyle = rgba('#ffffff', (0.25 + p.z * 0.75) * (0.4 + tw * 0.6)); x.fillRect(xx * s.w, p.y * s.h, p.z > 0.92 ? 2.2 : 1.2, p.z > 0.92 ? 2.2 : 1.2); }
-    const k = (t * 0.18) % 1; if (k < 0.12){ const q = k / 0.12, sx = s.w * (0.9 - q * 0.6), sy = s.h * (0.1 + q * 0.3);
-      const g = x.createLinearGradient(sx, sy, sx + 120, sy - 60); g.addColorStop(0, rgba('#ffffff', 0.9 * (1 - q))); g.addColorStop(1, rgba('#ffffff', 0));
-      x.strokeStyle = g; x.lineWidth = 2; x.beginPath(); x.moveTo(sx, sy); x.lineTo(sx + 120, sy - 60); x.stroke(); }
-  } },
   { id: 'synthwave', name: 'Neon horizon', group: 'Future & tech', draw(x, s, t){
     const hz = s.h * 0.58;
     fill(x, s, vgrad(x, s, [[0, mix(s.pal.bg, '#000000', 0.2)], [0.58, mix(s.pal.bg, s.pal.accent1, 0.3)], [0.58, mix(s.pal.bg, '#000000', 0.4)], [1, s.pal.bg]]));
@@ -241,15 +248,6 @@ export const SCENES: Scene[] = [
     x.fillRect(0, s.h * 0.56, s.w, 14);
   } },
 
-  { id: 'ocean', name: 'Under the sea', group: 'Nature', init(s){ s.d.b = parts(s, count(s, 40)); }, draw(x, s, t){
-    fill(x, s, vgrad(x, s, [[0, mix(s.pal.bg, s.pal.accent2, 0.35)], [1, mix(s.pal.bg, '#000000', 0.4)]]));
-    x.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < 7; i++){ const a = -0.25 + i * 0.08 + Math.sin(t * 0.3 + i) * 0.03; x.save(); x.translate(s.w * (0.15 + i * 0.12), -10); x.rotate(a);
-      const g = x.createLinearGradient(0, 0, 0, s.h); g.addColorStop(0, rgba(s.pal.glow, 0.12 * (0.4 + s.intensity))); g.addColorStop(1, rgba(s.pal.glow, 0)); x.fillStyle = g; x.fillRect(-14, 0, 28 + i * 4, s.h); x.restore(); }
-    x.globalCompositeOperation = 'source-over';
-    for (const b of s.d.b){ const y = 1 - wrap(b.y + t * 0.05 * b.v), xx = b.x + Math.sin(t * 2 * b.v + b.p) * 0.01;
-      x.strokeStyle = rgba('#ffffff', 0.3 + b.z * 0.4); x.lineWidth = 1; x.beginPath(); x.arc(xx * s.w, y * s.h, 2 + b.z * 6, 0, TAU); x.stroke(); }
-  } },
   { id: 'forest', name: 'Firefly forest', group: 'Nature', init(s){ s.d.f = parts(s, count(s, 50)); s.d.tr = parts(s, 16); }, draw(x, s, t){
     fill(x, s, vgrad(x, s, [[0, mix(s.pal.bg, s.pal.accent2, 0.18)], [1, mix(s.pal.bg, '#000000', 0.35)]]));
     for (const tr of s.d.tr){ x.fillStyle = rgba('#000000', 0.18 + tr.z * 0.3); const w = 10 + tr.z * 30; x.fillRect(tr.x * s.w, 0, w, s.h); }
@@ -266,12 +264,6 @@ export const SCENES: Scene[] = [
       x.beginPath(); x.ellipse(0, 0, 4 + p.z * 5, 2.5 + p.z * 3, 0, 0, TAU); x.fill(); x.restore(); }
   } },
 
-  { id: 'party', name: 'Party lights', group: 'Celebration', init(s){ s.d.b = parts(s, count(s, 40)); }, draw(x, s, t){
-    fill(x, s, s.pal.bg);
-    const cols = [s.pal.accent1, s.pal.accent2, s.pal.glow];
-    for (const [i, b] of s.d.b.entries()){ const xx = wrap(b.x + Math.sin(t * 0.2 * b.v + b.p) * 0.03), yy = wrap(b.y - t * 0.01 * b.v); const a = 0.12 + 0.12 * Math.sin(t * b.v + b.p);
-      x.fillStyle = rgba(cols[i % 3], a * (0.5 + s.intensity)); x.beginPath(); x.arc(xx * s.w, yy * s.h, 14 + b.z * 40, 0, TAU); x.fill(); }
-  } },
   { id: 'hearts', name: 'Floating hearts', group: 'Celebration', init(s){ s.d.h = parts(s, count(s, 28)); }, draw(x, s, t){
     fill(x, s, vgrad(x, s, [[0, s.pal.bg], [1, mix(s.pal.bg, s.pal.accent1, 0.2)]]));
     for (const h of s.d.h){ const y = 1.1 - wrap(h.y + t * 0.035 * h.v) * 1.2, xx = h.x + Math.sin(t * h.v + h.p) * 0.02, k = 5 + h.z * 12;
@@ -291,11 +283,28 @@ export const SCENES: Scene[] = [
     x.fillStyle = rgba(s.pal.accent1, 0.85); const by = s.h - 26;
     for (let i = 0; i < s.w; i += 8) x.fillRect(i, by + ((i / 8) % 2 ? 0 : 4), 8, 26);
   } },
-  { id: 'aurora', name: 'Aurora', group: 'Nature', draw(x, s, t){ fill(x, s, s.pal.bg); glowAt(x, s.w * (0.3 + Math.sin(t * 0.13) * 0.08), s.h * 0.35, Math.max(s.w, s.h) * 0.55, s.pal.accent1, 0.25); glowAt(x, s.w * 0.7, s.h * 0.7, Math.max(s.w, s.h) * 0.5, s.pal.accent2, 0.2); } },
-  { id: 'clouds', name: 'Sunset clouds', group: 'Nature', draw(x, s, t){ fill(x, s, s.pal.bg); glowAt(x, s.w * (0.3 + Math.sin(t * 0.13) * 0.08), s.h * 0.35, Math.max(s.w, s.h) * 0.55, s.pal.accent1, 0.25); glowAt(x, s.w * 0.7, s.h * 0.7, Math.max(s.w, s.h) * 0.5, s.pal.accent2, 0.2); } },
-  { id: 'lava', name: 'Molten lava', group: 'Elements', draw(x, s, t){ fill(x, s, s.pal.bg); glowAt(x, s.w * (0.3 + Math.sin(t * 0.13) * 0.08), s.h * 0.35, Math.max(s.w, s.h) * 0.55, s.pal.accent1, 0.25); glowAt(x, s.w * 0.7, s.h * 0.7, Math.max(s.w, s.h) * 0.5, s.pal.accent2, 0.2); } },
-  { id: 'smoke', name: 'Coloured smoke', group: 'Simple', draw(x, s, t){ fill(x, s, s.pal.bg); glowAt(x, s.w * (0.3 + Math.sin(t * 0.13) * 0.08), s.h * 0.35, Math.max(s.w, s.h) * 0.55, s.pal.accent1, 0.25); glowAt(x, s.w * 0.7, s.h * 0.7, Math.max(s.w, s.h) * 0.5, s.pal.accent2, 0.2); } },
-  { id: 'golddust', name: 'Gold dust', group: 'Celebration', draw(x, s, t){ fill(x, s, s.pal.bg); glowAt(x, s.w * (0.3 + Math.sin(t * 0.13) * 0.08), s.h * 0.35, Math.max(s.w, s.h) * 0.55, s.pal.accent1, 0.25); glowAt(x, s.w * 0.7, s.h * 0.7, Math.max(s.w, s.h) * 0.5, s.pal.accent2, 0.2); } }
+  // molten lava: dark crust with glowing cracks that slowly shift, and heat rising from below
+  { id: 'lava', name: 'Molten lava', group: 'Elements', init(s){ s.d.b = parts(s, 9); s.d.e = parts(s, count(s, 40)); }, draw(x, s, t){
+    fill(x, s, vgrad(x, s, [[0, mix(s.pal.bg, '#000000', 0.4)], [1, mix(s.pal.bg, s.pal.accent1, 0.25)]]));
+    x.globalCompositeOperation = 'lighter';
+    for (const b of s.d.b){ const cx = (b.x + Math.sin(t * 0.07 * b.v + b.p) * 0.08) * s.w, cy = s.h * (0.55 + b.y * 0.5) + Math.sin(t * 0.11 + b.p) * 18, pulse = 0.6 + 0.4 * Math.sin(t * 0.5 * b.v + b.p);
+      glowAt(x, cx, cy, s.h * (0.18 + b.z * 0.22), b.z > 0.5 ? s.pal.accent1 : s.pal.glow, 0.22 * pulse * (0.5 + s.intensity)); }
+    for (const e of s.d.e){ const y = 1 - wrap(e.y + t * 0.05 * e.v), xx = e.x + Math.sin(t * e.v + e.p) * 0.02;
+      x.fillStyle = rgba(s.pal.glow, (1 - Math.abs(y - 0.55)) * 0.5 * e.z); x.beginPath(); x.arc(xx * s.w, y * s.h, 0.6 + e.z * 1.8, 0, TAU); x.fill(); }
+    x.globalCompositeOperation = 'source-over';
+  } },
+  // gold dust: fine glitter drifting down through soft warm light, a few flakes catching it
+  { id: 'golddust', name: 'Gold dust', group: 'Celebration', init(s){ s.d.g = parts(s, count(s, 140)); }, draw(x, s, t){
+    fill(x, s, s.pal.bg);
+    glowAt(x, s.w * (0.35 + Math.sin(t * 0.1) * 0.06), s.h * 0.3, Math.max(s.w, s.h) * 0.5, s.pal.accent1, 0.2);
+    glowAt(x, s.w * 0.75, s.h * 0.75, Math.max(s.w, s.h) * 0.4, s.pal.glow, 0.12);
+    x.globalCompositeOperation = 'lighter';
+    for (const g of s.d.g){ const y = wrap(g.y + t * 0.018 * g.v), xx = wrap(g.x + Math.sin(t * 0.4 * g.v + g.p) * 0.015), tw = 0.5 + 0.5 * Math.sin(t * 3 * g.v + g.p * 5);
+      const r = 0.5 + g.z * 1.6; x.fillStyle = rgba(g.z > 0.8 ? '#fff4d6' : s.pal.glow, (0.15 + g.z * 0.55) * tw * (0.4 + s.intensity));
+      x.beginPath(); x.arc(xx * s.w, y * s.h, r, 0, TAU); x.fill();
+      if (g.z > 0.93 && tw > 0.8){ x.fillRect(xx * s.w - r * 4, y * s.h - 0.4, r * 8, 0.8); x.fillRect(xx * s.w - 0.4, y * s.h - r * 4, 0.8, r * 8); } }
+    x.globalCompositeOperation = 'source-over';
+  } }
 ];
 
 function heart(x: CanvasRenderingContext2D, k: number){ x.beginPath(); x.moveTo(0, k * 0.35); x.bezierCurveTo(-k * 1.1, -k * 0.4, -k * 0.45, -k * 1.1, 0, -k * 0.45); x.bezierCurveTo(k * 0.45, -k * 1.1, k * 1.1, -k * 0.4, 0, k * 0.35); x.closePath(); }

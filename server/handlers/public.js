@@ -11,6 +11,8 @@ import { str, email as vEmail } from '../core/validate.js';
 import { sendEmail } from '../core/email.js';
 import { isBlocked } from '../core/blocklist.js';
 import { demoPaymentsEnabled } from '../store/orders.js';
+import { storeState, publicStore } from '../store/access.js';
+import { threadKey } from './threads.js';
 // bundled with the code (the Worker has no file system to read it from at runtime)
 import seed from '../portfolio-seed.json' with { type: 'json' };
 import { STATS_DEFAULT, SKILLS_DEFAULT, ABOUT_DEFAULT } from '../admin/site-document.js';
@@ -36,18 +38,19 @@ export async function bumpLiveVersion(){
 export function currencyFor(country){ return country === 'IN' ? 'INR' : 'USD'; }
 
 export async function publicConfig(ctx){
-  const [upscaler, assistant, store] = await Promise.all([getSetting('upscaler'), getSetting('assistant'), getSetting('store')]);
+  const [upscaler, assistant, state, messages] = await Promise.all([getSetting('upscaler'), getSetting('assistant'), storeState(ctx.request), getSetting('messages')]);
   const country = ctx.geo?.country || null;
   return json({
     turnstileSiteKey: env('TURNSTILE_SITE_KEY') || '',
     razorpayKeyId: env('RAZORPAY_KEY_ID') || '',
     country,
     suggestedCurrency: currencyFor(country),
-    store: { enabled: store.enabled !== false, international: store.international !== false },
+    store: publicStore(state),
+    contact: { topics: (messages.contactTopics || []).slice(0, 12), replyOnSite: messages.replyOnSite !== false },
     demoPayments: demoPaymentsEnabled(),
     upscaler: { comingSoon: upscaler.comingSoon, title: upscaler.title, badge: upscaler.badge, text: upscaler.text, notifyEnabled: upscaler.notifyEnabled },
     assistant: { enabled: !!assistant.enabled, greeting: assistant.greeting, suggestions: assistant.suggestions }
-  }, 200, { 'Cache-Control': 'private, no-store', Vary: 'Cookie' });
+  }, 200, { 'Cache-Control': 'private, no-store', Vary: 'Cookie, X-KA-Pass' });
 }
 
 // The portfolio document the homepage renders (Featured Work + Portfolio). Same shape as the old
@@ -135,6 +138,8 @@ export async function contact(ctx){
   const address = vEmail(body.email);
   const subject = str(body.subject, { name: 'Subject', max: 180, required: true });
   const message = str(body.message, { name: 'Message', max: 8000, required: true, trim: false }).trim();
+  // the Regarding ticks, kept with the message so the inbox can show them
+  const topics = (Array.isArray(body.topics) ? body.topics : []).filter(t => typeof t === 'string').map(t => t.trim().slice(0, 60)).filter(Boolean).slice(0, 8);
   if (!message) throw new HttpError(400, 'Message is required.');
   await verifyTurnstile(body.turnstileToken, ctx.ip);
 
@@ -143,7 +148,7 @@ export async function contact(ctx){
   const db = await getDb();
   const row = await db.one(`insert into messages (source, name, email, subject, body, status, ip, meta)
     values ('contact', $1, $2, $3, $4, $5, $6, $7) returning id`,
-    [name, address, subject, message, spam ? 'spam' : 'new', ctx.ip, { country: ctx.geo?.country || null }]);
+    [name, address, subject, message, spam ? 'spam' : 'new', ctx.ip, { country: ctx.geo?.country || null, ...(topics.length ? { topics } : {}) }]);
   if (!spam){
     const to = settings.notifyEmail || env('OWNER_EMAIL');
     const portal = `${(env('PUBLIC_SITE_URL') || new URL(ctx.request.url).origin).replace(/\/+$/, '')}/portal/#messages/${row.id}`;
@@ -151,7 +156,8 @@ export async function contact(ctx){
     const reply = autoReplyFor(settings, new Date());
     if (reply) await sendEmail({ to: address, template: 'contact_autoreply', subjectOverride: reply.subject, bodyOverride: reply.body, vars: { name } });
   }
-  return json({ ok: true }, 201);
+  // the browser keeps this key, so replies can pop up on this device
+  return json({ ok: true, thread: settings.replyOnSite !== false ? threadKey(row.id) : null }, 201);
 }
 
 // Auto-reply text: the away message outside business hours (Asia/Kolkata), otherwise the normal

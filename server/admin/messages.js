@@ -4,6 +4,9 @@ import { getDb, ftsQuery } from '../core/db.js';
 import { sendEmail } from '../core/email.js';
 import { str, stringArray, uuid as vUuid } from '../core/validate.js';
 import { audit } from './auth.js';
+import { siteUrl } from '../core/env.js';
+import { getSetting } from '../core/settings.js';
+import { threadUrl } from '../handlers/threads.js';
 
 const STATUSES = ['new', 'read', 'done', 'spam'];
 
@@ -36,7 +39,7 @@ export async function getMessage(ctx){
   const m = await db.maybeOne('select id, source, name, email, subject, body, status, labels, ip, meta, created_at, replied_at from messages where id = $1', [id]);
   if (!m) throw new HttpError(404, 'Message not found.');
   if (m.status === 'new'){ await db.query(`update messages set status = 'read' where id = $1 and status = 'new'`, [id]); m.status = 'read'; }
-  const replies = await db.query('select id, body, sent_at, status from message_replies where message_id = $1 order by sent_at', [id]);
+  const replies = await db.query('select id, body, sent_at, status, seen_at from message_replies where message_id = $1 order by sent_at', [id]);
   const history = m.email ? await db.query('select id, subject, created_at, status from messages where lower(email) = lower($1) and id <> $2 order by created_at desc limit 10', [m.email, id]) : [];
   const orders = m.email ? await db.query(`select id, public_id, status, total, currency, created_at from orders where email = lower($1) and status in ('paid','delivered','refunded') order by created_at desc limit 10`, [m.email]) : [];
   return json({ message: m, replies, history, orders });
@@ -72,10 +75,17 @@ export async function reply(ctx){
   const body = str(b.body, { name: 'Reply', max: 20000, required: true, trim: false }).trim();
   if (!body) throw new HttpError(400, 'Write a reply first.');
   const db = await getDb();
-  const m = await db.maybeOne('select id, name, email, subject from messages where id = $1', [id]);
+  const m = await db.maybeOne('select id, source, name, email, subject from messages where id = $1', [id]);
   if (!m) throw new HttpError(404, 'Message not found.');
   if (!m.email) throw new HttpError(400, 'This message has no email address to reply to.');
-  const res = await sendEmail({ to: m.email, template: 'reply', vars: { subject: m.subject || 'your message', body, name: m.name } });
+  // contact messages get a link to the conversation on the site (the reply also pops up on the device they wrote from)
+  const onSite = m.source === 'contact' && (await getSetting('messages')).replyOnSite !== false;
+  const vars = { subject: m.subject || 'your message', body, name: m.name || 'there', thread_url: onSite ? threadUrl(siteUrl(ctx.request), m.id) : '' };
+  const res = await sendEmail({ to: m.email, template: 'reply', vars, bodyOverride: onSite ? undefined : `Hi {{name}},
+
+{{body}}
+
+{{signature}}` });
   await db.query('insert into message_replies (message_id, body, status) values ($1, $2, $3)', [id, body, res.ok ? 'sent' : 'failed']);
   if (!res.ok) throw new HttpError(502, 'The reply couldn’t be sent. It’s saved; check the email settings and try again.');
   await db.query(`update messages set replied_at = now(), status = case when $2 then 'done' else status end where id = $1`, [id, b.markDone !== false]);

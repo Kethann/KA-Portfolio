@@ -70,11 +70,11 @@ export async function visit(ctx){
   return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
 }
 
-// Retention: old visits and stale location cache entries are deleted every day.
+// Retention: old visits and stale location cache entries are deleted every day. Visits the owner saved are kept.
 onDaily('visitRetention', async () => {
   const db = await getDb();
   const { retentionDays } = await getSetting('visitors');
-  const removed = retentionDays > 0 ? (await db.query(`delete from visits where visited_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-' || $1 || ' days') returning 1`, [retentionDays])).length : 0;
+  const removed = retentionDays > 0 ? (await db.query(`delete from visits where not kept and visited_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-' || $1 || ' days') returning 1`, [retentionDays])).length : 0;
   await db.query(`delete from ip_geo_cache where looked_up_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-30 days')`);
   await db.query(`update visits set latitude = null, longitude = null, location_accuracy = null, location_source = null where location_source = 'browser-consent' and visited_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-7 days')`);
   return { removed };

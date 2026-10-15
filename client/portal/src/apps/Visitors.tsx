@@ -97,10 +97,11 @@ function Log(){
   const [bots, setBots] = useState<'exclude' | 'include' | 'only'>('exclude');
   const [open, setOpen] = useState<any>(null);
   const [markedOnly, setMarkedOnly] = useState(false);
+  const [savedOnly, setSavedOnly] = useState(false);
   const [view, setView] = usePref<'visits' | 'visitors'>('visitors.logView', 'visits');   // every visit, or one row per visitor
   const [clearing, setClearing] = useState(false);
   const dq = useDebounced(q, 300);
-  const qs = new URLSearchParams({ limit: '1000', bots }); if (dq) qs.set('q', dq); if (markedOnly) qs.set('marked', '1'); if (view === 'visitors') qs.set('group', '1');
+  const qs = new URLSearchParams({ limit: '1000', bots }); if (dq) qs.set('q', dq); if (markedOnly) qs.set('marked', '1'); if (savedOnly) qs.set('saved', '1'); if (view === 'visitors') qs.set('group', '1');
   const s = useLoad<{ rows: any[]; hasMore: boolean }>(`/visitors/log?${qs}`);
   const toast = useToast();
   const confirm = useConfirm();
@@ -112,6 +113,15 @@ function Log(){
     } catch (e){ toast.error(e); }
   };
   const afterDelete = async (msg: string) => { setOpen(null); toast.show(msg, { tone: 'success' }); await s.reload(); };
+  // saved visits are kept forever: through the daily clean-up and bulk clears
+  const keep = async (body: { ids?: number[]; visitorId?: string }, kept: boolean, what: string) => {
+    try {
+      const r = await put<{ changed: number; saved: number }>('/visitors/keep', { ...body, kept });
+      toast.show(kept ? `Saved ${what} permanently (${r.saved} saved in all)` : `${what[0].toUpperCase() + what.slice(1)} no longer saved`, { tone: 'success' });
+      if (open && body.ids?.includes(open.id)) setOpen({ ...open, kept: kept ? 1 : 0 });
+      await s.reload();
+    } catch (e){ toast.error(e); }
+  };
   const cols: Column<any>[] = [
     { key: 'when', label: 'When', width: '120px', render: r => <span title={dateTime(r.visited_at)}>{ago(r.visited_at)}</span> },
     { key: 'where', label: 'Where', width: '1.3fr', render: r => <span className="truncate" title={[r.city, r.region, r.postal, r.isp].filter(Boolean).join(' · ')}>{flag(r.country)} {r.city ? `${r.city}${r.region ? ', ' + r.region : ''}` : r.country || 'Unknown'}</span> },
@@ -120,7 +130,9 @@ function Log(){
     { key: 'dev', label: 'Device', width: '1.2fr', hideBelow: 880, render: r => <span className="truncate" title={[r.device_vendor, r.device_model, r.device_type, r.browser, r.os].filter(Boolean).join(' · ')}>{[r.device_vendor, r.device_model].filter(Boolean).join(' ') || r.device_type || 'Unknown'} · {r.browser || 'browser'} · {r.os || 'system'}</span> },
     { key: 'time', label: 'Time', width: '70px', align: 'right', hideBelow: 560, render: r => dur(r.duration_ms) },
     ...(view === 'visitors' ? [{ key: 'count', label: 'Visits', width: '70px', align: 'right' as const, render: (r: any) => <span className="num" title={`First seen ${dateTime(r.first_seen)}`}>{r.visit_count}</span> }] : []),
-    { key: 'bot', label: '', width: '104px', render: r => <span className="row" style={{ gap: 4 }}>
+    { key: 'bot', label: '', width: '132px', render: r => <span className="row" style={{ gap: 4 }}>
+      <button type="button" className="icon-btn sm keep-btn" aria-pressed={!!r.kept} aria-label={r.kept ? 'Saved permanently. Click to un-save' : 'Save this visit permanently'} title={r.kept ? 'Saved permanently (never auto-deleted). Click to un-save' : 'Save permanently'}
+        onKeyDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); void keep({ ids: [r.id] }, !r.kept, 'this visit'); }}><Icon name={r.kept ? 'lock' : 'archive'} size={13} /></button>
       <button type="button" className="icon-btn sm" aria-pressed={!!r.mark} aria-label={r.mark ? `Remove the mark (${r.mark.label})` : 'Mark this visitor'} title={r.mark ? `Marked: ${r.mark.label}${r.mark.note ? ' · ' + r.mark.note : ''}. Click to remove` : 'Mark this visitor'}
         style={{ color: r.mark ? 'var(--accent, #ff9438)' : undefined }} onKeyDown={e => e.stopPropagation()} onClick={() => void toggleMark(r)}>{r.mark ? '★' : '☆'}</button>
       {r.is_bot ? <Badge tone="warning">bot</Badge> : r.is_new ? <Badge tone="accent">new</Badge> : null}</span> }
@@ -131,9 +143,11 @@ function Log(){
         <SearchBox value={q} onChange={setQ} placeholder="IP, city, page, browser…" label="Search the visit log" />
         <Segmented label="Show" value={view} onChange={setView} options={[{ value: 'visits', label: 'Visits' }, { value: 'visitors', label: 'Visitors' }]} />
         <button type="button" className={'btn sm' + (markedOnly ? ' primary' : ' ghost')} aria-pressed={markedOnly} onClick={() => setMarkedOnly(m => !m)}>★ Marked</button>
+        <button type="button" className={'btn sm' + (savedOnly ? ' primary' : ' ghost')} aria-pressed={savedOnly} onClick={() => setSavedOnly(m => !m)} title="Visits you saved permanently"><Icon name="lock" size={12} /> Saved</button>
         <Segmented label="Bots" value={bots} onChange={setBots} options={[{ value: 'exclude', label: 'People' }, { value: 'include', label: 'All' }, { value: 'only', label: 'Bots' }]} />
         <span className="grow" />
         <AsyncButton className="btn sm" onClick={async () => { await downloadFile(`/visitors.csv?${qs}`, `visitors-${todayIST()}.csv`); toast.show('CSV downloaded', { tone: 'success' }); }}><Icon name="downloads" /> CSV</AsyncButton>
+        <Retention />
         <button type="button" className="btn sm ghost" style={{ color: 'var(--danger)' }} onClick={() => setClearing(true)}><Icon name="trash" /> Clear…</button>
       </div>
       <div className="app-main fill">
@@ -145,6 +159,8 @@ function Log(){
       {clearing && <ClearVisits onClose={() => setClearing(false)} onDone={async (n) => { setClearing(false); toast.show(n ? `Cleared ${n} visit${n === 1 ? '' : 's'}` : 'Nothing matched, so nothing was removed', { tone: 'success' }); await s.reload(); }} />}
       {open && (
         <Modal title="Visit details" onClose={() => setOpen(null)} footer={<>
+          <AsyncButton className="btn ghost" onClick={() => keep({ ids: [open.id] }, !open.kept, 'this visit')}><Icon name={open.kept ? 'lock' : 'archive'} /> {open.kept ? 'Saved · un-save' : 'Save permanently'}</AsyncButton>
+          <AsyncButton className="btn ghost" onClick={() => keep({ visitorId: open.visitor_id }, true, 'every visit from this visitor')}><Icon name="archive" /> Save all from this visitor</AsyncButton>
           <AsyncButton className="btn ghost danger-text push-left" onClick={async () => {
             if (!(await confirm({ title: 'Delete this visit?', body: 'Only this one page view is removed. The visitor’s other visits stay.', confirm: 'Delete visit', danger: true }))) return;
             await del(`/visitors/visit/${open.id}`); await afterDelete('Visit deleted');
@@ -222,24 +238,46 @@ function VisitorHistory({ visitorId, onChanged, onDeleted }: { visitorId: string
 }
 
 // Clear history in bulk: older than some days, bots only, or everything. Marked visitors can be kept.
+// How long the log keeps visits before the daily clean-up removes them (saved visits are always kept).
+const KEEP_OPTIONS: [number, string][] = [[30, '30 days'], [90, '90 days'], [180, '6 months'], [365, '1 year'], [730, '2 years'], [0, 'Forever']];
+function Retention(){
+  const s = useLoad<{ value: { retentionDays: number }; revision: number }>('/settings/visitors');
+  const toast = useToast();
+  if (!s.data) return null;
+  const days = s.data.value.retentionDays;
+  const opts = KEEP_OPTIONS.some(([d]) => d === days) ? KEEP_OPTIONS : [...KEEP_OPTIONS, [days, `${days} days`] as [number, string]];
+  return (
+    <label className="row" style={{ gap: 6, fontSize: 12 }} title="Visits older than this are deleted every day. Saved visits are never deleted.">
+      <span className="faint">Keep logs</span>
+      <select aria-label="Keep logs for" value={days} style={{ width: 'auto' }} onChange={async e => {
+        const next = Number(e.target.value);
+        try { s.setData(await put('/settings/visitors', { value: { ...s.data!.value, retentionDays: next }, revision: s.data!.revision })); toast.show(next ? `Visits are now kept for ${KEEP_OPTIONS.find(o => o[0] === next)?.[1] || next + ' days'}` : 'Visits are now kept forever', { tone: 'success' }); }
+        catch (err){ toast.error(err); void s.reload(); }
+      }}>{opts.map(([d, l]) => <option key={d} value={d}>{l}</option>)}</select>
+    </label>
+  );
+}
+
 function ClearVisits({ onClose, onDone }: { onClose: () => void; onDone: (removed: number) => void }){
   const confirm = useConfirm();
   const toast = useToast();
   const [scope, setScope] = useState<'older' | 'bots' | 'all'>('older');
   const [days, setDays] = useState('90');
   const [keep, setKeep] = useState(true);
+  const [keepSaved, setKeepSaved] = useState(true);
   const go = async () => {
     const what = scope === 'older' ? `Visits older than ${days} days` : scope === 'bots' ? 'All bot visits' : 'The whole visit history';
-    if (!(await confirm({ title: `${what} will be deleted for good`, body: keep ? 'Visitors you marked with a star are kept.' : 'Marked visitors are deleted too, along with their marks.', confirm: 'Delete', danger: true }))) return;
-    try { const r = await post<{ removed: number }>('/visitors/clear', { scope, days: Number(days), keepMarked: keep }); onDone(r.removed); } catch (e){ toast.error(e); }
+    if (!(await confirm({ title: `${what} will be deleted for good`, body: [keep ? 'Visitors you marked with a star are kept.' : 'Marked visitors are deleted too, along with their marks.', keepSaved ? 'Visits you saved permanently are kept.' : 'Saved visits are deleted too.'].join(' '), confirm: 'Delete', danger: true }))) return;
+    try { const r = await post<{ removed: number }>('/visitors/clear', { scope, days: Number(days), keepMarked: keep, keepSaved }); onDone(r.removed); } catch (e){ toast.error(e); }
   };
   return (
     <Modal title="Clear visitor history" onClose={onClose} footer={<><button type="button" className="btn ghost" onClick={onClose}>Cancel</button><AsyncButton className="btn danger" onClick={go}><Icon name="trash" /> Delete</AsyncButton></>}>
       <div className="stack">
-        <p className="field-hint" style={{ margin: 0 }}>Deleting is permanent. Older visits are also removed automatically after the retention period in Settings.</p>
+        <p className="field-hint" style={{ margin: 0 }}>Deleting is permanent. Older visits are also removed automatically after the “Keep logs” period (in the log’s toolbar); saved visits never are.</p>
         <Segmented label="What to clear" value={scope} onChange={setScope} options={[{ value: 'older', label: 'Older than…' }, { value: 'bots', label: 'Bots only' }, { value: 'all', label: 'Everything' }]} />
         {scope === 'older' && <label className="row" style={{ gap: 8 }}>Older than <select aria-label="Days" value={days} onChange={e => setDays(e.target.value)} style={{ width: 'auto' }}>{['7', '30', '90', '180', '365'].map(d => <option key={d} value={d}>{d} days</option>)}</select></label>}
         <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={keep} onChange={e => setKeep(e.target.checked)} /> Keep visitors I marked with a star</label>
+        <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={keepSaved} onChange={e => setKeepSaved(e.target.checked)} /> Keep visits I saved permanently</label>
       </div>
     </Modal>
   );

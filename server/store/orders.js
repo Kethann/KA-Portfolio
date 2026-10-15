@@ -134,10 +134,11 @@ export function quoteDto(q){
 
 // Creates the order (and the Razorpay order when there's something to pay). Returns what the
 // browser needs to open Razorpay Checkout, or a download link right away for free orders.
-export async function createOrder({ productId, currency, codes, email, ip, country, siteUrl, licenseHolder = null }){
+export async function createOrder({ productId, currency, codes, email, ip, country, siteUrl, licenseHolder = null, storePass = false }){
   const db = await getDb();
   const store = await getSetting('store');
-  if (store.enabled === false) throw new HttpError(503, 'The store is closed right now.');
+  // closed: only people the owner gave special access (Settings > Store status) can still buy
+  if (store.enabled === false && !storePass) throw new HttpError(503, 'The store is closed right now.', { code: 'store_closed' });
   const clientSecret = randomToken(24);
   const q = await quote(db, { productId, currency, codes, email, store });
   if (q.needsEmail) throw new HttpError(400, 'Enter your email to use this code.');

@@ -137,17 +137,19 @@ function Detail({ id, go, open, onChanged }: { id: string; go: (r: string) => vo
         <span className="grow" />
         <button type="button" className="btn sm ghost" aria-label="Delete message" onClick={() => { go('inbox'); toast.undoable('Message deleted', () => post('/messages/bulk', { ids: [id], action: 'delete' }).then(onChanged), () => go(id)); }}><Icon name="trash" /></button>
       </div>
+      {Array.isArray(m.meta?.topics) && m.meta.topics.length > 0 && <div className="row" style={{ gap: 6, flexWrap: 'wrap' }} aria-label="What it is about">{m.meta.topics.map((t: string) => <Badge key={t} tone="accent">{t}</Badge>)}</div>}
       <div className="msg-body">{m.body}</div>
       {labels && <Field label="Labels"><TagInput label="Labels" value={labels} onChange={async v => { setLabels(v); try { await patch(`/messages/${id}`, { labels: v }); onChanged(); } catch (e){ toast.error(e); } }} placeholder="e.g. client, commission" max={10} /></Field>}
       {replies.length > 0 && <section className="stack"><div className="eyebrow">Your replies</div>
-        {replies.map((r: any) => <div key={r.id} className="msg-reply"><div className="faint" style={{ fontSize: 12 }}>{dateTime(r.sent_at)} · {r.status}</div><div className="msg-body" style={{ margin: 0 }}>{r.body}</div></div>)}</section>}
+        {replies.map((r: any) => <div key={r.id} className="msg-reply"><div className="faint row" style={{ fontSize: 12, gap: 6 }}>{dateTime(r.sent_at)} · {r.status}
+          {r.status === 'sent' && m.source === 'contact' && (r.seen_at ? <Badge tone="success">Seen on the site {ago(r.seen_at)}</Badge> : <Badge tone="neutral">Not seen on the site yet</Badge>)}</div><div className="msg-body" style={{ margin: 0 }}>{r.body}</div></div>)}</section>}
       {m.email && (
         <section className="stack reply-box" aria-label="Reply">
           <div className="row between"><div className="eyebrow">Reply to {m.name || m.email}</div>
             {canned.data && canned.data.canned.length > 0 && <select aria-label="Insert a saved reply" value="" onChange={e => { const c = canned.data!.canned.find(x => x.id === e.target.value); if (c) setReply(r => (r ? r + '\n\n' : '') + c.body.replace(/\{\{name\}\}/g, m.name || 'there')); }} style={{ width: 'auto' }}>
               <option value="">Insert saved reply…</option>{canned.data.canned.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select>}</div>
           <textarea aria-label="Reply text" rows={6} value={reply} onChange={e => setReply(e.target.value)} placeholder="Write your reply. Your email signature is added automatically." />
-          <div className="row"><span className="faint grow" style={{ fontSize: 12 }}>Sent from your store address; their replies come to your email.</span>
+          <div className="row"><span className="faint grow" style={{ fontSize: 12 }}>{m.source === 'contact' ? 'Emailed to them, and it pops up on the site on the device they wrote from. Their replies come to your email.' : 'Sent from your store address; their replies come to your email.'}</span>
             <AsyncButton className="btn primary" disabled={!reply.trim()} onClick={async () => { await post(`/messages/${id}/reply`, { body: reply }); setReply(''); toast.show('Reply sent', { tone: 'success' }); s.reload(); onChanged(); }}><Icon name="send" /> Send</AsyncButton></div>
         </section>
       )}

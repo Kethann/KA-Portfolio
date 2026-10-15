@@ -247,6 +247,8 @@ function couponInput(b){
 export async function listCoupons(){
   const db = await getDb();
   const rows = await db.query(`select c.*, (select count(*) from coupon_redemptions r where r.coupon_id = c.id and r.status = 'confirmed') as confirmed_uses,
+    (select count(*) from coupon_redemptions r where r.coupon_id = c.id and r.status = 'reserved') as pending_uses,
+    (select count(*) from coupon_redemptions r where r.coupon_id = c.id) as checkout_uses,
     (select json_group_array(json_object('currency', x.currency, 'discount', x.s)) from (select currency, sum(amount) as s from coupon_redemptions r where r.coupon_id = c.id and r.status = 'confirmed' group by currency) x) as given
     from coupons c order by c.created_at desc`);
   return json({ coupons: rows });

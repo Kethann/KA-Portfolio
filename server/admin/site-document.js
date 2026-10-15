@@ -224,8 +224,16 @@ export function validateSiteDocument(input, current, seed){
   if (branding.enabled && !branding.logoUrl) throw bad('Upload a logo image before turning it on.');
 
   // plain text only: the homepage sets it with textContent, never as HTML
-  const notice = { enabled: !!input.notice?.enabled, text: text(input.notice?.text, 220), tone: input.notice?.tone === 'warning' ? 'warning' : 'info' };
-  if (notice.enabled && !notice.text) throw bad('Add notice text before turning the banner on, or turn it off.');
+  // the announcement: a tab on the side of the screen that slides open by itself, then tucks away after a few seconds
+  // (visitors can open it again, or pin it open); 'banner' keeps the old strip at the top
+  const n = input.notice && typeof input.notice === 'object' ? input.notice : {};
+  const autoClose = Number(n.autoClose);
+  const noticeLink = text(n.linkUrl, 300);
+  if (noticeLink && !httpUrl(noticeLink) && !/^\/[^\s]*$/.test(noticeLink)) throw bad('The announcement link must start with https://, http:// or /.');
+  const notice = { enabled: !!n.enabled, text: text(n.text, 220), tone: ['warning', 'success', 'offer'].includes(n.tone) ? n.tone : 'info',
+    style: n.style === 'banner' ? 'banner' : 'tab', side: n.side === 'left' ? 'left' : 'right', title: text(n.title, 40) || 'Announcement',
+    autoClose: Number.isFinite(autoClose) ? Math.min(30, Math.max(0, Math.round(autoClose))) : 6, linkLabel: text(n.linkLabel, 30), linkUrl: noticeLink };
+  if (notice.enabled && !notice.text) throw bad('Add announcement text before turning it on, or turn it off.');
   const visibility = { navGallery: input.visibility?.navGallery !== false, navAbout: input.visibility?.navAbout !== false, autoFullscreen: input.visibility?.autoFullscreen === true, downloadFormat: input.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png' };
 
   const layoutOverrides = {};
@@ -285,6 +293,7 @@ export function validateSiteDocument(input, current, seed){
   if (input.stacks?.covers && typeof input.stacks.covers === 'object'){
     for (const [folder, slug] of Object.entries(input.stacks.covers)) if (folders.includes(folder) && images.some(i => i.slug === slug && i.cat === folder)) stacks.covers[folder] = slug;
   }
+  const featuredShow = validateFeaturedShow(input.featuredShow, folders, images);
   // The checkout pass (Studio > Checkout pass): label, logo, fonts and where things sit on the card.
   const pc = input.passCard && typeof input.passCard === 'object' ? input.passCard : {};
   const pickOf = (v, list, fb) => list.includes(v) ? v : fb;
@@ -328,7 +337,41 @@ export function validateSiteDocument(input, current, seed){
   const intro = { version: introVersion(input.intro?.version) };   // which homepage intro runs (Studio > Intro)
   // a save from the portal makes the owner's skill list the authority: the one-time additions (handlers/public.js) never apply after it
   const skillsAdded = SKILLS_ADDITIONS.id;
-  return { typeV2: true, details, folders, images, notice, visibility, stacks, layoutOverrides, branding, elementStyles, socialLinks, passCard, stats, skills, about, sounds, intro, skillsAdded };
+  return { typeV2: true, details, folders, images, notice, visibility, stacks, featuredShow, layoutOverrides, branding, elementStyles, socialLinks, passCard, stats, skills, about, sounds, intro, skillsAdded };
+}
+
+// About > Featured Work as a showcase: rows that alternate sides (picture one side, words the other), each picture
+// frame a "template" whose pictures cross-fade in place (no sliding). The owner picks the frame's shape and size,
+// the order (in turn or shuffled), the pace, and the words beside it. Missing = the default showcase from the featured stacks.
+export const FEATURED_RATIOS = ['auto', 'free', '4:5', '2:3', '3:4', '1:1', '4:3', '3:2', '16:9', '21:9'];
+export const FEATURED_SIZES = ['auto', 's', 'm', 'l', 'free'];   // auto: sized from the pictures' own shape
+export const FEATURED_LIMITS = { rows: 6, slides: 12, title: 80, eyebrow: 40, description: 600, ctaLabel: 30 };
+export function validateFeaturedShow(input, folders, images){
+  if (input === undefined || input === null) return null;
+  if (typeof input !== 'object' || Array.isArray(input)) throw bad('Invalid Featured Work settings.');
+  const num = (v, lo, hi, d) => { const x = Number(v); return Number.isFinite(x) ? Math.min(hi, Math.max(lo, x)) : d; };
+  const rows = [];
+  for (const r of (Array.isArray(input.rows) ? input.rows : []).slice(0, FEATURED_LIMITS.rows)){
+    if (!r || typeof r !== 'object') throw bad('Invalid Featured Work row.');
+    const folder = text(r.folder, 70);
+    if (!folders.includes(folder)) throw bad('Each Featured Work row needs an existing folder.');
+    const slides = [];
+    for (const s of (Array.isArray(r.slides) ? r.slides : [])){
+      if (typeof s !== 'string' || slides.includes(s)) continue;
+      if (!images.some(i => i.slug === s && !i.hidden)) continue;   // hidden or deleted since: it simply leaves the row (like stack covers)
+      slides.push(s);
+      if (slides.length >= FEATURED_LIMITS.slides) break;
+    }
+    const ctaUrl = text(r.ctaUrl, 300);
+    if (ctaUrl && !httpUrl(ctaUrl) && !/^\/[^\s]*$/.test(ctaUrl)) throw bad('Featured Work button links must start with https://, http:// or /.');
+    rows.push({ folder, slides, title: text(r.title, FEATURED_LIMITS.title), eyebrow: text(r.eyebrow, FEATURED_LIMITS.eyebrow), description: text(r.description, FEATURED_LIMITS.description),
+      ratio: FEATURED_RATIOS.includes(r.ratio) ? r.ratio : 'auto', size: FEATURED_SIZES.includes(r.size) ? r.size : 'auto', side: ['auto', 'left', 'right'].includes(r.side) ? r.side : 'auto',
+      ctaLabel: text(r.ctaLabel, FEATURED_LIMITS.ctaLabel), ctaUrl,
+      // free size: the picture's share of the row (25-75%); free shape: any width:height
+      width: Math.round(num(r.width, 25, 75, 50)), ratioW: Math.round(num(r.ratioW, 1, 100, 4) * 100) / 100, ratioH: Math.round(num(r.ratioH, 1, 100, 5) * 100) / 100 });
+  }
+  return { enabled: input.enabled !== false, order: input.order === 'random' ? 'random' : 'sequence', interval: Math.round(num(input.interval, 2, 15, 5) * 10) / 10,
+    fade: Math.round(num(input.fade, 0.4, 4, 1.6) * 10) / 10, zoom: input.zoom === true, captions: input.captions !== false, rows };
 }
 
 // About > story. Missing (a document saved before the story was editable) means the defaults; bad values are refused.

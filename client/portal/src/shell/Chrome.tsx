@@ -1,8 +1,8 @@
 // Desktop chrome: menu bar, dock (with magnification), command palette, shortcut sheet, first-run tour,
 // the phone home screen, and the global keyboard shortcuts.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as RKeyboardEvent, ReactNode } from 'react';
-import { APPS, APP } from '../apps/registry';
+import { APPS, APP, SECTIONS } from '../apps/registry';
 import { useDesk } from './desk';
 import { Icon } from '../icons';
 import { get, post } from '../api';
@@ -11,15 +11,15 @@ import { useDebounced, useLoad, usePref } from '../hooks';
 import { TZ } from '../format';
 import { useFullscreen } from './fullscreen';
 import { useRotation } from './rotate';
-import { ChartBar, ChatCircleText, DownloadSimple, Gauge, GearSix, GlobeHemisphereWest, Images, Lightbulb, Package, Palette as PaletteGlyph, Receipt, Scales, Ticket } from '@phosphor-icons/react';
+import { ChartBar, ChatCircleText, DownloadSimple, FilmSlate, Gauge, GearSix, GlobeHemisphereWest, Images, Lightbulb, Package, Palette as PaletteGlyph, Receipt, Scales, Ticket, TreeStructure } from '@phosphor-icons/react';
 import type { Icon as PhIcon } from '@phosphor-icons/react';
 
 // App tiles use Phosphor's two-tone ("duotone") glyphs: modern, and they read like iOS icons on glass.
 const GLYPH: Record<string, PhIcon> = { overview: Gauge, products: Package, orders: Receipt, reports: ChartBar, coupons: Ticket, downloads: DownloadSimple,
-  visitors: GlobeHemisphereWest, messages: ChatCircleText, tips: Lightbulb, studio: PaletteGlyph, content: Images, legal: Scales, settings: GearSix };
+  visitors: GlobeHemisphereWest, messages: ChatCircleText, tips: Lightbulb, studio: PaletteGlyph, content: Images, legal: Scales, settings: GearSix, wallpaper: FilmSlate, map: TreeStructure };
 // "Obsidian glass": every tile is the same dark glass; each app is told apart by its symbol's soft colour.
 const HUE: Record<string, string> = { overview: '#FFB26B', products: '#A5B4FC', orders: '#6EE7B7', reports: '#7DD3FC', coupons: '#F9A8D4', downloads: '#BEF264',
-  visitors: '#5EEAD4', messages: '#93C5FD', tips: '#FDE68A', studio: '#D8B4FE', content: '#FDBA74', legal: '#E7E5E4', settings: '#D6D3D1' };
+  visitors: '#5EEAD4', messages: '#93C5FD', tips: '#FDE68A', studio: '#D8B4FE', content: '#FDBA74', legal: '#E7E5E4', settings: '#D6D3D1', wallpaper: '#9AD8FF', map: '#86EFAC' };
 import logo from '../assets/ka-logo.png';
 
 export type Theme = 'system' | 'dark' | 'light';
@@ -197,19 +197,20 @@ export function Dock({ pulse, compact }: { pulse: any; compact: boolean }){
   };
   return (
     <div className={'dock-wrap' + (compact ? ' compact' : '')}>
-      <div ref={ref} className="dock" role="toolbar" aria-label="Apps" onPointerMove={onMove} onPointerLeave={reset} onKeyDown={onKey} style={{ '--n': APPS.length } as React.CSSProperties}>
+      <div ref={ref} className="dock" role="toolbar" aria-label="Apps" onPointerMove={onMove} onPointerLeave={reset} onKeyDown={onKey} style={{ '--n': APPS.length, '--seps': SECTIONS.filter(s => APPS.some(a => a.section === s)).length - 1 } as React.CSSProperties}>
         {APPS.map((a, i) => {
           const w = desk.wins.find(x => x.id === a.id);
           const badge = a.id === 'messages' ? pulse?.newMessages : 0;
           return (
-            <div key={a.id} ref={el => { items.current[i] = el; }} className={'dock-item' + (w ? ' running' : '') + (desk.focused === a.id ? ' front' : '')}>
+            <Fragment key={a.id}>{i > 0 && APPS[i - 1].section !== a.section && <span className="dock-sep" role="separator" aria-label={a.section} />}
+            <div ref={el => { items.current[i] = el; }} className={'dock-item' + (w ? ' running' : '') + (desk.focused === a.id ? ' front' : '')}>
               <button type="button" tabIndex={i === tabIdx ? 0 : -1} onClick={() => click(a.id)} onFocus={() => setTabIdx(i)}
-                aria-label={a.title + (badge ? `, ${badge} new` : '') + (w ? ', open' : '')} data-tip={a.title}>
+                aria-label={a.title + (badge ? `, ${badge} new` : '') + (w ? ', open' : '')} data-tip={`${a.title} · ${a.section}`}>
                 <AppTile id={a.id} />
                 {badge > 0 && <span className="dock-badge" aria-hidden="true">{badge > 99 ? '99+' : badge}</span>}
                 {compact && <span className="dock-label">{a.title.replace('Licenses & Legal', 'Legal').replace('KA Assistant', 'Assistant')}</span>}
               </button>
-            </div>
+            </div></Fragment>
           );
         })}
       </div>
@@ -222,13 +223,16 @@ export function HomeScreen(){
   const desk = useDesk();
   return (
     <div className="home" role="navigation" aria-label="Apps">
-      <div className="home-grid">
-        {APPS.map(a => (
-          <button key={a.id} type="button" className="home-app" onClick={() => desk.open(a.id)}>
-            <AppTile id={a.id} size={58} /><span>{a.title.replace('Licenses & Legal', 'Legal')}</span>
-          </button>
-        ))}
-      </div>
+      {SECTIONS.filter(s => APPS.some(a => a.section === s)).map(s => <section key={s} className="home-section" aria-label={s}>
+        <h2 className="home-section-title">{s}</h2>
+        <div className="home-grid">
+          {APPS.filter(a => a.section === s).map(a => (
+            <button key={a.id} type="button" className="home-app" onClick={() => desk.open(a.id)}>
+              <AppTile id={a.id} size={58} /><span>{a.title.replace('Licenses & Legal', 'Legal')}</span>
+            </button>
+          ))}
+        </div>
+      </section>)}
     </div>
   );
 }

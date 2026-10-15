@@ -27,6 +27,38 @@ const SERVICES = [
   { key: 'geo', label: 'Visitor location (optional extra lookup; Cloudflare provides the country without it)', vars: ['IPSTACK_ACCESS_KEY'], required: false, ok: () => onCloudflare() || !!env('IPSTACK_ACCESS_KEY') }
 ];
 
+// The System map's live database view: every table with its columns, which tables it points to (foreign keys), and
+// how many rows it holds, plus the owner-editable settings documents. Read from the database itself (the CREATE
+// statements), so it is always current, on SQLite locally and on D1.
+export function parseTable(sql){
+  const body = String(sql || '').slice(String(sql || '').indexOf('(') + 1, String(sql || '').lastIndexOf(')'));
+  const parts = []; let depth = 0, cur = '';
+  for (const ch of body){ if (ch === '(') depth++; if (ch === ')') depth--; if (ch === ',' && depth === 0){ parts.push(cur); cur = ''; } else cur += ch; }
+  if (cur.trim()) parts.push(cur);
+  const columns = [], refs = [];
+  for (const raw of parts.map(p => p.replace(/--[^\n]*/g, '').trim()).filter(Boolean)){
+    const fk = /^(?:constraint\s+\w+\s+)?foreign\s+key\s*\(\s*(\w+)\s*\)\s*references\s+(\w+)/i.exec(raw);
+    if (fk){ refs.push({ column: fk[1], table: fk[2] }); continue; }
+    if (/^(constraint|unique|primary|check|foreign)\b/i.test(raw)) continue;
+    const m = /^"?(\w+)"?\s*(\w+)?/.exec(raw); if (!m) continue;
+    const ref = /references\s+"?(\w+)"?/i.exec(raw);
+    columns.push({ name: m[1], type: (m[2] || '').toLowerCase(), pk: /primary\s+key/i.test(raw), required: /not\s+null/i.test(raw) || /primary\s+key/i.test(raw) });
+    if (ref) refs.push({ column: m[1], table: ref[1] });
+  }
+  return { columns, refs };
+}
+export async function systemMap(){
+  const db = await getDb();
+  const tables = (await db.query(`select name, sql from sqlite_master where type = 'table' and name not like 'sqlite_%' and name not like '\\_cf\\_%' escape '\\' and name not like 'd1_%'
+    and name not like '%\\_fts' escape '\\' and name not like '%\\_fts\\_%' escape '\\' order by name`));
+  const counts = await Promise.all(tables.map(t => db.maybeOne(`select count(*) as n from "${t.name.replace(/"/g, '')}"`).then(r => Number(r?.n || 0)).catch(() => null)));
+  const settings = await db.query(`select key, revision, updated_at from settings order by key`);
+  return json({
+    tables: tables.map((t, i) => ({ name: t.name, rows: counts[i], ...parseTable(t.sql) })),
+    settings: settings.map(s => ({ key: s.key, revision: s.revision, updatedAt: s.updated_at }))
+  });
+}
+
 export async function status(){
   const db = await getDb();
   const t0 = Date.now();
@@ -102,7 +134,7 @@ export async function purgeVisits(ctx){
   const b = await readJson(ctx.request, 1024);
   const days = int(b.olderThanDays, { name: 'Days', min: 0, max: 3650 });
   const db = await getDb();
-  const rows = await db.query(`delete from visits where visited_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-' || $1 || ' days') returning 1`, [days]);
+  const rows = await db.query(`delete from visits where not kept and visited_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-' || $1 || ' days') returning 1`, [days]);
   await audit(ctx, 'visits_purged', null, { days, count: rows.length });
   return json({ ok: true, deleted: rows.length });
 }
@@ -147,6 +179,7 @@ export function registerSystem(route){
   route('GET', '/api/admin/pulse', pulse, a);
   route('GET', '/api/admin/search', search, a);
   route('GET', '/api/admin/system', status, a);
+  route('GET', '/api/admin/system/map', systemMap, a);
   route('GET', '/api/admin/system/storage', storageUsage, a);
   route('POST', '/api/admin/system/test-email', testEmail, a);
   route('GET', '/api/admin/backups', listBackups, a);

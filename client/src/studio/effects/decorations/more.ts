@@ -5,6 +5,7 @@ import { between } from '../rng';
 import type { CharInfo, EffectContext, Timeline } from '../types';
 import type { Decoration } from './index';
 import { baseOf, clear, drawOn, f, heartPath, layer, pickLetters, starPath, svgEl, textBox, topOf, unit } from './kit';
+import { ecgWave } from '../ecg';
 
 const S = (ctx: EffectContext) => Math.max(0.25, ctx.speed);
 type Picked = EffectContext & { _pick?: Set<number>; _g?: SVGGElement; _last?: { x: number; y: number } | null };
@@ -86,22 +87,6 @@ const flare = whole('flare', 'Lens flare', 'A cinematic flare sweeps across the 
 }, 0.6);
 
 // ---------------------------------------------------------------- elements
-const flames = perLetter('flames', 'Flames & embers', 'Flames lick up from the letters and embers float away.', 0.6, (tl, ctx, g, c, at) => {
-  const r = ctx.rng, p = ctx.palette, u = unit(c), top = topOf(c), H = between(r, 22, 40) * u, W = between(r, 9, 15) * u;
-  const fl = (h: number, w: number, col: string, op: number) => svgEl('path', { d: `M${f(top.x)} ${f(top.y + 2)} C${f(top.x - w)} ${f(top.y - h * 0.25)} ${f(top.x - w * 0.3)} ${f(top.y - h * 0.6)} ${f(top.x + w * 0.1)} ${f(top.y - h)} C${f(top.x + w * 0.2)} ${f(top.y - h * 0.55)} ${f(top.x + w)} ${f(top.y - h * 0.35)} ${f(top.x)} ${f(top.y + 2)}Z`, fill: col, opacity: op });
-  const outer = fl(H, W, 'url(#fxgFlame)', 0.95), inner = fl(H * 0.6, W * 0.55, 'url(#fxgGlow)', 0.9);
-  g.append(outer, inner);
-  const o = `${f(top.x)} ${f(top.y)}`;
-  tl.fromTo([outer, inner], { scaleY: 0, scaleX: 0.4, svgOrigin: o }, { scaleY: 1, scaleX: 1, svgOrigin: o, duration: 0.35 / S(ctx), ease: 'power2.out' }, at);
-  tl.to(outer, { scaleY: 0.82, scaleX: 1.1, skewX: 6, svgOrigin: o, duration: 0.18, yoyo: true, repeat: 9, ease: 'sine.inOut' }, at + 0.35 / S(ctx));
-  tl.to(inner, { scaleY: 1.15, skewX: -5, svgOrigin: o, duration: 0.14, yoyo: true, repeat: 11, ease: 'sine.inOut' }, at + 0.35 / S(ctx));
-  for (let k = 0; k < 3; k++){
-    const e = svgEl('circle', { cx: f(top.x), cy: f(top.y - H * 0.6), r: f(between(r, 1, 2.2) * u), fill: p.glow }); g.appendChild(e);
-    tl.fromTo(e, { x: 0, y: 0, opacity: 0 }, { x: (r() - 0.5) * 40 * u, y: -between(r, 50, 110) * u, opacity: 0, keyframes: { opacity: [0, 1, 0] }, duration: between(r, 1.2, 2), ease: 'power1.out' }, at + 0.3 + k * 0.35);
-  }
-  return at + 0.5 / S(ctx);
-});
-
 const frost = perLetter('frost', 'Frost crystals', 'Ice crystals branch out from the letters.', 0.5, (tl, ctx, g, c, at) => {
   const r = ctx.rng, p = ctx.palette, u = unit(c), o = c.anchors.outline[Math.floor(r() * c.anchors.outline.length)];
   const L = between(r, 12, 22) * u; let d = '';
@@ -229,15 +214,25 @@ const laurel = whole('laurel', 'Laurel wreath', 'Laurel branches grow around the
 // ---------------------------------------------------------------- science & tech
 const ecg = whole('ecg', 'Heartbeat line', 'An ECG trace beats under the words, with a pulse.', (tl, ctx, g, at) => {
   const b = textBox(ctx), p = ctx.palette, y = b.y + b.h + Math.max(18, b.h * 0.25), x0 = Math.max(10, b.x - 40), x1 = Math.min(b.sw - 10, b.x + b.w + 40), amp = Math.max(18, b.h * 0.35);
-  let d = `M${f(x0)} ${f(y)}`; const beats = 3, W = (x1 - x0) / beats;
-  for (let k = 0; k < beats; k++){ const o = x0 + k * W; d += ` L${f(o + W * 0.35)} ${f(y)} L${f(o + W * 0.42)} ${f(y - amp * 0.2)} L${f(o + W * 0.48)} ${f(y + amp * 0.25)} L${f(o + W * 0.55)} ${f(y - amp)} L${f(o + W * 0.62)} ${f(y + amp * 0.45)} L${f(o + W * 0.7)} ${f(y)} L${f(o + W)} ${f(y)}`; }
-  const glow = svgEl('path', { d, stroke: p.accent1, 'stroke-width': 6, fill: 'none', opacity: 0.25, 'stroke-linejoin': 'round' });
-  const line = svgEl('path', { d, stroke: p.accent1, 'stroke-width': 2.2, fill: 'none', 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
+  // a real P-QRS-T beat (ecg.ts), sampled finely, three beats across the words
+  const beats = 3, N = 240;
+  let d = '';
+  for (let i = 0; i <= N; i++){ const u = i / N; d += `${i ? ' L' : 'M'}${f(x0 + (x1 - x0) * u)} ${f(y - ecgWave(u * beats) * amp)}`; }
+  const trace = svgEl('path', { d, stroke: p.accent1, 'stroke-width': 1.6, fill: 'none', opacity: 0.35, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
+  const glow = svgEl('path', { d, stroke: p.accent1, 'stroke-width': 7, fill: 'none', opacity: 0.22, 'stroke-linejoin': 'round' });
+  const line = svgEl('path', { d, stroke: p.accent1, 'stroke-width': 2.4, fill: 'none', 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
   const dot = svgEl('circle', { cx: 0, cy: 0, r: 4, fill: p.glow });
-  g.append(glow, line, dot);
-  const dur = 1.8 / S(ctx); drawOn(tl, glow, at, dur, 'none'); drawOn(tl, line, at, dur, 'none');
-  const len = line.getTotalLength(), proxy = { k: 0 };
-  tl.fromTo(proxy, { k: 0 }, { k: 1, duration: dur, ease: 'none', onUpdate: () => { const q = line.getPointAtLength(proxy.k * len); dot.setAttribute('cx', f(q.x)); dot.setAttribute('cy', f(q.y)); } }, at);
+  g.append(trace, glow, line, dot);
+  const dur = 2.4 / S(ctx); drawOn(tl, trace, at, dur, 'none');
+  // then the monitor keeps sweeping: a bright stretch runs along the trace with its tail fading, beat after beat
+  const len = line.getTotalLength(), seg = len * 0.28, proxy = { k: 0 }, sweeps = 3;
+  for (const el of [glow, line]){ el.setAttribute('stroke-dasharray', `${f(seg)} ${f(len + seg)}`); el.setAttribute('stroke-dashoffset', f(seg)); }
+  tl.fromTo(proxy, { k: 0 }, { k: sweeps, duration: dur * sweeps, ease: 'none', onUpdate: () => {
+    const u = proxy.k % 1, q = line.getPointAtLength(u * len);
+    dot.setAttribute('cx', f(q.x)); dot.setAttribute('cy', f(q.y));
+    const off = f(seg - u * len);   // the bright stretch ends exactly at the moving head
+    glow.setAttribute('stroke-dashoffset', off); line.setAttribute('stroke-dashoffset', off);
+  } }, at);
   tl.fromTo(dot, { opacity: 0 }, { opacity: 1, duration: 0.1 }, at);
   // a medical cross pulses beside the words
   const cxp = Math.min(b.sw - 24, b.x + b.w + 30), cyp = b.y + 6, k = Math.max(7, b.h * 0.12);
@@ -245,7 +240,7 @@ const ecg = whole('ecg', 'Heartbeat line', 'An ECG trace beats under the words, 
   g.appendChild(cross);
   tl.fromTo(cross, { scale: 0, svgOrigin: `${f(cxp)} ${f(cyp)}` }, { scale: 1, svgOrigin: `${f(cxp)} ${f(cyp)}`, duration: 0.4, ease: 'back.out(3)' }, at + 0.2);
   tl.to(cross, { scale: 1.2, svgOrigin: `${f(cxp)} ${f(cyp)}`, duration: 0.18, yoyo: true, repeat: 5, ease: 'power1.inOut' }, at + 0.7);
-  return at + dur + 0.2;
+  return at + dur * sweeps;
 }, 0.3);
 
 const hud = (() => {
@@ -330,4 +325,4 @@ const doodles = whole('doodles', 'Doodles', 'Hand-drawn circles, arrows, stars a
   return at + 2.2 / S(ctx);
 }, 0.85);
 
-export const MORE_DECORATIONS: Decoration[] = [sparkles, constellation, flare, flames, frost, ripples, lightning, drips, roots, butterflies, petals, laurel, ecg, hud, bones, confetti, hearts, swash, doodles];
+export const MORE_DECORATIONS: Decoration[] = [sparkles, constellation, flare, frost, ripples, lightning, drips, roots, butterflies, petals, laurel, ecg, hud, bones, confetti, hearts, swash, doodles];

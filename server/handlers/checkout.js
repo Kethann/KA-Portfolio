@@ -8,6 +8,7 @@ import * as orders from '../store/orders.js';
 import { cleanHolder } from '../store/license.js';
 import { downloadPage, redeem, resendLinks, rate } from '../store/delivery.js';
 import { onDaily } from '../jobs/hooks.js';
+import { storeState } from '../store/access.js';
 
 function productIdFrom(body){
   const id = body.productId;
@@ -29,12 +30,24 @@ export async function quote(ctx){
   const db = await getDb();
   try {
     const q = await orders.quote(db, { productId: productIdFrom(body), currency: vCurrency(body.currency), codes, email });
+    if (q.applied.length) await countCoupons(db, q.applied.map(a => a.id), 'applied');
     return json(orders.quoteDto(q));
   } catch (err){
     // a rejected code is a normal answer the form shows, not an HTTP error
-    if (err instanceof HttpError && (err.extra.code === 'coupon_rejected' || err.extra.code === 'coupon_invalid')) return json({ ok: false, error: err.message, code: err.extra.code });
+    if (err instanceof HttpError && (err.extra.code === 'coupon_rejected' || err.extra.code === 'coupon_invalid')){
+      if (hasCodes) await countCoupons(db, [].concat(codes).filter(c => typeof c === 'string').map(c => c.trim().toUpperCase()).slice(0, 3), 'rejected', true);
+      return json({ ok: false, error: err.message, code: err.extra.code });
+    }
     throw err;
   }
+}
+
+// How often each code is applied in the cart (and refused there): shown beside paid uses in Coupons.
+// Never fails the quote itself.
+async function countCoupons(db, keys, kind, byCode = false){
+  if (!keys.length) return;
+  const col = kind === 'applied' ? 'applied_count = applied_count + 1, last_applied_at = now()' : 'rejected_count = rejected_count + 1';
+  try { await db.query(`update coupons set ${col} where ${byCode ? 'code' : 'id'} in (select value from json_each($1))`, [keys]); } catch { /* stats only */ }
 }
 
 export async function createOrder(ctx){
@@ -45,8 +58,9 @@ export async function createOrder(ctx){
   const holder = cleanHolder(body.licenseHolder);
   if (!holder || holder.length < 2) throw new HttpError(400, 'Enter the name for your license.', { code: 'holder_required' });
   await verifyTurnstile(body.turnstileToken, ctx.ip);
+  const state = await storeState(ctx.request, email);   // a pass on this device, or an email with access
   const result = await orders.createOrder({ productId: productIdFrom(body), currency: vCurrency(body.currency), codes: body.codes, email,
-    ip: ctx.ip, country: ctx.geo?.country || null, siteUrl: siteUrl(ctx.request), licenseHolder: holder });
+    ip: ctx.ip, country: ctx.geo?.country || null, siteUrl: siteUrl(ctx.request), licenseHolder: holder, storePass: !!state.pass });
   return json(result, 201);
 }
 

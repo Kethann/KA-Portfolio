@@ -15,7 +15,7 @@ export interface Review { rating: number; review: string; name: string; at: stri
 export interface Category { kind: string; slug: string; name: string }
 export interface TipSummary { slug: string; title: string; excerpt: string; coverUrl: string; tags: string[]; publishedAt: string | null; category: { slug: string; name: string } | null }
 export interface Tip extends TipSummary { html: string }
-export interface PublicConfig { turnstileSiteKey?: string; razorpayKeyId?: string; country?: string | null; suggestedCurrency?: Currency; store?: { enabled: boolean; international?: boolean } }
+export interface PublicConfig { turnstileSiteKey?: string; razorpayKeyId?: string; country?: string | null; suggestedCurrency?: Currency; store?: { enabled: boolean; international?: boolean; access?: boolean } }
 
 declare global {
   interface Window {
@@ -31,8 +31,19 @@ export const apiUrl = (path: string) => (window.kaApiUrl ? window.kaApiUrl(path)
 export class ApiError extends Error { constructor(message: string, public status: number, public code?: string){ super(message); } }
 
 // A dropped connection shows a sentence people understand, not the browser's "Failed to fetch".
+// A browser with special access (a pass link from the owner) shows it on every request, so it can buy while the store is closed.
+function withPass(init: RequestInit): RequestInit {
+  let pass: string | null = null;
+  try { pass = localStorage.getItem('ka_store_pass'); } catch { /* private mode */ }
+  return pass ? { ...init, headers: { ...(init.headers as Record<string, string>), 'X-KA-Pass': pass } } : init;
+}
 async function send(path: string, init: RequestInit): Promise<Response>{
-  try { return await fetch(apiUrl(path), init); }
+  try {
+    const res = await fetch(apiUrl(path), withPass(init));
+    // closed while this page was open: the page shows the closed board
+    if (res.status === 503) res.clone().json().then(b => { if (b?.code === 'store_closed') window.dispatchEvent(new CustomEvent('ka-store-closed')); }).catch(() => {});
+    return res;
+  }
   catch (e){
     if ((e as Error).name === 'AbortError') throw e;
     throw new ApiError(typeof navigator !== 'undefined' && navigator.onLine === false ? 'You’re offline. Check your connection and try again.' : 'Couldn’t reach the store. Check your connection and try again.', 0, 'network');

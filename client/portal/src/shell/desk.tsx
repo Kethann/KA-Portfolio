@@ -27,7 +27,7 @@ type Desk = {
 const Ctx = createContext<Desk | null>(null);
 export const useDesk = () => useContext(Ctx)!;
 
-const GEOM_KEY = 'ka.portal.geom';
+const GEOM_KEY = 'ka.portal.geom2';   // v2: windows open large by default (sizes saved under the old key were the small presets)
 function loadGeoms(): Record<string, { x: number; y: number; w: number; h: number }>{
   try { return JSON.parse(localStorage.getItem(GEOM_KEY) || '{}') || {}; } catch { return {}; }
 }
@@ -49,12 +49,14 @@ export function DeskProvider({ areaRef, children }: { areaRef: React.RefObject<H
   const area = useCallback(() => areaRef.current?.getBoundingClientRect() || new DOMRect(0, 0, innerWidth, innerHeight), [areaRef]);
 
   const place = useCallback((id: string): Pick<Win, 'x' | 'y' | 'w' | 'h'> => {
-    const a = area(), def = APP[id].size, saved = geoms.current[id];
-    const w = Math.min(saved?.w || def[0], Math.max(360, a.width - 24)), h = Math.min(saved?.h || def[1], Math.max(300, a.height - 16));
-    if (saved) return { w, h, x: clamp(saved.x, 0, Math.max(0, a.width - w)), y: clamp(saved.y, 0, Math.max(0, a.height - 60)) };
-    // cascade new windows from the centre
-    const n = APPS.findIndex(x => x.id === id) % 6;
-    return { w, h, x: clamp(Math.round((a.width - w) / 2) + (n - 3) * 26, 0, Math.max(0, a.width - w)), y: clamp(Math.round((a.height - h) / 2.6) + (n - 3) * 22, 0, Math.max(0, a.height - h)) };
+    const a = area(), saved = geoms.current[id];
+    if (saved){
+      const w = Math.min(saved.w, Math.max(360, a.width - 24)), h = Math.min(saved.h, Math.max(300, a.height - 16));
+      return { w, h, x: clamp(saved.x, 0, Math.max(0, a.width - w)), y: clamp(saved.y, 0, Math.max(0, a.height - 60)) };
+    }
+    // a new window opens large: nearly the whole desk (a small margin keeps the desk and dock visible around it)
+    const w = Math.max(360, Math.round(a.width - Math.min(48, a.width * 0.03) * 2)), h = Math.max(300, Math.round(a.height - 16));
+    return { w, h, x: Math.round((a.width - w) / 2), y: Math.max(0, Math.round((a.height - h) / 2)) };
   }, [area]);
 
   const open = useCallback((id: string, route?: string) => {

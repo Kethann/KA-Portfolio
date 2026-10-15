@@ -58,6 +58,7 @@ function logFilter(url){
   if (q){ args.push(`%${q.toLowerCase().replace(/[\\%_]/g, (m) => '\\' + m)}%`); const i = args.length; where.push(`(ip like $${i} or lower(coalesce(country,'')) like $${i} or lower(coalesce(city,'')) like $${i} or lower(path) like $${i} or lower(referrer) like $${i} or visitor_id like $${i} or lower(coalesce(browser,'')) like $${i})`); }
   const country = url.searchParams.get('country');
   if (country && /^[A-Z]{2}$/.test(country)) add('country = ?', country);
+  if (url.searchParams.get('saved') === '1') where.push('kept');   // only the visits the owner saved
   return { w: where.length ? 'where ' + where.join(' and ') : '', args };
 }
 export async function log(ctx){
@@ -72,7 +73,7 @@ export async function log(ctx){
   }
   const db = await getDb();
   const cols = `id, visited_at, last_seen_at, session_id, visitor_id, is_new, path, referrer, duration_ms, ip, country, region, city, timezone, language,
-    device_type, device_vendor, device_model, os, os_version, browser, browser_version, screen_w, screen_h, is_bot, user_agent, postal, latitude, longitude, isp, continent, location_accuracy, location_source`;
+    device_type, device_vendor, device_model, os, os_version, browser, browser_version, screen_w, screen_h, is_bot, user_agent, postal, latitude, longitude, isp, continent, location_accuracy, location_source, kept`;
   // group=1: one row per visitor (their latest visit) with how many visits and when they first came
   const grouped = ctx.url.searchParams.get('group') === '1';
   const rows = grouped
@@ -158,13 +159,32 @@ export async function deleteVisitor(ctx){
   await audit(ctx, 'visitor_history_deleted', v, { removed });
   return json({ ok: true, removed });
 }
-// scope: 'older' (days), 'bots' or 'all'. Marked visitors can be kept.
+// Save (or un-save) visits: saved visits stay forever, through the daily retention clean-up and bulk clears.
+// ids: the chosen visits; visitorId: every visit from that device.
+export async function keepVisits(ctx){
+  const b = await readJson(ctx.request, 64 * 1024);
+  const kept = b.kept !== false;
+  const db = await getDb();
+  let changed = 0;
+  if (Array.isArray(b.ids) && b.ids.length){
+    const ids = b.ids.map(Number).filter(n => Number.isInteger(n) && n > 0).slice(0, 2000);
+    changed = (await db.query(`update visits set kept = $2 where id in (select value from json_each($1)) returning 1`, [JSON.stringify(ids), kept])).length;
+  } else if (VISITOR_ID.test(String(b.visitorId || ''))){
+    changed = (await db.query('update visits set kept = $2 where visitor_id = $1 returning 1', [b.visitorId, kept])).length;
+  } else throw new HttpError(400, 'Choose the visits to save.');
+  await audit(ctx, kept ? 'visits_saved' : 'visits_unsaved', null, { changed });
+  const saved = await db.one('select count(*) as n from visits where kept');
+  return json({ ok: true, changed, saved: saved.n });
+}
+
+// scope: 'older' (days), 'bots' or 'all'. Marked visitors and saved visits can be kept.
 export async function clearVisits(ctx){
   const b = await readJson(ctx.request, 2048);
   const scope = ['older', 'bots', 'all'].includes(b.scope) ? b.scope : null;
   if (!scope) throw new HttpError(400, 'Choose what to clear.');
-  const keepMarked = b.keepMarked !== false;
+  const keepMarked = b.keepMarked !== false, keepSaved = b.keepSaved !== false;
   const where = [], args = [];
+  if (keepSaved) where.push('not kept');
   if (scope === 'older'){
     const days = Number(b.days);
     if (!Number.isInteger(days) || days < 1 || days > 3650) throw new HttpError(400, 'Choose between 1 and 3650 days.');
@@ -179,7 +199,7 @@ export async function clearVisits(ctx){
     await db.query('delete from ip_geo_cache');   // the cached IP lookups are personal data too
     if (!keepMarked && markedIds.length) await setSetting('visitorMarks', {}, revision || 0);
   }
-  await audit(ctx, 'visits_cleared', scope, { removed, keepMarked, days: b.days || null });
+  await audit(ctx, 'visits_cleared', scope, { removed, keepMarked, keepSaved, days: b.days || null });
   return json({ ok: true, removed });
 }
 
@@ -193,5 +213,6 @@ export function registerVisitors(route){
   route('DELETE', '/api/admin/visitors/visit/:id', deleteVisit, a);
   route('DELETE', '/api/admin/visitors/visitor', deleteVisitor, a);
   route('POST', '/api/admin/visitors/clear', clearVisits, a);
+  route('PUT', '/api/admin/visitors/keep', keepVisits, a);
   route('GET', '/api/admin/visitors.csv', logCsv, a);
 }

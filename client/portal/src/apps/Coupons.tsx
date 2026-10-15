@@ -1,4 +1,5 @@
 // Coupons: create/edit with all rules, pause (optimistic), duplicate, usage, delete (unused only, with Undo).
+// The strip on top and the columns count how often each code was applied in the cart, paid with, and refused.
 import { useEffect, useMemo, useState } from 'react';
 import type { AppProps } from './registry';
 import { useLoad } from '../hooks';
@@ -13,7 +14,8 @@ import { dateTime, money, pct } from '../format';
 type Coupon = { id: string; code: string; description: string; kind: 'percent' | 'fixed'; percent_bp: number | null; amount_inr: number | null; amount_usd: number | null;
   currencies: string[]; starts_at: string | null; ends_at: string | null; max_uses: number | null; per_email_limit: number | null; first_order_only: boolean;
   min_order_inr: number; min_order_usd: number; max_discount_inr: number | null; max_discount_usd: number | null; applies_to: string; product_ids: string[]; category_id: string | null;
-  stackable: boolean; paused: boolean; confirmed_uses: number; given: { currency: string; discount: number }[] | null; created_at: string };
+  stackable: boolean; paused: boolean; confirmed_uses: number; given: { currency: string; discount: number }[] | null; created_at: string;
+  applied_count: number; rejected_count: number; last_applied_at: string | null; pending_uses: number; checkout_uses: number };
 type Form = { code: string; description: string; kind: 'percent' | 'fixed'; percent: string; amountInr: number | null; amountUsd: number | null; currencies: string[];
   startsAt: string; endsAt: string; maxUses: string; perEmailLimit: string; firstOrderOnly: boolean; minOrderInr: number | null; minOrderUsd: number | null;
   maxDiscountInr: number | null; maxDiscountUsd: number | null; appliesTo: string; productIds: string[]; categoryId: string; stackable: boolean; paused: boolean };
@@ -38,6 +40,13 @@ export default function Coupons({ route, go }: AppProps){
     else if (route && s.data){ const c = s.data.coupons.find(x => x.id === route); if (c){ setEditing(c); go(''); } }
   }, [route, s.data, go]);
   const rows = useMemo(() => (s.data?.coupons || []).filter(c => !q || (c.code + ' ' + c.description).toLowerCase().includes(q.toLowerCase())), [s.data, q]);
+  const totals = useMemo(() => {
+    const list = s.data?.coupons || [];
+    const given: Record<string, number> = {};
+    for (const c of list) for (const g of c.given || []) given[g.currency] = (given[g.currency] || 0) + Number(g.discount);
+    return { active: list.filter(c => state(c)[0] === 'active').length, applied: list.reduce((n, c) => n + (c.applied_count || 0), 0), paid: list.reduce((n, c) => n + c.confirmed_uses, 0),
+      pending: list.reduce((n, c) => n + (c.pending_uses || 0), 0), refused: list.reduce((n, c) => n + (c.rejected_count || 0), 0), given, total: list.length };
+  }, [s.data]);
 
   const togglePause = async (c: Coupon) => {
     const prev = s.data!;
@@ -54,7 +63,10 @@ export default function Coupons({ route, go }: AppProps){
   const cols: Column<Coupon>[] = [
     { key: 'code', label: 'Code', width: '1.2fr', render: c => <span className="mono" style={{ fontWeight: 700 }}>{c.code}</span>, sort: (a, b) => a.code.localeCompare(b.code) },
     { key: 'value', label: 'Discount', width: '1.3fr', render: c => <span className="truncate">{value(c)}</span> },
-    { key: 'uses', label: 'Used', width: '90px', align: 'right', render: c => <span className="num">{c.confirmed_uses}{c.max_uses !== null ? ` / ${c.max_uses}` : ''}</span>, sort: (a, b) => a.confirmed_uses - b.confirmed_uses },
+    { key: 'applied', label: 'Applied', width: '84px', align: 'right', render: c => <span className="num" title={c.last_applied_at ? `Applied in the cart ${c.applied_count} times · last ${dateTime(c.last_applied_at)}` : 'Not applied in the cart yet'}>{c.applied_count || 0}</span>, sort: (a, b) => (a.applied_count || 0) - (b.applied_count || 0) },
+    { key: 'uses', label: 'Paid', width: '90px', align: 'right', render: c => <span className="num" title={`${c.confirmed_uses} paid orders${c.pending_uses ? ` · ${c.pending_uses} waiting for payment` : ''}`}>{c.confirmed_uses}{c.max_uses !== null ? ` / ${c.max_uses}` : ''}{c.pending_uses ? <span className="faint"> +{c.pending_uses}</span> : null}</span>, sort: (a, b) => a.confirmed_uses - b.confirmed_uses },
+    { key: 'conv', label: 'Conversion', width: '96px', align: 'right', hideBelow: 900, render: c => <span className="num muted" title="Paid orders out of the times the code was applied">{c.applied_count ? Math.round(Math.min(1, c.confirmed_uses / c.applied_count) * 100) + '%' : '—'}</span> },
+    { key: 'refused', label: 'Refused', width: '80px', align: 'right', hideBelow: 1000, render: c => <span className="num faint" title="Typed in the cart but refused (expired, used up, wrong item…)">{c.rejected_count || 0}</span> },
     { key: 'given', label: 'Given away', width: '1.2fr', hideBelow: 760, render: c => <span className="muted truncate">{c.given?.map(g => money(Number(g.discount), g.currency)).join(' · ') || '—'}</span> },
     { key: 'state', label: 'Status', width: '100px', render: c => { const [t, tone] = state(c); return <Badge tone={tone}>{t}</Badge>; } },
     { key: 'actions', label: '', width: '92px', align: 'right', render: c => (
@@ -67,6 +79,12 @@ export default function Coupons({ route, go }: AppProps){
   return (
     <div className="app">
       <WinTools><button type="button" className="btn primary sm" onClick={() => setEditing('new')}><Icon name="plus" /> New code</button></WinTools>
+      {s.data && s.data.coupons.length > 0 && <div className="kpis coupon-kpis" style={{ padding: '12px 16px 0' }}>
+        <div className="kpi"><div className="kpi-label"><Icon name="coupons" size={13} />Active codes</div><div className="kpi-value">{totals.active}</div><div className="kpi-sub">of {totals.total} codes</div></div>
+        <div className="kpi"><div className="kpi-label"><Icon name="sparkle" size={13} />Times applied</div><div className="kpi-value">{totals.applied}</div><div className="kpi-sub">in the cart, all codes</div></div>
+        <div className="kpi"><div className="kpi-label"><Icon name="orders" size={13} />Paid with a code</div><div className="kpi-value">{totals.paid}</div><div className="kpi-sub">{totals.pending ? `${totals.pending} waiting for payment` : totals.applied ? `${Math.round(Math.min(1, totals.paid / totals.applied) * 100)}% of applies` : 'orders'}</div></div>
+        <div className="kpi"><div className="kpi-label"><Icon name="reports" size={13} />Given away</div><div className="kpi-value">{Object.entries(totals.given).map(([cur, v]) => money(v, cur)).join(' · ') || '—'}</div><div className="kpi-sub">{totals.refused ? `${totals.refused} codes refused at checkout` : 'in discounts'}</div></div>
+      </div>}
       <div className="app-toolbar"><SearchBox value={q} onChange={setQ} placeholder="Search codes" label="Search coupons" /></div>
       <div className="app-main fill">
         {s.error && !s.data ? <ErrorState message={s.error} retry={s.reload} /> : !s.data ? <SkeletonRows rows={6} /> : (
@@ -135,10 +153,10 @@ function Editor({ coupon, onClose, onSaved }: { coupon: Coupon | 'new' | { copy:
       <AsyncButton className="btn primary" disabled={!!problem} onClick={save}>{existing ? 'Save changes' : 'Create code'}</AsyncButton>
     </>}>
       {existing && <div className="tabs" role="tablist" style={{ margin: '-8px -20px 0', padding: '0 20px' }}>
-        {(['rules', 'uses'] as const).map(t => <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{t === 'rules' ? 'Rules' : `Uses (${existing.confirmed_uses})`}</button>)}
+        {(['rules', 'uses'] as const).map(t => <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{t === 'rules' ? 'Rules' : `Uses (${existing.confirmed_uses} paid · ${existing.applied_count || 0} applied)`}</button>)}
       </div>}
       {tab === 'uses' && existing ? (
-        !uses.data ? <SkeletonRows rows={4} /> : !uses.data.uses.length ? <Empty icon="coupons" title="Not used yet" /> : (
+        !uses.data ? <SkeletonRows rows={4} /> : !uses.data.uses.length ? <Empty icon="coupons" title="Not used yet">{existing.applied_count ? `Applied in the cart ${existing.applied_count} times, but no order was placed with it yet.` : undefined}</Empty> : (
           <ul className="list">{uses.data.uses.map((u, i) => (
             <li key={i}><Badge tone={u.status === 'confirmed' ? 'success' : u.status === 'reserved' ? 'info' : 'neutral'}>{u.status}</Badge><span className="grow truncate">{u.email}</span>
               <span className="mono faint" style={{ fontSize: 12 }}>{u.public_id}</span><span className="num">−{money(u.amount, u.currency)}</span><span className="faint" style={{ fontSize: 12 }}>{dateTime(u.created_at)}</span></li>

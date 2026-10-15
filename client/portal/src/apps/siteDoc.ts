@@ -9,9 +9,20 @@ import { PASS_DEFAULTS, type PassSettings } from '../../../src/store/checkout/Pa
 import { ABOUT_DEFAULT, ABOUT_LIMITS } from '../../../../shared/about-default.js';
 
 export type SiteImage = { id: string; slug: string; title: string; cat: string; description: string; technologies: string[]; link: string; downloadable?: boolean; hidden?: boolean; archived?: boolean; focusX?: number; focusY?: number; zoom?: number; src?: string; widths: number[]; full: number; width?: number; height?: number };
+// The announcement: a side tab that slides open by itself and tucks away after autoClose seconds (0 = stays open), or the old top banner.
+export type Announcement = { enabled: boolean; text: string; tone: 'info' | 'warning' | 'success' | 'offer'; style: 'tab' | 'banner'; side: 'left' | 'right'; title: string; autoClose: number; linkLabel: string; linkUrl: string };
+export const ANNOUNCEMENT_DEFAULTS: Announcement = { enabled: false, text: '', tone: 'info', style: 'tab', side: 'right', title: 'Announcement', autoClose: 6, linkLabel: '', linkUrl: '' };
+// About > Featured Work as a showcase: rows alternating sides, each picture frame cross-fading through its pictures.
+export type FeaturedRow = { folder: string; slides: string[]; title: string; eyebrow: string; description: string; ratio: string; size: 'auto' | 's' | 'm' | 'l' | 'free'; width?: number; ratioW?: number; ratioH?: number; side: 'auto' | 'left' | 'right'; ctaLabel: string; ctaUrl: string };
+export type FeaturedShow = { enabled: boolean; order: 'sequence' | 'random'; interval: number; fade: number; zoom: boolean; captions: boolean; rows: FeaturedRow[] };
+export const FEATURED_RATIOS: [string, string][] = [['auto', 'Fit each picture'], ['free', 'Free shape (your own)'], ['4:5', 'Portrait 4:5'], ['2:3', 'Poster 2:3'], ['3:4', 'Portrait 3:4'], ['1:1', 'Square'], ['4:3', 'Landscape 4:3'], ['3:2', 'Landscape 3:2'], ['16:9', 'Wide 16:9'], ['21:9', 'Cinema 21:9']];
+export const featuredRow = (folder: string): FeaturedRow => ({ folder, slides: [], title: '', eyebrow: '', description: '', ratio: 'auto', size: 'auto', width: 50, ratioW: 4, ratioH: 5, side: 'auto', ctaLabel: '', ctaUrl: '' });
+export const featuredDefaults = (d: SiteDoc): FeaturedShow => ({ enabled: true, order: 'sequence', interval: 5, fade: 1.6, zoom: false, captions: true,
+  rows: (d.stacks?.featured?.length ? d.stacks.featured : d.folders.slice(0, 2)).filter(f => d.folders.includes(f)).slice(0, 6).map(featuredRow) });
 export type SiteDoc = {
+  featuredShow?: FeaturedShow | null;
   revision: number; details: Record<string, any> & { customFonts: { family: string; url: string }[] }; folders: string[]; images: SiteImage[];
-  notice: { enabled: boolean; text: string; tone: 'info' | 'warning' }; visibility: { navGallery: boolean; navAbout: boolean; autoFullscreen?: boolean; downloadFormat?: 'png' | 'jpeg' };
+  notice: Announcement; visibility: { navGallery: boolean; navAbout: boolean; autoFullscreen?: boolean; downloadFormat?: 'png' | 'jpeg' };
   stacks: { loop: boolean; loops?: Record<string, boolean>; covers: Record<string, string>; featured?: string[] }; layoutOverrides: Record<string, Record<string, { x: number; y: number; scale: number }>>;
   branding: { enabled: boolean; logoUrl: string }; elementStyles: Record<string, any>; socialLinks: { label: string; url: string; icon: string }[];
   passCard: PassDraft;
@@ -59,7 +70,7 @@ export async function loadSite(force = false){
   } catch (e: any){ emit({ error: e.message, loading: false }); }
 }
 function withDefaults(d: SiteDoc): SiteDoc {
-  return { ...d, notice: d.notice || { enabled: false, text: '', tone: 'info' }, visibility: { navGallery: d.visibility?.navGallery ?? true, navAbout: d.visibility?.navAbout ?? true, autoFullscreen: d.visibility?.autoFullscreen ?? false, downloadFormat: d.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png' },
+  return { ...d, notice: { ...ANNOUNCEMENT_DEFAULTS, ...(d.notice || {}) }, visibility: { navGallery: d.visibility?.navGallery ?? true, navAbout: d.visibility?.navAbout ?? true, autoFullscreen: d.visibility?.autoFullscreen ?? false, downloadFormat: d.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png' },
     stacks: d.stacks || { loop: true, covers: {} }, layoutOverrides: d.layoutOverrides || { mobile: {}, tablet: {}, desktop: {} }, branding: d.branding || { enabled: false, logoUrl: '' },
     elementStyles: d.elementStyles || {}, socialLinks: d.socialLinks || [], passCard: { ...PASS_DRAFT_DEFAULTS, ...(d.passCard || {}) }, stats: d.stats ? { enabled: d.stats.enabled !== false, items: d.stats.items || [] } : STATS_DEFAULTS,
     intro: { version: d.intro?.version || 'v1' },

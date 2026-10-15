@@ -174,6 +174,8 @@ kbd{ font:500 var(--fs-2xs)/1 var(--font-mono); padding:3px 5px; border-radius:4
 .dock-label{ font-size:10px; color:var(--text-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:62px; }
 .home{ position:absolute; inset:0; overflow:auto; padding:var(--sp-6) var(--sp-4); }
 .home-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(78px, 1fr)); gap:var(--sp-5) var(--sp-3); max-width:520px; margin:0 auto; }
+.home-section{ max-width:520px; margin:0 auto var(--sp-6); }
+.home-section-title{ margin:0 0 var(--sp-3); padding:0 4px; font:700 var(--fs-2xs)/1 var(--font-ui); letter-spacing:.14em; text-transform:uppercase; color:var(--text-3); }
 .home-app{ display:grid; justify-items:center; gap:6px; border:0; background:transparent; font-size:var(--fs-xs); color:var(--text); padding:4px; border-radius:var(--r-md); }
 .home-app .tile{ width:58px; }
 
@@ -383,7 +385,7 @@ input.invalid,textarea.invalid{ border-color:var(--danger) !important; box-shado
    shelf under them, sized from the resting icon size so it stays perfectly still. Phones keep a bar. */
 .dock-wrap:not(.compact) .dock{ background:none; border:0; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; padding:4px 6px 12px; }
 .dock-wrap:not(.compact) .dock::before{ top:auto; bottom:0; left:50%; right:auto; height:3px; translate:-50% 0; border-radius:3px;
-  width:calc(var(--n, 14) * var(--dock-icon) + (var(--n, 14) - 1) * 7px + 28px);
+  width:calc(var(--n, 14) * var(--dock-icon) + (var(--n, 14) - 1) * 7px + var(--seps, 0) * 16px + 28px);
   background:linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.55) 12%, rgba(255,255,255,.8) 50%, rgba(255,255,255,.55) 88%, rgba(255,255,255,0));
   box-shadow:0 0 10px rgba(255,255,255,.25), 0 2px 6px rgba(0,0,0,.35); -webkit-mask-image:none; mask-image:none; }
 :root[data-theme="light"] .dock-wrap:not(.compact) .dock::before{ background:linear-gradient(90deg, rgba(60,40,30,0), rgba(60,40,30,.28) 12%, rgba(60,40,30,.4) 50%, rgba(60,40,30,.28) 88%, rgba(60,40,30,0)); box-shadow:0 1px 0 #fff; }
