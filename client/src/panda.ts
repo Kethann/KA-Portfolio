@@ -46,19 +46,29 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
   // opening it calls the panda over; it leaps back to the board afterwards.
   const visit:{target:Element|null;stage:'idle'|'leap'|'sit'|'back';t:number;from:{x:number;y:number}}={target:null,stage:'idle',t:0,from:{x:0,y:0}};
   const smooth=(t:number)=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
+  // the turn (radians) of an element, including every turning parent: the sign swings on its ropes
+  function turnOf(el:Element|null){let a=0;for(let n:Element|null=el;n&&n!==document.body;n=n.parentElement){const t=getComputedStyle(n).transform;if(t&&t!=='none'){try{const m=new DOMMatrixReadOnly(t);a+=Math.atan2(m.b,m.a);}catch{/* not a matrix */}}}return a;}
+  let perchTurn=0,lastTurn=0;
   function visitStep(dt:number,home:{x:number;y:number},width:number,height:number){
     const r=visit.target?.getBoundingClientRect?.();
-    // sits on the board's top edge, a little right of its centre, feet just over the rim
-    const perch=r&&r.width?{x:r.left+r.width*.62-width*.5,y:r.top-height*.78}:home;
+    // sits on the board's top edge, a little right of its centre, feet just over the rim. The panda rides the sign rigidly:
+    // it takes the sign's own turn and position every frame, so it swings with it instead of wobbling against it
+    let perch=home;perchTurn=0;
+    if(r&&r.width&&visit.target){
+      const th=media.matches?0:turnOf(visit.target),w0=(visit.target as HTMLElement).offsetWidth||r.width,h0=(visit.target as HTMLElement).offsetHeight||r.height;
+      const c=Math.cos(th),s=Math.sin(th),ux=w0*.12,uy=-h0/2,off=-height*.28;
+      const px=r.left+r.width/2+ux*c-uy*s-off*s,py=r.top+r.height/2+ux*s+uy*c+off*c;
+      perch={x:px-width/2,y:py-height/2};perchTurn=th*180/Math.PI;
+    }
     if(media.matches){visit.stage=visit.target?'sit':'idle';visit.t=0;return {...(visit.target?perch:home),rotation:0};}
     visit.t+=Math.min(.1,Math.max(0,dt));
     const D=visit.stage==='leap'?1.15:visit.stage==='back'?.95:0;
     if(D&&visit.t>=D){visit.t=0;visit.stage=visit.stage==='leap'?'sit':'idle';}
-    if(visit.stage==='sit')return {...perch,rotation:Math.sin(time*1.1)*1.6};
+    if(visit.stage==='sit')return {...perch,rotation:perchTurn};
     if(visit.stage==='idle')return {...home,rotation:0};
     const from=visit.stage==='leap'?home:visit.from,to=visit.stage==='leap'?perch:home,p=smooth(visit.t/D);
     const arc=Math.max(70,Math.abs(to.x-from.x)*.22+Math.abs(to.y-from.y)*.12);
-    return {x:from.x+(to.x-from.x)*p,y:from.y+(to.y-from.y)*p-arc*4*p*(1-p),rotation:(visit.stage==='leap'?-1:1)*360*smooth((visit.t/D-.15)/.7)};
+    return {x:from.x+(to.x-from.x)*p,y:from.y+(to.y-from.y)*p-arc*4*p*(1-p),rotation:(visit.stage==='leap'?-1:1)*360*smooth((visit.t/D-.15)/.7)+(visit.stage==='leap'?perchTurn*p:lastTurn*(1-p))};
   }
   function movePanda(dt:number){
     if(!panel)return 0;
@@ -91,8 +101,8 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
     const home={x:launch.left+launch.width/2-width/2,y:launch.bottom-height-(compact?30:26)};
     if(visiting){
       const p=visitStep(dt,home,width,height);
-      lastPosition={x:p.x,y:p.y};
-      host.style.transform=`translate3d(${p.x}px,${p.y}px,0) rotate(${p.rotation}deg)`;
+      lastPosition={x:p.x,y:p.y};if(visit.stage==='sit')lastTurn=perchTurn;
+      host.style.transform=`translate3d(${p.x.toFixed(2)}px,${p.y.toFixed(2)}px,0) rotate(${p.rotation.toFixed(3)}deg)`;
       host.style.opacity='1';host.dataset.travel='visit-'+visit.stage;
       if(thread)thread.style.opacity='0';
       return 0;

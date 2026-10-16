@@ -8,6 +8,7 @@
 //   * every transition is one all-or-nothing batch whose statements re-check the order's state in SQL
 //     (D1 has no row locks), so duplicate/out-of-order events can't double-pay or double-deliver
 import { HttpError } from '../core/http.js';
+import { storeIsOpen } from './access.js';
 import { getDb } from '../core/db.js';
 import { env, isProduction } from '../core/env.js';
 import { getSetting } from '../core/settings.js';
@@ -138,7 +139,7 @@ export async function createOrder({ productId, currency, codes, email, ip, count
   const db = await getDb();
   const store = await getSetting('store');
   // closed: only people the owner gave special access (Settings > Store status) can still buy
-  if (store.enabled === false && !storePass) throw new HttpError(503, 'The store is closed right now.', { code: 'store_closed' });
+  if (!storeIsOpen(store) && !storePass) throw new HttpError(503, 'The store is closed right now.', { code: 'store_closed' });
   const clientSecret = randomToken(24);
   const q = await quote(db, { productId, currency, codes, email, store });
   if (q.needsEmail) throw new HttpError(400, 'Enter your email to use this code.');

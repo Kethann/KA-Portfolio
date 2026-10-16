@@ -16,6 +16,8 @@ export const MAX_PASSES = 200;
 export const SCENES = ['panda', 'emoji'];
 const secret = () => env('DOWNLOAD_TOKEN_SECRET', 'local-development-only');
 const sign = (id) => hmacHex(secret(), `store-pass:${id}`).slice(0, 32);
+/** is the store open right now? Open by switch, or closed with "open automatically" on and the reopening time reached */
+export const storeIsOpen = (s, now = Date.now()) => s.enabled !== false || (s.autoOpen === true && !!s.reopensAt && Date.parse(s.reopensAt) <= now);
 export const passToken = (id) => `${id}.${sign(id)}`;
 
 /** the pass entry a token belongs to, or null (bad signature, removed pass, or no token) */
@@ -30,7 +32,7 @@ const passFrom = (request) => request.headers.get('x-ka-pass') || '';
 /** what the site needs to know about the store, for this visitor */
 export async function storeState(request, emailAddress = null){
   const [store, access] = await Promise.all([getSetting('store'), getSetting('storeAccess')]);
-  const open = store.enabled !== false;
+  const open = storeIsOpen(store);
   let pass = open ? null : findPass(access.passes, passFrom(request));
   if (!open && !pass && emailAddress) pass = (access.passes || []).find(p => p.kind === 'email' && p.email === String(emailAddress).toLowerCase()) || null;
   return { open, store, pass, access };
@@ -41,7 +43,7 @@ export function publicStore(state){
   const s = state.store;
   return {
     enabled: state.open, international: s.international !== false, access: !state.open && !!state.pass,
-    closed: state.open ? null : { title: s.closedTitle, message: s.closedMessage, reopensAt: s.reopensAt || null, scene: SCENES.includes(s.closedScene) ? s.closedScene : 'panda', emailAccess: (state.access.passes || []).some(p => p.kind === 'email') }
+    closed: state.open ? null : { title: s.closedTitle, message: s.closedMessage, reopensAt: s.reopensAt || null, autoOpen: s.autoOpen === true && !!s.reopensAt, scene: SCENES.includes(s.closedScene) ? s.closedScene : 'panda', emailAccess: (state.access.passes || []).some(p => p.kind === 'email') }
   };
 }
 
@@ -87,7 +89,7 @@ async function sendPassEmail(p, base){
 async function adminView(base){
   const [store, access] = await Promise.all([getSetting('store'), getSetting('storeAccess')]);
   return json({
-    status: { open: store.enabled !== false, closedTitle: store.closedTitle, closedMessage: store.closedMessage, reopensAt: store.reopensAt || '', closedScene: store.closedScene },
+    status: { open: storeIsOpen(store), closedTitle: store.closedTitle, closedMessage: store.closedMessage, reopensAt: store.reopensAt || '', autoOpen: store.autoOpen === true, closedScene: store.closedScene },
     passes: (access.passes || []).map(p => ({ ...p, link: p.kind === 'device' ? passLink(p, base) : null }))
   });
 }
@@ -98,7 +100,10 @@ export async function setStatus(ctx){
   const b = await readJson(ctx.request, 8 * 1024);
   const { value, revision } = await getSettingWithRevision('store');
   const next = { ...value };
+  const wasOpen = storeIsOpen(value);
+  if (wasOpen) next.enabled = true;   // it opened by itself at its time: make that the saved state before changing anything
   if (typeof b.open === 'boolean') next.enabled = b.open;
+  if (typeof b.autoOpen === 'boolean') next.autoOpen = b.autoOpen;
   if (b.closedTitle !== undefined) next.closedTitle = str(b.closedTitle, { name: 'Title', max: 80 }) || 'The store is taking a nap';
   if (b.closedMessage !== undefined) next.closedMessage = str(b.closedMessage, { name: 'Message', max: 400 });
   if (b.closedScene !== undefined) next.closedScene = SCENES.includes(b.closedScene) ? b.closedScene : 'panda';
@@ -107,9 +112,12 @@ export async function setStatus(ctx){
     if (at && Number.isNaN(at.getTime())) throw new HttpError(400, 'Choose a valid reopening time, or leave it empty.');
     next.reopensAt = at ? at.toISOString() : '';
   }
+  // closing the store by hand while an old reopening time is still set must not make it open itself straight away
+  if (b.open === false && next.reopensAt && Date.parse(next.reopensAt) <= Date.now() && b.reopensAt === undefined) next.reopensAt = '';
+  if (!next.reopensAt) next.autoOpen = false;
   const rev = await setSetting('store', next, revision);
   if (rev === null) throw new HttpError(409, 'The store settings changed in another window. Try again.', { code: 'stale' });
-  if (typeof b.open === 'boolean' && b.open !== (value.enabled !== false)) await audit(ctx, b.open ? 'store_opened' : 'store_closed', null);
+  if (typeof b.open === 'boolean' && b.open !== wasOpen) await audit(ctx, b.open ? 'store_opened' : 'store_closed', null);
   return adminView(siteUrl(ctx.request));
 }
 

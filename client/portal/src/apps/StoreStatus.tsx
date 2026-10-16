@@ -10,7 +10,7 @@ import { DateTimeInput } from './common';
 import { ago, dateTime } from '../format';
 import { qrMatrix, qrPath } from '../qr';
 
-export type StoreStatusDoc = { open: boolean; closedTitle: string; closedMessage: string; reopensAt: string; closedScene: 'panda' | 'emoji' };
+export type StoreStatusDoc = { open: boolean; closedTitle: string; closedMessage: string; reopensAt: string; autoOpen: boolean; closedScene: 'panda' | 'emoji' };
 export type StorePass = { id: string; kind: 'email' | 'device'; label: string; email: string | null; createdAt: string; lastUsedAt: string | null; uses: number; link: string | null };
 type View = { status: StoreStatusDoc; passes: StorePass[] };
 
@@ -60,7 +60,7 @@ export default function StoreStatusPanel(){
   const dirty = !!draft && JSON.stringify({ ...draft, open: s.data.status.open }) !== JSON.stringify(s.data.status);
   const set = <K extends keyof StoreStatusDoc>(k: K, v: StoreStatusDoc[K]) => setDraft({ ...st, [k]: v });
   const saveBoard = async () => {
-    s.setData(await post<View>('/store/status', { closedTitle: st.closedTitle, closedMessage: st.closedMessage, reopensAt: st.reopensAt, closedScene: st.closedScene }));
+    s.setData(await post<View>('/store/status', { closedTitle: st.closedTitle, closedMessage: st.closedMessage, reopensAt: st.reopensAt, autoOpen: !!st.reopensAt && st.autoOpen, closedScene: st.closedScene }));
     setDraft(null); toast.show('Closed board saved', { tone: 'success' });
   };
   const add = async () => {
@@ -100,6 +100,9 @@ export default function StoreStatusPanel(){
       <Field label="Message" hint="A line or two: why, and when to come back."><textarea rows={3} maxLength={400} value={st.closedMessage} onChange={e => set('closedMessage', e.target.value)} /></Field>
       <div className="form-grid">
         <Field label="Reopens" hint="Optional, India time. Shown as a countdown."><DateTimeInput label="Reopens" value={toLocal(st.reopensAt)} onChange={v => set('reopensAt', toIso(v))} /></Field>
+        <Field label="When the time comes" hint={st.reopensAt ? (st.autoOpen ? 'The store opens by itself at that moment, and the board plays the opening animation.' : 'The countdown ends, but the store stays closed until you switch it on above.') : 'Set a reopening time first.'}>
+          <Switch checked={!!st.reopensAt && st.autoOpen} disabled={!st.reopensAt} onChange={v => set('autoOpen', v)} label="Open the store automatically" />
+        </Field>
         <Field label="Scene"><Segmented label="Scene" value={st.closedScene} onChange={v => set('closedScene', v)} options={[{ value: 'panda', label: '🐼 Resting panda' }, { value: 'emoji', label: '😢 Sad face' }]} /></Field>
       </div>
       <div className="row"><AsyncButton className="btn primary" disabled={!dirty} onClick={saveBoard}>Save the board</AsyncButton>{dirty && <button type="button" className="btn ghost" onClick={() => setDraft(null)}>Discard</button>}</div>

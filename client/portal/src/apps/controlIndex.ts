@@ -30,7 +30,7 @@ export const CONTROLS: Control[] = [
   { group: 'Website', title: 'Image Upscaler box and waiting list', desc: 'The “coming soon” box and who signed up.', app: 'content', route: 'upscaler', keywords: 'upscaler coming soon notify list launch' },
   { group: 'Website', title: 'Live wallpaper of the intro', desc: 'Record the intro as a video or image at any screen size.', app: 'wallpaper', keywords: 'wallpaper video download intro record' },
   // ---- Store & money
-  { group: 'Store & money', title: 'Open or close the store', desc: 'Close the store, the closed board and countdown, and who may still buy.', app: 'settings', route: 'storestatus', keywords: 'store open close closed reopen countdown access pass guest' },
+  { group: 'Store & money', title: 'Open or close the store', desc: 'Close the store, the closed board and countdown, whether it opens by itself, and who may still buy.', app: 'settings', route: 'storestatus', keywords: 'store open close closed reopen countdown automatic auto open timer access pass guest' },
   { group: 'Store & money', title: 'Payments (Razorpay)', desc: 'Test or live, international payments, and the go-live checklist.', app: 'settings', route: 'store', keywords: 'payment razorpay live test bank international card upi' },
   { group: 'Store & money', title: 'Business details on invoices', desc: 'Your name, address, tax ID and support email.', app: 'settings', route: 'store', keywords: 'business seller name address invoice gst pan tax id support email' },
   { group: 'Store & money', title: 'GST and tax', desc: 'Whether GST is charged, its rate, and inclusive or on top.', app: 'settings', route: 'store', keywords: 'gst tax rate inclusive' },

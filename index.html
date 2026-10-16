@@ -86,10 +86,10 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
 (function(){
   var preview = window.parent !== window || /[?&]preview=1(&|$)/.test(location.search);
   var root = document.documentElement, on = !preview, shieldTimer = 0;
-  var SHADOW_CSS = ":host(.ka-protect) img,:host(.ka-protect) video,:host(.ka-protect) canvas,:host(.ka-protect) picture{-webkit-user-drag:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}"
-    + ":host(.ka-shield) img,:host(.ka-shield) video,:host(.ka-shield) canvas,:host(.ka-shield) picture,:host(.ka-shield) [style*='background-image']{filter:blur(30px) brightness(.55)!important;transition:none!important}"
-    + ":host(.ka-unshield) img,:host(.ka-unshield) video,:host(.ka-unshield) canvas,:host(.ka-unshield) picture,:host(.ka-unshield) [style*='background-image']{transition:filter .28s ease-out!important}"
-    + "@media print{:host(.ka-protect) img,:host(.ka-protect) video,:host(.ka-protect) canvas,:host(.ka-protect) picture{visibility:hidden!important}}";
+  var SHADOW_CSS = ":host(.ka-protect) img,:host(.ka-protect) video,:host(.ka-protect) canvas,:host(.ka-protect) picture,:host(.ka-protect) .folder-card{-webkit-user-drag:none!important;-webkit-touch-callout:none!important;-webkit-user-select:none!important;user-select:none!important}"
+    + ":host(.ka-shield) img,:host(.ka-shield) video,:host(.ka-shield) canvas,:host(.ka-shield) picture,:host(.ka-shield) [style*='background-image'],:host(.ka-shield) .folder-card{opacity:0!important;visibility:hidden!important;filter:blur(40px) brightness(0)!important;transition:none!important}"
+    + ":host(.ka-unshield) img,:host(.ka-unshield) video,:host(.ka-unshield) canvas,:host(.ka-unshield) picture,:host(.ka-unshield) [style*='background-image'],:host(.ka-unshield) .folder-card{opacity:1!important;visibility:visible!important;transition:opacity .2s ease-out,filter .28s ease-out!important}"
+    + "@media print{:host(.ka-protect) img,:host(.ka-protect) video,:host(.ka-protect) canvas,:host(.ka-protect) picture,:host(.ka-protect) [style*='background-image']{visibility:hidden!important;opacity:0!important;display:none!important}}";
   var ZONE = '#section-gallery, #section-portfolio, #section-store, #section-tips, #lightbox, [data-ka-shadow]';
   function inZone(e){ var p = e.composedPath ? e.composedPath() : [e.target]; for (var i = 0; i < p.length; i++){ if (p[i].nodeType === 1 && p[i].matches && p[i].matches(ZONE)) return true; } return false; }
   function hosts(){ return document.querySelectorAll('[data-ka-shadow]'); }
@@ -98,11 +98,8 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
     h.classList.toggle('ka-protect', on);
   }
   function sync(){ root.classList.toggle('ka-protect', on); Array.prototype.forEach.call(hosts(), dress); apply(); }
-  // One timing model for every trigger: images are shielded while ANY reason holds (a screenshot-key hold that hasn't
-  // run out, the page having lost focus, the page being hidden). A returning focus can't cut a hold short, and every part
-  // of the page (light DOM and shadow roots) blurs in the same frame and clears together with the same short fade.
-  var HOLD = 3000, ARM = 1500, holdUntil = 0, away = false, shown = false, fadeTimer = 0;
-  function want(){ return on && (Date.now() < holdUntil || away || document.hidden); }
+  var HOLD = 3500, ARM = 1800, holdUntil = 0, away = false, shown = false, fadeTimer = 0, devtoolsOpen = false;
+  function want(){ return on && (Date.now() < holdUntil || away || document.hidden || devtoolsOpen); }
   function setShield(v){
     var all = [root].concat(Array.prototype.slice.call(hosts()));
     clearTimeout(fadeTimer);
@@ -117,24 +114,79 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
     if (v && holdUntil > Date.now()) shieldTimer = setTimeout(apply, holdUntil - Date.now() + 16);
   }
   function hold(ms){ if (!on) return; holdUntil = Math.max(holdUntil, Date.now() + ms); apply(); }
-  function wipeClipboard(){ try { navigator.clipboard && navigator.clipboard.writeText('').catch(function(){}); } catch(err){} }
+  function wipeClipboard(){ try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText('').catch(function(){}); } catch(err){} }
   var editable = function(t){ return t && t.closest && t.closest('input, textarea, select, [contenteditable="true"], .ka-allow-menu'); };
-  // right-click / long-press menus and dragging (shadow content included: the event's path is checked)
-  document.addEventListener('contextmenu', function(e){ if (!on) return; var t = e.composedPath ? e.composedPath()[0] : e.target; if (editable(t) || !inZone(e)) return; e.preventDefault(); }, true);
-  document.addEventListener('dragstart', function(e){ if (!on) return; var t = e.composedPath ? e.composedPath()[0] : e.target; if (t && /^(IMG|CANVAS|VIDEO|PICTURE)$/.test(t.tagName || '') && inZone(e)) e.preventDefault(); }, true);
+  function isProtectedMedia(t, e){
+    if (!t || editable(t)) return false;
+    if (/^(IMG|CANVAS|VIDEO|PICTURE|SVG)$/i.test(t.tagName || '')) return true;
+    if (t.closest && t.closest('img, canvas, video, picture, [data-ka-shadow], .folder-card, .cf-card, .pw-thumb, #lb-img, [style*="background-image"]')) return true;
+    return inZone(e);
+  }
+  // 1. Right-click / context menu
+  document.addEventListener('contextmenu', function(e){
+    if (!on) return;
+    var t = e.composedPath ? e.composedPath()[0] : e.target;
+    if (editable(t)) return;
+    if (isProtectedMedia(t, e)){ e.preventDefault(); e.stopPropagation(); return false; }
+  }, true);
+  // 2. Mouse side-clicks & auxiliary buttons (middle-click, side buttons 3 & 4)
+  document.addEventListener('auxclick', function(e){
+    if (!on) return;
+    var t = e.composedPath ? e.composedPath()[0] : e.target;
+    if (editable(t)) return;
+    if (isProtectedMedia(t, e)){ e.preventDefault(); e.stopPropagation(); return false; }
+  }, true);
+  // 3. Mousedown for non-primary buttons
+  document.addEventListener('mousedown', function(e){
+    if (!on) return;
+    var t = e.composedPath ? e.composedPath()[0] : e.target;
+    if (editable(t)) return;
+    if (e.button !== 0 && isProtectedMedia(t, e)){ e.preventDefault(); e.stopPropagation(); return false; }
+  }, true);
+  // 4. Drag prevention
+  document.addEventListener('dragstart', function(e){
+    if (!on) return;
+    var t = e.composedPath ? e.composedPath()[0] : e.target;
+    if (isProtectedMedia(t, e)){ e.preventDefault(); e.stopPropagation(); return false; }
+  }, true);
+  // 5. Select prevention on media
+  document.addEventListener('selectstart', function(e){
+    if (!on) return;
+    var t = e.composedPath ? e.composedPath()[0] : e.target;
+    if (editable(t)) return;
+    if (isProtectedMedia(t, e)){ e.preventDefault(); return false; }
+  }, true);
+  // 6. Screenshot, Screen Record, DevTools & View-Source shortcuts
   document.addEventListener('keydown', function(e){
     if (!on) return;
     var k = (e.key || '').toLowerCase(), mod = e.ctrlKey || e.metaKey;
-    if (k === 'printscreen'){ hold(HOLD); wipeClipboard(); return; }
-    if (e.metaKey && e.shiftKey && /^[3456s]$/.test(k)){ hold(HOLD); return; }               // macOS / Windows screenshot shortcuts
-    // arm early: the Windows / Command key (or Shift with it) starts every screenshot and recorder chord (Win+Shift+S,
-    // Win+Alt+R, Cmd+Shift+3/4/5), so images are already blurred before the last key is pressed and the screen freezes
+    // PrintScreen - immediate 0-delay shield and wipe clipboard
+    if (k === 'printscreen' || e.code === 'PrintScreen' || (e.altKey && k === 'printscreen')){
+      hold(HOLD); wipeClipboard(); return;
+    }
+    // Screenshot chords: Win+Shift+S, Cmd+Shift+3/4/5/6, Ctrl+Shift+S, Win+Alt+R, Alt+PrtScn
+    if ((mod || e.metaKey) && e.shiftKey){
+      hold(ARM);
+      if (/^[3456s]$/.test(k)){ hold(HOLD); wipeClipboard(); }
+    }
+    if (e.altKey && (k === 'r' || k === 's' || k === 'g' || k === 'a' || k === 'printscreen')){ hold(ARM); }
     if (k === 'meta' || k === 'os' || e.metaKey){ hold(ARM); }
-    if (k === 'f12' || (mod && e.shiftKey && /^[ijc]$/.test(k)) || (mod && /^[sup]$/.test(k) && !e.shiftKey && !editable(e.target))){ e.preventDefault(); }
+    // Block DevTools shortcuts across Windows, Linux & Mac: F12, Ctrl/Cmd+Shift/Option+I/J/C, Ctrl/Cmd+U, Ctrl/Cmd+S, Ctrl/Cmd+P, ContextMenu, Shift+F10
+    var isDevTools = k === 'f12' ||
+      (mod && (e.shiftKey || e.altKey) && /^[ijc]$/.test(k)) ||
+      (mod && /^[sup]$/.test(k) && !editable(e.target)) ||
+      k === 'contextmenu' ||
+      (e.shiftKey && (k === 'f10' || e.keyCode === 121));
+    if (isDevTools){
+      e.preventDefault(); e.stopPropagation(); hold(HOLD);
+    }
   }, true);
-  document.addEventListener('keyup', function(e){ if (on && (e.key || '').toLowerCase() === 'printscreen'){ hold(HOLD); wipeClipboard(); } }, true);
-  // losing focus (a screenshot tool takes over, another app, developer tools): blur in the same moment, until the page is
-  // back. Focus moving into one of our own frames (Razorpay, the human check) is not "away": that is undone at once.
+  document.addEventListener('keyup', function(e){
+    if (!on) return;
+    var k = (e.key || '').toLowerCase();
+    if (k === 'printscreen' || e.code === 'PrintScreen'){ hold(HOLD); wipeClipboard(); }
+  }, true);
+  // 7. Losing focus (screenshot tool taking over, another app, DevTools panel)
   window.addEventListener('blur', function(){
     if (!on) return;
     var a = document.activeElement; if (a && a.tagName === 'IFRAME') return;
@@ -143,18 +195,33 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
   });
   window.addEventListener('focus', function(){ away = false; apply(); });
   document.addEventListener('visibilitychange', apply);
-  // the store and gallery mount later: dress their shadow roots as they appear
+  window.addEventListener('beforeprint', function(){ if (on) hold(HOLD * 2); });
+  // 8. Active DevTools detector
+  function checkDevTools(){
+    if (!on) return;
+    var isZoomed = window.visualViewport && window.visualViewport.scale > 1.1;
+    var wDiff = window.outerWidth - window.innerWidth;
+    var hDiff = window.outerHeight - window.innerHeight;
+    if (!isZoomed && (wDiff > 160 || hDiff > 160)){
+      devtoolsOpen = true; hold(HOLD);
+    } else if (devtoolsOpen){
+      devtoolsOpen = false; apply();
+    }
+  }
+  window.addEventListener('resize', checkDevTools, { passive: true });
+  setInterval(checkDevTools, 600);
+  // 9. Observer for dynamic shadow hosts (store, gallery)
   if (window.MutationObserver) new MutationObserver(function(list){ for (var i = 0; i < list.length; i++){ var n = list[i].addedNodes; for (var j = 0; j < n.length; j++){ var el = n[j]; if (el.nodeType !== 1) continue; if (el.hasAttribute && el.hasAttribute('data-ka-shadow')) setTimeout(function(h){ return function(){ dress(h); }; }(el), 0); else if (el.querySelectorAll){ var inner = el.querySelectorAll('[data-ka-shadow]'); for (var q = 0; q < inner.length; q++) setTimeout(function(h){ return function(){ dress(h); }; }(inner[q]), 0); } } } }).observe(document.documentElement, { childList: true, subtree: true });
   window.kaSetProtection = function(v){ on = !!v && !preview; sync(); };
   sync();
 })();
 </script>
 <style>
-/* only the gallery, portfolio, store and poster viewer are protected; the rest of the page records normally */
-html.ka-protect #section-gallery img, html.ka-protect #section-gallery video, html.ka-protect #section-gallery canvas, html.ka-protect #section-gallery picture, html.ka-protect #section-portfolio img, html.ka-protect #section-portfolio video, html.ka-protect #section-portfolio canvas, html.ka-protect #section-portfolio picture, html.ka-protect #section-store img, html.ka-protect #section-store video, html.ka-protect #section-store canvas, html.ka-protect #section-store picture, html.ka-protect #section-tips img, html.ka-protect #section-tips video, html.ka-protect #section-tips canvas, html.ka-protect #section-tips picture, html.ka-protect #lightbox img, html.ka-protect #lightbox video, html.ka-protect #lightbox canvas, html.ka-protect #lightbox picture{ -webkit-user-drag:none; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
-html.ka-shield #section-gallery img, html.ka-shield #section-gallery video, html.ka-shield #section-gallery picture, html.ka-shield #section-gallery canvas, html.ka-shield #section-gallery .folder-card, html.ka-shield #section-gallery [style*="background-image"], html.ka-shield #section-portfolio img, html.ka-shield #section-portfolio video, html.ka-shield #section-portfolio picture, html.ka-shield #section-portfolio canvas, html.ka-shield #section-portfolio .folder-card, html.ka-shield #section-portfolio [style*="background-image"], html.ka-shield #section-store img, html.ka-shield #section-store video, html.ka-shield #section-store picture, html.ka-shield #section-store canvas, html.ka-shield #section-store .folder-card, html.ka-shield #section-store [style*="background-image"], html.ka-shield #section-tips img, html.ka-shield #section-tips video, html.ka-shield #section-tips picture, html.ka-shield #section-tips canvas, html.ka-shield #section-tips .folder-card, html.ka-shield #section-tips [style*="background-image"], html.ka-shield #lightbox img, html.ka-shield #lightbox video, html.ka-shield #lightbox picture, html.ka-shield #lightbox canvas, html.ka-shield #lightbox .folder-card, html.ka-shield #lightbox [style*="background-image"]{ filter:blur(30px) brightness(.55) !important; transition:none !important; }
-html.ka-unshield #section-gallery img, html.ka-unshield #section-gallery video, html.ka-unshield #section-gallery picture, html.ka-unshield #section-gallery canvas, html.ka-unshield #section-gallery .folder-card, html.ka-unshield #section-gallery [style*="background-image"], html.ka-unshield #section-portfolio img, html.ka-unshield #section-portfolio video, html.ka-unshield #section-portfolio picture, html.ka-unshield #section-portfolio canvas, html.ka-unshield #section-portfolio .folder-card, html.ka-unshield #section-portfolio [style*="background-image"], html.ka-unshield #section-store img, html.ka-unshield #section-store video, html.ka-unshield #section-store picture, html.ka-unshield #section-store canvas, html.ka-unshield #section-store .folder-card, html.ka-unshield #section-store [style*="background-image"], html.ka-unshield #section-tips img, html.ka-unshield #section-tips video, html.ka-unshield #section-tips picture, html.ka-unshield #section-tips canvas, html.ka-unshield #section-tips .folder-card, html.ka-unshield #section-tips [style*="background-image"], html.ka-unshield #lightbox img, html.ka-unshield #lightbox video, html.ka-unshield #lightbox picture, html.ka-unshield #lightbox canvas, html.ka-unshield #lightbox .folder-card, html.ka-unshield #lightbox [style*="background-image"]{ transition:filter .28s ease-out !important; }
-@media print{ html.ka-protect #section-gallery img, html.ka-protect #section-gallery video, html.ka-protect #section-gallery canvas, html.ka-protect #section-gallery picture, html.ka-protect #section-portfolio img, html.ka-protect #section-portfolio video, html.ka-protect #section-portfolio canvas, html.ka-protect #section-portfolio picture, html.ka-protect #section-store img, html.ka-protect #section-store video, html.ka-protect #section-store canvas, html.ka-protect #section-store picture, html.ka-protect #section-tips img, html.ka-protect #section-tips video, html.ka-protect #section-tips canvas, html.ka-protect #section-tips picture, html.ka-protect #lightbox img, html.ka-protect #lightbox video, html.ka-protect #lightbox canvas, html.ka-protect #lightbox picture{ visibility:hidden !important; } }
+/* Image protection: no dragging, no context menu, zero-delay shield on capture */
+html.ka-protect #section-gallery img, html.ka-protect #section-gallery video, html.ka-protect #section-gallery canvas, html.ka-protect #section-gallery picture, html.ka-protect #section-portfolio img, html.ka-protect #section-portfolio video, html.ka-protect #section-portfolio canvas, html.ka-protect #section-portfolio picture, html.ka-protect #section-store img, html.ka-protect #section-store video, html.ka-protect #section-store canvas, html.ka-protect #section-store picture, html.ka-protect #section-tips img, html.ka-protect #section-tips video, html.ka-protect #section-tips canvas, html.ka-protect #section-tips picture, html.ka-protect #lightbox img, html.ka-protect #lightbox video, html.ka-protect #lightbox canvas, html.ka-protect #lightbox picture, html.ka-protect .pw-thumb, html.ka-protect .folder-card{ -webkit-user-drag:none !important; -webkit-touch-callout:none !important; -webkit-user-select:none !important; user-select:none !important; }
+html.ka-shield #section-gallery img, html.ka-shield #section-gallery video, html.ka-shield #section-gallery picture, html.ka-shield #section-gallery canvas, html.ka-shield #section-gallery .folder-card, html.ka-shield #section-gallery [style*="background-image"], html.ka-shield #section-portfolio img, html.ka-shield #section-portfolio video, html.ka-shield #section-portfolio picture, html.ka-shield #section-portfolio canvas, html.ka-shield #section-portfolio .folder-card, html.ka-shield #section-portfolio [style*="background-image"], html.ka-shield #section-store img, html.ka-shield #section-store video, html.ka-shield #section-store picture, html.ka-shield #section-store canvas, html.ka-shield #section-store .folder-card, html.ka-shield #section-store [style*="background-image"], html.ka-shield #section-tips img, html.ka-shield #section-tips video, html.ka-shield #section-tips picture, html.ka-shield #section-tips canvas, html.ka-shield #section-tips .folder-card, html.ka-shield #section-tips [style*="background-image"], html.ka-shield #lightbox img, html.ka-shield #lightbox video, html.ka-shield #lightbox picture, html.ka-shield #lightbox canvas, html.ka-shield #lightbox .folder-card, html.ka-shield #lightbox [style*="background-image"], html.ka-shield .pw-thumb, html.ka-shield .hero-crystal-canvas{ opacity:0 !important; visibility:hidden !important; filter:blur(40px) brightness(0) !important; transition:none !important; }
+html.ka-unshield #section-gallery img, html.ka-unshield #section-gallery video, html.ka-unshield #section-gallery picture, html.ka-unshield #section-gallery canvas, html.ka-unshield #section-gallery .folder-card, html.ka-unshield #section-gallery [style*="background-image"], html.ka-unshield #section-portfolio img, html.ka-unshield #section-portfolio video, html.ka-unshield #section-portfolio picture, html.ka-unshield #section-portfolio canvas, html.ka-unshield #section-portfolio .folder-card, html.ka-unshield #section-portfolio [style*="background-image"], html.ka-unshield #section-store img, html.ka-unshield #section-store video, html.ka-unshield #section-store picture, html.ka-unshield #section-store canvas, html.ka-unshield #section-store .folder-card, html.ka-unshield #section-store [style*="background-image"], html.ka-unshield #section-tips img, html.ka-unshield #section-tips video, html.ka-unshield #section-tips picture, html.ka-unshield #section-tips canvas, html.ka-unshield #section-tips .folder-card, html.ka-unshield #section-tips [style*="background-image"], html.ka-unshield #lightbox img, html.ka-unshield #lightbox video, html.ka-unshield #lightbox picture, html.ka-unshield #lightbox canvas, html.ka-unshield #lightbox .folder-card, html.ka-unshield #lightbox [style*="background-image"], html.ka-unshield .pw-thumb, html.ka-unshield .hero-crystal-canvas{ opacity:1 !important; visibility:visible !important; transition:opacity .2s ease-out, filter .28s ease-out !important; }
+@media print{ html.ka-protect #section-gallery img, html.ka-protect #section-gallery video, html.ka-protect #section-gallery canvas, html.ka-protect #section-gallery picture, html.ka-protect #section-portfolio img, html.ka-protect #section-portfolio video, html.ka-protect #section-portfolio canvas, html.ka-protect #section-portfolio picture, html.ka-protect #section-store img, html.ka-protect #section-store video, html.ka-protect #section-store canvas, html.ka-protect #section-store picture, html.ka-protect #section-tips img, html.ka-protect #section-tips video, html.ka-protect #section-tips canvas, html.ka-protect #section-tips picture, html.ka-protect #lightbox img, html.ka-protect #lightbox video, html.ka-protect #lightbox canvas, html.ka-protect #lightbox picture, html.ka-protect .pw-thumb, html.ka-protect [style*="background-image"]{ visibility:hidden !important; opacity:0 !important; display:none !important; } }
 </style>
 
 <!-- the first rel="icon" is the one the Creator Portal's favicon setting replaces (applyFavicon) -->
@@ -10102,7 +10169,7 @@ function renderLightbox(){
         .catch(function(){ var a = document.createElement("a"); a.href = url; a.download = (lbDownload.dataset.slug || "image") + ".webp"; document.body.appendChild(a); a.click(); a.remove(); });
     });
   }
-  if (p.downloadable === false){
+  if (p.downloadable === false || document.documentElement.classList.contains("ka-protect")){
     lbDownload.hidden = true;
   } else {
     lbDownload.hidden = false;
@@ -10933,6 +11000,29 @@ function prefetchShop(e){
   var item = e.target.closest && e.target.closest('.nav-item[data-section="store"], .nav-item[data-section="tips"]');
   if (item) shopImport().catch(function(){});
 }
+// Once the intro is done and the browser is idle, the rest of the site is fetched quietly in the background (one piece at a time,
+// never on a slow or data-saving connection), so the Store, Tips and the Typography studio open without a wait.
+(function(){
+  var conn = navigator.connection || {};
+  if (conn.saveData || /(^|slow-)2g/.test(conn.effectiveType || "") || (typeof KA_WALLPAPER !== "undefined" && KA_WALLPAPER)) return;
+  var started = false, qs = new URLSearchParams(location.search);
+  function idle(fn){ if (window.requestIdleCallback) requestIdleCallback(fn, { timeout: 5000 }); else setTimeout(fn, 400); }
+  function preload(href){ try { var l = document.createElement("link"); l.rel = "modulepreload"; l.href = href; document.head.appendChild(l); } catch(e){} }
+  var steps = [
+    function(){ preload("./dist/assets/studio.js"); },
+    function(){ shopImport().catch(function(){}); },
+    function(){ if (!qs.get("product") && !shopMounted.store) loadStorePage("store"); },
+    function(){ if (!qs.get("tip") && !shopMounted.tips) loadStorePage("tips"); }
+  ];
+  function next(){
+    if (document.hidden){ document.addEventListener("visibilitychange", function(){ if (!document.hidden) next(); }, { once: true }); return; }
+    var step = steps.shift(); if (!step) return;
+    idle(function(){ try { step(); } catch(e){} setTimeout(next, 900); });
+  }
+  function begin(){ if (started) return; started = true; setTimeout(next, 1500); }
+  window.addEventListener("ka-sequence-complete", begin, { once: true });
+  setTimeout(begin, 16000);
+})();
 navItemsContainer.addEventListener("pointerover", prefetchShop);
 navItemsContainer.addEventListener("focusin", prefetchShop);
 // The Typography studio is its own lazily loaded bundle (dist/assets/studio.js): nothing of it is
@@ -13570,15 +13660,20 @@ function sendMessage(text){
 
 /* ---- store closed: a lit wooden sign hanging on two ropes, the 3D panda napping on it, a live countdown; the store behind rests (blurred, not usable) ---- */
 #section-store{ position:relative; }
-.shop-root.is-locked{ filter:blur(7px) saturate(.55); opacity:.32; pointer-events:none; user-select:none; transition:filter .7s ease, opacity .7s ease; }
-.store-closed{ position:relative; z-index:3; display:grid; justify-items:center; gap:20px; margin:0 auto 46px; padding:0 16px; text-align:center; max-width:640px;
+/* while closed the store takes no room at all (no empty page to scroll through); it eases back in when it opens */
+.shop-root.is-locked{ display:none; }
+#section-store:has(.store-closed:not([hidden])), #section-store:has(.store-closed:not([hidden])) .shop-shell{ min-height:0; }
+#section-store:has(.store-closed:not([hidden])) .shop-shell{ padding-bottom:24px; }
+.shop-root.is-waking{ animation:sc-wake .9s cubic-bezier(.22,.8,.24,1) both; }
+@keyframes sc-wake{ from{ opacity:0; transform:translateY(16px); filter:blur(6px); } to{ opacity:1; transform:none; filter:blur(0); } }
+.store-closed{ position:relative; z-index:3; display:grid; justify-items:center; gap:20px; margin:0 auto 24px; padding:0 16px; text-align:center; max-width:640px;
   opacity:0; transform:translateY(-18px); transition:opacity .8s cubic-bezier(.22,.8,.24,1), transform .8s cubic-bezier(.22,.8,.24,1); }
 .store-closed.is-in{ opacity:1; transform:none; }
 .store-closed[hidden]{ display:none; }
 .sc-scene{ position:relative; display:grid; justify-items:center; padding-top:8px; }
 /* a soft pool of light from above, like a lamp over a shop door */
-.sc-spot{ position:absolute; top:-40px; left:50%; width:min(560px, 92vw); height:330px; translate:-50% 0; pointer-events:none;
-  background:radial-gradient(50% 60% at 50% 18%, rgba(255,196,140,.16), transparent 70%); filter:blur(2px); }
+.sc-spot{ position:absolute; top:-150px; left:50%; width:min(860px, 100vw); height:640px; translate:-50% 0; pointer-events:none;
+  background:radial-gradient(closest-side, rgba(255,196,140,.17) 0%, rgba(255,190,130,.135) 16%, rgba(255,182,122,.095) 32%, rgba(255,174,112,.058) 50%, rgba(255,166,104,.028) 68%, rgba(255,160,100,.009) 86%, rgba(255,160,100,0) 100%); }
 .sc-hang{ position:relative; display:grid; justify-items:center; transform-origin:50% 0; animation:sc-swing 5.6s cubic-bezier(.45,0,.55,1) infinite; }
 .sc-nail{ position:relative; z-index:2; width:14px; height:14px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #fff6, #9a7752 40%, #3a2a1c); box-shadow:0 3px 8px #000a; }
 .sc-ropes{ width:240px; height:70px; margin:-8px 0 -10px; overflow:visible; }
@@ -13589,7 +13684,7 @@ function sendMessage(text){
     radial-gradient(120% 90% at 30% 0%, #4a3322, transparent 60%),
     linear-gradient(170deg, #3d2b1d 0%, #261a11 58%, #1b120b 100%);
   border:2px solid #8c6239;
-  box-shadow:0 0 0 6px rgba(140,98,57,.16), 0 26px 60px -12px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,214,170,.22), inset 0 -10px 24px rgba(0,0,0,.35); }
+  box-shadow:0 0 22px 2px rgba(255,172,92,.10), 0 0 64px 12px rgba(255,150,70,.07), 0 0 130px 30px rgba(255,140,60,.035), 0 26px 60px -12px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,214,170,.22), inset 0 -10px 24px rgba(0,0,0,.35); }
 .sc-sign::before{ content:""; position:absolute; inset:8px; border-radius:13px; border:1px dashed rgba(255,190,130,.26); pointer-events:none; }
 .sc-ring{ position:absolute; top:-7px; width:14px; height:14px; border-radius:50%; border:3px solid #b98d5d; background:#1b120b; box-shadow:0 2px 4px #0009; }
 .sc-ring.l{ left:44px; } .sc-ring.r{ right:44px; }
@@ -13893,7 +13988,7 @@ function sendMessage(text){
       '<div class="sc-count" hidden><p class="sc-count-label">Reopening in</p>' +
         '<div class="sc-tiles" role="timer" aria-live="off">' + tile("d", "days") + tile("h", "hours") + tile("m", "minutes") + tile("s", "seconds") + '</div>' +
         '<p class="sc-date"></p></div>' +
-      '<p class="sc-soon" hidden><span class="sc-dot" aria-hidden="true"></span>Opening any moment now…</p>' +
+      '<p class="sc-soon" hidden><span class="sc-dot" aria-hidden="true"></span><span class="sc-soon-text">Opening any moment now…</span></p>' +
       '<div class="sc-access" hidden><button type="button" class="sc-access-toggle">Have special access? Get your link</button>' +
         '<form class="sc-access-form" hidden novalidate><input type="email" required autocomplete="email" placeholder="you@example.com" aria-label="Your email"><button type="submit" class="sc-btn">Email me</button></form>' +
         '<p class="sc-note" role="status" aria-live="polite"></p></div>';
@@ -13916,7 +14011,7 @@ function sendMessage(text){
   // the live countdown: days / hours / minutes / seconds, each digit pair easing in when it changes;
   // at zero the board says it is opening any moment and checks the store every 20 seconds
   var soonPoll = 0;
-  function startCountdown(b, at){
+  function startCountdown(b, at, auto){
     clearInterval(countdown); clearInterval(soonPoll);
     var box = b.querySelector(".sc-count"), soon = b.querySelector(".sc-soon");
     if (isNaN(at)){ box.hidden = true; soon.hidden = true; return; }
@@ -13928,6 +14023,7 @@ function sendMessage(text){
       var left = at - Date.now();
       if (left <= 0){
         box.hidden = true; soon.hidden = false; clearInterval(countdown);
+        var soonText = soon.querySelector(".sc-soon-text"); if (soonText) soonText.textContent = auto ? "Opening any moment now…" : "Back very soon — the doors will open shortly.";
         if (!soonPoll) soonPoll = setInterval(function(){ if (window.kaPublicConfig && window.kaPublicConfig.refresh) window.kaPublicConfig.refresh(); refreshStore(); }, 20000);
         return;
       }
@@ -13938,7 +14034,7 @@ function sendMessage(text){
     };
     tick(); countdown = setInterval(tick, 1000);
   }
-  function unlockRoot(){ var root = document.getElementById("store-root"); if (root){ root.classList.remove("is-locked"); root.removeAttribute("inert"); root.removeAttribute("aria-hidden"); } }
+  function unlockRoot(){ var root = document.getElementById("store-root"); if (root){ var was = root.classList.contains("is-locked"); root.classList.remove("is-locked"); root.removeAttribute("inert"); root.removeAttribute("aria-hidden"); if (was && !REDUCED){ root.classList.add("is-waking"); setTimeout(function(){ root.classList.remove("is-waking"); }, 1000); } } }
   function applyStore(cfg){
     var st = cfg && cfg.store; storeState = st || null;
     var closed = !!st && st.enabled === false && !st.access;
@@ -13970,7 +14066,7 @@ function sendMessage(text){
     b.querySelector(".sc-emoji").hidden = scene !== "emoji";
     b.classList.toggle("has-panda", scene === "panda");
     b.querySelector(".sc-access").hidden = !c.emailAccess;
-    startCountdown(b, c.reopensAt ? Date.parse(c.reopensAt) : NaN);
+    startCountdown(b, c.reopensAt ? Date.parse(c.reopensAt) : NaN, c.autoOpen === true);
     if (root){ root.classList.add("is-locked"); root.setAttribute("inert", ""); root.setAttribute("aria-hidden", "true"); }
     b.hidden = false; boardShown = true;
     requestAnimationFrame(function(){ b.classList.add("is-in"); });

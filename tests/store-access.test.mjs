@@ -186,3 +186,27 @@ test('announcements: several, each on/off with dates; bad links and backwards da
   assert.deepEqual([res.json.announcements[0].id, res.json.announcements[0].tone], ['sale', 'offer']);
   assert.equal((await app.call('GET', '/api/portfolio')).json.announcements[0].text, '20% off');
 });
+
+test('reopening time: with "open automatically" the store opens itself at that moment; without it, it stays closed', async () => {
+  const past = new Date(Date.now() - 60e3).toISOString(), future = new Date(Date.now() + 3600e3).toISOString();
+  const pub = async () => (await app.call('GET', '/api/public-config')).json.store;
+  // automatic, time still ahead: closed, and the board is told it will open by itself
+  let r = await admin('POST', '/api/admin/store/status', { open: false, reopensAt: future, autoOpen: true });
+  assert.equal(r.json.status.open, false); assert.equal(r.json.status.autoOpen, true);
+  let st = await pub(); assert.equal(st.enabled, false); assert.equal(st.closed.autoOpen, true);
+  // automatic, time reached: open for visitors and shown as open in the portal, orders accepted
+  r = await admin('POST', '/api/admin/store/status', { reopensAt: past });
+  assert.equal(r.json.status.open, true, 'the portal shows it as open');
+  st = await pub(); assert.equal(st.enabled, true); assert.equal(st.closed, null);
+  const order = await app.call('POST', '/api/checkout/order', { body: { productId, currency: 'INR', email: 'auto@example.com', licenseHolder: 'Auto Buyer' }, ip: ip() });
+  assert.equal(order.status, 201, 'orders work once it has opened itself');
+  // not automatic: the time passes and the store stays closed until it is opened by hand
+  r = await admin('POST', '/api/admin/store/status', { open: false, reopensAt: past, autoOpen: false });
+  assert.equal(r.json.status.open, false); st = await pub(); assert.equal(st.enabled, false); assert.equal(st.closed.autoOpen, false);
+  assert.equal((await app.call('POST', '/api/checkout/order', { body: { productId, currency: 'INR', email: 'x@example.com', licenseHolder: 'Pat Buyer' }, ip: ip() })).status, 503);
+  // closing by hand while an old automatic time is still saved does not reopen it straight away
+  await admin('POST', '/api/admin/store/status', { open: true, autoOpen: true, reopensAt: past });
+  r = await admin('POST', '/api/admin/store/status', { open: false });
+  assert.equal(r.json.status.open, false); assert.equal(r.json.status.reopensAt, ''); assert.equal(r.json.status.autoOpen, false);
+  await admin('POST', '/api/admin/store/status', { open: true });
+});

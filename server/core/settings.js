@@ -8,6 +8,7 @@ export const DEFAULTS = {
     closedTitle: 'The store is taking a nap',
     closedMessage: 'New orders are paused for a little while. Everything is safe, and the shop will be back soon.',
     reopensAt: '',                    // optional ISO time shown on the closed board
+    autoOpen: false,                  // true: the store opens by itself when that time arrives; false: it stays closed until you open it
     closedScene: 'panda',             // 'panda' (the panda hangs the sign) or 'emoji'
     international: true,              // buyers outside India can pay in USD (international cards must also be on in Razorpay)
     allowCouponStacking: false,       // one coupon per order unless turned on
