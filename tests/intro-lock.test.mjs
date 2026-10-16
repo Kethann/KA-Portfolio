@@ -63,3 +63,12 @@ test('Version 2 (the editable copy) takes the owner\'s skill bubbles; Version 1 
   const doc = validateSiteDocument({ ...seed, intro: { version: 'v2', bubbles: { enabled: false, items: [] } } }, seed, seed);
   assert.equal(doc.intro.version, 'v2'); assert.equal(doc.intro.bubbles.enabled, false);
 });
+
+test('the local dev server switches intros like the live router (V2 runs with the saved bubbles, "none" included)', async () => {
+  const { applyIntroToHtml } = await import('../shared/intro-page.js');
+  assert.equal(applyIntroToHtml(html, 'v1', []), html, 'V1 is served exactly as built');
+  const none = applyIntroToHtml(html, 'v2', []);
+  assert.match(none, /<script>window\.KA_INTRO_BUBBLES=\[\];<\/script><script data-intro="v2">/);
+  assert.match(none, /<script data-intro="v1" type="text\/plain">/);
+  assert.ok(!/KA_INTRO_BUBBLES=null/.test(applyIntroToHtml(html, 'v2', null)), 'nothing saved = no override');
+});

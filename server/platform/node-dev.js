@@ -14,6 +14,7 @@ import { setEnvSource, env } from '../core/env.js';
 import { setDatabase } from '../core/db.js';
 import { getStorage } from '../core/storage.js';
 import { validateEnv } from '../core/env-validate.js';
+import { applyIntroToHtml } from '../../shared/intro-page.js';
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 config({ path: resolve(root, '.env') });
@@ -132,6 +133,13 @@ export async function createDevServer({ port = Number(env('PORT', 9878)), host =
         res.writeHead(404); return res.end();
       }
       if (path === '/' || path === '/index.html' || path === '/crystal'){
+        // like the Pages router: run the chosen intro version with the owner's skill bubbles
+        try {
+          const [html, info] = await Promise.all([readFile(resolve(root, 'index.html'), 'utf8'), handle(new Request(new URL('/api/intro', url)), platform).then(r => r.json())]);
+          const out = applyIntroToHtml(html, info.version, info.bubbles);
+          res.writeHead(200, { ...SECURITY, 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-cache' });
+          return res.end(out);
+        } catch { /* fall back to the file as built */ }
         if (await sendFile(res, resolve(root, 'index.html'), 'no-cache')) return;
       }
       for (const [prefix, base, cache] of [['/dist/assets/', resolve(root, 'dist/assets'), 'no-cache'], ['/assets/', resolve(root, 'dist/assets'), 'no-cache'],
