@@ -11526,15 +11526,15 @@ function buildSurfaceParticles(){
   geometry.setAttribute('aSize',new THREE.BufferAttribute(sizes,1).setUsage(THREE.DynamicDrawUsage));
   geometry.setAttribute('aTint',new THREE.BufferAttribute(tints,1).setUsage(THREE.DynamicDrawUsage));
   const material=new THREE.ShaderMaterial({
-    uniforms:{uDpr:{value:renderer.getPixelRatio()}},
+    uniforms:{uDpr:{value:renderer.getPixelRatio()},uGreen:V3_UG},
     vertexShader:`attribute float aAlpha,aSize,aTint;uniform float uDpr;varying float vAlpha,vTint;
       void main(){vAlpha=aAlpha;vTint=aTint;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_PointSize=max(1.,aSize*uDpr);}`,
     // [fix] was a flat vec3(0.0) (pure black) with NormalBlending -- read as black particles
     // scattering across the bright crystal whenever the cursor moved over it. Each particle now
     // gets its own warm red/gold/white mix (aTint, set once per emission below) and blends
     // additively, so it can only ever ADD light on top of the crystal, never darken it.
-    fragmentShader:`varying float vAlpha,vTint;void main(){float r=length(gl_PointCoord-.5);if(r>.5||vAlpha<=0.)discard;
-      vec3 ember=vec3(0.95,0.22,0.08);vec3 gold=vec3(1.0,0.66,0.24);vec3 white=vec3(1.0,0.95,0.85);
+    fragmentShader:`uniform float uGreen;varying float vAlpha,vTint;void main(){float r=length(gl_PointCoord-.5);if(r>.5||vAlpha<=0.)discard;
+      vec3 ember=mix(vec3(0.95,0.22,0.08),vec3(0.06,0.80,0.36),uGreen);vec3 gold=mix(vec3(1.0,0.66,0.24),vec3(0.60,1.0,0.42),uGreen);vec3 white=mix(vec3(1.0,0.95,0.85),vec3(0.86,1.0,0.90),uGreen);   // VERSION 3: green sparks in the green world
       vec3 col=mix(ember,gold,clamp(vTint*2.0,0.0,1.0));
       col=mix(col,white,clamp(vTint*2.0-1.0,0.0,1.0));
       gl_FragColor=vec4(col,vAlpha*(1.-smoothstep(.24,.5,r)));}`,
@@ -12310,16 +12310,19 @@ function v3BuildSmoke(){
   const soft = new THREE.CanvasTexture(sc); soft.generateMipmaps = false; soft.minFilter = soft.magFilter = THREE.LinearFilter;
   const mat = new THREE.ShaderMaterial(Object.assign({
     uniforms: { map: { value: soft }, uTime: { value: 0 }, uAmt: { value: 0 }, uCol: { value: new THREE.Color() }, uOct: { value: V3.low ? 3 : 4 },
-      uLogo: { value: new THREE.Vector2(dw, dh) }, uSize: { value: new THREE.Vector2(W, H) }, uOffY: { value: offY } },
+      uLogo: { value: new THREE.Vector2(dw, dh) }, uSize: { value: new THREE.Vector2(W, H) }, uOffY: { value: offY },
+      uM: { value: new THREE.Vector2() }, uMV: { value: new THREE.Vector2() }, uMA: { value: 0 } },
     vertexShader: V3_RING_VS,
     fragmentShader: [
-      'uniform sampler2D map;uniform float uTime,uAmt,uOct,uOffY;uniform vec3 uCol;uniform vec2 uLogo,uSize;varying vec2 vUv;',
+      'uniform sampler2D map;uniform float uTime,uAmt,uOct,uOffY,uMA;uniform vec3 uCol;uniform vec2 uLogo,uSize,uM,uMV;varying vec2 vUv;',
       'float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}',
       'float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}',
       'float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<4;i++){if(float(i)>=uOct)break;s+=a*n2(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return s;}',
       'void main(){',
       '  if(uAmt<.003){gl_FragColor=vec4(0.);return;}',
       '  vec2 wp=(vUv-.5)*uSize+vec2(0.,uOffY);',   // relative to the logo's centre
+      '  vec2 dm=wp-uM;float fm=exp(-dot(dm,dm)/4900.)*uMA;',
+      '  wp-=(dm/(length(dm)+8.)*20.+vec2(-dm.y,dm.x)*.1+uMV*.06)*fm;',   // the pointer parts the smoke, swirls it a little and drags it along
       '  float t=uTime*.001;',
       '  vec2 q=wp*.018;',
       '  vec2 warp=vec2(fbm(q+vec2(0.,-t*.35)),fbm(q+vec2(4.3,1.1)+vec2(0.,-t*.3)))-.5;',
@@ -12341,7 +12344,7 @@ function v3BuildSmoke(){
       '}'].join('\n') }, V3_ADD));
   const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
   m.scale.set(W, H, 1); m.position.set(0, offY, 4); m.renderOrder = 6; m.frustumCulled = false; m.visible = false; m.userData.kaKind = 'loomSmoke';
-  scene.add(m); V3.smoke = m;
+  scene.add(m); V3.smoke = m; V3.smk = { x: 0, y: 0, vx: 0, vy: 0, a: 0, ts: 0 };
 }
 function v3UpdateSmoke(ts, t){
   const S = V3.smoke; if (!S) return;
@@ -12355,7 +12358,25 @@ function v3UpdateSmoke(ts, t){
   S.visible = a > 0.004;
   if (!S.visible) return;
   const u = S.material.uniforms;
-  u.uTime.value = ts; u.uAmt.value = a; u.uCol.value.copy(V3_SMOKE_W).lerp(V3_SMOKE_G, V3G); u.uOct.value = V3.gq >= 2 ? 2 : (V3.low ? 3 : 4);
+  // the pointer on the smoke's plane, smoothed, with its speed: moving through the smoke stirs it, and it settles again
+  const K = V3.smk, D = V3.dust, dt = K.ts ? Math.min(50, ts - K.ts) : 16; K.ts = ts;
+  let want = 0;
+  if (D && performance.now() - D.pt < 1200){
+    const rect = renderer.domElement.getBoundingClientRect();
+    V3_TMP.set((D.px - rect.left)/rect.width*2 - 1, 1 - (D.py - rect.top)/rect.height*2, 0.5).unproject(camera).sub(camera.position);
+    const k = (S.position.z - camera.position.z)/(V3_TMP.z || -1), wx = camera.position.x + V3_TMP.x*k, wy = camera.position.y + V3_TMP.y*k;
+    const e = 1 - Math.exp(-dt/90), e2 = 1 - Math.exp(-dt/180);
+    if (K.a < 0.01){ K.x = wx; K.y = wy; }
+    const ivx = (wx - K.x)/(dt/1000), ivy = (wy - K.y)/(dt/1000);
+    K.x += (wx - K.x)*e; K.y += (wy - K.y)*e;
+    K.vx += (ivx*e - K.vx)*e2; K.vy += (ivy*e - K.vy)*e2;
+    want = Math.min(1, 0.4 + Math.hypot(K.vx, K.vy)/300);
+  }
+  K.a += (want - K.a)*(1 - Math.exp(-dt/(want > K.a ? 160 : 700)));
+  const vl = Math.hypot(K.vx, K.vy), vs = vl > 600 ? 600/vl : 1;
+  u.uM.value.set(K.x, K.y); u.uMV.value.set(K.vx*vs, K.vy*vs); u.uMA.value = K.a;
+  u.uAmt.value = a*(1 + 0.45*K.a);   // stirring the smoke thickens it a touch
+  u.uTime.value = ts; u.uCol.value.copy(V3_SMOKE_W).lerp(V3_SMOKE_G, V3G); u.uOct.value = V3.gq >= 2 ? 2 : (V3.low ? 3 : 4);
 }
 
 // ---- space dust: fine points stream out of the core in every direction (some towards the camera), scatter and fade ----
@@ -12377,26 +12398,31 @@ function v3BuildDust(){
       'gl_FragColor=vec4((uCol*a+vec3(1.)*pow(a,4.)*.6)*vL,0.);}' }, V3_ADD));
   const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = -3; pts.visible = false; pts.userData.kaKind = 'loomDust';
   scene.add(pts);
-  V3.dust = { pts, geo, N, pos, life, size, vel: new Float32Array(N*3), age: new Float32Array(N), max: new Float32Array(N), next: 0, alive: 0, acc: 0 };
+  V3.dust = { pts, geo, N, pos, life, size, vel: new Float32Array(N*3), kick: new Float32Array(N*2), age: new Float32Array(N), max: new Float32Array(N), next: 0, alive: 0, acc: 0, px: 0, py: 0, pt: -1e9 };
+  // hover: the pointer (or a finger while dragging) gently parts the dust
+  const onPtr = (e) => { const D = V3.dust; D.px = e.clientX; D.py = e.clientY; D.pt = performance.now(); };
+  window.addEventListener('pointermove', onPtr, { passive: true }); window.addEventListener('pointerdown', onPtr, { passive: true });
 }
 function v3UpdateDust(ts, t, dt){
   const D = V3.dust; if (!D) return;
   let rate = 0;
-  if (phase === 'assembling' && V3.tg && t >= V3.tg - 40) rate = (V3.low ? 26 : 60)*smootherStep((t - V3.tg)/600);
-  else if (phase === 'held') rate = V3.low ? 10 : 22;
+  if (phase === 'assembling' && V3.tg && t >= V3.tg - 40) rate = (V3.low ? 8 : 16)*smootherStep((t - V3.tg)/600);
+  else if (phase === 'held') rate = V3.low ? 3 : 5;
   if (V3.gq >= 2) rate *= 0.5;
   D.acc += rate*dt/1000;
   while (D.acc >= 1){
     D.acc -= 1;
     const i = D.next; D.next = (i + 1) % D.N;
     if (!(D.max[i] > 0)) D.alive++;
-    const u = Math.random()*1.6 - 0.6, a = Math.random()*Math.PI*2, q = Math.sqrt(1 - u*u), s = 40 + Math.random()*170, r0 = 10 + Math.random()*40;   // biased towards the camera
+    const u = Math.random()*1.6 - 0.6, a = Math.random()*Math.PI*2, q = Math.sqrt(1 - u*u), s = 12 + Math.random()*46, r0 = 10 + Math.random()*40;   // slow, like drifting through space   // biased towards the camera
     D.pos[i*3] = Math.cos(a)*q*r0; D.pos[i*3 + 1] = Math.sin(a)*q*r0; D.pos[i*3 + 2] = -40 + u*r0;
     D.vel[i*3] = Math.cos(a)*q*s; D.vel[i*3 + 1] = Math.sin(a)*q*s; D.vel[i*3 + 2] = u*s;
-    D.age[i] = 0; D.max[i] = 2600 + Math.random()*2600; D.size[i] = 1.8 + Math.random()*3.2;
+    D.kick[i*2] = D.kick[i*2 + 1] = 0; D.age[i] = 0; D.max[i] = 5500 + Math.random()*4000; D.size[i] = 1.8 + Math.random()*3.2;
   }
   if (!D.alive){ D.pts.visible = false; return; }
-  const sec = dt/1000, grow = 1 + 0.35*sec, camZ = camera.position.z;
+  const sec = dt/1000, grow = 1 + 0.07*sec, camZ = camera.position.z, kdrag = Math.max(0, 1 - 2.2*sec);
+  const hov = performance.now() - D.pt < 4000, rect = hov ? renderer.domElement.getBoundingClientRect() : null, HR = 130;
+  const wpp = 2*Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)/Math.max(1, rect ? rect.height : 1);   // world units per pixel, per unit of depth
   let alive = 0;
   for (let i = 0; i < D.N; i++){
     if (!(D.max[i] > 0)) continue;
@@ -12405,8 +12431,17 @@ function v3UpdateDust(ts, t, dt){
     if (D.age[i] >= D.max[i] || D.pos[j + 2] > camZ - 60){ D.max[i] = 0; D.life[i] = 0; continue; }
     alive++;
     D.vel[j] *= grow; D.vel[j + 1] *= grow; D.vel[j + 2] *= grow;   // gathers pace as it leaves the core
-    D.vel[j] += (Math.random() - 0.5)*30*sec; D.vel[j + 1] += (Math.random() - 0.5)*30*sec;   // and scatters a little
-    D.pos[j] += D.vel[j]*sec; D.pos[j + 1] += D.vel[j + 1]*sec; D.pos[j + 2] += D.vel[j + 2]*sec;
+    D.vel[j] += (Math.random() - 0.5)*8*sec; D.vel[j + 1] += (Math.random() - 0.5)*8*sec;   // and scatters a little
+    if (hov){   // near the pointer: pushed aside with a slight swirl, then it drifts back on its way
+      V3_P.set(D.pos[j], D.pos[j + 1], D.pos[j + 2]).project(camera);
+      const sx = rect.left + (V3_P.x*0.5 + 0.5)*rect.width, sy = rect.top + (-V3_P.y*0.5 + 0.5)*rect.height, dx = sx - D.px, dy = sy - D.py, d = Math.hypot(dx, dy);
+      if (d < HR && d > 0.5){
+        const f = (1 - d/HR)*(1 - d/HR)*900*sec*wpp*Math.max(60, camZ - D.pos[j + 2]), nx = dx/d, ny = -dy/d;
+        D.kick[i*2] += (nx - ny*0.35)*f; D.kick[i*2 + 1] += (ny + nx*0.35)*f;
+      }
+    }
+    D.kick[i*2] *= kdrag; D.kick[i*2 + 1] *= kdrag;
+    D.pos[j] += (D.vel[j] + D.kick[i*2])*sec; D.pos[j + 1] += (D.vel[j + 1] + D.kick[i*2 + 1])*sec; D.pos[j + 2] += D.vel[j + 2]*sec;
     const f = D.age[i]/D.max[i];
     D.life[i] = smootherStep(f/0.12)*(1 - smootherStep((f - 0.55)/0.45));   // fades in, then dissipates
   }
@@ -12660,6 +12695,7 @@ function v3Grade(ts, t){
   } else if (phase === 'held'){ g = 1; ba = 1; light = 0.45; }   // the finished logo stays in its green world
   else if (phase === 'disassembling'){ g = 1 - smootherStep(clamp01(t/(DISASSEMBLE_DUR*0.9))); ba = 1 - smootherStep(clamp01(t/DISASSEMBLE_DUR)); light = 0.45; }
   V3G = g; V3_UG.value = g; V3.la = la;
+  if ((g > 0.5) !== V3.worldGreen){ V3.worldGreen = g > 0.5; document.documentElement.toggleAttribute('data-ka-world', false); if (V3.worldGreen) document.documentElement.setAttribute('data-ka-world', 'green'); }   // the page's cursor trail turns green too
   if (Math.abs(g - V3.lastG) > 0.002 || (g === 0) !== (V3.lastG === 0)){ V3.lastG = g; v3Lights(g); }
   if (V3.liq){
     const u = V3.liq.material.uniforms;
@@ -19357,20 +19393,24 @@ function updateCursor(now){
     // literal black mark. Same single smoothed path, same gradient shape.
     // Skipped on touch: one fewer full-path stroke per frame, since every frame here is stealing
     // time from whatever the finger is actually doing (scrolling, swiping the image stacks).
+    // the intro can turn the world green (Version 3 sets data-ka-world="green"); the trail follows it
+    var greenWorld = !!(document.documentElement && document.documentElement.getAttribute && document.documentElement.getAttribute("data-ka-world") === "green");
+    var cShadowA = greenWorld ? "6,70,36" : "120,20,10", cShadowB = greenWorld ? "8,96,48" : "160,30,12";
+    var cLineA = greenWorld ? "150,240,190" : "230,196,150", cLineB = greenWorld ? "200,255,220" : "255,222,180";
     if(!coarsePointer.matches){
       var shadowGradient = tctx.createLinearGradient(tail.x, tail.y, head.x, head.y);
-      shadowGradient.addColorStop(0, "rgba(120,20,10,0)");
-      shadowGradient.addColorStop(0.4, "rgba(120,20,10,"+(0.18*headLife)+")");
-      shadowGradient.addColorStop(1, "rgba(160,30,12,"+(0.5*headLife)+")");
+      shadowGradient.addColorStop(0, "rgba("+cShadowA+",0)");
+      shadowGradient.addColorStop(0.4, "rgba("+cShadowA+","+(0.18*headLife)+")");
+      shadowGradient.addColorStop(1, "rgba("+cShadowB+","+(0.5*headLife)+")");
       tctx.strokeStyle = shadowGradient;
       tctx.lineWidth = 2.1 + headLife*2.28; // [35% then 30% smaller] was 4.6 + headLife*5
       smoothTrailPath(tctx, trailPoints);
       tctx.stroke();
     }
     var gradient = tctx.createLinearGradient(tail.x, tail.y, head.x, head.y);
-    gradient.addColorStop(0, "rgba(230,196,150,0)");
-    gradient.addColorStop(0.4, "rgba(230,196,150,"+(0.28*headLife)+")");
-    gradient.addColorStop(1, "rgba(255,222,180,"+(0.92*headLife)+")");
+    gradient.addColorStop(0, "rgba("+cLineA+",0)");
+    gradient.addColorStop(0.4, "rgba("+cLineA+","+(0.28*headLife)+")");
+    gradient.addColorStop(1, "rgba("+cLineB+","+(0.92*headLife)+")");
     // soft wide underlay pass then a tighter, brighter core pass -- both the SAME single
     // smoothed path, just two stroke weights, so the line reads as one soft elastic ribbon
     // rather than a hard wire, still with no seams since each pass is one continuous stroke().
