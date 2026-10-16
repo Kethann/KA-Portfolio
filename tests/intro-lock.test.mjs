@@ -55,8 +55,9 @@ test('the Pages router serves the homepage with the chosen intro and leaves V1 u
   const router = readFileSync(new URL('../pages/_worker.js', import.meta.url), 'utf8');
   const routes = JSON.parse(readFileSync(new URL('../pages/_routes.json', import.meta.url), 'utf8'));
   assert.ok(routes.include.includes('/') && routes.include.includes('/index.html'));
-  assert.match(router, /if \(version === 'v1' \|\| !page\.ok/);
   assert.match(router, /script\[data-intro\]/);
+  assert.match(router, /else el\.remove\(\);/, 'intros that are not chosen are left out of the page');
+  assert.ok(!/el\.(setInnerContent|replace|append|prepend)\(/.test(router), 'the chosen intro script is never rewritten');
 });
 
 test('Version 2 (the editable copy) takes the owner\'s skill bubbles; Version 1 does not', async () => {
@@ -77,10 +78,15 @@ test('Version 2 (the editable copy) takes the owner\'s skill bubbles; Version 1 
 
 test('the local dev server switches intros like the live router (V2 runs with the saved bubbles, "none" included)', async () => {
   const { applyIntroToHtml } = await import('../shared/intro-page.js');
-  assert.equal(applyIntroToHtml(html, 'v1', []), html, 'V1 is served exactly as built');
+  const raw = (id) => { const o = html.indexOf(`<script data-intro="${id}"`), open = html.indexOf('>', o) + 1; return html.slice(open, html.indexOf('</script>', open)); };
+  const v1 = applyIntroToHtml(html, 'v1', []);
+  assert.ok(v1.includes('<script data-intro="v1">' + raw('v1') + '</script>'), 'V1 is served exactly as built');
+  assert.ok(!v1.includes('<script data-intro="v2"') && !v1.includes('<script data-intro="v3"'), 'the other versions are left out, so the page is lighter');
+  assert.ok(!v1.includes('KA_INTRO_BUBBLES='), 'V1 never gets bubbles');
   const none = applyIntroToHtml(html, 'v2', []);
   assert.match(none, /<script>window\.KA_INTRO_BUBBLES=\[\];<\/script><script data-intro="v2">/);
-  assert.match(none, /<script data-intro="v1" type="text\/plain">/);
+  assert.ok(none.includes('<script data-intro="v2">' + raw('v2') + '</script>'), 'the chosen version is served exactly as built');
+  assert.ok(!none.includes('<script data-intro="v1"'), 'V1 is left out when another version is chosen');
   assert.ok(!/KA_INTRO_BUBBLES=null/.test(applyIntroToHtml(html, 'v2', null)), 'nothing saved = no override');
 });
 

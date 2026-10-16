@@ -12676,6 +12676,12 @@ function v3BuildLiquid(){
   v3BuildFog(); v3BuildSpell(); v3BuildSparks(); v3BuildRibbons(); v3BuildVines(); v3BuildSmoke(); v3BuildDust();
   if (!V3.low && (navigator.hardwareConcurrency || 8) <= 4) V3.gq = 1;   // a modest machine starts one step lighter
   v3ApplyQ();
+  // compile every V3 shader now, while the page is still covered: otherwise each effect stalls a frame or two the first
+  // time it appears (the circle, the liquid, the fog, the smoke...), which reads as a stutter in the middle of the intro
+  const pre = [V3.fog, V3.liq, V3.spell, V3.sp && V3.sp.pts, V3.rib && V3.rib.mesh, V3.vF && V3.vF.mesh, V3.smoke, V3.dust && V3.dust.pts, v3Skin].filter(Boolean);
+  const was = pre.map(o => o.visible); pre.forEach(o => { o.visible = true; });
+  try { renderer.compile(scene, camera); } catch (e) {}
+  pre.forEach((o, i) => { o.visible = was[i]; });
 }
 function v3Lights(g){
   keyLight.color.copy(V3_KEY0).lerp(V3_KEY1, g);

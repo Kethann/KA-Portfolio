@@ -26,15 +26,16 @@ export default {
     if (/^\/(api\/|legal(\/|$)|license(\/|$)|__storage\/|__storage-upload\/)/.test(path)) return env.SITE.fetch(request);
     if (request.method === 'GET' && (path === '/' || path === '/index.html')){
       const [page, { version, bubbles }] = await Promise.all([env.ASSETS.fetch(request), chosenIntro(request, env, ctx)]);
-      if (version === 'v1' || !page.ok || !(page.headers.get('content-type') || '').includes('text/html')) return page;
+      if (!page.ok || !(page.headers.get('content-type') || '').includes('text/html')) return page;
       try {
-        // every intro script runs only if it is the chosen one
+        // only the chosen intro is sent: the others are dropped from the page (about 260-340 KB each), so it loads much
+        // faster. The chosen script itself goes out exactly as built (V1, the default, included).
         return new HTMLRewriter().on('script[data-intro]', { element(el){
           if (el.getAttribute('data-intro') === version){
             el.removeAttribute('type');
             // the owner's bubbles are set just before the chosen intro runs (the page has no explicit <head> to put them in)
-            if (bubbles) el.before('<script>window.KA_INTRO_BUBBLES=' + JSON.stringify(bubbles).replace(/</g, '\\u003c') + ';</script>', { html: true });
-          } else el.setAttribute('type', 'text/plain');
+            if (bubbles && version !== 'v1') el.before('<script>window.KA_INTRO_BUBBLES=' + JSON.stringify(bubbles).replace(/</g, '\\u003c') + ';</script>', { html: true });
+          } else el.remove();
         } }).on('html', { element(el){ el.setAttribute('data-ka-intro', version); } }).transform(page);
       } catch { return page; }
     }
