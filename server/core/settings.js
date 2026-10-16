@@ -50,6 +50,7 @@ export const DEFAULTS = {
     customRules: []                   // the owner's own rules, added after the built-in ones
   },
   social: { webhook: '', webhookHost: '', defaultPlatforms: ['instagram'], defaultHashtags: [], signature: '', lastTest: null },   // webhook is stored encrypted
+  email: { fromName: '', signature: '' },   // Content > Emails: the sender name and the sign-off on every email (empty = the site name)
   reports: { daily: false, weekly: true, email: '' },
   visitors: { retentionDays: 365 },   // visits older than this are deleted daily (0 = keep forever)
   deliveryEmails: {},                 // per product: { <product id>: { subject, note, attachments: [{ name, path, bytes }] } } (Products > Delivery email)

@@ -56,7 +56,7 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
       <div className="studio">
         <div className="studio-panel">
           {!only && <div className="studio-nav" role="tablist" aria-label="Studio sections">
-            {([['identity', 'Colour'], ['type', 'Type'], ['notice', 'Announcements'], ['nav', 'Nav & downloads'], ['social', 'Links'], ['elements', 'Elements'], ['arrange', 'Arrange'], ['pass', 'Checkout pass'], ['intro', 'Intro']] as [Section, string][]).map(([k, l]) => (
+            {([['identity', 'Colours & logo'], ['type', 'Fonts'], ['notice', 'Announcements'], ['nav', 'Menu & features'], ['social', 'Social links'], ['elements', 'Text styles'], ['arrange', 'Layout'], ['pass', 'Checkout pass'], ['intro', 'Intro']] as [Section, string][]).map(([k, l]) => (
               <button key={k} type="button" role="tab" aria-selected={section === k} className={section === k ? 'on' : ''} onClick={() => setSection(k)}>{l}</button>
             ))}
           </div>}
@@ -87,10 +87,7 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
 
             {section === 'notice' && <AnnouncementForm />}
             {section === 'nav' && <>
-              <div className="stack"><div className="eyebrow">Navigation</div>
-                <Switch checked={d.visibility.navGallery} onChange={v => updateSite(x => ({ ...x, visibility: { ...x.visibility, navGallery: v } }))} label="Show the gallery in the nav" />
-                <Switch checked={d.visibility.navAbout} onChange={v => updateSite(x => ({ ...x, visibility: { ...x.visibility, navAbout: v } }))} label="Show About in the nav" />
-              </div>
+              <FeatureSwitches doc={d} />
               <div className="stack"><div className="eyebrow">Image protection</div>
                 <Switch checked={d.visibility.protectImages !== false} onChange={v => updateSite(x => ({ ...x, visibility: { ...x.visibility, protectImages: v } }))} label="Protect my images" />
                 <p className="field-hint">Covers the gallery, portfolio, store and poster viewer only; the rest of the site records and screenshots normally.
@@ -157,6 +154,24 @@ function annStatus(a: AnnouncementItem): [string, 'success' | 'info' | 'neutral'
   if (a.endsAt && Date.parse(a.endsAt) <= now) return ['Ended', 'neutral'];
   return ['Live', 'success'];
 }
+// Studio > Menu & features: every page in the top bar, every item in the ☰ menu, and the panda, each a simple switch
+function FeatureSwitches({ doc }: { doc: SiteDoc }){
+  const v = doc.visibility as Record<string, unknown>;
+  const sw = (key: string, label: string, hint?: string) => <Switch key={key} checked={v[key] !== false} onChange={on => updateSite(x => ({ ...x, visibility: { ...x.visibility, [key]: on } }))} label={hint ? <>{label} <span className="faint">· {hint}</span></> : label} />;
+  return <>
+    <div className="stack"><div className="eyebrow">Pages in the top bar</div>
+      <div className="feature-grid">{sw('navAbout', 'About', 'with the Portfolio')}{sw('navContact', 'Contact')}{sw('navStore', 'Store')}{sw('navTypography', 'Typography studio')}</div>
+    </div>
+    <div className="stack"><div className="eyebrow">Items in the ☰ menu</div>
+      <div className="feature-grid">{sw('menuPortfolio', 'Portfolio')}{sw('menuTips', 'Tips')}{sw('menuUpscaler', 'Image Upscaler')}{sw('menuDemix', 'Demix Pro')}{sw('menuFullscreen', 'Full screen')}{sw('menuSound', 'Sound on / off')}</div>
+    </div>
+    <div className="stack"><div className="eyebrow">The panda</div>
+      {sw('panda', 'Show the 3D panda by the chat button', 'it also naps on the board while the store is closed')}
+      <p className="field-hint" style={{ margin: 0 }}>The chat itself is switched on or off in KA Assistant › Rules & settings.</p>
+    </div>
+  </>;
+}
+
 function AnnouncementForm(){
   const { doc } = useSite();
   const [open, setOpen] = useState<string | null>(null);

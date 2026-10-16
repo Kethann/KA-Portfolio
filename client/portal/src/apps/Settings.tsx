@@ -10,20 +10,22 @@ import { Icon } from '../icons';
 import { ago, bytes, dateTime } from '../format';
 import { qrMatrix, qrPath } from '../qr';
 import StoreStatusPanel from './StoreStatus';
+import { CONTROL_GROUPS, searchControls } from './controlIndex';
 
-type Sec = 'security' | 'team' | 'storestatus' | 'store' | 'messages' | 'reports' | 'categories' | 'system' | 'backups' | 'audit' | 'appearance';
+type Sec = 'home' | 'security' | 'team' | 'storestatus' | 'store' | 'messages' | 'reports' | 'categories' | 'system' | 'backups' | 'audit' | 'appearance';
 // grouped by what they belong to; the group name shows above its first section
 const SECTIONS: [Sec, string, string, string][] = [
+  ['home', 'Control Center', 'search', 'Start'],
   ['security', 'Account & security', 'shield', 'Account'], ['team', 'Team', 'visitors', 'Account'], ['appearance', 'Appearance', 'studio', 'Account'],
   ['storestatus', 'Store status & access', 'lock', 'Store'], ['store', 'Payments & tax', 'products', 'Store'], ['categories', 'Categories', 'tag', 'Store'],
   ['messages', 'Messages & contact form', 'messages', 'People'], ['reports', 'Email reports', 'reports', 'People'],
   ['system', 'System status', 'info', 'System'], ['backups', 'Backups', 'archive', 'System'], ['audit', 'Activity log', 'list', 'System']];
 
-export default function Settings({ route, go }: AppProps){
+export default function Settings({ route, go, open }: AppProps){
   const me = useLoad<{ role: 'owner' | 'admin' }>('/account');
   const isOwner = me.data?.role === 'owner';
   const sections = SECTIONS.filter(s => s[0] !== 'team' || isOwner);   // only owners manage the team
-  const sec: Sec = sections.some(s => s[0] === route) ? route as Sec : 'security';
+  const sec: Sec = sections.some(s => s[0] === route) ? route as Sec : 'home';
   return (
     <div className="content-split">
       <nav className="folder-nav" aria-label="Settings sections">
@@ -32,11 +34,34 @@ export default function Settings({ route, go }: AppProps){
           <button type="button" className={'folder-btn' + (k === sec ? ' on' : '')} aria-current={k === sec || undefined} onClick={() => go(k)}><Icon name={ic} size={14} /><span className="grow truncate">{l}</span></button></div>)}
       </nav>
       <div className="app-main"><div style={{ maxWidth: 820, width: '100%' }} className="stack-lg">
-        {sec === 'security' ? <Security /> : sec === 'team' ? <Team /> : sec === 'storestatus' ? <StoreStatusPanel /> : sec === 'store' ? <StoreSettings go={go} /> : sec === 'messages' ? <MessageSettings /> : sec === 'reports' ? <ReportSettings />
+        {sec === 'home' ? <ControlCenter open={(app, r) => app === 'settings' ? go(r || '') : open(app, r)} /> : sec === 'security' ? <Security /> : sec === 'team' ? <Team /> : sec === 'storestatus' ? <StoreStatusPanel /> : sec === 'store' ? <StoreSettings go={go} /> : sec === 'messages' ? <MessageSettings /> : sec === 'reports' ? <ReportSettings />
           : sec === 'categories' ? <Categories /> : sec === 'system' ? <System /> : sec === 'backups' ? <Backups /> : sec === 'audit' ? <Audit /> : <Appearance />}
       </div></div>
     </div>
   );
+}
+
+// Control Center: every setting in the portal in one place, in plain words, grouped by what it is for; search finds
+// anything ("logo", "gst", "panda", "close store") and one click opens the exact screen.
+function ControlCenter({ open }: { open: (app: string, route?: string) => void }){
+  const [q, setQ] = useState('');
+  const found = searchControls(q);
+  return <>
+    <section className="cc-hero">
+      <h2>What would you like to change?</h2>
+      <p className="muted">Every setting in your portal, in one place. Search, or pick from the groups below.</p>
+      <SearchBox value={q} onChange={setQ} placeholder="Try “logo”, “close store”, “gst”, “announcement”, “panda”…" label="Search all settings" />
+    </section>
+    {CONTROL_GROUPS.map(g => { const items = found.filter(c => c.group === g.id); if (!items.length) return null; return (
+      <section key={g.id} className="cc-group">
+        <div className="cc-group-head"><Icon name={g.icon} size={15} /><h3>{g.id}</h3><span className="faint">{g.blurb}</span></div>
+        <div className="cc-grid">{items.map(c => (
+          <button key={c.title} type="button" className="cc-item" onClick={() => open(c.app, c.route)}>
+            <b>{c.title}</b><span>{c.desc}</span><i aria-hidden="true">Open ›</i>
+          </button>))}</div>
+      </section>); })}
+    {!found.length && <Empty icon="search" title="Nothing matches">Try another word, like “price”, “email” or “colour”.</Empty>}
+  </>;
 }
 
 function Section({ title, children, desc }: { title: string; children: ReactNode; desc?: ReactNode }){

@@ -206,6 +206,19 @@ select option:checked, select option:hover{ background:#ff9438; color:#1a0f05; }
 .fx-stage{ position:absolute; inset:0; z-index:2; display:grid; place-items:center; overflow:hidden; background:var(--fx-bg, #140b10);
   --fx-text:#f6ebe6; --fx-a1:#e2557a; --fx-a2:#7fb88f; --fx-stroke:#2b141d; --fx-glow:#ff9ab3; }
 .fx-stage[hidden]{ display:none !important; }
+/* a chosen frame size: the stage keeps that shape, with a dark matte around it and the size in a corner */
+.fx-stage.is-framed{ border-radius:10px; box-shadow:0 0 0 1px rgba(255,255,255,.16), 0 0 0 100vmax #08070a, 0 24px 70px rgba(0,0,0,.6); }
+.fx-stage.is-framed::after{ content:attr(data-frame); position:absolute; left:10px; top:10px; z-index:6; padding:3px 8px; border-radius:999px; font:600 11px/1.4 system-ui, sans-serif; color:rgba(255,255,255,.82); background:rgba(0,0,0,.42); pointer-events:none; }
+.fx-place-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.fx-place-row > span{ color:var(--ink); font-size:13px; }
+.fx-place{ display:grid; grid-template-columns:repeat(3, 30px); gap:4px; padding:4px; border-radius:10px; background:rgba(0,0,0,.3); border:1px solid var(--line2); }
+.fx-place button{ width:30px; height:24px; display:grid; place-items:center; padding:0; border:0; border-radius:6px; background:transparent; cursor:pointer; }
+.fx-place button i{ width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,.3); transition:transform .15s ease, background .15s ease; }
+.fx-place button:hover i{ background:rgba(255,255,255,.65); }
+.fx-place button[aria-pressed="true"]{ background:rgba(255,255,255,.1); }
+.fx-place button[aria-pressed="true"] i{ background:var(--fx-a1, #e2557a); transform:scale(1.35); }
+.fx-export-note{ flex-basis:100%; color:var(--faint); font-size:12px; }
+.fx-export select[hidden]{ display:none; }
 .fx-text{ position:relative; z-index:2; color:var(--fx-text); text-align:center; line-height:1.12; padding:0 4vw; max-width:100%; user-select:none; -webkit-user-select:none; }
 .fx-line{ display:block; white-space:nowrap; }
 .fx-word{ display:inline-block; white-space:nowrap; }

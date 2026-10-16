@@ -52,7 +52,7 @@ export class GpuText {
   private atlasTex: WebGLTexture | null = null; private atlas: Atlas | null = null; private atlasKey = '';
   private fbo: WebGLFramebuffer | null = null; private maskTex: WebGLTexture | null = null; private maskW = 0; private maskH = 0;
   private s: GpuSetup | null = null; private raf = 0; private data = new Float32Array(0);
-  private cam = { x: 0, y: 0 }; private t0 = performance.now(); private quality = 1; private last = 0; private slow = 0;
+  private cam = { x: 0, y: 0 }; private t0 = performance.now(); private quality = 1; private last = 0; private slow = 0; private changedAt = 0;
   private strike = { next: 0, start: -10, pts: [] as number[], rng: seeded(1) };
   private box = { x0: 0, y0: 0, x1: 1, y1: 1 };
   /** where each drawn letter's top is this frame (lightning aims at it) */
@@ -134,7 +134,16 @@ export class GpuText {
 
   private frame = (now: number) => {
     this.raf = 0; if (!this.s || document.hidden || this.canvas.hidden) return;
-    if (this.last){ const dt = now - this.last; if (dt > 28){ if (++this.slow > 24 && this.quality > 0.6){ this.quality = Math.max(0.6, this.quality - 0.1); this.slow = 0; } } else { this.slow = Math.max(0, this.slow - 1); if (dt < 18 && this.quality < 1) this.quality = Math.min(1, this.quality + 0.002); } }
+    // resolution adapts in a few fixed steps, at most every 2.5 s (changing it every frame resized the canvas constantly and flickered)
+    if (this.last){
+      const dt = now - this.last, steps = [1, 0.85, 0.7, 0.6];
+      if (dt > 28) this.slow++; else if (dt < 18) this.slow = Math.max(-60, this.slow - 1);
+      if (now - this.changedAt > 2500){
+        let at = steps.findIndex(v => Math.abs(v - this.quality) < 0.01); if (at < 0) at = 0;
+        if (this.slow > 24 && at < steps.length - 1){ this.quality = steps[at + 1]; this.slow = 0; this.changedAt = now; }
+        else if (this.slow <= -60 && at > 0){ this.quality = steps[at - 1]; this.slow = 0; this.changedAt = now; }
+      }
+    }
     this.last = now;
     this.draw();
     this.raf = requestAnimationFrame(this.frame);

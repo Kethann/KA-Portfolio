@@ -97,7 +97,7 @@ export const SHADERS: Record<string, string> = {
     float ground = -0.36 + fbm3(vec2(p.x * 2.0, 5.0)) * 0.05;
     col = mix(col, vec3(0.72, 0.8, 0.95) * (0.75 + 0.25 * fbm(p * 8.0)), smoothstep(ground + 0.004, ground, p.y));   // snow on the ground
     col += vec3(0.6, 0.7, 0.9) * fbm(p * 1.5 + vec2(t * 0.02, 0.0)) * 0.12 * smoothstep(0.2, -0.4, p.y);   // low mist
-    col += flakes(p, 60.0, 0.05, 0.07, 0.02, t, 0.45) * 0.5;
+    col += flakes(p, 60.0, 0.05, 0.1, 0.07, t, 0.45) * 0.42;   // the far flakes are softer and a touch bigger, so they never sparkle as they move
     col += flakes(p + 3.0, 28.0, 0.08, 0.07, 0.04, t, 0.22) * 0.7 * (0.5 + uI);
     col += flakes(p + 7.0, 11.0, 0.13, 0.06, 0.09, t, 0.06) * 0.5 * (0.4 + uI);
     return col;
@@ -339,15 +339,6 @@ export const SHADERS: Record<string, string> = {
     float smoke = fbm(p * 2.0 + vec2(t * 0.04, -t * 0.03) + fbm(p * 3.0 + t * 0.02));
     col += mix(uText, uGlow, 0.5) * smoothstep(0.45, 0.9, smoke) * 0.12;
     return col * (1.0 - 0.45 * length(p));
-  }`,
-  lava: `vec3 scene(vec2 uv, vec2 p){
-    float t = uTime * 0.15;
-    vec2 q = p * 2.2 + vec2(fbm(p * 2.0 + t), fbm(p * 2.0 - t + 3.0));
-    float n = fbm(q + t * 0.5);
-    float crack = smoothstep(0.06, 0.0, abs(n - 0.5));
-    vec3 crust = mix(vec3(0.05, 0.02, 0.015), vec3(0.16, 0.07, 0.04), fbm(q * 3.0));
-    vec3 hot = mix(uA1, vec3(1.0, 0.85, 0.4), crack);
-    return mix(crust, hot, clamp(crack * (0.7 + uI) + smoothstep(0.62, 0.85, n) * 0.5, 0.0, 1.0));
   }`,
   golddust: `vec3 scene(vec2 uv, vec2 p){
     float t = uTime;

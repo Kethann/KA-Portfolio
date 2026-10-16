@@ -71,3 +71,20 @@ test('the heartbeat is a real P-QRS-T beat: small P, tall narrow R, dip below th
   assert.ok(Math.abs(at(0.9)) < 0.01 && Math.abs(at(0.02)) < 0.01, 'flat between beats');
   assert.ok(Math.abs(at(1.31) - at(0.31)) < 1e-9, 'repeats every beat');
 });
+
+test('Control Center: every setting opens an app and section that really exist', () => {
+  const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+  const idx = read('../client/portal/src/apps/controlIndex.ts'), registry = read('../client/portal/src/apps/registry.ts');
+  const apps = new Set([...registry.matchAll(/\{ id: '([a-z]+)', section:/g)].map(m => m[1]));
+  const routes = {
+    settings: [...read('../client/portal/src/apps/Settings.tsx').matchAll(/\['([a-z]+)', '[^']+', '[a-z]+', '[A-Za-z &]+'\]/g)].map(m => m[1]),
+    studio: (/const SECTIONS: Section\[\] = \[([^\]]+)\]/.exec(read('../client/portal/src/apps/Studio.tsx'))[1].match(/'([a-z]+)'/g) || []).map(s => s.slice(1, -1)),
+    content: ['portfolio', 'featured', 'text', 'upscaler', 'emails'], assistant: ['knowledge', 'repeats', 'logs', 'playground', 'settings'], visitors: ['live', 'log']
+  };
+  const entries = [...idx.matchAll(/title: '([^']+)'[^}]*?app: '([a-z]+)'(?:, route: '([a-z]+)')?/g)];
+  assert.ok(entries.length >= 40, 'the index lists the settings');
+  for (const [, title, app, route] of entries){
+    assert.ok(apps.has(app), `${title}: app ${app}`);
+    if (route) assert.ok((routes[app] || []).includes(route), `${title}: ${app}/${route}`);
+  }
+});

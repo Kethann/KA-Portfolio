@@ -23,7 +23,21 @@ import { PALETTES } from './effects/palettes';
 import { newSeed } from './effects/rng';
 
 export interface StudioOptions { returnFocus?: HTMLElement | null }
-const fxState: Composition & { theme: string } = { theme: 'garden', text: 'Bloom where\nyou are planted', font: "'Playfair Display', serif", typing: 'typewriter', decoration: 'floral', caret: 'bar', palette: 'rose-noir', seed: newSeed(), speed: 1, density: 0.6, params: { typo: true, pen: false },
+/** frame sizes for the text effect: the stage takes the shape, the words and background re-fit, and downloads come out at that exact size */
+const FX_FRAMES: { id: string; name: string; w: number; h: number }[] = [
+  { id: 'fill', name: 'Fit my screen', w: 0, h: 0 },
+  { id: 'story', name: 'Phone story / Reel · 9:16', w: 1080, h: 1920 },
+  { id: 'iphone', name: 'iPhone wallpaper', w: 1179, h: 2556 },
+  { id: 'android', name: 'Android wallpaper', w: 1440, h: 3200 },
+  { id: 'post', name: 'Instagram post · 4:5', w: 1080, h: 1350 },
+  { id: 'square', name: 'Square · 1:1', w: 1080, h: 1080 },
+  { id: 'tablet', name: 'iPad / tablet · 3:4', w: 1640, h: 2360 },
+  { id: 'hd', name: 'YouTube / HD · 16:9', w: 1920, h: 1080 },
+  { id: 'laptop', name: 'Laptop wallpaper · 16:10', w: 2560, h: 1600 },
+  { id: '4k', name: '4K desktop · 16:9', w: 3840, h: 2160 },
+  { id: 'cinema', name: 'Cinema · 21:9', w: 2560, h: 1080 },
+];
+const fxState: Composition & { theme: string; frame: string } = { theme: 'garden', frame: 'fill', offsetX: 0, offsetY: 0,text: 'Bloom where\nyou are planted', font: "'Playfair Display', serif", typing: 'typewriter', decoration: 'floral', caret: 'bar', palette: 'rose-noir', seed: newSeed(), speed: 1, density: 0.6, params: { typo: true, pen: false },
   scene: 'glow', sceneIntensity: 0.6, sceneSpeed: 1, finish: 'none', finishAmount: 0.6, fill: 'solid', glow: 0, textCase: 'as-typed', tracking: 0, decoSize: 1, colors: {}, depth: 0.6, light: 225, camera: 'drift', look: '2d' };
 let fxTextEdited = false;   // once you type your own words, themes stop replacing them with their sample
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -682,7 +696,8 @@ class Studio {
         case 'fx-regen': fxState.seed = newSeed(); this.fxCompose(); break;
         case 'fx-replay': this.fx?.replay(); break;
         case 'fx-close': this.closeFx(); break;
-        case 'fx-download': void this.exportFx(); break;
+        case 'fx-download': if ((this.$('[name="fxFormat"]') as HTMLSelectElement).value === 'video') void this.exportFxVideo(); else void this.exportFx(); break;
+        case 'fx-place': fxState.offsetX = Number(t.dataset.x) || 0; fxState.offsetY = Number(t.dataset.y) || 0; this.fxSyncInputs(); this.fxCompose(); break;
         case 'undo': this.undoAct(); break;
         case 'redo': this.redoAct(); break;
         case 'replay': this.replay ? this.endReplay() : this.startReplay(); break;
@@ -762,6 +777,8 @@ class Studio {
     if (name === 'fxLight') return Math.round(v) + '°';
     if (name === 'fxTracking') return v.toFixed(2) + ' em';
     if (name === 'fxSpeed') return v.toFixed(1) + '×';
+    if (name === 'fxOffX') return v === 0 ? 'Centre' : `${Math.abs(Math.round(v))}% ${v < 0 ? 'left' : 'right'}`;
+    if (name === 'fxOffY') return v === 0 ? 'Middle' : `${Math.abs(Math.round(v))}% ${v < 0 ? 'up' : 'down'}`;
     if (name === 'lifetime') return v <= 0 ? 'Permanent' : `${v.toFixed(1)} s`;
     if (name === 'flow' || name === 'wobble') return v.toFixed(1) + '×';
     if (name === 'inDur' || name === 'outDur' || name === 'hold') return v.toFixed(1) + ' s';
@@ -809,6 +826,13 @@ class Studio {
       case 'fxC_bg': case 'fxC_text': case 'fxC_accent1': case 'fxC_accent2': case 'fxC_glow':
         fxState.colors = { ...fxState.colors, [name.slice(4)]: el.value };
         clearTimeout(this.fxTimer); this.fxTimer = window.setTimeout(() => this.fxCompose(), 250); return;
+      case 'fxFrame': fxState.frame = el.value; this.fxSync(); this.fxLayout(); return;
+      case 'fxOffX': case 'fxOffY': {
+        if (name === 'fxOffX') fxState.offsetX = num; else fxState.offsetY = num;
+        const out = this.root.querySelector(`output[for="${name}"]`); if (out) out.textContent = this.fmt(name, num);
+        this.fxSync(); clearTimeout(this.fxTimer); this.fxTimer = window.setTimeout(() => this.fxCompose(), 200); return;
+      }
+      case 'fxFormat': this.fxSync(); return;
       case 'fxCaret': fxState.caret = el.value as Composition['caret']; this.fxCompose(); return;
       case 'fxTypo': fxState.params = { ...fxState.params, typo: el.checked }; this.fxCompose(); return;
       case 'fxPen': fxState.params = { ...fxState.params, pen: el.checked }; this.fxCompose(); return;
@@ -860,7 +884,7 @@ class Studio {
   }
   openPanel: string | null = null;
   // ---- Text effects: a composer on top of the studio's text (typing + decoration + palette), exported as a still
-  fx: EffectController | null = null; fxOn = false; fxTimer = 0;
+  fx: EffectController | null = null; fxOn = false; fxTimer = 0; fxRecording = false;
   fxCompose(){ if (!this.fx) return; void this.fx.compose({ ...fxState }); this.fxSync(); }
   /** scene and finish changes apply at once, without restarting the words */
   fxLive(){
@@ -886,6 +910,7 @@ class Studio {
     set('fxDepth', fxState.depth ?? 0.6); set('fxLight', fxState.light ?? 225); set('fxCamera', fxState.camera || 'drift'); set('fxCase', fxState.textCase || 'as-typed'); set('fxCaret', fxState.caret);
     set('fxTracking', fxState.tracking ?? 0); set('fxGlow', fxState.glow ?? 0); set('fxSpeed', fxState.speed); set('fxDensity', fxState.density); set('fxDecoSize', fxState.decoSize ?? 1);
     set('fxScene', fxState.scene || 'plain'); set('fxFinish', fxState.finish || 'none'); set('fxSceneI', fxState.sceneIntensity ?? 0.6); set('fxSceneS', fxState.sceneSpeed ?? 1); set('fxFinishA', fxState.finishAmount ?? 0.6);
+    set('fxFrame', fxState.frame); set('fxOffX', fxState.offsetX ?? 0); set('fxOffY', fxState.offsetY ?? 0);
   }
   fxSync(){
     const r = this.root;
@@ -908,6 +933,14 @@ class Studio {
     r.querySelectorAll<HTMLElement>('.fx-pen-row').forEach(n => { n.hidden = fxState.typing !== 'handwriting'; });   // the pen only belongs to Real handwriting
     const penBox = r.querySelector<HTMLInputElement>('[name="fxPen"]'); if (penBox) penBox.checked = fxState.params?.pen === true;   // caret and typo only apply to the typewriter
     const m3 = MATERIALS.find(m => m.id === (LEGACY_FILL[fxState.fill || 'solid'] || fxState.fill))?.shaded; r.querySelectorAll<HTMLElement>('.fx-3d').forEach(n => { n.hidden = !m3; });
+    // frame and placement: the summary, the pressed spot on the grid, and what the download will be
+    const fr = FX_FRAMES.find(f => f.id === fxState.frame) || FX_FRAMES[0], ox = fxState.offsetX ?? 0, oy = fxState.offsetY ?? 0;
+    sum('frame', fr.w ? `${fr.w}×${fr.h}` : 'Screen');
+    r.querySelectorAll<HTMLElement>('[data-act="fx-place"]').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.x) === ox && Number(b.dataset.y) === oy)));
+    const fmt = (r.querySelector('[name="fxFormat"]') as HTMLSelectElement | null)?.value || 'png', sizeSel = r.querySelector<HTMLElement>('[name="fxSize"]');
+    if (sizeSel) sizeSel.hidden = !!fr.w;   // a chosen frame sets the exact size
+    const note = r.querySelector('.fx-export-note');
+    if (note) note.textContent = (fr.w ? `${fr.w}×${fr.h} px` : 'Your screen’s shape') + (fmt === 'video' ? ` · one full loop, ${this.videoType()?.includes('mp4') ? 'MP4' : 'WebM'} video` : '');
   }
   /** how many sections start open: everything on a laptop, the first two on a tablet, only Themes on a phone */
   fxSections(){
@@ -927,17 +960,34 @@ class Studio {
   fxLayout(){
     const stage = this.$('.fx-stage'), panel = this.$('.panel[data-panel="fx"]'), wrap = this.$('.toolbar-wrap');
     const compact = this.$('.studio').classList.contains('is-compact');
-    stage.style.right = ''; stage.style.bottom = ''; stage.style.top = '';
-    if (panel.hidden) return;
+    stage.style.right = ''; stage.style.bottom = ''; stage.style.top = ''; stage.style.left = '';
+    const framed = !!FX_FRAMES.find(f => f.id === fxState.frame)?.w;
+    if (panel.hidden){ if (this.fxFrame() || framed) this.fxCompose(); return; }
     if (compact){
       const wr = wrap.getBoundingClientRect(), tb = this.$('.topbar').getBoundingClientRect();
       if (tb.height) stage.style.top = Math.round(tb.bottom + 6) + 'px';   // below undo / Hide / close
       panel.style.setProperty('--fxb', Math.max(0, window.innerHeight - wr.top + 8) + 'px');
-      requestAnimationFrame(() => { const pr = panel.getBoundingClientRect(); stage.style.bottom = Math.max(0, window.innerHeight - pr.top + 4) + 'px'; this.fxCompose(); });
+      requestAnimationFrame(() => { const pr = panel.getBoundingClientRect(); stage.style.bottom = Math.max(0, window.innerHeight - pr.top + 4) + 'px'; this.fxFrame(); this.fxCompose(); });
     } else {
       stage.style.right = (panel.getBoundingClientRect().width + 32) + 'px';
+      this.fxFrame();
       this.fxCompose();
     }
+  }
+  /** a chosen frame (phone, post, 4K…): the stage shrinks to that shape, centred in the room it has, with a dark matte around it */
+  fxFrame(){
+    const stage = this.$('.fx-stage'), fr = FX_FRAMES.find(f => f.id === fxState.frame);
+    const was = stage.classList.contains('is-framed');
+    stage.classList.toggle('is-framed', !!fr?.w);
+    if (!fr?.w){ stage.removeAttribute('data-frame'); return was; }
+    const host = (stage.offsetParent as HTMLElement | null) || stage.parentElement!, hr = host.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+    const pad = 14, aw = Math.max(40, sr.width - pad * 2), ah = Math.max(40, sr.height - pad * 2);
+    const k = Math.min(aw / fr.w, ah / fr.h), w = Math.round(fr.w * k), h = Math.round(fr.h * k);
+    const left = sr.left - hr.left + (sr.width - w) / 2, top = sr.top - hr.top + (sr.height - h) / 2;
+    stage.style.left = Math.round(left) + 'px'; stage.style.top = Math.round(top) + 'px';
+    stage.style.right = Math.round(hr.width - left - w) + 'px'; stage.style.bottom = Math.round(hr.height - top - h) + 'px';
+    stage.dataset.frame = `${fr.name.split(' · ')[0]} · ${fr.w}×${fr.h}`;
+    return true;
   }
   closeFx(){ this.fxOn = false; this.fx?.stop(); this.$('.fx-stage').hidden = true; this.closePanels(); }
   /** a full-resolution still of the composed piece: PNG (with or without background) or SVG */
@@ -970,12 +1020,14 @@ class Studio {
         const grad = stops ? `<defs><linearGradient id="${gid}" gradientUnits="userSpaceOnUse" ${stops.angle === 'h' ? `x1="${bx0}" y1="0" x2="${bx1}" y2="0"` : stops.angle === 'v-up' ? `x1="0" y1="${by1}" x2="0" y2="${by0}"` : `x1="0" y1="${by0}" x2="0" y2="${by1}"`}>${stops.stops.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join('')}</linearGradient></defs>` : '';
         const paint = outline ? `fill="none" stroke="${strokeCol}" stroke-width="${Math.max(1.5, px * 0.03).toFixed(1)}"` : `fill="${stops ? `url(#${gid})` : pal.text}"`;
         const scene = layerUrl(x => ctrl.scene.paint(x, t)), fin = (fxState.finish || 'none') !== 'none' ? layerUrl(x => paintFinish(x, fxState.finish!, W, H, fxState.finishAmount ?? 0.6, pal, t)) : '';
-        const doc = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><style>@import url('${googleFontsUrl([fam.split(',')[0].replace(/['"]/g, '').trim()]).replace(/&/g, '&amp;')}');</style>${grad}<image href="${scene}" width="${W}" height="${H}"/>${svgText.replace(/^<svg[^>]*>|<\/svg>$/g, '')}<g font-family="${fam}" font-size="${px}" letter-spacing="${ls === 'normal' ? 0 : ls}" ${paint}>${texts}</g>${arts}${fin ? `<image href="${fin}" width="${W}" height="${H}"/>` : ''}</svg>`;
+        const fr = FX_FRAMES.find(f => f.id === fxState.frame), ow = fr?.w || W, oh = fr?.w ? fr.h : H;
+        const doc = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${ow}" height="${oh}" viewBox="0 0 ${W} ${H}"><style>@import url('${googleFontsUrl([fam.split(',')[0].replace(/['"]/g, '').trim()]).replace(/&/g, '&amp;')}');</style>${grad}<image href="${scene}" width="${W}" height="${H}"/>${svgText.replace(/^<svg[^>]*>|<\/svg>$/g, '')}<g font-family="${fam}" font-size="${px}" letter-spacing="${ls === 'normal' ? 0 : ls}" ${paint}>${texts}</g>${arts}${fin ? `<image href="${fin}" width="${W}" height="${H}"/>` : ''}</svg>`;
         this.download(new Blob([doc], { type: 'image/svg+xml' }), `ka-text-effect-${stamp()}.svg`);
       } else {
-        const scale = size === '4k' ? 3840 / W : size === '2x' ? 2 : Math.max(1, window.devicePixelRatio || 1);
-        const c = document.createElement('canvas'); c.width = Math.round(W * scale); c.height = Math.round(H * scale);
-        const x = c.getContext('2d')!; x.scale(scale, scale);
+        const fr = FX_FRAMES.find(f => f.id === fxState.frame);
+        const scale = fr?.w ? fr.w / W : size === '4k' ? 3840 / W : size === '2x' ? 2 : Math.max(1, window.devicePixelRatio || 1);
+        const c = document.createElement('canvas'); c.width = fr?.w || Math.round(W * scale); c.height = fr?.w ? fr.h : Math.round(H * scale);
+        const x = c.getContext('2d')!; x.scale(c.width / W, c.height / H);
         if (withBg){ x.fillStyle = pal.bg; x.fillRect(0, 0, W, H); ctrl.scene.paint(x, t); }
         const img = new Image(); const url = URL.createObjectURL(new Blob([svgText.replace('<svg', `<svg width="${W}" height="${H}"`)], { type: 'image/svg+xml' }));
         await new Promise<void>(res => { img.onload = () => res(); img.onerror = () => res(); img.src = url; });
@@ -997,6 +1049,112 @@ class Studio {
       }
       this.toast('Downloaded');
     } finally { ctrl.flat(false); if (playing) tl.play(); }
+  }
+  /** one full loop of the text effect as a video (MP4 where the browser can, otherwise WebM), at the frame's size:
+   *  every frame is drawn from the live stage — background, decorations, each letter as it animates, the 3D/elements layer and the finish */
+  async exportFxVideo(){
+    const ctrl = this.fx; if (!ctrl || !ctrl.tl || this.fxRecording) return;
+    const type = this.videoType();
+    if (!type){ this.toast('Video export isn’t supported in this browser. Try Chrome, Edge or Firefox, or download an image.'); return; }
+    const tl = ctrl.tl, stage = ctrl.stage, sr0 = stage.getBoundingClientRect(), W = sr0.width, H = sr0.height;
+    const fr = FX_FRAMES.find(f => f.id === fxState.frame), size = (this.$('[name="fxSize"]') as HTMLSelectElement).value;
+    // the output size: the frame's pixels, or the screen's shape at the chosen sharpness; even numbers, at most 3840 on the long side
+    let ow = fr?.w || W * (size === '4k' ? 3840 / W : size === '2x' ? 2 : Math.max(1, window.devicePixelRatio || 1)), oh = fr?.w ? fr.h : ow * H / W;
+    const cap = Math.min(1, 3840 / Math.max(ow, oh)); ow = Math.round(ow * cap / 2) * 2; oh = Math.round(oh * cap / 2) * 2;
+    const scale = ow / W;
+    const c = document.createElement('canvas'); c.width = ow; c.height = oh;
+    const x = c.getContext('2d')!;
+    const pal = ctrl.palette || PALETTES[0], fill = fxState.fill || 'solid', stops = fillStops(fill, pal);
+    const glow = fill === 'outline-glow' ? Math.max(0.6, fxState.glow ?? 0) : (fxState.glow ?? 0), outline = fill === 'outline' || fill === 'outline-glow', strokeCol = fill === 'outline' ? pal.text : pal.accent1;
+    const gpuOn = !ctrl.gpu.canvas.hidden, gpuLetters = gpuOn && isShaded(fill) && fxState.look !== '2d', finish = fxState.finish || 'none';
+    const charEls = Array.from(ctrl.textEl.querySelectorAll<HTMLElement>('.fx-char'));
+    // decorations are SVG drawn by the timeline: re-rendered as an image whenever the previous one is ready
+    let deco: HTMLImageElement | null = null, decoBusy = false;
+    const refreshDeco = () => {
+      if (decoBusy) return; decoBusy = true;
+      const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(ctrl.svg).replace('<svg', `<svg width="${W}" height="${H}"`)], { type: 'image/svg+xml' }));
+      const img = new Image(); img.onload = () => { deco = img; decoBusy = false; URL.revokeObjectURL(url); }; img.onerror = () => { decoBusy = false; URL.revokeObjectURL(url); }; img.src = url;
+    };
+    const opacityOf = (el: Element | null) => { let o = 1; for (let n = el; n && n !== stage; n = n.parentElement) o *= parseFloat(getComputedStyle(n).opacity || '1'); return o; };
+    const drawFrame = () => {
+      const sr = stage.getBoundingClientRect(), t = ctrl.scene.time();
+      x.setTransform(ow / W, 0, 0, oh / H, 0, 0);
+      x.globalAlpha = 1; x.fillStyle = pal.bg; x.fillRect(0, 0, W, H);
+      ctrl.scene.paint(x, t);
+      const so = opacityOf(ctrl.svg); if (deco && so > 0.01){ x.globalAlpha = so; try { x.drawImage(deco, 0, 0, W, H); } catch { /* not ready */ } x.globalAlpha = 1; }
+      refreshDeco();
+      if (!gpuLetters){
+        const base = getComputedStyle(ctrl.textEl), font = base.font, px = parseFloat(base.fontSize) || 64, to = opacityOf(ctrl.textEl);
+        if (stops){
+          let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+          for (const el of charEls){ const r = el.getBoundingClientRect(); if (!r.width) continue; bx0 = Math.min(bx0, r.left - sr.left); by0 = Math.min(by0, r.top - sr.top); bx1 = Math.max(bx1, r.right - sr.left); by1 = Math.max(by1, r.bottom - sr.top); }
+          const g = stops.angle === 'h' ? x.createLinearGradient(bx0, 0, bx1, 0) : stops.angle === 'v-up' ? x.createLinearGradient(0, by1, 0, by0) : x.createLinearGradient(0, by0, 0, by1);
+          for (const [o, col] of stops.stops) g.addColorStop(o, col); x.fillStyle = g;
+        } else x.fillStyle = pal.text;
+        x.strokeStyle = strokeCol; x.lineWidth = Math.max(1.5, px * 0.03); x.textBaseline = 'alphabetic';
+        const pass = (shadow: string, blur: number) => {
+          x.save(); if (blur){ x.shadowColor = shadow; x.shadowBlur = blur * scale; }
+          for (const el of charEls){
+            const cs = getComputedStyle(el), o = parseFloat(cs.opacity || '1') * to; if (o < 0.01 || cs.visibility === 'hidden') continue;
+            const r = el.getBoundingClientRect(), lh = el.offsetHeight || r.height; if (!r.width || !r.height) continue;
+            const ch = el.dataset.ch || el.textContent || '', k = r.height / Math.max(1, lh);   // a letter scaled by its animation
+            x.globalAlpha = o; x.font = Math.abs(k - 1) > 0.02 ? font.replace(/(\d+(?:\.\d+)?)px/, `${(px * k).toFixed(2)}px`) : font;
+            x.save();
+            // a letter being wiped in (clip-path: inset(...)) shows only its revealed part
+            const m = /inset\(([^)]*)\)/.exec(cs.clipPath || '');
+            if (m){ const v = m[1].split(/\s+/).filter(s => /^-?[\d.]/.test(s)).map(s => s.endsWith('%') ? (parseFloat(s) || 0) / 100 : (parseFloat(s) || 0) / Math.max(1, r.height)); const [it, ir = it, ib = it, il = ir] = v;
+              x.beginPath(); x.rect(r.left - sr.left + il * r.width, r.top - sr.top + it * r.height, r.width * (1 - il - ir), r.height * (1 - it - ib)); x.clip(); }
+            const bl = /blur\(([\d.]+)px\)/.exec(cs.filter || ''); if (bl) x.filter = `blur(${parseFloat(bl[1]) * scale}px)`;
+            const yy = r.top - sr.top + baselineIn(x, ch, r.height);
+            if (outline) x.strokeText(ch, r.left - sr.left, yy); else x.fillText(ch, r.left - sr.left, yy);
+            x.restore();
+          }
+          x.restore();
+        };
+        if (glow > 0){ pass(pal.glow, 6 + glow * 18); pass(pal.accent1, 18 + glow * 30); }
+        pass('', 0);
+        x.globalAlpha = 1;
+      }
+      // the typewriter caret
+      const cr = ctrl.caret.getBoundingClientRect(), co = opacityOf(ctrl.caret);
+      if (cr.width && co > 0.05 && getComputedStyle(ctrl.caret).display !== 'none'){ x.globalAlpha = co; x.fillStyle = pal.accent1; x.fillRect(cr.left - sr.left, cr.top - sr.top, cr.width, cr.height); x.globalAlpha = 1; }
+      if (gpuOn) ctrl.gpu.paintInto(x, W, H, scale);
+      if (finish !== 'none') paintFinish(x, finish, W, H, fxState.finishAmount ?? 0.6, pal, t);
+    };
+    this.fxRecording = true;
+    const btn = this.$('[data-act="fx-download"]') as HTMLButtonElement; btn.disabled = true;
+    const bar = this.$('.progress'), barFill = this.$('.progress i');
+    bar.hidden = false; this.$('.progress-label').textContent = 'Recording video…';
+    ctrl.flat(true);
+    const len = Math.min(30, Math.max(2, tl.duration()));
+    const stream = c.captureStream(30);
+    const rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: Math.round(Math.min(24, Math.max(8, ow * oh / 1e5)) * 1e6) });
+    const chunks: Blob[] = [];
+    rec.ondataavailable = (ev) => { if (ev.data.size) chunks.push(ev.data); };
+    try {
+      refreshDeco(); drawFrame();
+      tl.play(0);
+      const t0 = performance.now();
+      await new Promise<void>((resolve) => {
+        rec.onstop = () => resolve();
+        rec.start(250);
+        const tick = () => {
+          const el = (performance.now() - t0) / 1000;
+          drawFrame();
+          barFill.style.width = Math.min(100, el / len * 100).toFixed(1) + '%';
+          if (el >= len || !this.fxOn){ rec.stop(); return; }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+      const blob = new Blob(chunks, { type: type.split(';')[0] });
+      if (blob.size) this.download(blob, `ka-text-effect-${stamp()}-${ow}x${oh}.${type.includes('mp4') ? 'mp4' : 'webm'}`);
+      this.toast(blob.size ? 'Video downloaded' : 'The video came out empty — try a smaller size.');
+    } finally {
+      stream.getTracks().forEach(tr => tr.stop());
+      bar.hidden = true; barFill.style.width = '0%';
+      btn.disabled = false; this.fxRecording = false; ctrl.flat(false);
+    }
   }
   togglePanel(name: string, trigger: HTMLElement){
     const was = this.openPanel === name;
@@ -1172,10 +1330,19 @@ const TEMPLATE = `
       <button type="button" class="fx-btn" data-act="fx-close">Close effects</button>
       <span class="fx-seedbox">Seed <b class="fx-seed"></b></span>
     </div>
+    <section class="fx-sec" data-sec="frame"><button type="button" class="fx-sec-h" data-act="fx-sec" aria-expanded="true"><span>Frame size &amp; placement</span><small class="fx-sum" data-sum="frame"></small><i aria-hidden="true"></i></button><div class="fx-sec-b">
+      <label class="row"><span>Screen size</span><select name="fxFrame" aria-label="Frame size">${FX_FRAMES.map(f => `<option value="${f.id}">${esc(f.name)}${f.w ? ` (${f.w}×${f.h})` : ''}</option>`).join('')}</select></label>
+      <div class="fx-place-row"><span>Where the words sit</span>
+        <div class="fx-place" role="group" aria-label="Place the words">${[-30, 0, 30].map(y => [-30, 0, 30].map(xx => `<button type="button" data-act="fx-place" data-x="${xx}" data-y="${y}" aria-pressed="false" aria-label="${y < 0 ? 'Top' : y > 0 ? 'Bottom' : 'Middle'} ${xx < 0 ? 'left' : xx > 0 ? 'right' : 'centre'}"><i></i></button>`).join('')).join('')}</div>
+      </div>
+      <label class="row"><span>Left / right</span><input type="range" name="fxOffX" min="-40" max="40" step="1" value="0"><output for="fxOffX">Centre</output></label>
+      <label class="row"><span>Up / down</span><input type="range" name="fxOffY" min="-40" max="40" step="1" value="0"><output for="fxOffY">Middle</output></label>
+    </div></section>
     <div class="fx-actions fx-export">
-      <select name="fxFormat" aria-label="Download format"><option value="png">PNG</option><option value="png-t">PNG, transparent</option><option value="svg">SVG (vector)</option></select>
+      <select name="fxFormat" aria-label="Download format"><option value="png">PNG image</option><option value="png-t">PNG, transparent</option><option value="svg">SVG (vector)</option><option value="video">Video (MP4 / WebM)</option></select>
       <select name="fxSize" aria-label="Resolution"><option value="screen">Screen (sharp)</option><option value="2x">2×</option><option value="4k" selected>4K (3840 px wide)</option></select>
       <button type="button" class="primary" data-act="fx-download">Download</button>
+      <small class="fx-export-note"></small>
     </div>
   </div>
 <div class="toolbar-wrap">

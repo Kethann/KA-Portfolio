@@ -289,17 +289,6 @@ export const SCENES: Scene[] = [
     x.fillStyle = rgba(s.pal.accent1, 0.85); const by = s.h - 26;
     for (let i = 0; i < s.w; i += 8) x.fillRect(i, by + ((i / 8) % 2 ? 0 : 4), 8, 26);
   } },
-  // molten lava: dark crust with glowing cracks that slowly shift, and heat rising from below
-  { id: 'lava', name: 'Molten lava', group: 'Elements', init(s){ s.d.b = parts(s, 9); s.d.e = parts(s, count(s, 40)); }, draw(x, s, t){
-    fill(x, s, vgrad(x, s, [[0, mix(s.pal.bg, '#000000', 0.4)], [1, mix(s.pal.bg, s.pal.accent1, 0.25)]]));
-    x.globalCompositeOperation = 'lighter';
-    for (const b of s.d.b){ const cx = (b.x + Math.sin(t * 0.07 * b.v + b.p) * 0.08) * s.w, cy = s.h * (0.55 + b.y * 0.5) + Math.sin(t * 0.11 + b.p) * 18, pulse = 0.6 + 0.4 * Math.sin(t * 0.5 * b.v + b.p);
-      glowAt(x, cx, cy, s.h * (0.18 + b.z * 0.22), b.z > 0.5 ? s.pal.accent1 : s.pal.glow, 0.22 * pulse * (0.5 + s.intensity)); }
-    for (const e of s.d.e){ const y = 1 - wrap(e.y + t * 0.05 * e.v), xx = e.x + Math.sin(t * e.v + e.p) * 0.02;
-      x.fillStyle = rgba(s.pal.glow, (1 - Math.abs(y - 0.55)) * 0.5 * e.z); x.beginPath(); x.arc(xx * s.w, y * s.h, 0.6 + e.z * 1.8, 0, TAU); x.fill(); }
-    x.globalCompositeOperation = 'source-over';
-  } },
-  // gold dust: fine glitter drifting down through soft warm light, a few flakes catching it
   { id: 'golddust', name: 'Gold dust', group: 'Celebration', init(s){ s.d.g = parts(s, count(s, 140)); }, draw(x, s, t){
     fill(x, s, s.pal.bg);
     glowAt(x, s.w * (0.35 + Math.sin(t * 0.1) * 0.06), s.h * 0.3, Math.max(s.w, s.h) * 0.5, s.pal.accent1, 0.2);
@@ -331,14 +320,14 @@ export class SceneRunner {
   canvas: HTMLCanvasElement; gl: HTMLCanvasElement; private x: CanvasRenderingContext2D; scene: Scene = SCENES[0]; state: SceneState | null = null;
   speed = 1; private raf = 0; private t0 = performance.now(); private key = ''; reduced = false;
   flat = false;   // the 2D look: always the drawn (canvas) version of a scene
-  private painter: ShaderPainter | null = null; private useGL = false; private quality = 1; private last = 0; private slow = 0;
+  private painter: ShaderPainter | null = null; private useGL = false; private quality = 1; private last = 0; private slow = 0; private changedAt = 0;
   constructor(host: HTMLElement){
     this.canvas = document.createElement('canvas'); this.canvas.className = 'fx-scene'; this.canvas.setAttribute('aria-hidden', 'true');
     this.gl = document.createElement('canvas'); this.gl.className = 'fx-scene fx-scene-gl'; this.gl.setAttribute('aria-hidden', 'true'); this.gl.hidden = true;
     host.prepend(this.canvas, this.gl); this.x = this.canvas.getContext('2d')!;
     this.gl.addEventListener('webglcontextlost', e => { e.preventDefault(); this.painter = null; this.useGL = false; this.gl.hidden = true; this.canvas.hidden = false; this.key = ''; });
     const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-    this.quality = coarse ? 0.7 : 1;   // phones and tablets start a little lighter
+    this.quality = coarse ? 0.7 : 1;   // one of the fixed steps below   // phones and tablets start a little lighter
   }
   private gpu(){ if (!this.painter){ try { this.painter = new ShaderPainter(this.gl); } catch { this.painter = null; } } return this.painter && this.painter.gl ? this.painter : null; }
   set(id: string, pal: Palette, intensity: number, speed: number, seed: number){
@@ -374,8 +363,17 @@ export class SceneRunner {
   private frame = (now: number) => {
     this.raf = 0; const st = this.state; if (!st || document.hidden) return;
     if (this.useGL && this.painter){
-      // adapt the resolution to how fast frames actually arrive
-      if (this.last){ const dt = now - this.last; if (dt > 26){ if (++this.slow > 20 && this.quality > 0.45){ this.quality = Math.max(0.45, this.quality - 0.1); this.slow = 0; } } else { this.slow = Math.max(0, this.slow - 1); if (dt < 18 && this.quality < 1) this.quality = Math.min(1, this.quality + 0.002); } }
+      // adapt the resolution to how fast frames actually arrive, in a few fixed steps and at most every 2.5 s: changing
+      // it on every frame resized the canvas constantly, which made fine detail (snow, stars, rain) shimmer and flicker
+      if (this.last){
+        const dt = now - this.last, steps = [1, 0.85, 0.7, 0.55, 0.45];
+        if (dt > 26) this.slow++; else if (dt < 18) this.slow = Math.max(-60, this.slow - 1);
+        if (now - this.changedAt > 2500){
+          const at = steps.indexOf(this.quality) < 0 ? 0 : steps.indexOf(this.quality);
+          if (this.slow > 20 && at < steps.length - 1){ this.quality = steps[at + 1]; this.slow = 0; this.changedAt = now; }
+          else if (this.slow <= -60 && at > 0){ this.quality = steps[at - 1]; this.slow = 0; this.changedAt = now; }
+        }
+      }
       this.last = now;
       const dpr = Math.min(1.5, window.devicePixelRatio || 1) * this.quality;
       this.painter.draw(this.scene.id, Math.max(2, Math.round(st.w * dpr)), Math.max(2, Math.round(st.h * dpr)), this.time(), st.intensity, st.seed, colsOf(st.pal));

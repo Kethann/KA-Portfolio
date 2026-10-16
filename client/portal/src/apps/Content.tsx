@@ -704,6 +704,26 @@ function Upscaler(){
   );
 }
 
+// Who every email comes from, and how it is signed
+function SenderCard(){
+  const s = useLoad<{ value: { fromName: string; signature: string }; revision: number }>('/settings/email');
+  const [v, setV] = useDraft(s.data?.value);
+  const toast = useToast();
+  if (!s.data || !v) return null;
+  const dirty = JSON.stringify(v) !== JSON.stringify(s.data.value);
+  return (
+    <section className="card stack" style={{ marginBottom: 16 }}>
+      <h3 style={{ margin: 0 }}>Sender name & sign-off</h3>
+      <p className="muted" style={{ marginTop: -4 }}>Used on every email the site sends: receipts, download links, replies and alerts.</p>
+      <div className="form-grid">
+        <Field label="Sender name" hint="What inboxes show as “From”. Empty = your site name"><input value={v.fromName} maxLength={80} onChange={e => setV({ ...v, fromName: e.target.value })} placeholder="Kethan Artzz" /></Field>
+        <Field label="Sign-off" hint="The line at the end. Empty = “— your site name”"><input value={v.signature} maxLength={200} onChange={e => setV({ ...v, signature: e.target.value })} placeholder="— Kethan Artzz" /></Field>
+      </div>
+      <div className="row"><AsyncButton className="btn primary sm" disabled={!dirty} onClick={async () => { const r = await put<{ value: { fromName: string; signature: string }; revision: number }>('/settings/email', { value: v, revision: s.data!.revision }); s.setData(r); setV(r.value); toast.show('Saved', { tone: 'success' }); }}>Save</AsyncButton></div>
+    </section>
+  );
+}
+
 function Emails(){
   const s = useLoad<{ templates: { key: string; label: string; subject: string; body: string; customised: boolean; updatedAt: string | null; placeholders: string[] }[] }>('/email-templates');
   const [key, setKey] = useState<string | null>(null);
@@ -740,7 +760,7 @@ function Emails(){
         ))}
       </nav>
       <div className="app-main">
-        {!t || !draft ? <Empty icon="mail" title="Choose an email">Edit the words of any email the site sends. Placeholders like {'{{name}}'} are filled in automatically.</Empty> : <>
+        {!t || !draft ? <><SenderCard /><Empty icon="mail" title="Choose an email">Edit the words of any email the site sends. Placeholders like {'{{name}}'} are filled in automatically.</Empty></> : <>
           <h2 className="section-title">{t.label}</h2>
           <Field label="Subject"><input value={draft.subject} onChange={e => setDraft({ ...draft, subject: e.target.value })} maxLength={200} /></Field>
           <Field label="Message" hint="Plain text. Links become clickable."><textarea ref={body} rows={14} value={draft.body} onChange={e => setDraft({ ...draft, body: e.target.value })} /></Field>

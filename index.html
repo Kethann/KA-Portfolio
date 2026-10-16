@@ -1495,6 +1495,8 @@ html.ka-modal-open{ overflow:hidden; }
 html.ka-wallpaper, html.ka-wallpaper body{ overflow:hidden !important; cursor:none; background:#050506; }
 html.ka-wallpaper body > :not(#nebula-bg):not(#stage):not(script):not(style){ display:none !important; }
 html.ka-wallpaper #stage{ opacity:1 !important; }
+/* the panda switched off in the portal (Studio > Menu & features) */
+html.ka-no-panda #panda-mascot, html.ka-no-panda .panda-bubble, html.ka-no-panda .panda-thread{ display:none !important; }
 </style>
 <div id="nebula-bg" aria-hidden="true"></div>
 <div id="top-fade" aria-hidden="true"></div>
@@ -9101,8 +9103,26 @@ function applySiteAppearance(data){
     var filtered = ALL_NAV_ITEMS.filter(function(item){
       if (item.name === "gallery" && data.visibility.navGallery === false) return false;
       if (item.name === "about" && data.visibility.navAbout === false) return false;
+      if (item.name === "contact" && data.visibility.navContact === false) return false;
+      if (item.name === "store" && data.visibility.navStore === false) return false;
+      if (item.name === "typography" && data.visibility.navTypography === false) return false;
       return true;
     });
+    // the ☰ menu: items switched off in the portal (Studio > Menu & features) are hidden and skipped by the keyboard
+    var MENU_KEYS = { tips: "menuTips", demix: "menuDemix", upscaler: "menuUpscaler", portfolio: "menuPortfolio", fullscreen: "menuFullscreen", sound: "menuSound" };
+    Object.keys(MENU_KEYS).forEach(function(action){
+      var item = document.querySelector && document.querySelector('[data-menu-action="' + action + '"]'); if (!item) return;
+      var off = data.visibility[MENU_KEYS[action]] === false;
+      if (action === "fullscreen" && !off && item.dataset.kaOff !== "1") return;   // full screen also hides itself where it can't work
+      item.hidden = off; item.dataset.kaOff = off ? "1" : "";
+    });
+    if (typeof menuItems !== "undefined" && typeof expandPanel !== "undefined"){
+      menuItems.length = 0;
+      Array.prototype.push.apply(menuItems, Array.prototype.slice.call(expandPanel.querySelectorAll('[role="menuitem"], [role="menuitemcheckbox"]')).filter(function(el){ return !el.hidden; }));
+    }
+    // the panda by the chat button
+    if (document.documentElement.classList) document.documentElement.classList.toggle("ka-no-panda", data.visibility.panda === false);
+    if (typeof window !== "undefined") window.__kaNoPanda = data.visibility.panda === false;
     if (filtered.map(function(item){return item.name;}).join(',') !== NAV_ITEMS.map(function(item){return item.name;}).join(',')){
       NAV_ITEMS = filtered;
       renderNavItems();
@@ -10332,7 +10352,7 @@ function sendMessage(text){
     return board;
   }
   function onStorePage(){ var s = document.getElementById("section-store"); return !!s && !s.hidden; }
-  function pandaTo(target){ window.__kaPandaVisit = target; if (target){ var bub = document.querySelector("#assistant-launcher .panda-bubble.show"); if (bub) bub.classList.remove("show"); } try { document.dispatchEvent(new CustomEvent("ka-panda-visit", { detail: { target: target } })); } catch(e){} }
+  function pandaTo(target){ if (window.__kaNoPanda) target = null; window.__kaPandaVisit = target; if (target){ var bub = document.querySelector("#assistant-launcher .panda-bubble.show"); if (bub) bub.classList.remove("show"); } try { document.dispatchEvent(new CustomEvent("ka-panda-visit", { detail: { target: target } })); } catch(e){} }
   // the live countdown: days / hours / minutes / seconds, each digit pair easing in when it changes;
   // at zero the board says it is opening any moment and checks the store every 20 seconds
   var soonPoll = 0;
@@ -10756,7 +10776,7 @@ window.addEventListener('pageshow',event=>{if(event.persisted)schedulePanda();})
 // The panda brings its own Three.js (~600 KB): wait for the crystal intro to finish so it never competes
 // with the hero for bandwidth or frames; the timer covers a device where the intro can't run.
 let pandaQueued=false;
-function queuePanda(){if(pandaQueued||document.documentElement.classList.contains('ka-wallpaper'))return;pandaQueued=true;welcomeWanted=true;clearTimeout(pandaFallback);schedulePanda();}
+function queuePanda(){if(pandaQueued||document.documentElement.classList.contains('ka-wallpaper'))return;if(window.__kaNoPanda){setTimeout(queuePanda,3000);return;}pandaQueued=true;welcomeWanted=true;clearTimeout(pandaFallback);schedulePanda();}
 const pandaFallback=setTimeout(queuePanda,12000);
 // the panda's code downloads quietly in the background while the intro plays, so it appears at once afterwards
 setTimeout(()=>{try{const l=document.createElement('link');l.rel='modulepreload';l.href='./dist/assets/panda.js';document.head.appendChild(l);}catch{}},2500);

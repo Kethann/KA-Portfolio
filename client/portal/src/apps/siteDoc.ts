@@ -24,7 +24,7 @@ export type SiteDoc = {
   featuredShow?: FeaturedShow | null;
   announcements?: AnnouncementItem[];
   revision: number; details: Record<string, any> & { customFonts: { family: string; url: string }[] }; folders: string[]; images: SiteImage[];
-  notice: Announcement; visibility: { navGallery: boolean; navAbout: boolean; autoFullscreen?: boolean; downloadFormat?: 'png' | 'jpeg'; protectImages?: boolean };
+  notice: Announcement; visibility: { navGallery: boolean; navAbout: boolean; navContact?: boolean; navStore?: boolean; navTypography?: boolean; menuTips?: boolean; menuDemix?: boolean; menuUpscaler?: boolean; menuPortfolio?: boolean; menuFullscreen?: boolean; menuSound?: boolean; panda?: boolean; autoFullscreen?: boolean; downloadFormat?: 'png' | 'jpeg'; protectImages?: boolean };
   stacks: { loop: boolean; loops?: Record<string, boolean>; covers: Record<string, string>; featured?: string[] }; layoutOverrides: Record<string, Record<string, { x: number; y: number; scale: number; width?: number }>>;
   branding: { enabled: boolean; logoUrl: string }; elementStyles: Record<string, any>; socialLinks: { label: string; url: string; icon: string }[];
   passCard: PassDraft;

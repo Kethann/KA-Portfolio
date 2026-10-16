@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as RKeyboardEvent, ReactNode } from 'react';
 import { APPS, APP, SECTIONS } from '../apps/registry';
+import { CONTROLS } from '../apps/controlIndex';
 import { useDesk } from './desk';
 import { Icon } from '../icons';
 import { get, post } from '../api';
@@ -258,8 +259,10 @@ export function Palette({ onClose, commands }: { onClose: () => void; commands: 
   const local = useMemo(() => {
     const t = q.trim().toLowerCase();
     const apps: Cmd[] = APPS.map(a => ({ id: 'app-' + a.id, title: a.title, kind: 'App', app: a.id, run: () => desk.open(a.id), meta: a.keywords }));
-    const all = [...apps, ...commands];
-    if (!t) return all.slice(0, 20);
+    // every setting, by name (Settings > Control Center): opens the exact screen
+    const settings: Cmd[] = CONTROLS.map(c => ({ id: 'set-' + c.title, title: c.title, kind: 'Setting', app: c.app, meta: c.desc + ' ' + (c.keywords || ''), run: () => desk.open(c.app, c.route) }));
+    const all = [...apps, ...commands, ...settings];
+    if (!t) return [...apps, ...commands].slice(0, 20);
     const words = t.split(/\s+/);
     return all.map(c => {
       const hay = (c.title + ' ' + (c.meta || '') + ' ' + c.kind).toLowerCase();

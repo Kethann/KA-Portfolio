@@ -34,6 +34,8 @@ export interface Composition {
   camera?: 'still' | 'drift' | 'dramatic';
   /** 2D: flat illustration (flat fills, drawn backgrounds, no camera). 3D: lit materials, shaded decorations, GPU scenes, camera */
   look?: '2d' | '3d';
+  /** where the words sit in the frame: an offset from the centre, in % of the frame's width and height (-40 … 40) */
+  offsetX?: number; offsetY?: number;
   /** your own colours over the palette */
   colors?: Partial<Pick<Palette, 'bg' | 'text' | 'accent1' | 'accent2' | 'glow'>>;
 }
@@ -112,9 +114,11 @@ export class EffectController {
     gsap.to(this.stage, { ...vars, duration: 0.5, ease: 'power1.out' });
   }
 
-  /** fits the text to the stage: the longest line takes about 86% of the width, never taller than the stage allows */
-  private fit(font: string, text: string, tracking = 0){
-    const lines = text.split('\n'), w = this.stage.clientWidth * 0.86, h = this.stage.clientHeight * 0.62;
+  /** fits the text to the stage: the longest line takes about 86% of the width, never taller than the stage allows;
+   *  words moved towards an edge get only the room left on that side, so they never run off the frame */
+  private fit(font: string, text: string, tracking = 0, ox = 0, oy = 0){
+    const lines = text.split('\n');
+    const w = this.stage.clientWidth * Math.min(0.86, 2 * (0.5 - Math.abs(ox) / 100) * 0.92), h = this.stage.clientHeight * Math.min(0.62, 2 * (0.5 - Math.abs(oy) / 100) * 0.85);
     const probe = document.createElement('canvas').getContext('2d')!;
     probe.font = `100px ${font}`;
     const widest = Math.max(...lines.map(l => probe.measureText(l || ' ').width + Array.from(l).length * tracking * 100), 1);
@@ -146,11 +150,13 @@ export class EffectController {
     this.camAmp = flat2d ? 0 : c.camera === 'dramatic' ? (touch ? 3 : 9) : c.camera === 'drift' ? (touch ? 0 : 4) : 0;
     this.flat(true);
     if (!this.camAmp){ this.scene.canvas.style.transform = this.scene.gl.style.transform = ''; }
-    const px = this.fit(c.font, text, c.tracking || 0);
+    const ox = Math.max(-40, Math.min(40, c.offsetX || 0)), oy = Math.max(-40, Math.min(40, c.offsetY || 0));
+    this.textEl.style.translate = ox || oy ? `${(ox * this.stage.clientWidth / 100).toFixed(1)}px ${(oy * this.stage.clientHeight / 100).toFixed(1)}px` : '';
+    const px = this.fit(c.font, text, c.tracking || 0, ox, oy);
     const family = c.font.split(',')[0];
     try { await document.fonts.load(`${px}px ${family}`, text); } catch { /* falls back to the next font in the stack */ }
     if (run !== this.building) return;           // a newer compose started while the font loaded
-    this.fit(c.font, text, c.tracking || 0);
+    this.fit(c.font, text, c.tracking || 0, ox, oy);
     const split = splitText(this.textEl, text);
     for (const ch of split.chars) ch.el.dataset.ch = ch.el.textContent || '';
     this.scene.set(c.scene || 'plain', palette, c.sceneIntensity ?? 0.6, c.sceneSpeed ?? 1, c.seed);

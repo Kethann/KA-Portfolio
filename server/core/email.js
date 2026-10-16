@@ -4,6 +4,7 @@
 // email_log (never the body).
 import { env, localDataDir } from './env.js';
 import { getDb } from './db.js';
+import { getSetting } from './settings.js';
 import { buildMime, smtpSend } from './smtp.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { sep } from 'node:path';
@@ -239,9 +240,10 @@ export async function loadTemplate(key){
 export async function sendEmail({ to, template, vars = {}, replyTo, attachments, subjectOverride, bodyOverride, card, hero, blocks = {}, buttons, preheader }){
   const db = await getDb();
   const siteName = env('SITE_NAME', 'Kethan Artzz');
-  const from = { email: env('MAIL_FROM', 'no-reply@localhost'), name: env('MAIL_FROM_NAME', siteName) };
+  const brand = await getSetting('email').catch(() => ({}));   // sender name and sign-off set in the portal (Content > Emails)
+  const from = { email: env('MAIL_FROM', 'no-reply@localhost'), name: (brand.fromName || '').trim() || env('MAIL_FROM_NAME', siteName) };
   const tpl = await loadTemplate(template);
-  const allVars = { signature: env('MAIL_SIGNATURE', `— ${siteName}`), customer_name: 'there', ...vars };
+  const allVars = { signature: (brand.signature || '').trim() || env('MAIL_SIGNATURE', `— ${siteName}`), customer_name: 'there', ...vars };
   const subject = fill(subjectOverride ?? tpl.subject, allVars).replace(/[\r\n]+/g, ' ').slice(0, 200);
   const body = bodyOverride ?? tpl.body;
   const text = fill(body, allVars).replace(/\n{3,}/g, '\n\n').trim() + '\n';   // an empty placeholder never leaves a gap

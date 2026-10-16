@@ -259,6 +259,9 @@ export function validateSiteDocument(input, current, seed){
     return item;
   });
   const visibility = { navGallery: input.visibility?.navGallery !== false, navAbout: input.visibility?.navAbout !== false, autoFullscreen: input.visibility?.autoFullscreen === true, downloadFormat: input.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png', protectImages: input.visibility?.protectImages !== false };
+  // Studio > Menu & features: which pages sit in the top bar, which items are in the ☰ menu, and whether the panda
+  // shows (everything on unless switched off)
+  for (const k of ['navContact', 'navStore', 'navTypography', 'menuTips', 'menuDemix', 'menuUpscaler', 'menuPortfolio', 'menuFullscreen', 'menuSound', 'panda']) visibility[k] = input.visibility?.[k] !== false;
 
   const layoutOverrides = {};
   for (const bp of LAYOUT_BREAKPOINTS){
