@@ -202,3 +202,17 @@ test('About elements can be arranged per screen size, with an optional text widt
   assert.deepEqual(d.elementStyles['about-bio-text'], { indent: 2.5 }, 'first-line indent is kept, rounded to 0.1 em');
   assert.throws(() => validateSiteDocument({ ...base, layoutOverrides: { mobile: {}, tablet: {}, desktop: { 'about-bio-text': { x: 0, y: 0, scale: 1, width: 50 } } } }, seed, seed));
 });
+
+test('a picture can carry its own reference image (held to compare on Featured Work): kept for that picture only, own uploads only', () => {
+  const doc = structuredClone(seed);
+  doc.images[0].reference = { src: '/images/my-original.webp', label: '  Before  ' };
+  const d = validateSiteDocument(doc, seed, seed);
+  assert.deepEqual(d.images[0].reference, { src: '/images/my-original.webp', label: 'Before' });
+  assert.equal(d.images[1].reference, undefined, 'other pictures have none');
+  doc.images[0].reference = { src: '/images/my-original.webp', label: '' };
+  assert.equal(validateSiteDocument(doc, seed, seed).images[0].reference.label, 'Reference', 'a default label');
+  doc.images[0].reference = { src: 'https://evil.example/x.png', label: 'x' };
+  assert.throws(() => validateSiteDocument(doc, seed, seed), /reference/i, 'a link to somebody else\'s site is refused');
+  delete doc.images[0].reference;
+  assert.equal(validateSiteDocument(doc, seed, seed).images[0].reference, undefined, 'removing it removes it');
+});

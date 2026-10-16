@@ -486,9 +486,26 @@ function ImageEditor({ slug, onClose }: { slug: string; onClose: () => void }){
       </div>
       <SellImage f={f} setF={setF} />
       <StackFraming f={f} setF={setF} />
+      <ReferencePicture f={f} setF={setF} />
       <Field label="Description"><textarea rows={4} value={f.description} onChange={e => setF({ ...f, description: e.target.value })} maxLength={4000} /></Field>
       <Field label="Tools"><TagInput label="Tools" value={f.technologies} onChange={v => setF({ ...f, technologies: v })} placeholder="Photoshop, Blender…" /></Field>
     </Modal>
+  );
+}
+
+// A small reference picture for this image (the original photo, a sketch, the "before"): on Featured Work a small box shows it, and
+// holding the box lays it over the picture so visitors can compare. It belongs to this one picture only.
+function ReferencePicture({ f, setF }: { f: SiteImage; setF: (v: SiteImage) => void }){
+  const ref = f.reference;
+  return (
+    <section className="stack ref-pic" aria-label="Reference picture">
+      <div className="row" style={{ justifyContent: 'space-between', gap: 8 }}><b>Reference picture</b>{ref && <button type="button" className="btn sm ghost" onClick={() => { const { reference: _r, ...rest } = f; setF(rest as SiteImage); }}>Remove</button>}</div>
+      <p className="field-hint" style={{ margin: 0 }}>Optional. Shows as a small box on this picture in Featured Work; visitors hold it to compare. It only appears with this picture.</p>
+      {ref ? <div className="row" style={{ gap: 12, alignItems: 'center' }}>
+        <img src={ref.src} alt="" style={{ width: 88, height: 88, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border)' }} />
+        <Field label="Label on the box" hint="e.g. Original, Sketch, Before"><input value={ref.label} maxLength={30} onChange={e => setF({ ...f, reference: { ...ref, label: e.target.value } })} placeholder="Reference" /></Field>
+      </div> : <Uploader kind="image" accept="image/png,image/jpeg,image/webp,image/avif" label="Add a reference picture" onUploaded={u => { if (u.publicUrl) setF({ ...f, reference: { src: u.publicUrl, label: 'Reference' } }); }}>PNG, JPG, WebP or AVIF.</Uploader>}
+    </section>
   );
 }
 

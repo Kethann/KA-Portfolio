@@ -8,7 +8,7 @@ import { get, put } from '../api';
 import { PASS_DEFAULTS, type PassSettings } from '../../../src/store/checkout/PassCard';
 import { ABOUT_DEFAULT, ABOUT_LIMITS } from '../../../../shared/about-default.js';
 
-export type SiteImage = { id: string; slug: string; title: string; cat: string; description: string; technologies: string[]; link: string; downloadable?: boolean; hidden?: boolean; archived?: boolean; focusX?: number; focusY?: number; zoom?: number; src?: string; widths: number[]; full: number; width?: number; height?: number };
+export type SiteImage = { id: string; slug: string; title: string; cat: string; description: string; technologies: string[]; link: string; downloadable?: boolean; hidden?: boolean; archived?: boolean; focusX?: number; focusY?: number; zoom?: number; src?: string; widths: number[]; full: number; width?: number; height?: number; reference?: { src: string; label: string } };
 // The announcement: a side tab that slides open by itself and tucks away after autoClose seconds (0 = stays open), or the old top banner.
 export type Announcement = { enabled: boolean; text: string; tone: 'info' | 'warning' | 'success' | 'offer'; style: 'tab' | 'banner'; side: 'left' | 'right'; title: string; autoClose: number; linkLabel: string; linkUrl: string };
 export type AnnouncementItem = { id: string; enabled: boolean; title: string; text: string; tone: Announcement['tone']; linkLabel: string; linkUrl: string; startsAt: string; endsAt: string };

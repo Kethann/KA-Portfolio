@@ -13814,6 +13814,36 @@ function sendMessage(text){
   transition:opacity var(--fw-fade, 1.6s) cubic-bezier(.45,0,.55,1), transform calc(var(--fw-hold, 5s) + var(--fw-fade, 1.6s)) linear; }
 .fw-slide.is-on{ opacity:1; }
 .fw-show.has-zoom .fw-slide.is-on{ transform:scale(1.06); }
+/* swipe / tap to change picture at once; a small reference box you hold to compare */
+.fw-frame{ touch-action:pan-y; -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none; }
+.fw-ref{ position:absolute; left:clamp(8px, 1.6cqi, 14px); bottom:clamp(8px, 1.6cqi, 14px); z-index:4; width:clamp(54px, 9cqi, 92px); aspect-ratio:1; padding:0; border-radius:12px; border:1.5px solid rgba(255,255,255,.6); background:#0d0b10; overflow:hidden; cursor:pointer;
+  touch-action:none; -webkit-touch-callout:none; box-shadow:0 8px 22px rgba(0,0,0,.5), 0 0 0 4px rgba(0,0,0,.2);
+  transition:opacity .3s ease, transform .4s cubic-bezier(.22,.8,.24,1), box-shadow .25s ease, border-color .25s ease; }
+.fw-ref[hidden]{ display:none; }
+.fw-ref.is-out{ opacity:0; transform:translateY(8px) scale(.88); pointer-events:none; }
+.fw-ref:hover{ transform:translateY(-2px); } .fw-ref:focus-visible{ outline:2px solid #ff9438; outline-offset:3px; }
+.fw-ref img{ width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; -webkit-user-drag:none; }
+.fw-ref-label{ position:absolute; left:0; right:0; bottom:0; padding:14px 4px 5px; font:600 9px/1 var(--font-mono, monospace); letter-spacing:.12em; text-transform:uppercase; text-align:center; color:#fff; background:linear-gradient(transparent, rgba(0,0,0,.78)); pointer-events:none; }
+.fw-ref-hint{ position:absolute; left:clamp(8px, 1.6cqi, 14px); bottom:calc(clamp(54px, 9cqi, 92px) + clamp(8px, 1.6cqi, 14px) + 8px); z-index:4; white-space:nowrap; padding:5px 10px; border-radius:999px; font:600 10px/1 var(--font-mono, monospace); letter-spacing:.1em; text-transform:uppercase; color:#fff; background:rgba(10,8,12,.72); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,.16); opacity:0; transform:translateY(4px); transition:opacity .25s ease, transform .25s ease; pointer-events:none; }
+.fw-ref[hidden] + .fw-ref-hint{ display:none; }
+.fw-frame:hover .fw-ref-hint, .fw-ref:focus-visible + .fw-ref-hint{ opacity:1; transform:none; }
+.fw-frame.is-comparing .fw-ref-hint{ opacity:0; }
+@media (hover:none){ .fw-ref-hint{ opacity:.9; transform:none; } }
+.fw-ref-full{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#0d0b10; opacity:0; z-index:3; pointer-events:none; transition:opacity .16s ease; -webkit-user-drag:none; }
+.fw-ref-chip{ position:absolute; left:12px; top:12px; z-index:5; padding:6px 12px; border-radius:999px; font:600 11px/1 var(--font-mono, monospace); letter-spacing:.1em; text-transform:uppercase; color:#fff; background:rgba(10,8,12,.72); backdrop-filter:blur(8px); border:1px solid rgba(255,148,56,.55); opacity:0; transform:translateY(-4px); transition:opacity .18s ease, transform .22s ease; pointer-events:none; }
+.fw-frame.is-comparing .fw-ref-full{ opacity:1; }
+.fw-frame.is-comparing .fw-ref-chip{ opacity:1; transform:none; }
+.fw-frame.is-comparing .fw-ref{ transform:scale(.94); border-color:#ff9438; box-shadow:0 0 0 4px rgba(255,148,56,.28), 0 8px 22px rgba(0,0,0,.5); }
+.fw-nav, .fw-expand{ position:absolute; z-index:4; display:grid; place-items:center; width:38px; height:38px; padding:0; border-radius:50%; border:1px solid rgba(255,255,255,.28); background:rgba(10,8,12,.5); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); color:#fff; cursor:pointer;
+  opacity:0; transition:opacity .25s ease, background .2s ease, transform .2s ease; }
+.fw-nav{ top:50%; translate:0 -50%; } .fw-nav.prev{ left:10px; } .fw-nav.next{ right:10px; }
+.fw-expand{ top:10px; right:10px; width:34px; height:34px; }
+.fw-frame:hover .fw-nav, .fw-frame:hover .fw-expand, .fw-nav:focus-visible, .fw-expand:focus-visible{ opacity:1; }
+.fw-nav:hover, .fw-expand:hover{ background:rgba(255,148,56,.45); } .fw-nav:active, .fw-expand:active{ transform:scale(.92); }
+.fw-nav svg, .fw-expand svg{ width:16px; height:16px; }
+.fw-frame.is-comparing .fw-nav, .fw-frame.is-comparing .fw-expand{ opacity:0; }
+@media (hover:none){ .fw-nav{ display:none; } .fw-expand{ opacity:.85; } }
+@media (prefers-reduced-motion: reduce){ .fw-ref, .fw-ref-full, .fw-ref-chip, .fw-nav, .fw-expand{ transition:none; } }
 .fw-copy{ min-width:0; display:grid; gap:clamp(8px, 2.2cqi, 16px); align-content:center; }
 .fw-eyebrow{ margin:0; font:600 clamp(10px, 1.6cqi, 12px)/1.3 var(--font-mono, monospace); letter-spacing:.22em; text-transform:uppercase; color:#e7c5a0; }
 .fw-title{ margin:0; font-family:var(--font-heading), serif; font-size:clamp(26px, 6.2cqi, 54px); line-height:1.04; letter-spacing:-.02em; text-wrap:balance; }
@@ -14220,7 +14250,8 @@ function sendMessage(text){
       var size = r.size && r.size !== "auto" ? r.size : shape >= 1.25 ? "l" : shape <= 0.9 ? "m" : "a";
       var row = el("article", "fw-row"); row.dataset.side = side; row.dataset.size = size;
       if (size === "free") row.style.setProperty("--fw-img", Math.max(25, Math.min(75, r.width || 50)) + "%");   // free size: the owner's own share of the row
-      var frame = el("figure", "fw-frame"); frame.setAttribute("role", "button"); frame.tabIndex = 0; frame.setAttribute("aria-label", "Open " + (r.title || r.folder) + " in the gallery");
+      var frame = el("figure", "fw-frame"); frame.setAttribute("role", "group"); frame.setAttribute("aria-roledescription", "carousel"); frame.tabIndex = 0;
+      frame.setAttribute("aria-label", (r.title || r.folder) + (pics.length > 1 ? ": swipe or use the arrow keys to change picture" : "") + ". Press Enter to open the gallery.");
       var fixed = fixedShape;
       if (fixed) frame.style.aspectRatio = fixed[0] + " / " + fixed[1];
       var imgs = pics.map(function(p, k){
@@ -14230,6 +14261,21 @@ function sendMessage(text){
         im.src = posterSrc(p, 1080);
         frame.appendChild(im); return im;
       });
+      // the reference box (only for pictures that have one), the expand button and the arrows
+      var ICON = function(d){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>'; };
+      var refFull = el("img", "fw-ref-full"); refFull.alt = ""; refFull.decoding = "async"; refFull.draggable = false; refFull.setAttribute("aria-hidden", "true");
+      var refChip = el("span", "fw-ref-chip"); refChip.setAttribute("aria-hidden", "true");
+      var refBox = el("button", "fw-ref"); refBox.type = "button"; refBox.hidden = true;
+      refBox.innerHTML = '<img alt="" draggable="false" decoding="async"><span class="fw-ref-label"></span>';
+      var refHint = el("span", "fw-ref-hint", "Hold to compare"); refHint.setAttribute("aria-hidden", "true");
+      var expandB = el("button", "fw-expand"); expandB.type = "button"; expandB.setAttribute("aria-label", "Open in the gallery"); expandB.innerHTML = ICON('<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>');
+      frame.append(refFull, refChip, refBox, refHint, expandB);
+      var prevB = null, nextB = null;
+      if (pics.length > 1){
+        prevB = el("button", "fw-nav prev"); prevB.type = "button"; prevB.setAttribute("aria-label", "Previous picture"); prevB.innerHTML = ICON('<path d="M15 5l-7 7 7 7"/>');
+        nextB = el("button", "fw-nav next"); nextB.type = "button"; nextB.setAttribute("aria-label", "Next picture"); nextB.innerHTML = ICON('<path d="M9 5l7 7-7 7"/>');
+        frame.append(prevB, nextB);
+      }
       var copy = el("div", "fw-copy");
       if (r.eyebrow) copy.appendChild(el("p", "fw-eyebrow", r.eyebrow));
       copy.appendChild(el("h3", "fw-title", r.title || r.folder));
@@ -14251,14 +14297,46 @@ function sendMessage(text){
       }
       copy.appendChild(foot);
       row.append(frame, copy); fw.el.appendChild(row);
-      var state = { row: row, frame: frame, imgs: imgs, pics: pics, at: 0, caption: caption, pdesc: pdesc, dots: dots, count: count, fixed: fixed, visible: false, timer: 0, delay: idx * 1300 };
+      var state = { row: row, frame: frame, imgs: imgs, pics: pics, at: 0, caption: caption, pdesc: pdesc, dots: dots, count: count, fixed: fixed, visible: false, timer: 0, delay: idx * 1300,
+        refBox: refBox, refFull: refFull, refChip: refChip, comparing: false, nav: 0, suppress: 0, refTimer: 0 };
       fw.rows.push(state);
+      setRef(state, 0, true);
       var open = function(){
         var list = pics.slice(), at = state.at;
         if (typeof openLightbox === "function") openLightbox(list, at, frame);
       };
-      frame.addEventListener("click", open);
-      frame.addEventListener("keydown", function(e){ if (e.key === "Enter" || e.key === " "){ e.preventDefault(); open(); } });
+      var many = pics.length > 1, onControl = function(t){ return !!(t && t.closest && t.closest(".fw-ref, .fw-expand, .fw-nav")); };
+      frame.addEventListener("click", function(e){ if (onControl(e.target) || Date.now() < state.suppress) return; open(); });
+      expandB.addEventListener("click", function(e){ e.stopPropagation(); open(); });
+      if (many){
+        prevB.addEventListener("click", function(e){ e.stopPropagation(); goTo(state, (state.at - 1 + pics.length) % pics.length, true); });
+        nextB.addEventListener("click", function(e){ e.stopPropagation(); goTo(state, (state.at + 1) % pics.length, true); });
+      }
+      frame.addEventListener("keydown", function(e){
+        if (e.target !== frame) return;
+        if (e.key === "Enter" || e.key === " "){ e.preventDefault(); open(); }
+        else if (many && (e.key === "ArrowRight" || e.key === "ArrowLeft")){ e.preventDefault(); goTo(state, (state.at + (e.key === "ArrowRight" ? 1 : -1) + pics.length) % pics.length, true); }
+      });
+      // swipe left / right changes the picture at once (no waiting for the slow fade); on a touch screen a tap does too: right side = next, left side = previous
+      var down = null;
+      frame.addEventListener("pointerdown", function(e){ if (e.button || onControl(e.target)) { down = null; return; } down = { x: e.clientX, y: e.clientY, t: performance.now(), type: e.pointerType }; });
+      frame.addEventListener("pointercancel", function(){ down = null; });
+      frame.addEventListener("pointerup", function(e){
+        var d = down; down = null; if (!d || !many || state.comparing) return;
+        var dx = e.clientX - d.x, dy = e.clientY - d.y, ax = Math.abs(dx), ay = Math.abs(dy);
+        if (ax > 36 && ax > ay * 1.3){ state.suppress = Date.now() + 450; goTo(state, (state.at + (dx < 0 ? 1 : -1) + pics.length) % pics.length, true); return; }
+        if (d.type !== "mouse" && ax < 10 && ay < 10 && performance.now() - d.t < 500){
+          var b = frame.getBoundingClientRect(); state.suppress = Date.now() + 450;
+          goTo(state, (state.at + ((e.clientX - b.left) < b.width * 0.35 ? -1 : 1) + pics.length) % pics.length, true);
+        }
+      });
+      // hold the reference box to lay it over the picture; let go (or change picture) and it goes back
+      refBox.addEventListener("pointerdown", function(e){ if (e.button) return; e.preventDefault(); e.stopPropagation(); try { refBox.setPointerCapture(e.pointerId); } catch(err){} startCompare(state); });
+      ["pointerup", "pointercancel", "lostpointercapture", "blur"].forEach(function(n){ refBox.addEventListener(n, function(){ endCompare(state); }); });
+      refBox.addEventListener("keydown", function(e){ if ((e.key === " " || e.key === "Enter") && !e.repeat){ e.preventDefault(); e.stopPropagation(); startCompare(state); } });
+      refBox.addEventListener("keyup", function(e){ if (e.key === " " || e.key === "Enter"){ e.stopPropagation(); endCompare(state); } });
+      refBox.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+      refBox.addEventListener("click", function(e){ e.stopPropagation(); });
       if (!r.ctaUrl) cta.addEventListener("click", open);
       if (!fixed) fitFrame(state, 0);
     });
@@ -14279,25 +14357,62 @@ function sendMessage(text){
       s.timer = setTimeout(function(){ advance(s); }, ms);
       fw.timers.push(s.timer);
     }
-    function advance(s){
-      if (!s.visible || document.hidden){ return; }
-      var next = show.order === "random" ? (s.at + 1 + Math.floor(Math.random() * (s.imgs.length - 1))) % s.imgs.length : (s.at + 1) % s.imgs.length;
-      var img = s.imgs[next];
+    // the reference box follows the picture: it eases out, and if the new picture has a reference of its own it eases in with it;
+    // a picture without one has no box, so there is nothing to hold
+    function setRef(s, k, now){
+      clearTimeout(s.refTimer);
+      var ref = s.pics[k].reference, ok = !!(ref && ref.src);
+      var apply = function(){
+        if (!ok){ s.refBox.hidden = true; s.refBox.classList.add("is-out"); s.refFull.removeAttribute("src"); return; }
+        s.refBox.querySelector("img").src = ref.src; s.refFull.src = ref.src;
+        var label = (ref.label || "Reference").trim();
+        s.refBox.querySelector(".fw-ref-label").textContent = label; s.refChip.textContent = label + " · release to go back";
+        s.refBox.setAttribute("aria-label", "Hold to compare with the " + label.toLowerCase() + " picture");
+        s.refBox.hidden = false; void s.refBox.offsetWidth; s.refBox.classList.remove("is-out");
+      };
+      if (now){ apply(); if (ok) s.refBox.classList.remove("is-out"); return; }
+      s.refBox.classList.add("is-out");
+      s.refTimer = setTimeout(apply, 220);
+    }
+    function startCompare(s){
+      if (s.refBox.hidden || s.comparing) return;
+      s.comparing = true; clearTimeout(s.timer); s.frame.classList.add("is-comparing"); s.refBox.setAttribute("aria-pressed", "true");
+    }
+    function endCompare(s, resume){
+      if (!s.comparing) return;
+      s.comparing = false; s.frame.classList.remove("is-comparing"); s.refBox.setAttribute("aria-pressed", "false");
+      if (resume !== false) schedule(s, show.interval * 1000);
+    }
+    // change picture: by the timer (slow cross-fade) or by hand (swipe, tap, arrows: a quick fade, no waiting)
+    function goTo(s, next, quick){
+      if (next === s.at || next < 0 || next >= s.imgs.length) return;
+      endCompare(s, false);
+      var img = s.imgs[next], token = ++s.nav, fade = quick ? 0.28 : show.fade;
       // the next picture is decoded before it starts to appear, so the fade is never interrupted by loading
       var ready = img.complete && img.naturalWidth ? Promise.resolve() : (img.decode ? img.decode() : new Promise(function(res){ img.onload = res; img.onerror = res; }));
       img.loading = "eager";
+      if (quick) ready = Promise.race([ready, new Promise(function(res){ setTimeout(res, 260); })]);
       ready.catch(function(){}).then(function(){
-        s.imgs[s.at].classList.remove("is-on"); img.classList.add("is-on");
-        s.imgs.forEach(function(x, k){ x.alt = k === next ? (s.pics[k].title || "") : ""; });
+        if (token !== s.nav) return;   // a newer change replaced this one
+        if (quick) s.frame.style.setProperty("--fw-fade", fade + "s"); else s.frame.style.removeProperty("--fw-fade");
+        s.imgs.forEach(function(x, k){ x.classList.toggle("is-on", k === next); x.alt = k === next ? (s.pics[k].title || "") : ""; });
         s.at = next;
+        // the neighbours load ahead, so the next swipe is instant too
+        [(next + 1) % s.imgs.length, (next - 1 + s.imgs.length) % s.imgs.length].forEach(function(k){ s.imgs[k].loading = "eager"; });
         if (s.caption){ s.caption.classList.add("is-out"); if (s.pdesc) s.pdesc.classList.add("is-out");
-          setTimeout(function(){ s.caption.textContent = s.pics[next].title || ""; s.caption.classList.remove("is-out");
-            if (s.pdesc){ s.pdesc.textContent = (s.pics[next].description || "").trim(); s.pdesc.classList.remove("is-out"); } }, show.fade * 500); }
+          setTimeout(function(){ if (token !== s.nav) return; s.caption.textContent = s.pics[next].title || ""; s.caption.classList.remove("is-out");
+            if (s.pdesc){ s.pdesc.textContent = (s.pics[next].description || "").trim(); s.pdesc.classList.remove("is-out"); } }, fade * 500); }
         if (s.dots) Array.prototype.forEach.call(s.dots.children, function(d, k){ d.classList.toggle("is-on", k === next); });
         if (s.count) s.count.textContent = String(next + 1).padStart(2, "0") + " / " + String(s.imgs.length).padStart(2, "0");
         if (!s.fixed) fitFrame(s, next);
-        schedule(s, (show.interval + show.fade) * 1000);
+        setRef(s, next, false);
+        schedule(s, (show.interval + (quick ? 1.2 : show.fade)) * 1000);
       });
+    }
+    function advance(s){
+      if (!s.visible || document.hidden || s.comparing){ return; }
+      var next = show.order === "random" ? (s.at + 1 + Math.floor(Math.random() * (s.imgs.length - 1))) % s.imgs.length : (s.at + 1) % s.imgs.length;
+      goTo(s, next, false);
     }
   };
   // "Fit each picture": the frame eases to each picture's own shape, and the words beside it re-centre with it

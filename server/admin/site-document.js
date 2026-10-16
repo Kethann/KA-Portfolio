@@ -301,7 +301,11 @@ export function validateSiteDocument(input, current, seed){
     const fx = clamp(image.focusX, 0, 100, 50), fy = clamp(image.focusY, 0, 100, 50), zm = clamp(image.zoom, 1, 3, 1);
     const framing = fx !== 50 || fy !== 50 || zm !== 1 ? { focusX: Math.round(fx * 10) / 10, focusY: Math.round(fy * 10) / 10, zoom: Math.round(zm * 100) / 100 } : {};
     const archived = image.archived === true;   // archived = taken off the site but kept here to republish; it is hidden too
-    const common = { id: slug, slug, title, cat, description, technologies, link, downloadable: image.downloadable !== false, hidden: image.hidden === true || archived, ...(archived ? { archived: true } : {}), ...framing };
+    // a small reference picture (the original, a sketch, the "before") that visitors can hold to compare on Featured Work
+    const refSrc = image.reference && typeof image.reference === 'object' ? text(image.reference.src, 600) : '';
+    if (refSrc && !isImageUrl(refSrc)) throw bad('Upload the reference image before saving.');
+    const reference = refSrc ? { reference: { src: refSrc, label: text(image.reference.label, 30) || 'Reference' } } : {};
+    const common = { id: slug, slug, title, cat, description, technologies, link, downloadable: image.downloadable !== false, hidden: image.hidden === true || archived, ...(archived ? { archived: true } : {}), ...framing, ...reference };
     const w = Number(image.width), h = Number(image.height);
     const dims = Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0 && w <= 20000 && h <= 20000 ? { width: Math.round(w), height: Math.round(h) } : {};
     if (image.src){
@@ -312,7 +316,7 @@ export function validateSiteDocument(input, current, seed){
     } else {
       const original = originals.get(slug);
       if (!original) throw bad('Unknown original image: ' + slug);
-      const { archived: _a, focusX: _x, focusY: _y, zoom: _z, ...plain } = original;   // the stored flags must not leak back once they are switched off
+      const { archived: _a, focusX: _x, focusY: _y, zoom: _z, reference: _r, ...plain } = original;   // the stored flags must not leak back once they are switched off
       images.push({ ...plain, ...common });
     }
   }
