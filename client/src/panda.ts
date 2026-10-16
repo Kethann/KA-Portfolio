@@ -46,7 +46,7 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
   // opening it calls the panda over; it leaps back to the board afterwards.
   const visit:{target:Element|null;stage:'idle'|'leap'|'sit'|'back';t:number;from:{x:number;y:number}|null}={target:null,stage:'idle',t:0,from:null};
   const smooth=(t:number)=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
-  let perchTurn=0,lastTurn=0;
+  let perchTurn=0,lastTurn=0,idleSettled=false;
   // The jetpack flight. The panda puts on a jetpack and flying goggles, turns to the side it is heading, lifts off, flies a smooth arc
   // (banking into the turn, the jets roaring harder as it brakes), hovers over the sign and settles on it. Back home it does the same
   // and takes the pack off at the chat button. fl is what the character reads to pose itself.
@@ -120,6 +120,8 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
     if(travel.stage!=='idle'||media.matches)greetingAge=-1;
     if(greetingAge>=0)greetingAge+=dt;
     greeting?.classList.toggle('show',greetingAge>=0&&greetingAge<2.8);
+    // resting at the chat button there is nothing to measure: skipping the layout reads here removes a forced layout on every frame
+    if(idleSettled&&travel.stage==='idle'&&!travel.open&&visit.stage==='idle'&&!media.matches)return 0;
     // Idle mascot shares the launcher's containing block, clipping and native zoom.
     // Detach only while travelling to/from the open conversation.
     const visiting=travel.stage==='idle'&&!travel.open&&visit.stage!=='idle';
@@ -137,6 +139,7 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
       else if(b.left>=width+20)lastPerch={x:b.left-width-12,y:b.top+14};
       else{lastPerch={x:b.left+b.width/2-width/2,y:4};tucked=true;}}
     const home={x:launch.left+launch.width/2-width/2,y:launch.bottom-height-(compact?30:26)};
+    idleSettled=false;
     if(visiting){
       const p=visitStep(dt,home,width,height);
       lastPosition={x:p.x,y:p.y};if(visit.stage==='sit')lastTurn=perchTurn;
@@ -181,6 +184,7 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
         thread.style.opacity='0';
       }
     }
+    idleSettled=travel.stage==='idle'&&!travel.open&&visit.stage==='idle';
     return pose.climb;
   }
   document.addEventListener('ka-chat-state',((event:CustomEvent<{open:boolean}>)=>{
@@ -227,6 +231,7 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
   function tick(now:number){
     frame=0;if(!canRender()||media.matches)return;
     const elapsed=last?now-last:0;
+    if(idleSettled&&last&&elapsed<30&&greetingAge<0){frame=requestAnimationFrame(tick);return;}
     const dt=Math.min(.1,elapsed/1000);last=now;time+=dt;draw(dt);schedule(false);
   }
   function schedule(reset=true){

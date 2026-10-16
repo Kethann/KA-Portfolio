@@ -8,7 +8,7 @@
 //  - a version must keep the homepage contract V1 keeps: fade the #boot-veil out, and dispatch the
 //    'ka-sequence-complete' window event once the logo is fully revealed (the nav, sounds and pages wait for it).
 //
-// V1 is LOCKED: its code must never change. tests/intro-lock.test.mjs fails the build if the fingerprint below no
+// V1 and V2 are LOCKED (V3 is the one being worked on; it gets locked in the same way when it is finished): its code must never change. tests/intro-lock.test.mjs fails the build if the fingerprint below no
 // longer matches the script, so a new idea always becomes a new version instead of an edit to V1.
 export const INTRO_VERSIONS = [
   {
@@ -23,8 +23,16 @@ export const INTRO_VERSIONS = [
     id: 'v2',
     name: 'KA crystal · your bubbles',
     label: 'Version 2',
-    locked: false,
+    locked: true,
     description: 'The same KA crystal intro, with the skill bubbles under your control: show or hide them, pick which ones, put them in order and rename them (Studio > Intro > Bubbles).',
+    sha256: 'db9d138110db5596f8702d69bb582555cbea37f8a5d03bebf9bc6c101d47e14a',
+  },
+  {
+    id: 'v3',
+    name: 'The Timeline Loom',
+    label: 'Version 3',
+    locked: false,
+    description: 'Loki-style green magic: glowing timeline threads rush in from every side, curl and sew the logo together, each stitch flaring and spreading light to its neighbours inside a turning spell circle, then a ring of green fire reveals the crystal. Skill bubbles work here too.',
   },
 ];
 export const INTRO_IDS = INTRO_VERSIONS.map(v => v.id);

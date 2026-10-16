@@ -15,14 +15,25 @@ function scriptOf(id){
   return { tag: html.slice(o, open), code: html.slice(open, close).replace(/\r\n/g, '\n') };
 }
 
-test('Version 1 (the KA crystal intro) is locked: its script is unchanged', () => {
-  const v1 = INTRO_VERSIONS.find(v => v.id === 'v1');
-  assert.ok(v1 && v1.locked, 'V1 is listed and locked');
-  const s = scriptOf('v1');
-  assert.ok(s, 'the V1 script is tagged data-intro="v1"');
-  assert.equal(s.tag, '<script data-intro="v1">', 'V1 runs by default (no type attribute)');
-  assert.equal(createHash('sha256').update(s.code).digest('hex'), v1.sha256,
-    'The locked V1 intro was edited. Revert it, and put new ideas in a new intro version instead.');
+test('Versions 1 and 2 are locked: their scripts are unchanged', () => {
+  for (const id of ['v1', 'v2']){
+    const v = INTRO_VERSIONS.find(x => x.id === id);
+    assert.ok(v && v.locked, id + ' is listed and locked');
+    const s = scriptOf(id);
+    assert.ok(s, 'the ' + id + ' script is tagged data-intro="' + id + '"');
+    if (id === 'v1') assert.equal(s.tag, '<script data-intro="v1">', 'V1 runs by default (no type attribute)');
+    assert.equal(createHash('sha256').update(s.code).digest('hex'), v.sha256,
+      'The locked ' + id.toUpperCase() + ' intro was edited. Revert it, and put new ideas in a new intro version instead.');
+  }
+});
+
+test('Version 3 (the Timeline Loom) exists, is off unless chosen, takes the owner\'s bubbles, and builds on the crystal intro without touching it', () => {
+  const v3 = scriptOf('v3');
+  assert.ok(v3 && /type="text\/plain"/.test(v3.tag));
+  assert.match(v3.code, /window\.KA_INTRO_BUBBLES/);
+  assert.match(v3.code, /function v3PlanThreads/);
+  assert.match(v3.code, /ka-sequence-complete/);
+  assert.ok(INTRO_VERSIONS.some(v => v.id === 'v3'));
 });
 
 test('every listed version has its script, and only V1 runs without the router', () => {
@@ -71,4 +82,14 @@ test('the local dev server switches intros like the live router (V2 runs with th
   assert.match(none, /<script>window\.KA_INTRO_BUBBLES=\[\];<\/script><script data-intro="v2">/);
   assert.match(none, /<script data-intro="v1" type="text\/plain">/);
   assert.ok(!/KA_INTRO_BUBBLES=null/.test(applyIntroToHtml(html, 'v2', null)), 'nothing saved = no override');
+});
+
+test('Version 3 never changes the logo\'s shape: the woven skin is clipped to the logo\'s own outline and the logo mesh is built exactly as in Version 2', () => {
+  const v2 = scriptOf('v2').code, v3 = scriptOf('v3').code;
+  assert.match(v3, /if\(tex\.a<\.02\)discard;/, 'the skin only draws where the logo itself is opaque');
+  const grab = (code, re) => (code.match(re) || [])[0];
+  const logoBuild = /function buildLogo\(\)\{[\s\S]*?\n\}\n/;
+  assert.ok(grab(v2, logoBuild), 'found buildLogo in V2');
+  assert.equal(grab(v3, logoBuild), grab(v2, logoBuild), 'buildLogo is identical to Version 2');
+  assert.equal(grab(v3, /const LOGO_BOX_W = [^\n]*\n/), grab(v2, /const LOGO_BOX_W = [^\n]*\n/), 'the logo box is unchanged');
 });

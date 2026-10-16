@@ -579,9 +579,9 @@ function IntroBubblesCard({ doc, active }: { doc: SiteDoc; active: string }){
         <p className="field-hint" style={{ margin: '4px 0 0' }}>The small round icons with their words that appear around the KA logo. {shown === 0 ? 'None will show.' : shown + ' will show.'} Press Publish changes to apply.</p></div>
       <Switch checked={b.enabled} onChange={v => set({ ...b, enabled: v })} label="Show the bubbles" />
     </div>
-    {active !== 'v2' && <div className="callout" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-      <span className="grow">These choices are used by <b>Version 2</b>. Version 1 is locked and always shows its eight bubbles.</span>
-      <button type="button" className="btn sm primary" onClick={() => updateSite(x => ({ ...x, intro: { ...(x.intro || { version: 'v2' }), version: 'v2' } } as SiteDoc))}>Use Version 2</button>
+    {active === 'v1' && <div className="callout" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      <span className="grow">These choices work in <b>Version 2</b> and <b>Version 3</b>. Version 1 is locked and always shows its eight bubbles.</span>
+      <button type="button" className="btn sm primary" onClick={() => updateSite(x => ({ ...x, intro: { ...(x.intro || { version: 'v3' }), version: 'v3' } } as SiteDoc))}>Use Version 3</button>
     </div>}
     <ul className="list bubble-list" aria-label="Skill bubbles" style={{ opacity: b.enabled ? 1 : 0.5 }}>
       {b.items.map((it, i) => <li key={it.type} className="row" style={{ gap: 8, alignItems: 'center' }}>
