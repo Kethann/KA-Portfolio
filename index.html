@@ -11705,7 +11705,7 @@ replayBtn?.addEventListener('click', () => {
 // and nothing to leak early -- there's no premature-reveal bug this could ever reproduce.
 function settleStatic(){
   V3G = 1; V3_UG.value = 1; v3Lights(1);   // VERSION 3: the finished logo is green, with no liquid, tint or threads left over
-  if (V3.liq) V3.liq.visible = false; if (V3.spell) V3.spell.visible = false; if (V3.sp) V3.sp.pts.visible = false; if (V3.rib) V3.rib.mesh.visible = false; if (V3.fog) V3.fog.visible = false; if (V3.vF) V3.vF.mesh.visible = false; if (V3.smoke) V3.smoke.visible = false; if (V3.vB) V3.vB.mesh.visible = false; if (V3.bg) V3.bg.style.opacity = '1'; if (V3.cv && !V3.hidden) v3Hide();
+  if (V3.liq) V3.liq.visible = false; if (V3.spell) V3.spell.visible = false; if (V3.sp) V3.sp.pts.visible = false; if (V3.rib) V3.rib.mesh.visible = false; if (V3.fog) V3.fog.visible = false; if (V3.vF) V3.vF.mesh.visible = false; if (V3.smoke) V3.smoke.visible = false; if (V3.dust) V3.dust.pts.visible = false; if (V3.vB) V3.vB.mesh.visible = false; if (V3.bg) V3.bg.style.opacity = '1'; if (V3.cv && !V3.hidden) v3Hide();
   clearSurfaceParticles();
   if(cometTrails)cometTrails.mesh.visible=false;
   if(joinSeams)joinSeams.visible=false;
@@ -12219,10 +12219,10 @@ function v3BuildFog(){
       '  float rays=fbm(vec2(atan(p.y-L.y,p.x-L.x)*5.,d*1.2-t*.08))*glow;',
       '  vec3 col=vec3(.003,.014,.012);',
       '  col+=vec3(.012,.10,.085)*fog*(.55+glow*1.2);',   // teal haze
-      '  col+=vec3(.03,.40,.19)*glow*(.5+.7*fog)*uLight;',   // emerald light behind the logo
-      '  col+=vec3(.50,.85,.30)*heart*.5*uLight;',   // its yellow-green heart
+      '  col+=vec3(.03,.30,.15)*glow*(.5+.7*fog)*uLight;',   // emerald light behind the logo
+      '  col+=vec3(.50,.85,.30)*heart*.3*uLight;',   // its yellow-green heart
       '  col+=vec3(.04,.26,.14)*glow2*(.45+fog)*.8;',   // a softer light high on the left
-      '  col+=vec3(.06,.36,.18)*rays*rays*1.3*uLight;',   // shafts of light through the fog
+      '  col+=vec3(.06,.36,.18)*rays*rays*.8*uLight;',   // shafts of light through the fog
       '  col*=mix(.16,1.,smoothstep(.78,.16,length(vec2(p.x/uAsp,p.y))));',   // vignette: the edges fall to near black
       '  col+=(h(gl_FragCoord.xy+fract(t*7.))-.5)/255.;',   // dither
       '  gl_FragColor=vec4(col,uAmt);',
@@ -12303,8 +12303,13 @@ const V3_SMOKE_W = new THREE.Color(1.0, 0.62, 0.30), V3_SMOKE_G = new THREE.Colo
 function v3BuildSmoke(){
   if (reducedMotion || !logoMesh) return;
   const dw = logoMesh.userData.dw, dh = logoMesh.userData.dh, W = dw*1.7, H = dh*1.9, offY = dh*0.3;
+  // a small, soft copy of the logo's silhouette: the smoke rises from this, so its edges are never hard
+  const img = cutoutTex.image, sw = 112, sh = Math.max(16, Math.round(sw*dh/dw)), sc = document.createElement('canvas');
+  sc.width = sw; sc.height = sh;
+  const sg = sc.getContext('2d'); if ('filter' in sg) sg.filter = 'blur(2px)'; if (img) sg.drawImage(img, 0, 0, sw, sh);
+  const soft = new THREE.CanvasTexture(sc); soft.generateMipmaps = false; soft.minFilter = soft.magFilter = THREE.LinearFilter;
   const mat = new THREE.ShaderMaterial(Object.assign({
-    uniforms: { map: { value: cutoutTex }, uTime: { value: 0 }, uAmt: { value: 0 }, uCol: { value: new THREE.Color() }, uOct: { value: V3.low ? 3 : 4 },
+    uniforms: { map: { value: soft }, uTime: { value: 0 }, uAmt: { value: 0 }, uCol: { value: new THREE.Color() }, uOct: { value: V3.low ? 3 : 4 },
       uLogo: { value: new THREE.Vector2(dw, dh) }, uSize: { value: new THREE.Vector2(W, H) }, uOffY: { value: offY } },
     vertexShader: V3_RING_VS,
     fragmentShader: [
@@ -12319,17 +12324,19 @@ function v3BuildSmoke(){
       '  vec2 q=wp*.018;',
       '  vec2 warp=vec2(fbm(q+vec2(0.,-t*.35)),fbm(q+vec2(4.3,1.1)+vec2(0.,-t*.3)))-.5;',
       '  float d=0.;',
-      '  for(int i=0;i<6;i++){',
+      '  for(int i=0;i<9;i++){',
       '    float fi=float(i);',
-      '    vec2 sp=wp+warp*(18.+fi*16.)-vec2(sin(t*.7+fi*1.3)*5.,12.+fi*22.);',   // where this smoke rose from
+      '    vec2 sp=wp+warp*(12.+fi*11.)-vec2(sin(t*.7+fi*1.3)*4.,6.+fi*13.);',   // where this smoke rose from
       '    vec2 luv=sp/uLogo+.5;',
-      '    float inside=step(0.,luv.x)*step(0.,luv.y)*step(luv.x,1.)*step(luv.y,1.);',
-      '    d+=smoothstep(.12,.6,texture2D(map,clamp(luv,0.,1.)).a)*inside*(1.-fi/6.)*.3;',
+      '    float inside=smoothstep(0.,.05,luv.x)*smoothstep(0.,.05,luv.y)*smoothstep(1.,.95,luv.x)*smoothstep(1.,.95,luv.y);',
+      '    d+=texture2D(map,clamp(luv,0.,1.)).a*inside*(1.-fi/9.)*.2;',
       '  }',
-      '  float wisp=fbm(wp*.03+warp*2.2+vec2(0.,-t*.5));',
-      '  d*=smoothstep(.28,.78,wisp)*1.7;',   // broken into curling wisps
-      '  d*=smoothstep(1.,.5,vUv.y)*smoothstep(0.,.08,vUv.y)*smoothstep(0.,.14,vUv.x)*smoothstep(1.,.86,vUv.x);',   // thins out as it climbs
-      '  vec3 col=uCol*d+vec3(.85,1.,.9)*pow(d,3.)*.3;',
+      '  float wisp=fbm(wp*.022+warp*1.5+vec2(0.,-t*.42));',
+      '  d*=mix(.3,1.,smoothstep(.15,.9,wisp))*1.5;',   // soft curling wisps, never cut off
+      '  d*=smoothstep(1.,.45,vUv.y)*smoothstep(0.,.1,vUv.y)*smoothstep(0.,.18,vUv.x)*smoothstep(1.,.82,vUv.x);',   // thins out as it climbs
+      '  d=1.-exp(-d*1.4);',   // saturates softly instead of clipping
+      '  vec3 col=uCol*d*.8+vec3(.85,1.,.9)*d*d*.14;',
+      '  col+=step(.002,d)*(h(gl_FragCoord.xy+fract(t*3.))-.5)/255.;',   // dither: no banding in the faint parts
       '  gl_FragColor=vec4(col*uAmt,0.);',
       '}'].join('\n') }, V3_ADD));
   const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
@@ -12349,6 +12356,65 @@ function v3UpdateSmoke(ts, t){
   if (!S.visible) return;
   const u = S.material.uniforms;
   u.uTime.value = ts; u.uAmt.value = a; u.uCol.value.copy(V3_SMOKE_W).lerp(V3_SMOKE_G, V3G); u.uOct.value = V3.gq >= 2 ? 2 : (V3.low ? 3 : 4);
+}
+
+// ---- space dust: fine points stream out of the core in every direction (some towards the camera), scatter and fade ----
+// It starts when the core drinks the energy and carries on, gently, behind the finished logo like a living background.
+function v3BuildDust(){
+  if (reducedMotion) return;
+  const N = V3.low ? 120 : 260, geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(N*3), life = new Float32Array(N), size = new Float32Array(N), tw = new Float32Array(N);
+  const dyn = (arr, n) => { const b = new THREE.BufferAttribute(arr, n); if (b.setUsage) b.setUsage(THREE.DynamicDrawUsage); return b; };
+  for (let i = 0; i < N; i++) tw[i] = Math.random()*6.28;
+  geo.setAttribute('position', dyn(pos, 3)); geo.setAttribute('aLife', dyn(life, 1)); geo.setAttribute('aSize', dyn(size, 1)); geo.setAttribute('aTw', new THREE.BufferAttribute(tw, 1));
+  const mat = new THREE.ShaderMaterial(Object.assign({
+    uniforms: { uPx: { value: 1 }, uTime: { value: 0 }, uCol: { value: new THREE.Color(0.55, 1.0, 0.7) } },
+    vertexShader: 'attribute float aLife,aSize,aTw;uniform float uPx,uTime;varying float vL;' +
+      'void main(){vec4 mv=modelViewMatrix*vec4(position,1.);vL=aLife*(.65+.35*sin(uTime*.006+aTw));' +
+      'gl_PointSize=aLife>0.?max(1.,aSize*uPx/max(1.,-mv.z)):0.;gl_Position=projectionMatrix*mv;}',
+    fragmentShader: 'uniform vec3 uCol;varying float vL;' +
+      'void main(){if(vL<=0.)discard;float r=length(gl_PointCoord-.5)*2.;if(r>1.)discard;float a=pow(1.-r,1.8);' +
+      'gl_FragColor=vec4((uCol*a+vec3(1.)*pow(a,4.)*.6)*vL,0.);}' }, V3_ADD));
+  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = -3; pts.visible = false; pts.userData.kaKind = 'loomDust';
+  scene.add(pts);
+  V3.dust = { pts, geo, N, pos, life, size, vel: new Float32Array(N*3), age: new Float32Array(N), max: new Float32Array(N), next: 0, alive: 0, acc: 0 };
+}
+function v3UpdateDust(ts, t, dt){
+  const D = V3.dust; if (!D) return;
+  let rate = 0;
+  if (phase === 'assembling' && V3.tg && t >= V3.tg - 40) rate = (V3.low ? 26 : 60)*smootherStep((t - V3.tg)/600);
+  else if (phase === 'held') rate = V3.low ? 10 : 22;
+  if (V3.gq >= 2) rate *= 0.5;
+  D.acc += rate*dt/1000;
+  while (D.acc >= 1){
+    D.acc -= 1;
+    const i = D.next; D.next = (i + 1) % D.N;
+    if (!(D.max[i] > 0)) D.alive++;
+    const u = Math.random()*1.6 - 0.6, a = Math.random()*Math.PI*2, q = Math.sqrt(1 - u*u), s = 40 + Math.random()*170, r0 = 10 + Math.random()*40;   // biased towards the camera
+    D.pos[i*3] = Math.cos(a)*q*r0; D.pos[i*3 + 1] = Math.sin(a)*q*r0; D.pos[i*3 + 2] = -40 + u*r0;
+    D.vel[i*3] = Math.cos(a)*q*s; D.vel[i*3 + 1] = Math.sin(a)*q*s; D.vel[i*3 + 2] = u*s;
+    D.age[i] = 0; D.max[i] = 2600 + Math.random()*2600; D.size[i] = 1.8 + Math.random()*3.2;
+  }
+  if (!D.alive){ D.pts.visible = false; return; }
+  const sec = dt/1000, grow = 1 + 0.35*sec, camZ = camera.position.z;
+  let alive = 0;
+  for (let i = 0; i < D.N; i++){
+    if (!(D.max[i] > 0)) continue;
+    D.age[i] += dt;
+    const j = i*3;
+    if (D.age[i] >= D.max[i] || D.pos[j + 2] > camZ - 60){ D.max[i] = 0; D.life[i] = 0; continue; }
+    alive++;
+    D.vel[j] *= grow; D.vel[j + 1] *= grow; D.vel[j + 2] *= grow;   // gathers pace as it leaves the core
+    D.vel[j] += (Math.random() - 0.5)*30*sec; D.vel[j + 1] += (Math.random() - 0.5)*30*sec;   // and scatters a little
+    D.pos[j] += D.vel[j]*sec; D.pos[j + 1] += D.vel[j + 1]*sec; D.pos[j + 2] += D.vel[j + 2]*sec;
+    const f = D.age[i]/D.max[i];
+    D.life[i] = smootherStep(f/0.12)*(1 - smootherStep((f - 0.55)/0.45));   // fades in, then dissipates
+  }
+  D.alive = alive;
+  const at = D.geo.attributes; at.position.needsUpdate = true; at.aLife.needsUpdate = true; at.aSize.needsUpdate = true;
+  const u = D.pts.material.uniforms;
+  u.uPx.value = renderer.getPixelRatio()*kaLayoutH()/(2*Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)); u.uTime.value = ts;
+  D.pts.visible = true;
 }
 
 const V3_TMP = new THREE.Vector3(), V3_TMP2 = new THREE.Vector3();
@@ -12411,6 +12477,7 @@ function v3Scene(ts, t){
   }
   v3UpdateVines(ts, t);
   v3UpdateSmoke(ts, t);
+  v3UpdateDust(ts, t, dt);
   v3SparkStep(dt);
 }
 
@@ -12539,39 +12606,39 @@ function v3BuildLiquid(){
       '}',
       'void main(){',
       '  vec2 p=(vUv-.5)*uSize;float r=length(p);',
-      '  float rIn=smoothstep(110.,180.,r),rOut=1.-smoothstep(240.+uGrow*120.,340.+uGrow*130.,r);',
-      '  float front=1.-smoothstep(uGrow*440.-80.,uGrow*440.+30.,r);',   // boils outward from the core
+      '  float rIn=smoothstep(85.,195.,r),rOut=1.-smoothstep(195.+uGrow*110.,370.+uGrow*130.,r);',
+      '  float front=1.-smoothstep(uGrow*440.-170.,uGrow*440.+60.,r);',   // boils outward from the core
       '  float ring=rIn*rOut*front;',
       '  if(ring<.003||uAmt<.003){gl_FragColor=vec4(0.);return;}',
       '  float th=atan(p.y,p.x);',
       '  float f0=field(p,r,uTime);',
       '  float fx=field(p+vec2(2.2,0.),r,uTime),fy=field(p+vec2(0.,2.2),r,uTime);',
-      '  vec3 n=normalize(vec3((f0-fx)*30.,(f0-fy)*30.,1.));',
+      '  vec3 n=normalize(vec3((f0-fx)*13.,(f0-fy)*13.,1.));',
       '  float arms=mix(1.,.5+.5*cos(3.*th-4.2*log(r+8.)+uTime*.0011),.55);',
-      '  float body=smoothstep(.40,.60,f0),dens=body*arms*ring;',
-      '  float meniscus=smoothstep(.37,.45,f0)*(1.-smoothstep(.45,.56,f0));',
+      '  float body=smoothstep(.32,.72,f0),dens=body*arms*ring;',
+      '  float meniscus=smoothstep(.30,.45,f0)*(1.-smoothstep(.45,.64,f0));',
       '  vec3 Ld=normalize(vec3(-.45,.62,.75)),H=normalize(Ld+vec3(0.,0.,1.));',
       '  float dif=max(dot(n,Ld),0.),nh=max(dot(n,H),0.);',
-      '  float spec=pow(nh,110.)*1.8+pow(nh,18.)*.22;',
+      '  float spec=pow(nh,48.)*.9+pow(nh,10.)*.16;',
       '  float fres=pow(1.-n.z,2.2);',
       '  float thick=smoothstep(.45,.86,f0);',
-      '  float caus=0.;if(uLite<.5){float cs=field(p+n.xy*46.,r,uTime*1.35);caus=pow(max(0.,1.-abs(cs-.5)*3.2),6.);}',
+      '  float caus=0.;if(uLite<.5){float cs=field(p+n.xy*46.,r,uTime*1.35);caus=pow(max(0.,1.-abs(cs-.5)*2.4),3.);}',
       '  vec3 deep=vec3(0.,.035,.022),em=vec3(.03,.58,.27),lime=vec3(.50,.92,.32),mint=vec3(.86,1.,.86);',   // a dark, natural emerald
       '  vec3 col=mix(deep,em,thick)*(.28+.95*dif)*dens*1.25;',
       '  col+=em*thick*thick*dens*.35;',
-      '  col+=lime*caus*dens*.55;',
+      '  col+=lime*caus*dens*.28;',
       '  col+=mint*spec*dens;',
       '  col+=lime*fres*dens*.5;',
-      '  col+=lime*meniscus*ring*arms*.45;',
+      '  col+=lime*meniscus*ring*arms*.2;',
       '  col+=em*ring*smoothstep(.28,.6,f0)*.08;',
-      '  gl_FragColor=vec4(col*uAmt*.8,0.);',
+      '  gl_FragColor=vec4(col*uAmt*.62,0.);',
       '}'
     ].join('\n') }, V3_ADD));
   const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
   m.scale.set(SZ, SZ, 1); m.position.set(0, 0, -30); m.renderOrder = -2; m.visible = false; m.frustumCulled = false;
   m.userData.kaKind = 'loomLiquid';
   scene.add(m); V3.liq = m;
-  v3BuildFog(); v3BuildSpell(); v3BuildSparks(); v3BuildRibbons(); v3BuildVines(); v3BuildSmoke();
+  v3BuildFog(); v3BuildSpell(); v3BuildSparks(); v3BuildRibbons(); v3BuildVines(); v3BuildSmoke(); v3BuildDust();
   if (!V3.low && (navigator.hardwareConcurrency || 8) <= 4) V3.gq = 1;   // a modest machine starts one step lighter
   v3ApplyQ();
 }
@@ -12587,11 +12654,11 @@ function v3Grade(ts, t){
   if (reducedMotion){ g = 1; ba = 1; }
   else if (phase === 'assembling' && V3.tg){
     g = smootherStep((t - (V3.tg - 40))/240);   // all at once: a quarter of a second
-    la = smootherStep((t - V3.tg + 60)/500) * (1 - smootherStep((t - REVEAL_START - REVEAL_DUR*0.3)/(REVEAL_DUR*0.9)));
-    ba = g;   // the green world arrives with the flip...
-    light = 1 - 0.4*smootherStep((t - REVEAL_START - REVEAL_DUR*0.5)/1600);   // ...and its light settles once the logo is revealed
-  } else if (phase === 'held'){ g = 1; ba = 1; light = 0.6; }   // the finished logo stays in its green world
-  else if (phase === 'disassembling'){ g = 1 - smootherStep(clamp01(t/(DISASSEMBLE_DUR*0.9))); ba = g; light = 0.6; }
+    la = smootherStep((t - V3.tg + 60)/1000) * (1 - smootherStep((t - REVEAL_START - REVEAL_DUR*0.2)/(REVEAL_DUR*1.2)));   // rises and drains away slowly
+    ba = smootherStep((t - V3.tg + 40)/1400);   // the green world eases in after the flip...
+    light = 0.75 - 0.3*smootherStep((t - REVEAL_START - REVEAL_DUR*0.5)/2200);   // ...and its light eases down once the logo is revealed
+  } else if (phase === 'held'){ g = 1; ba = 1; light = 0.45; }   // the finished logo stays in its green world
+  else if (phase === 'disassembling'){ g = 1 - smootherStep(clamp01(t/(DISASSEMBLE_DUR*0.9))); ba = 1 - smootherStep(clamp01(t/DISASSEMBLE_DUR)); light = 0.45; }
   V3G = g; V3_UG.value = g; V3.la = la;
   if (Math.abs(g - V3.lastG) > 0.002 || (g === 0) !== (V3.lastG === 0)){ V3.lastG = g; v3Lights(g); }
   if (V3.liq){
