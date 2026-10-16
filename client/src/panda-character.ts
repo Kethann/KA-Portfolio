@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import {activities, type Activity} from './panda-activity';
 
+/** how the panda is flying right now (all 0..1 unless noted): written by the visit flight in panda.ts, read by the character */
+export type Flight = { face: number /* -1 left … 1 right: which way it turns */; bank: number; wear: number /* the jetpack is on */; thrust: number /* jet power */; pitch: number /* forward lean */; settle: number /* touchdown squash */ };
 export type Character = {
+  fly?: (time: number, dt: number, f: Flight) => void;
   root: THREE.Group;
   activities: readonly Activity[];
   update: (activity: Activity, elapsed: number, weight: number, time: number, look: THREE.Vector2, dt: number) => void;
@@ -90,9 +93,62 @@ export function createPanda(compact: boolean): Character {
       stroke.position.y=y;stroke.rotation.z=angle;mark.add(stroke);
     }
   }
+  // ---- the jetpack: two steel tanks with orange bands and nozzles, and flames that follow the thrust; flying goggles on the forehead
+  const pack = new THREE.Group(); pack.position.set(0,.66,-.52); pack.visible = false; body.add(pack);
+  const steel = new THREE.MeshStandardMaterial({color:0xcfd5de,metalness:.75,roughness:.32});
+  const accent = new THREE.MeshStandardMaterial({color:0xff7a2f,metalness:.35,roughness:.45});
+  const dark = new THREE.MeshStandardMaterial({color:0x2a2d35,metalness:.5,roughness:.5});
+  const tankGeo = new THREE.CylinderGeometry(.115,.115,.56,compact?12:20), capGeo = new THREE.SphereGeometry(.115,compact?10:16,8,0,Math.PI*2,0,Math.PI/2);
+  const bandGeo = new THREE.CylinderGeometry(.123,.123,.07,compact?12:20), nozzleGeo = new THREE.CylinderGeometry(.078,.052,.1,12);
+  const coneGeo = (r: number, h: number) => { const g = new THREE.ConeGeometry(r,h,compact?8:12,1,true); g.rotateX(Math.PI); g.translate(0,-h/2,0); return g; };
+  const outerFlame = new THREE.MeshBasicMaterial({color:0xff7a22,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+  const innerFlame = new THREE.MeshBasicMaterial({color:0xfff0b0,transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+  const flames: THREE.Group[] = [];
+  for (const sign of [-1,1]) {
+    const tank = new THREE.Group(); tank.position.x = sign*.17; pack.add(tank);
+    tank.add(new THREE.Mesh(tankGeo,steel));
+    const cap = new THREE.Mesh(capGeo,steel); cap.position.y = .28; tank.add(cap);
+    for (const y of [.12,-.1]) { const band = new THREE.Mesh(bandGeo,accent); band.position.y = y; tank.add(band); }
+    const nozzle = new THREE.Mesh(nozzleGeo,dark); nozzle.position.y = -.33; tank.add(nozzle);
+    const flame = new THREE.Group(); flame.position.y = -.38; tank.add(flame); flames.push(flame);
+    flame.add(new THREE.Mesh(coneGeo(.082,.5),outerFlame)); const core = new THREE.Mesh(coneGeo(.045,.34),innerFlame); flame.add(core);
+  }
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(.5,.07,.09),dark); bar.position.set(0,.16,.02); pack.add(bar);
+  const goggles = new THREE.Group(); goggles.position.set(0,.62,.04); goggles.visible = false; head.add(goggles);
+  const glass = new THREE.MeshStandardMaterial({color:0x6bc7ff,metalness:.3,roughness:.08,emissive:0x1b4a66,emissiveIntensity:.6});
+  const strap = new THREE.Mesh(new THREE.TorusGeometry(.6,.026,8,compact?24:40),dark); strap.rotation.x = Math.PI/2; strap.scale.set(1,.76,1); strap.position.set(0,-.1,0); goggles.add(strap);
+  for (const sign of [-1,1]) {
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(.115,.115,.05,compact?14:22),glass); lens.rotation.x = Math.PI/2; lens.position.set(sign*.2,-.02,.42); goggles.add(lens);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(.118,.026,8,compact?14:22),accent); rim.position.set(sign*.2,-.02,.445); goggles.add(rim);
+  }
   const toy = ellipsoid(root,new THREE.MeshPhysicalMaterial({color:0xb5a1a0,roughness:.4,clearcoat:.4}),[.6,-.03,.47],[.14,.14,.14]);
   root.rotation.y=-.13;
-  return {root,activities,dispose:()=>disposeObject(root),climb(time,weight){
+  return {root,activities,dispose:()=>disposeObject(root),fly(time,dt,f){
+    const worn = f.wear > .01;
+    pack.visible = goggles.visible = worn;
+    if (!worn) { root.rotation.y = -.13; return; }
+    const ease = (x: number) => { x = Math.max(0,Math.min(1,x)); return x*x*(3-2*x); };
+    // the pack pops on with a little overshoot
+    const pop = f.wear < 1 ? ease(f.wear)*1.12 - Math.sin(ease(f.wear)*Math.PI)*.08 : 1;
+    pack.scale.setScalar(Math.max(.01,pop)*1.22); goggles.scale.setScalar(Math.max(.01,pop));
+    const air = Math.min(1,f.thrust*2.2);   // flying pose while the jets are on
+    const turn = 1-Math.exp(-dt*9);
+    root.rotation.y += (-.13 + f.face*.95 - root.rotation.y)*turn;   // turns to the side it flies to
+    body.rotation.x += f.pitch*.3*air; body.rotation.z += f.bank*-.12*air;
+    body.scale.y *= 1 - f.settle*.05;
+    head.rotation.x += (-.14*f.pitch - head.rotation.x)*turn*air;
+    arms.forEach((arm,i) => { const sign = i ? 1 : -1;
+      arm.rotation.z += (sign*(1.05 + Math.sin(time*9+i*2)*.07) - arm.rotation.z)*air;
+      arm.rotation.x += (.55 - arm.rotation.x)*air; });
+    const flick = (k: number) => .86 + .1*Math.sin(time*41+k*2.3) + .07*Math.sin(time*73+k);
+    flames.forEach((flame,i) => {
+      const t = f.thrust, on = t > .03; flame.visible = on;
+      if (!on) return;
+      const len = (.34 + t*1.2)*flick(i);
+      flame.scale.set(.85 + t*.3 + Math.sin(time*55+i)*.06, len*2, .85 + t*.3);
+    });
+    outerFlame.opacity = .5 + .4*f.thrust; innerFlame.opacity = .6 + .4*f.thrust;
+  },climb(time,weight){
     if(!weight)return;
     arms.forEach((arm,i)=>{const sign=i?1:-1;arm.rotation.z=THREE.MathUtils.lerp(arm.rotation.z,sign*(2.55+Math.sin(time*7+i*Math.PI)*.23),weight);arm.rotation.x=THREE.MathUtils.lerp(arm.rotation.x,-.15,weight);});
     head.rotation.x=THREE.MathUtils.lerp(head.rotation.x,-.08,weight);
