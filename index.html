@@ -202,7 +202,7 @@ function kaLayoutH(){ return kaZoomed() ? document.documentElement.clientHeight 
     var isZoomed = window.visualViewport && window.visualViewport.scale > 1.1;
     var wDiff = window.outerWidth - window.innerWidth;
     var hDiff = window.outerHeight - window.innerHeight;
-    if (!isZoomed && (wDiff > 160 || hDiff > 160)){
+    if (!isZoomed && (wDiff > 300 || hDiff > 450)){
       devtoolsOpen = true; hold(HOLD);
     } else if (devtoolsOpen){
       devtoolsOpen = false; apply();
@@ -10373,9 +10373,14 @@ function init(){
   // formula (below) is unchanged, it just now measures back from the true end of Phase B.
   ASSEMBLY_FULL_T = Math.max(...shards.map(s => s.repairDelay + s.repairDur));
   REVEAL_START = Math.max(0, ASSEMBLY_FULL_T - REVEAL_LEAD);
+  // VERSION 3: once the weave is whole the energy runs into the core (ab0), the world turns green (tg), liquid magic swirls, then the reveal
+  V3.ab0 = ASSEMBLY_FULL_T - 650; V3.tg = V3.ab0 + 780;
+  REVEAL_START = Math.max(REVEAL_START, V3.tg + 1000);
   buildDust();
   buildLogo();
+  logoMesh.material.uniforms.uGreen = V3_UG;   // VERSION 3: the logo turns green with the rest of the world
   v3BuildSkin();   // VERSION 3: the woven skin on the logo
+  v3BuildLiquid();   // VERSION 3: green liquid magic behind the logo + the background tint
   buildJoinSeams();
   buildIcons();
   buildSkillCallouts();
@@ -10448,6 +10453,15 @@ function init(){
 // away. `uTint` is still a plain multiply, now doing double duty: the raw-to-resolved color
 // transmutation during flight (v5 �2.4) AND the fusion-spark overexposure at landing, combined
 // (not overwritten) by JS before this uniform is set -- see updateShardsAssembling.
+// VERSION 3: one shared "how green is the world" value read by every shader, and the colour grade it drives
+const V3_UG = { value: reducedMotion ? 1 : 0 };
+const V3_GLSL_GREEN = `
+  vec3 kaGreen(vec3 c){
+    float l = dot(c, vec3(.299,.587,.114)), k = clamp(l*1.2, 0., 1.5);
+    vec3 g = k < .5 ? mix(vec3(.01,.13,.055), vec3(.05,.74,.32), k*2.) : mix(vec3(.05,.74,.32), vec3(.80,1.,.88), clamp((k-.5)*2., 0., 1.));
+    return g * (1. + max(0., k-1.)*.6);
+  }
+`;
 const shardVertex = `
   varying vec2 vUv;
   void main(){
@@ -10461,7 +10475,9 @@ const shardFragment = `
   uniform vec3 uTint;
   uniform vec3 uGlow;
   uniform float uEnergy;
+  uniform float uGreen;
   varying vec2 vUv;
+  ${V3_GLSL_GREEN}
   void main(){
     vec4 tex = texture2D(map, vUv);
     if (tex.a < 0.01) discard;
@@ -10472,9 +10488,10 @@ const shardFragment = `
     float facet = smoothstep(.18,.85,max(tex.r,max(tex.g,tex.b)));
     vec3 base = tex.rgb * uTint + uGlow * facet * .22;
     // green magic: the piece glows from within, brightest along its facets, before it cures into crystal
-    vec3 magic = mix(vec3(.10,.95,.50), vec3(.82,1.0,.88), facet) * (.30 + .90*facet);
+    vec3 magic = mix(mix(vec3(.95,.52,.18), vec3(1.0,.90,.74), facet), mix(vec3(.10,.95,.50), vec3(.82,1.0,.88), facet), uGreen) * (.30 + .90*facet);
     float en = clamp(uEnergy, 0., 1.);
-    gl_FragColor = vec4(mix(base, magic, en*.78) + vec3(.05,.45,.22) * en * facet, tex.a * uOpacity);
+    vec3 outc = mix(base, magic, en*.78) + mix(vec3(.40,.22,.07), vec3(.05,.45,.22), uGreen) * en * facet;
+    gl_FragColor = vec4(mix(outc, kaGreen(outc), uGreen), tex.a * uOpacity);
   }
 `;
 
@@ -10605,7 +10622,7 @@ function buildShards_LEGACY_10piece_v27(){
         // "uncured" multiply on the real photographed texture) rather than neutral (1,1,1) --
         // see updateShardsIdle/Assembling for the mix toward RESOLVED_TINT (neutral, i.e. the
         // texture's own true polished color) as each shard actually flies into place.
-        uTint: { value: new THREE.Vector3(RAW_TINT.x, RAW_TINT.y, RAW_TINT.z) }, uEnergy: { value: 0 },
+        uTint: { value: new THREE.Vector3(RAW_TINT.x, RAW_TINT.y, RAW_TINT.z) }, uEnergy: { value: 0 }, uGreen: V3_UG,
       },
       vertexShader: shardVertex, fragmentShader: shardFragment,
       transparent: true, side: THREE.DoubleSide, depthWrite: false,
@@ -10795,6 +10812,7 @@ const pulseFragment = `
   uniform float uTime;         // now driven every frame regardless of phase (see frame()) so
                                 // time-based effects -- the wipe noise during assembly, and the
                                 // subtle facet lighting below -- never freeze between phases
+  uniform float uGreen;
   uniform float uCharge;       // 0..1, driven by chargeEnv in updateLogoReveal -- the "Charge &
                                 // Bloom" pre-reveal beat that replaced the old camera zoom punch.
                                 // Purely photometric: brightens the crystal itself and boosts the
@@ -10802,6 +10820,7 @@ const pulseFragment = `
                                 // or the reveal mask, so it cannot read as anything moving.
   varying vec2 vUv;
 
+  ${V3_GLSL_GREEN}
   // cheap value noise -- gives the wipe boundary (and its shard-side counterpart, see
   // uWipeJitter in JS) an organic, uneven edge instead of a razor-straight line, and animates
   // slowly so the merge itself reads as active, living motion rather than a static gradient --
@@ -10897,6 +10916,7 @@ const pulseFragment = `
       float fresnel=.045+whiteFacet*.19+rim*.12;
       col=mix(col,col*.84+reflected*.5,fresnel*environment);
     }
+    col = mix(col, kaGreen(col), uGreen);
     gl_FragColor = vec4(col, tex.a * uAlpha * revealMask);
   }
 `;
@@ -10940,9 +10960,9 @@ function buildJoinSeams(){
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
   const material=new THREE.ShaderMaterial({
-    uniforms:{map:{value:cutoutTex},uWH:{value:new THREE.Vector2(dw,dh)},uPixel:{value:new THREE.Vector2(2/CUT_W,2/CUT_H)},uFront:{value:0},uEnvelope:{value:0}},
+    uniforms:{map:{value:cutoutTex},uWH:{value:new THREE.Vector2(dw,dh)},uPixel:{value:new THREE.Vector2(2/CUT_W,2/CUT_H)},uFront:{value:0},uEnvelope:{value:0},uGreen:V3_UG},
     vertexShader:`varying vec2 vPoint;void main(){vPoint=position.xy;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
-    fragmentShader:`uniform sampler2D map;uniform vec2 uWH,uPixel;uniform float uFront,uEnvelope;varying vec2 vPoint;
+    fragmentShader:`uniform sampler2D map;uniform vec2 uWH,uPixel;uniform float uFront,uEnvelope,uGreen;varying vec2 vPoint;
       void main(){
         vec2 uv=vPoint/uWH+.5;
         if(any(lessThan(uv,vec2(0.)))||any(greaterThan(uv,vec2(1.))))discard;
@@ -10952,7 +10972,7 @@ function buildJoinSeams(){
         float radius=length(vPoint)/(.5*length(uWH));
         float head=exp(-pow((radius-uFront)/.095,2.));
         float tail=exp(-pow((radius-uFront+.13)/.2,2.))*.22;
-        gl_FragColor=vec4(vec3(1.,.78,.47)*(1.+head*.8),alpha*(head+tail)*uEnvelope);
+        gl_FragColor=vec4(mix(vec3(1.,.78,.47),vec3(.45,1.,.72),uGreen)*(1.+head*.8),alpha*(head+tail)*uEnvelope);
       }`,
     transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false
   });
@@ -11680,6 +11700,8 @@ replayBtn?.addEventListener('click', () => {
 // function instead renders the single correct FINAL state once, synchronously, with no animation
 // and nothing to leak early -- there's no premature-reveal bug this could ever reproduce.
 function settleStatic(){
+  V3G = 1; V3_UG.value = 1; v3Lights(1);   // VERSION 3: the finished logo is green, with no liquid, tint or threads left over
+  if (V3.liq) V3.liq.visible = false; if (V3.bg) V3.bg.style.opacity = '0'; if (V3.cv && !V3.hidden) v3Hide();
   clearSurfaceParticles();
   if(cometTrails)cometTrails.mesh.visible=false;
   if(joinSeams)joinSeams.visible=false;
@@ -11831,18 +11853,29 @@ window.__kaDebugScene = function(){
   return report;
 };
 // ============================================================ VERSION 3: THE TIMELINE LOOM ==
-// Loki / TVA mood. Instead of crystal shards flying in from the edges, glowing green timeline threads rush in from every
-// side, curling like streams of time, and sew the logo together: each thread lands on a piece of the crystal, snaps taut
-// and rings like a plucked string, a green flare marks the stitch, and the glow spreads along short filaments to the
-// neighbouring pieces, which light up and "cure" from green magic into crystal. A slowly turning spell circle (rings, ticks,
-// runes) hangs around the logo, and a shock-ring of green fire carries the final reveal.
-// Everything lives on one 2D overlay canvas over the 3D scene (additive light), planned in v3PlanThreads() and drawn in v3Frame().
-const V3 = { cv:null, x:null, w:1, h:1, dpr:1, threads:[], links:[], parts:[], flashes:[], sigA:null, sigB:null,
-  prev:'', hidden:false, burst:false, lastTs:0, low:isMobile, ks:1, cx:0, cy:0, R:200, ema:0, lvl:0 };
+// Loki / TVA mood, in three beats.
+//  1. Multiversal threads in their own natural colours (amber, gold, blue, violet, crimson, teal) shake and wander in from every
+//     side, curl like streams of time and stitch the crystal pieces together, each landing with a flare. Until now everything
+//     (circle, mist, crystal) keeps its normal colours.
+//  2. When the weave is complete a pulse of light runs down every thread into the logo's core. The core drinks the energy,
+//     flashes, and EVERYTHING turns green at once: threads, circle, mist, background, crystal and logo.
+//  3. Green liquid magic (Doctor Doom's emerald) boils up from the core and swirls round the logo, then a shock-ring of green
+//     fire carries the reveal.
+// The overlay lives on one 2D canvas over the 3D scene (additive light, planned in v3PlanThreads, drawn in v3Draw); the liquid is a
+// shader plane behind the logo and the background tint a div behind the 3D canvas. v3Grade() drives the colour flip.
+const V3 = { cv:null, x:null, w:1, h:1, dpr:1, threads:[], links:[], parts:[], flashes:[], sigA:null, sigB:null, sigNA:null, sigNB:null,
+  prev:'', hidden:false, burst:false, lastTs:0, low:isMobile, ks:1, cx:0, cy:0, R:200, ema:0, lvl:0,
+  ab0:0, tg:0, fed:0, absorbed:false, ringAt:-1, liq:null, bg:null, lastG:-1, lastBg:-1 };
 window.__kaV3 = V3;   // read-only debugging aid: V3.ema is the average drawing time in ms, V3.lvl the quality step
-const V3_GREEN = '64,255,150', V3_MINT = '224,255,238', V3_GOLD = '255,206,112';
+const V3_GREEN = '64,255,150', V3_MINT = '224,255,238', V3_GOLD = '255,206,112', V3_AMBER = '255,176,104', V3_WARM = '255,244,226';
+const V3_RGB = { green:[64,255,150], mint:[224,255,238], gold:[255,206,112], amber:[255,176,104], warm:[255,244,226], lime:[190,255,140],
+  haze:[120,130,200], hazeMid:[60,50,110], hazeGreen:[20,150,90] };
+const V3_PAL = [[255,150,60],[255,206,112],[96,176,255],[182,126,255],[255,96,116],[96,236,224],[236,240,255]];   // the threads' natural colours
+const V3_KEY0 = new THREE.Color(0xff8a4c), V3_KEY1 = new THREE.Color(0x4cff9a), V3_RIM0 = new THREE.Color(0xff3a1a), V3_RIM1 = new THREE.Color(0x1aff6a);
+let V3G = 0;   // 0 = natural colours, 1 = everything green (the same value is in V3_UG for the shaders)
 const V3_P = new THREE.Vector3();
 const v3Ease = (p) => 1 - Math.pow(1 - clamp01(p), 2.2);
+function v3Mix(a, b, k){ return Math.round(a[0] + (b[0] - a[0])*k) + ',' + Math.round(a[1] + (b[1] - a[1])*k) + ',' + Math.round(a[2] + (b[2] - a[2])*k); }
 function v3Screen(x, y, z, o){ V3_P.set(x, y, z).project(camera); o.x = (V3_P.x*0.5 + 0.5)*V3.w; o.y = (-V3_P.y*0.5 + 0.5)*V3.h; return o; }
 
 function v3Resize(){
@@ -11855,28 +11888,29 @@ function v3Resize(){
   V3.ks = Math.max(0.8, Math.min(1.6, Math.min(w, h) / 760));
 }
 
-// The spell circle is drawn once into two bitmaps (one turns clockwise, one the other way) and only rotated while playing.
-function v3BuildSigil(){
+// The spell circle is drawn once into bitmaps (one turns clockwise, one the other way) and only rotated while playing.
+// Two sets: natural (amber and white-gold) for the first beat, green for the rest; they cross-fade when everything turns green.
+function v3SigilSet(cMain, cLight, cGold){
   const S = V3.low ? 640 : 1024, half = S/2, ref = S*0.322;   // ref: radius of "1.0" in the bitmap
-  const mk = () => { const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); g.translate(half, half); g.lineCap = 'round'; g.lineJoin = 'round'; g.shadowColor = 'rgba(' + V3_GREEN + ',0.9)'; g.shadowBlur = S*0.012; return { c, g }; };
+  const mk = () => { const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); g.translate(half, half); g.lineCap = 'round'; g.lineJoin = 'round'; g.shadowColor = 'rgba(' + cMain + ',0.9)'; g.shadowBlur = S*0.012; return { c, g }; };
   const A = mk(), B = mk();
   let g = A.g;
-  g.strokeStyle = 'rgba(' + V3_GREEN + ',0.55)'; g.lineWidth = S*0.0022; g.setLineDash([S*0.014, S*0.010]);
+  g.strokeStyle = 'rgba(' + cMain + ',0.55)'; g.lineWidth = S*0.0022; g.setLineDash([S*0.014, S*0.010]);
   g.beginPath(); g.arc(0, 0, ref*1.10, 0, Math.PI*2); g.stroke(); g.setLineDash([]);
-  g.strokeStyle = 'rgba(' + V3_MINT + ',0.34)'; g.lineWidth = S*0.0016;
+  g.strokeStyle = 'rgba(' + cLight + ',0.34)'; g.lineWidth = S*0.0016;
   for (let k = 0; k < 2; k++){ g.beginPath(); for (let i = 0; i <= 4; i++){ const a = i*Math.PI/2 + k*Math.PI/4 + Math.PI/4; const px = Math.cos(a)*ref*1.02, py = Math.sin(a)*ref*1.02; if (i) g.lineTo(px, py); else g.moveTo(px, py); } g.stroke(); }
-  g.fillStyle = 'rgba(' + V3_MINT + ',0.8)';
+  g.fillStyle = 'rgba(' + cLight + ',0.8)';
   for (let i = 0; i < 8; i++){ const a = i*Math.PI/4 + Math.PI/4; g.beginPath(); g.arc(Math.cos(a)*ref*1.02, Math.sin(a)*ref*1.02, S*0.0042, 0, Math.PI*2); g.fill(); }
   g = B.g;
-  g.strokeStyle = 'rgba(' + V3_GREEN + ',0.5)'; g.lineWidth = S*0.002;
+  g.strokeStyle = 'rgba(' + cMain + ',0.5)'; g.lineWidth = S*0.002;
   g.beginPath(); g.arc(0, 0, ref*1.30, 0, Math.PI*2); g.stroke();
-  g.strokeStyle = 'rgba(' + V3_GREEN + ',0.38)'; g.lineWidth = S*0.0014;
+  g.strokeStyle = 'rgba(' + cMain + ',0.38)'; g.lineWidth = S*0.0014;
   g.beginPath(); g.arc(0, 0, ref*1.19, 0, Math.PI*2); g.stroke();
-  for (let i = 0; i < 120; i++){ const a = i*Math.PI/60, long = i%10 === 0, r0 = ref*1.19, r1 = ref*(long ? 1.26 : 1.225); g.strokeStyle = 'rgba(' + V3_MINT + ',' + (long ? 0.6 : 0.3) + ')'; g.beginPath(); g.moveTo(Math.cos(a)*r0, Math.sin(a)*r0); g.lineTo(Math.cos(a)*r1, Math.sin(a)*r1); g.stroke(); }
+  for (let i = 0; i < 120; i++){ const a = i*Math.PI/60, long = i%10 === 0, r0 = ref*1.19, r1 = ref*(long ? 1.26 : 1.225); g.strokeStyle = 'rgba(' + cLight + ',' + (long ? 0.6 : 0.3) + ')'; g.beginPath(); g.moveTo(Math.cos(a)*r0, Math.sin(a)*r0); g.lineTo(Math.cos(a)*r1, Math.sin(a)*r1); g.stroke(); }
   // a belt of invented runes: short strokes in a small cell, set round the ring
   let seed = 7;
   const rnd = () => { seed = (seed*16807) % 2147483647; return seed/2147483647; };
-  g.strokeStyle = 'rgba(' + V3_GOLD + ',0.62)'; g.lineWidth = S*0.0019;
+  g.strokeStyle = 'rgba(' + cGold + ',0.62)'; g.lineWidth = S*0.0019;
   const RUNES = 30;
   for (let i = 0; i < RUNES; i++){
     g.save(); g.rotate(i*Math.PI*2/RUNES); g.translate(0, -ref*1.245);
@@ -11885,7 +11919,11 @@ function v3BuildSigil(){
     for (let k = 0; k < n; k++){ const y = (rnd()*2 - 1)*u*1.6, dx = (rnd() < 0.5 ? -1 : 1)*u*(0.6 + rnd()*0.9), dy = (rnd()*2 - 1)*u*1.2; g.moveTo(0, y); g.lineTo(dx, y + dy); }
     g.stroke(); g.restore();
   }
-  V3.sigA = A.c; V3.sigB = B.c; V3.sigRef = ref; V3.sigS = S;
+  return { A: A.c, B: B.c, ref, S };
+}
+function v3BuildSigil(){
+  const gr = v3SigilSet(V3_GREEN, V3_MINT, V3_GOLD), na = v3SigilSet(V3_AMBER, V3_WARM, V3_GOLD);
+  V3.sigA = gr.A; V3.sigB = gr.B; V3.sigNA = na.A; V3.sigNB = na.B; V3.sigRef = gr.ref; V3.sigS = gr.S;
 }
 
 // Plans the whole sequence once the pieces exist: which pieces get a thread ("seeds", spread evenly over the logo), when each
@@ -11904,18 +11942,18 @@ function v3PlanThreads(){
   const owner = P.map(p => { let bi = 0, bd = 1e9; seeds.forEach((si, k) => { const d = Math.hypot(p.x - P[si].x, p.y - P[si].y); if (d < bd){ bd = d; bi = k; } }); return { k: bi, d: bd }; });
   // the middle is stitched first and the weave builds outward, with enough scatter to feel alive
   const order = seeds.map((si, k) => ({ k, key: Math.hypot(P[si].x, P[si].y)/maxR*0.55 + Math.random()*0.45 })).sort((a, b) => a.key - b.key);
-  const T0 = 800, SPAN = 1900, arrive = new Array(K);
+  const T0 = 600, SPAN = 1500, arrive = new Array(K);
   order.forEach((o, r) => { arrive[o.k] = T0 + Math.pow(r/Math.max(1, K - 1), 0.9)*SPAN + Math.random()*90; });
   V3.threads = seeds.map((si, k) => {
-    const dur = 820 + Math.random()*520, arr = Math.max(arrive[k], dur + 60);
-    return { shard: shards[si], k, arrive: arr, start: arr - dur, dur, hit: false, px: new Float32Array(30), py: new Float32Array(30) };
+    const dur = 780 + Math.random()*480, arr = Math.max(arrive[k], dur + 60);
+    return { shard: shards[si], k, arrive: arr, start: arr - dur, dur, hit: false, fed: false, px: new Float32Array(30), py: new Float32Array(30) };
   });
   V3.links = [];
   shards.forEach((s, i) => {
     const o = owner[i], th = V3.threads[o.k], isSeed = seeds[o.k] === i;
     if (isSeed) s.repairDelay = th.arrive;
     else { s.repairDelay = th.arrive + 70 + o.d*2.3 + Math.random()*90; V3.links.push({ a: th.shard, b: s, at: s.repairDelay, bend: (Math.random()*2 - 1), hit: false }); }
-    s.repairDur = 720 + Math.random()*260;
+    s.repairDur = 700 + Math.random()*240;
     // no flight: each piece materialises in place, a few units off, and settles as the thread pulls it taut
     s.isInitiallyMissing = true; s.isMegaOutlier = false; s.mesh.visible = false;
     const lp = s.landedPos;
@@ -11932,15 +11970,17 @@ function v3PlanThreads(){
     v3Resize(); v3BuildSigil();
   }
 }
-// each play (and every replay) gets its own shapes: where the threads come from and how they curl
+// each play (and every replay) gets its own shapes: where the threads come from, how they curl and shake, and their natural colour
 function v3Shuffle(){
   const K = V3.threads.length, rot = Math.random()*Math.PI*2;
   V3.threads.forEach((th, k) => {
     th.ang = rot + (k/K)*Math.PI*2 + (Math.random() - 0.5)*(Math.PI*2/K)*1.5;
     th.sgn = k % 5 === 0 ? -1 : 1;   // a few curl the other way, so threads cross and braid
     th.swirl = 0.16 + Math.random()*0.26; th.swirl2 = 0.10 + Math.random()*0.22;
-    th.phase = Math.random()*6.28; th.freq = 2 + Math.random()*3; th.amp = 3 + Math.random()*7; th.twist = Math.random()*6.28;
-    th.gold = Math.random() < 0.14; th.tail = 0.26 + Math.random()*0.18; th.hit = false;
+    th.phase = Math.random()*6.28; th.freq = 2 + Math.random()*3; th.amp = 4 + Math.random()*9; th.twist = Math.random()*6.28;
+    th.gold = Math.random() < 0.14; th.tail = 0.26 + Math.random()*0.18; th.hit = false; th.fed = false;
+    th.nat = th.gold ? V3_RGB.gold : V3_PAL[Math.floor(Math.random()*V3_PAL.length)];
+    th.abr = ((k*0.61803398875) % 1)*260 + Math.random()*70;   // when this thread's energy runs into the core, relative to the absorb start
   });
   V3.links.forEach(l => { l.hit = false; l.bend = Math.random()*2 - 1; });
 }
@@ -11958,10 +11998,88 @@ function v3Pt(th, u, tx, ty, ax, ay, nx, ny, L, ts, pluck, out){
   const cx = ax + (tx - ax)*0.68 + nx*L*th.swirl2*th.sgn*0.7, cy = ay + (ty - ay)*0.68 + ny*L*th.swirl2*th.sgn*0.7;
   let x = iu*iu*iu*ax + 3*iu*iu*u*bx + 3*iu*u*u*cx + u*u*u*tx, y = iu*iu*iu*ay + 3*iu*iu*u*by + 3*iu*u*u*cy + u*u*u*ty;
   const env = Math.sin(Math.PI*Math.min(1, Math.max(0, u)));
-  const w = th.amp*V3.ks*env*Math.sin(u*th.freq*Math.PI*2 + th.phase + ts*0.0016) + pluck*env*Math.sin(th.pw - (1 - u)*16);
+  // a slow wave plus a quicker, smaller one: the timeline shakes
+  const w = th.amp*V3.ks*env*(Math.sin(u*th.freq*Math.PI*2 + th.phase + ts*0.0016) + 0.4*Math.sin(u*th.freq*5.1 + th.phase*1.7 - ts*0.0041)) + pluck*env*Math.sin(th.pw - (1 - u)*16);
   out.x = x + nx*w; out.y = y + ny*w;
 }
 
+// ---- green liquid magic (a shader plane behind the logo) and the background tint (a div behind the 3D canvas) ----
+function v3BuildLiquid(){
+  if (reducedMotion) return;
+  const SZ = 800, oct = V3.low ? 3 : 4;
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uAmt: { value: 0 }, uGrow: { value: 0 }, uSize: { value: new THREE.Vector2(SZ, SZ) } },
+    vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    fragmentShader: [
+      'uniform float uTime,uAmt,uGrow;uniform vec2 uSize;varying vec2 vUv;',
+      'float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}',
+      'float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}',
+      'float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<' + oct + ';i++){s+=a*n2(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return s;}',
+      // the liquid surface: a domain-warped noise field, twisted harder near the core so it reads as a vortex
+      'float field(vec2 p,float r,float tm){',
+      '  float sw=3.4/(1.+r*.011)+tm*.00035,ca=cos(sw),sa=sin(sw);',
+      '  vec2 q=mat2(ca,-sa,sa,ca)*p;',
+      '  vec2 w=vec2(fbm(q*.011+vec2(0.,tm*.00022)),fbm(q*.011+vec2(5.2,1.3)-vec2(tm*.00018,0.)));',
+      '  return fbm(q*.0095+2.4*(w-.5)+vec2(tm*.0001,-tm*.00008));',
+      '}',
+      'void main(){',
+      '  vec2 p=(vUv-.5)*uSize;float r=length(p);',
+      '  float rIn=smoothstep(115.,185.,r),rOut=1.-smoothstep(235.+uGrow*110.,335.+uGrow*120.,r);',
+      '  float front=1.-smoothstep(uGrow*430.-80.,uGrow*430.+30.,r);',   // boils outward from the core
+      '  float ring=rIn*rOut*front;',
+      '  if(ring<.003||uAmt<.003){gl_FragColor=vec4(0.);return;}',
+      '  float th=atan(p.y,p.x);',
+      '  float f0=field(p,r,uTime);',
+      '  float f1=field(p+vec2(-1.9,2.5),r,uTime);',
+      '  float bump=clamp((f0-f1)*10.+.5,0.,1.);',   // light from the upper left rolling over the surface
+      '  float arms=mix(1.,.5+.5*cos(3.*th-4.2*log(r+8.)+uTime*.0011),.55);',
+      '  float body=smoothstep(.40,.60,f0);',
+      '  float dens=body*arms*ring;',
+      '  float meniscus=smoothstep(.37,.45,f0)*(1.-smoothstep(.45,.56,f0));',
+      '  vec3 deep=vec3(0.,.17,.06),em=vec3(.05,.85,.36),lime=vec3(.60,1.,.42),mint=vec3(.86,1.,.93);',
+      '  vec3 col=mix(deep,em,smoothstep(.45,.80,f0))*dens*1.2;',
+      '  col+=lime*meniscus*ring*arms*.85;',
+      '  col+=mint*pow(bump,7.)*dens*.8;',
+      '  col+=em*ring*smoothstep(.28,.6,f0)*.10;',
+      '  gl_FragColor=vec4(col*uAmt,0.);',
+      '}'
+    ].join('\n'),
+    transparent: true, blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
+    blendEquationAlpha: THREE.AddEquation, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor, depthWrite: false, depthTest: false, toneMapped: false,
+  });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+  m.scale.set(SZ, SZ, 1); m.position.set(0, 0, -30); m.renderOrder = -2; m.visible = false; m.frustumCulled = false;
+  m.userData.kaKind = 'loomLiquid';
+  scene.add(m); V3.liq = m;
+  // behind the 3D canvas: a deep green wash with a glow in the middle, for the circle to sit on
+  const bg = document.createElement('div'); bg.className = 'v3-bg'; bg.setAttribute('aria-hidden', 'true');
+  bg.style.cssText = 'position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at 50% 50%,rgba(10,110,58,.62) 0%,rgba(4,52,30,.66) 36%,rgba(0,18,11,.86) 100%);';
+  stage.insertBefore(bg, stage.firstChild); V3.bg = bg;
+}
+function v3Lights(g){
+  keyLight.color.copy(V3_KEY0).lerp(V3_KEY1, g);
+  rimLight.color.copy(V3_RIM0).lerp(V3_RIM1, g);
+  if (dust) dust.inst.material.color.setRGB(1 - 0.72*g, 1, 1 - 0.5*g);   // the warm motes turn green with everything else
+}
+// the colour flip: decides how green the world is this frame and moves the liquid and the background with it
+function v3Grade(ts, t){
+  let g = 0, la = 0, ba = 0;
+  if (reducedMotion) g = 1;
+  else if (phase === 'assembling' && V3.tg){
+    g = smootherStep((t - (V3.tg - 40))/240);   // all at once: a quarter of a second
+    la = smootherStep((t - V3.tg + 60)/500) * (1 - smootherStep((t - REVEAL_START - REVEAL_DUR*0.3)/(REVEAL_DUR*0.9)));
+    ba = g * (1 - smootherStep((t - REVEAL_START - REVEAL_DUR*0.5)/1600));
+  } else if (phase === 'held') g = 1;
+  else if (phase === 'disassembling') g = 1 - smootherStep(clamp01(t/(DISASSEMBLE_DUR*0.9)));
+  V3G = g; V3_UG.value = g;
+  if (Math.abs(g - V3.lastG) > 0.002 || (g === 0) !== (V3.lastG === 0)){ V3.lastG = g; v3Lights(g); }
+  if (V3.liq){
+    const u = V3.liq.material.uniforms;
+    u.uAmt.value = la; u.uTime.value = ts; u.uGrow.value = V3.tg ? smootherStep((t - V3.tg)/900) : 0;
+    V3.liq.visible = la > 0.004;
+  }
+  if (V3.bg && Math.abs(ba - V3.lastBg) > 0.004){ V3.lastBg = ba; V3.bg.style.opacity = ba.toFixed(3); }
+}
 
 // The woven skin: an extra texture laid ON the logo (never changing its outline: it is clipped to the logo's own alpha).
 // Fine green threads cross in two directions over the crystal, glowing brightest on the bright facets, with light running
@@ -12038,12 +12156,12 @@ function v3Frame(ts, t){
   }
   V3.prev = phase;
 }
-function v3Begin(){ V3.hidden = false; V3.cv.style.display = ''; V3.parts.length = 0; V3.flashes.length = 0; V3.burst = false; V3.lastTs = 0; v3Shuffle(); }
+function v3Begin(){ V3.hidden = false; V3.cv.style.display = ''; V3.parts.length = 0; V3.flashes.length = 0; V3.burst = false; V3.fed = 0; V3.absorbed = false; V3.ringAt = -1; V3.lastTs = 0; v3Shuffle(); }
 function v3Hide(){ V3.hidden = true; V3.x.clearRect(0, 0, V3.w, V3.h); V3.cv.style.display = 'none'; V3.parts.length = 0; V3.flashes.length = 0; }
 
 function v3Draw(ts, t){
   const t0 = performance.now();
-  const x = V3.x, w = V3.w, h = V3.h, ks = V3.ks, M = V3.lvl >= 1 ? 14 : (V3.low ? 18 : 26);
+  const x = V3.x, w = V3.w, h = V3.h, ks = V3.ks, M = V3.lvl >= 1 ? 14 : (V3.low ? 18 : 26), G = V3G, K = Math.max(1, V3.threads.length);
   const dt = V3.lastTs ? Math.min(50, ts - V3.lastTs) : 16; V3.lastTs = ts;
   x.setTransform(V3.dpr, 0, 0, V3.dpr, 0, 0); x.clearRect(0, 0, w, h);
   x.globalCompositeOperation = 'lighter'; x.lineCap = 'round'; x.lineJoin = 'round';
@@ -12052,20 +12170,52 @@ function v3Draw(ts, t){
   V3.cx = cx; V3.cy = cy; V3.R = R;
   const revealT = clamp01((t - REVEAL_START)/REVEAL_DUR), revealE = smootherStep(revealT);
   const gone = 1 - smootherStep((t - REVEAL_START)/(REVEAL_DUR*0.85));   // everything dissolves into the reveal
+  // the colours of the moment: natural until the core has drunk the energy, then green
+  const cT = v3Mix(V3_RGB.amber, V3_RGB.green, G), cM = v3Mix(V3_RGB.warm, V3_RGB.mint, G), cGold = v3Mix(V3_RGB.gold, V3_RGB.lime, G);
 
-  // green mist behind the logo
-  {
-    const a = (0.05 + 0.13*smootherStep(t/1400)) * (0.88 + 0.12*Math.sin(ts*0.0034)) * (1 - smootherStep((t - REVEAL_START - REVEAL_DUR*0.5)/1000));
-    if (a > 0.004 && V3.lvl < 2){ const g = x.createRadialGradient(cx, cy, 0, cx, cy, R*2.1); g.addColorStop(0, 'rgba(' + V3_GREEN + ',' + a + ')'); g.addColorStop(0.55, 'rgba(20,150,90,' + a*0.4 + ')'); g.addColorStop(1, 'rgba(0,60,40,0)'); x.fillStyle = g; x.fillRect(cx - R*2.2, cy - R*2.2, R*4.4, R*4.4); }
+  // the core drinks the energy: it is the whole weave's destination
+  if (!V3.absorbed && V3.tg && t >= V3.tg - 40){
+    V3.absorbed = true; V3.ringAt = ts;
+    v3Flash(cx, cy, R*0.85, true); v3Burst(cx, cy, V3.low ? 40 : 90, 300*ks, true);
   }
-  // the spell circle: fades in as the threads gather, turns, then bursts outward with the reveal
+  const fedE = V3.fed/K, sinceFlip = V3.absorbed ? clamp01((t - V3.tg)/760) : 0;
+
+  // mist behind the logo: cool and faint at first, green once everything turns
+  {
+    const a = (0.04 + 0.14*smootherStep(t/1400)*(0.35 + 0.65*G)) * (0.88 + 0.12*Math.sin(ts*0.0034)) * (1 - smootherStep((t - REVEAL_START - REVEAL_DUR*0.5)/1000));
+    if (a > 0.004 && V3.lvl < 2){ const g = x.createRadialGradient(cx, cy, 0, cx, cy, R*2.1); g.addColorStop(0, 'rgba(' + v3Mix(V3_RGB.haze, V3_RGB.green, G) + ',' + a + ')'); g.addColorStop(0.55, 'rgba(' + v3Mix(V3_RGB.hazeMid, V3_RGB.hazeGreen, G) + ',' + a*0.4 + ')'); g.addColorStop(1, 'rgba(0,40,30,0)'); x.fillStyle = g; x.fillRect(cx - R*2.2, cy - R*2.2, R*4.4, R*4.4); }
+  }
+  // the core's charge: grows as each thread delivers its energy, flares at the flip
+  {
+    const a = (fedE*0.55 + (V3.absorbed ? 0.4*(1 - sinceFlip) : 0)) * gone, r = R*(0.16 + 0.42*fedE + (V3.absorbed ? 0.3*(1 - sinceFlip) : 0));
+    if (a > 0.01){
+      const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, 'rgba(255,255,255,' + Math.min(1, a) + ')'); g.addColorStop(0.35, 'rgba(' + cM + ',' + a*0.6 + ')'); g.addColorStop(1, 'rgba(' + cT + ',0)');
+      x.fillStyle = g; x.fillRect(cx - r, cy - r, r*2, r*2);
+    }
+  }
+  // the flip's shock ring: a ring of light races out from the core as the world turns green
+  if (V3.ringAt >= 0){
+    const a = (ts - V3.ringAt)/820;
+    if (a < 1){
+      const q = 1 - a, rr = R*(0.15 + 1.55*v3Ease(a));
+      x.strokeStyle = 'rgba(' + cT + ',' + 0.5*q*gone + ')'; x.lineWidth = (12*q + 2)*ks; x.beginPath(); x.arc(cx, cy, rr, 0, Math.PI*2); x.stroke();
+      x.strokeStyle = 'rgba(255,255,255,' + 0.75*q*q*gone + ')'; x.lineWidth = (2.5 + 3*q)*ks; x.beginPath(); x.arc(cx, cy, rr, 0, Math.PI*2); x.stroke();
+    }
+  }
+  // the spell circle: fades in as the threads gather (amber), turns green with the world, then bursts outward with the reveal
   {
     const a = smootherStep((t - 250)/1500) * (1 - revealE);
     if (a > 0.01 && V3.sigA){
-      const sc = (R/V3.sigRef) * (0.9 + 0.1*smootherStep(t/1800) + 0.28*revealE), size = V3.sigS*sc, hs = size/2;
-      x.save(); x.globalAlpha = a*0.9; x.translate(cx, cy);
-      x.save(); x.rotate(ts*0.00020); x.drawImage(V3.sigA, -hs, -hs, size, size); x.restore();
-      x.save(); x.rotate(-ts*0.00014); x.drawImage(V3.sigB, -hs, -hs, size, size); x.restore();
+      const pulse = 0.07*Math.sin(Math.PI*sinceFlip)*(V3.absorbed ? 1 : 0);
+      const sc = (R/V3.sigRef) * (0.9 + 0.1*smootherStep(t/1800) + 0.28*revealE + pulse), size = V3.sigS*sc, hs = size/2;
+      x.save(); x.translate(cx, cy);
+      if (G < 0.99){ x.globalAlpha = a*0.8*(1 - G);
+        x.save(); x.rotate(ts*0.00020); x.drawImage(V3.sigNA, -hs, -hs, size, size); x.restore();
+        x.save(); x.rotate(-ts*0.00014); x.drawImage(V3.sigNB, -hs, -hs, size, size); x.restore(); }
+      if (G > 0.01){ x.globalAlpha = a*0.9*G;
+        x.save(); x.rotate(ts*0.00020); x.drawImage(V3.sigA, -hs, -hs, size, size); x.restore();
+        x.save(); x.rotate(-ts*0.00014); x.drawImage(V3.sigB, -hs, -hs, size, size); x.restore(); }
       x.restore();
     }
   }
@@ -12080,22 +12230,23 @@ function v3Draw(ts, t){
     const dx = tmpB.x - tmpA.x, dy = tmpB.y - tmpA.y, len = Math.hypot(dx, dy) || 1, nx = -dy/len, ny = dx/len, bend = l.bend*len*0.16;
     const ex = tmpA.x + dx*grow, ey = tmpA.y + dy*grow;
     x.beginPath(); x.moveTo(tmpA.x, tmpA.y); x.quadraticCurveTo(tmpA.x + dx*0.5*grow + nx*bend, tmpA.y + dy*0.5*grow + ny*bend, ex, ey);
-    x.strokeStyle = 'rgba(' + V3_GREEN + ',' + 0.18*f*gone + ')'; x.lineWidth = 5*ks; x.stroke();
-    x.strokeStyle = 'rgba(' + V3_MINT + ',' + 0.8*f*gone + ')'; x.lineWidth = 1.1*ks; x.stroke();
+    x.strokeStyle = 'rgba(' + cT + ',' + 0.18*f*gone + ')'; x.lineWidth = 5*ks; x.stroke();
+    x.strokeStyle = 'rgba(' + cM + ',' + 0.8*f*gone + ')'; x.lineWidth = 1.1*ks; x.stroke();
     if (!l.hit && age >= 320){ l.hit = true; v3Flash(tmpB.x, tmpB.y, 15*ks, false); v3Burst(tmpB.x, tmpB.y, 3, 70*ks, false); }
   }
-  // the threads
-  const head = { x: 0, y: 0 }, tail = { x: 0, y: 0 }, T = { x: 0, y: 0 };
+  // the threads, each in its own natural colour; once the weave is whole, a pulse runs down each one into the core
+  const tail = { x: 0, y: 0 }, T = { x: 0, y: 0 };
   const R0 = Math.hypot(w, h)*0.62;
   for (let k = 0; k < V3.threads.length; k++){
     const th = V3.threads[k];
     if (t < th.start) continue;
     const p = clamp01((t - th.start)/th.dur), age = t - th.arrive;
     const u1 = v3Ease(p);
+    const ab = V3.tg ? V3.ab0 + th.abr : 1e9;   // when this thread's energy starts toward the core
     let u0, alpha;
     if (age <= 0){ u0 = Math.max(0, u1 - th.tail); alpha = smootherStep((t - th.start)/180); }
-    else { u0 = lerp(Math.max(0, 1 - th.tail), 0, smootherStep(age/520)); alpha = 1 - smootherStep((age - 650)/1500); }
-    alpha *= gone;
+    else { u0 = lerp(Math.max(0, 1 - th.tail), 0, smootherStep(age/520)); alpha = lerp(1, 0.66, smootherStep(age/700)); }
+    alpha *= gone * (1 - smootherStep((t - ab - 560)/420));   // once drained, the thread lets go
     v3Screen(th.shard.landedPos.x, th.shard.landedPos.y, th.shard.landedPos.z, T);
     if (age > 0 && !th.hit){ th.hit = true; v3Flash(T.x, T.y, 30*ks, true); v3Burst(T.x, T.y, V3.low ? 8 : 14, 120*ks, th.gold); }
     if (alpha <= 0.01) continue;
@@ -12105,7 +12256,7 @@ function v3Draw(ts, t){
     const pluck = age > 0 ? 11*ks*Math.exp(-age/260) : 0;
     const px = th.px, py = th.py, pt = { x: 0, y: 0 };
     for (let i = 0; i <= M; i++){ v3Pt(th, u0 + (u1 - u0)*i/M, T.x, T.y, ax, ay, nx, ny, L, ts, pluck, pt); px[i] = pt.x; py[i] = pt.y; }
-    const col = th.gold ? V3_GOLD : V3_GREEN;
+    const col = v3Mix(th.nat, V3_RGB.green, G);
     x.beginPath(); x.moveTo(px[0], py[0]); for (let i = 1; i <= M; i++) x.lineTo(px[i], py[i]);
     x.strokeStyle = 'rgba(' + col + ',' + 0.10*alpha + ')'; x.lineWidth = 7*ks; x.stroke();
     const hx = px[M], hy = py[M], tx = px[0], ty = py[0];
@@ -12114,14 +12265,14 @@ function v3Draw(ts, t){
       g.addColorStop(0, 'rgba(' + col + ',0)'); g.addColorStop(1, 'rgba(' + col + ',' + 0.62*alpha + ')');
       x.strokeStyle = g; x.lineWidth = 2.6*ks; x.stroke();
       const g2 = x.createLinearGradient(tx, ty, hx, hy);
-      g2.addColorStop(0, 'rgba(' + V3_MINT + ',0)'); g2.addColorStop(0.82, 'rgba(' + V3_MINT + ',' + 0.5*alpha + ')'); g2.addColorStop(1, 'rgba(255,255,255,' + alpha + ')');
+      g2.addColorStop(0, 'rgba(' + cM + ',0)'); g2.addColorStop(0.82, 'rgba(' + cM + ',' + 0.5*alpha + ')'); g2.addColorStop(1, 'rgba(255,255,255,' + alpha + ')');
       x.strokeStyle = g2; x.lineWidth = 1.05*ks; x.stroke();
     }
-    if (!V3.low && V3.lvl === 0 && (u1 - u0) > 0.08){   // two fine strands twist round the core, like a spun thread
-      for (let sdx = -1; sdx <= 1; sdx += 2){
+    if (!V3.low && V3.lvl === 0 && (u1 - u0) > 0.08){   // three fine strands twist round the core, like a spun thread
+      for (let sdx = -1; sdx <= 1; sdx++){
         x.beginPath();
-        for (let i = 0; i <= M; i++){ const uu = u0 + (u1 - u0)*i/M, off = sdx*1.9*ks*Math.sin(uu*26 + th.twist + ts*0.004), ddx = i ? px[i] - px[i - 1] : px[1] - px[0], ddy = i ? py[i] - py[i - 1] : py[1] - py[0], dl = Math.hypot(ddx, ddy) || 1; const qx = px[i] - ddy/dl*off, qy = py[i] + ddx/dl*off; if (i) x.lineTo(qx, qy); else x.moveTo(qx, qy); }
-        x.strokeStyle = 'rgba(' + col + ',' + 0.30*alpha + ')'; x.lineWidth = 0.8*ks; x.stroke();
+        for (let i = 0; i <= M; i++){ const uu = u0 + (u1 - u0)*i/M, off = (sdx ? sdx*1.9 : 0.8)*ks*Math.sin(uu*26 + th.twist + sdx*2.1 + ts*0.004), ddx = i ? px[i] - px[i - 1] : px[1] - px[0], ddy = i ? py[i] - py[i - 1] : py[1] - py[0], dl = Math.hypot(ddx, ddy) || 1; const qx = px[i] - ddy/dl*off, qy = py[i] + ddx/dl*off; if (i) x.lineTo(qx, qy); else x.moveTo(qx, qy); }
+        x.strokeStyle = 'rgba(' + col + ',' + (sdx ? 0.30 : 0.22)*alpha + ')'; x.lineWidth = 0.8*ks; x.stroke();
       }
     }
     if (p < 1){   // the head: a bright bead throwing off sparks
@@ -12130,17 +12281,42 @@ function v3Draw(ts, t){
       x.fillStyle = gr; x.fillRect(hx - 18*ks, hy - 18*ks, 36*ks, 36*ks);
       if (Math.random() < 0.55) v3Part(hx, hy, (Math.random() - 0.5)*40*ks, (Math.random() - 0.5)*40*ks, 380 + Math.random()*420, (0.8 + Math.random()*1.4)*ks, th.gold ? 2 : (Math.random() < 0.3 ? 1 : 0));
     }
+    // the energy: a bright run down the thread to its piece, then straight on into the core
+    const ua = (t - ab)/380;
+    if (ua > 0 && ua < 1.05){
+      const pu1 = Math.pow(clamp01(ua), 1.5), pu0 = Math.max(0, pu1 - 0.32), N = V3.low ? 7 : 11;
+      let bx = T.x, by = T.y;
+      x.beginPath();
+      for (let i = 0; i <= N; i++){ v3Pt(th, pu0 + (pu1 - pu0)*i/N, T.x, T.y, ax, ay, nx, ny, L, ts, 0, pt); if (i) x.lineTo(pt.x, pt.y); else x.moveTo(pt.x, pt.y); bx = pt.x; by = pt.y; }
+      x.strokeStyle = 'rgba(' + col + ',' + 0.40*alpha + ')'; x.lineWidth = 8*ks; x.stroke();
+      x.strokeStyle = 'rgba(' + cM + ',' + 0.95*alpha + ')'; x.lineWidth = 2.3*ks; x.stroke();
+      const gr = x.createRadialGradient(bx, by, 0, bx, by, 14*ks);
+      gr.addColorStop(0, 'rgba(255,255,255,' + alpha + ')'); gr.addColorStop(0.3, 'rgba(' + col + ',' + 0.6*alpha + ')'); gr.addColorStop(1, 'rgba(' + col + ',0)');
+      x.fillStyle = gr; x.fillRect(bx - 15*ks, by - 15*ks, 30*ks, 30*ks);
+    }
+    const cb = (t - (ab + 380))/260;
+    if (cb > 0){
+      const ee = clamp01(cb)*clamp01(cb), hx2 = lerp(T.x, cx, ee), hy2 = lerp(T.y, cy, ee), sx = lerp(T.x, cx, Math.max(0, ee - 0.5)), sy = lerp(T.y, cy, Math.max(0, ee - 0.5));
+      if (cb < 1.0){
+        const g = x.createLinearGradient(sx, sy, hx2, hy2);
+        g.addColorStop(0, 'rgba(' + col + ',0)'); g.addColorStop(1, 'rgba(255,255,255,' + 0.9*alpha + ')');
+        x.beginPath(); x.moveTo(sx, sy); x.lineTo(hx2, hy2); x.strokeStyle = g; x.lineWidth = 2.2*ks; x.stroke();
+        const gr = x.createRadialGradient(hx2, hy2, 0, hx2, hy2, 12*ks);
+        gr.addColorStop(0, 'rgba(255,255,255,' + alpha + ')'); gr.addColorStop(1, 'rgba(' + col + ',0)');
+        x.fillStyle = gr; x.fillRect(hx2 - 13*ks, hy2 - 13*ks, 26*ks, 26*ks);
+      } else if (!th.fed){ th.fed = true; V3.fed++; }
+    }
   }
   // flashes: a ring, a soft bloom and four spikes where a thread lands or a piece lights
   for (let i = V3.flashes.length - 1; i >= 0; i--){
     const f = V3.flashes[i]; if (f.t0 < 0) f.t0 = ts;
     const a = (ts - f.t0)/f.life; if (a >= 1){ V3.flashes.splice(i, 1); continue; }
-    const q = 1 - a, r = f.r*(0.35 + 1.15*v3Ease(a));
+    const q = 1 - a, r = f.r*(0.35 + 1.15*v3Ease(a)), fg = gone*(0.55 + 0.45*G);
     const g = x.createRadialGradient(f.x, f.y, 0, f.x, f.y, r*1.6);
-    g.addColorStop(0, 'rgba(255,255,255,' + 0.85*q*gone + ')'); g.addColorStop(0.3, 'rgba(' + V3_GREEN + ',' + 0.45*q*gone + ')'); g.addColorStop(1, 'rgba(' + V3_GREEN + ',0)');
+    g.addColorStop(0, 'rgba(255,255,255,' + 0.85*q*fg + ')'); g.addColorStop(0.3, 'rgba(' + cT + ',' + 0.45*q*fg + ')'); g.addColorStop(1, 'rgba(' + cT + ',0)');
     x.fillStyle = g; x.fillRect(f.x - r*1.7, f.y - r*1.7, r*3.4, r*3.4);
-    x.strokeStyle = 'rgba(' + V3_MINT + ',' + 0.7*q*q*gone + ')'; x.lineWidth = 1.4*ks; x.beginPath(); x.arc(f.x, f.y, r, 0, Math.PI*2); x.stroke();
-    if (f.life > 500){ x.strokeStyle = 'rgba(255,255,255,' + 0.6*q*gone + ')'; x.lineWidth = 1.1*ks; x.beginPath(); x.moveTo(f.x - r*1.5, f.y); x.lineTo(f.x + r*1.5, f.y); x.moveTo(f.x, f.y - r*1.5); x.lineTo(f.x, f.y + r*1.5); x.stroke(); }
+    x.strokeStyle = 'rgba(' + cM + ',' + 0.7*q*q*fg + ')'; x.lineWidth = 1.4*ks; x.beginPath(); x.arc(f.x, f.y, r, 0, Math.PI*2); x.stroke();
+    if (f.life > 500){ x.strokeStyle = 'rgba(255,255,255,' + 0.6*q*fg + ')'; x.lineWidth = 1.1*ks; x.beginPath(); x.moveTo(f.x - r*1.5, f.y); x.lineTo(f.x + r*1.5, f.y); x.moveTo(f.x, f.y - r*1.5); x.lineTo(f.x, f.y + r*1.5); x.stroke(); }
   }
   // the reveal: a shock-ring of green fire and a surge of light travel outward with the wipe
   if (revealT > 0 && revealT < 1){
@@ -12155,7 +12331,7 @@ function v3Draw(ts, t){
   // sparks and motes
   const sec = dt/1000;
   for (let cls = 0; cls < 3; cls++){
-    x.fillStyle = 'rgb(' + (cls === 0 ? V3_GREEN : cls === 1 ? V3_MINT : V3_GOLD) + ')';
+    x.fillStyle = 'rgb(' + (cls === 0 ? cT : cls === 1 ? cM : cGold) + ')';
     for (let i = V3.parts.length - 1; i >= 0; i--){
       const q = V3.parts[i]; if (q.cls !== cls) continue;
       const a = q.life/q.max;
@@ -12206,6 +12382,7 @@ function frame(ts){
   // Gallery scrolling gets the GPU once reconstruction has finished.
   if (phase === 'held' && (!heroVisible || document.hidden)) return;
   const t = ts - phaseStart;
+  v3Grade(ts, t);   // VERSION 3: how green the world is this frame
   updateLogoHoverCue(); // no-op unless the click-to-toggle interaction is actually live
 
   // Driven unconditionally, every frame, off the raw animation clock (ts) rather than the
@@ -12794,7 +12971,7 @@ function buildShards(){
         // "uncured" multiply on the real photographed texture) rather than neutral (1,1,1) --
         // see updateShardsIdle/Assembling for the mix toward RESOLVED_TINT (neutral, i.e. the
         // texture's own true polished color) as each shard actually flies into place.
-        uTint: { value: new THREE.Vector3(RAW_TINT.x, RAW_TINT.y, RAW_TINT.z) }, uEnergy: { value: 0 },
+        uTint: { value: new THREE.Vector3(RAW_TINT.x, RAW_TINT.y, RAW_TINT.z) }, uEnergy: { value: 0 }, uGreen: V3_UG,
         uGlow: { value: new THREE.Vector3(0, 0, 0) }, // ambient scattered-phase shine, see updateShardsIdle
       },
       vertexShader: shardVertex, fragmentShader: shardFragment,
@@ -13083,18 +13260,18 @@ function buildShardGlow(){
   geom.setAttribute('aRect',new THREE.InstancedBufferAttribute(rects,4));
   geom.setAttribute('aEmission',new THREE.InstancedBufferAttribute(seeds,3));
   const mat=new THREE.ShaderMaterial({
-    uniforms:{map:{value:texture},uTime:{value:0},uMotion:{value:1}},
+    uniforms:{map:{value:texture},uTime:{value:0},uMotion:{value:1},uGreen:V3_UG},
     vertexShader:`attribute vec4 aRect;attribute vec3 aEmission;varying vec2 vUv,vLocal;varying vec3 vEmission,vStrength;
       void main(){vLocal=uv;vUv=aRect.xy+uv*aRect.zw;vEmission=aEmission;vStrength=instanceColor;
         gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.);}`,
-    fragmentShader:`uniform sampler2D map;uniform float uTime,uMotion;varying vec2 vUv,vLocal;varying vec3 vEmission,vStrength;
+    fragmentShader:`uniform sampler2D map;uniform float uTime,uMotion,uGreen;varying vec2 vUv,vLocal;varying vec3 vEmission,vStrength;
       void main(){vec3 mask=texture2D(map,vUv).rgb;
         float pulse=1.+uMotion*(.07*sin(uTime*.63*vEmission.z+vEmission.x)+.035*sin(uTime*1.13+vEmission.x*2.3));
         float spark=pow(max(0.,sin(uTime*.71*vEmission.z+vEmission.x)),48.)*uMotion;
         float facetSpot=pow(max(0.,sin(dot(vLocal,vec2(17.,23.))+vEmission.x)),16.);
-        vec3 hot=vec3(.80,1.,.86)*mask.r*(.65+spark*facetSpot*.7);
-        vec3 close=vec3(.10,.95,.45)*mask.g*1.35;
-        vec3 air=vec3(.04,.70,.30)*mask.b*1.1;
+        vec3 hot=mix(vec3(1.,.93,.78),vec3(.80,1.,.86),uGreen)*mask.r*(.65+spark*facetSpot*.7);
+        vec3 close=mix(vec3(.95,.55,.15),vec3(.10,.95,.45),uGreen)*mask.g*1.35;
+        vec3 air=mix(vec3(.75,.28,.05),vec3(.04,.70,.30),uGreen)*mask.b*1.1;
         float boundary=smoothstep(0.,.06,min(min(vLocal.x,1.-vLocal.x),min(vLocal.y,1.-vLocal.y)));
         vec3 emission=(hot+close+air)*pulse*vEmission.y*vStrength*boundary;
         if(max(emission.r,max(emission.g,emission.b))<.001)discard;
@@ -13137,9 +13314,9 @@ function buildResolvedEmission(){
   const bloomTexture=new THREE.CanvasTexture(bloomCanvas);bloomTexture.generateMipmaps=false;bloomTexture.minFilter=THREE.LinearFilter;
   const mat=new THREE.ShaderMaterial({
     uniforms:{uBloom:{value:bloomTexture},map:{value:cutoutTex},uOwners:{value:owners},uStep:{value:new THREE.Vector2(3/CUT_W,3/CUT_H)},
-      uGlowEnvelope:{value:1},uWH:{value:new THREE.Vector2(dw,dh)},uTime:{value:0},uMotion:{value:1},uOpacity:{value:0},uReveal:{value:-2}},
+      uGlowEnvelope:{value:1},uGreen:V3_UG,uWH:{value:new THREE.Vector2(dw,dh)},uTime:{value:0},uMotion:{value:1},uOpacity:{value:0},uReveal:{value:-2}},
     vertexShader:`varying vec2 vUv,vBloomUv;void main(){vBloomUv=uv;vUv=uv*1.2-.1;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
-    fragmentShader:`uniform sampler2D map,uOwners,uBloom;uniform vec2 uStep,uWH;uniform float uTime,uMotion,uOpacity,uReveal,uGlowEnvelope;varying vec2 vUv,vBloomUv;
+    fragmentShader:`uniform sampler2D map,uOwners,uBloom;uniform vec2 uStep,uWH;uniform float uTime,uMotion,uOpacity,uReveal,uGlowEnvelope,uGreen;varying vec2 vUv,vBloomUv;
       vec4 crystal(vec2 uv){if(uv.x<0.||uv.y<0.||uv.x>1.||uv.y>1.)return vec4(0.);return texture2D(map,uv);}
       float energy(vec4 c){float l=dot(c.rgb,vec3(.299,.587,.114));return c.a*smoothstep(.12,.78,l);}
       void main(){
@@ -13165,6 +13342,7 @@ function buildResolvedEmission(){
         // Suppress all source RGB in dark transparent texels; only a soft sampled halo remains.
         float radius=length((vUv-.5)*uWH)/(length(uWH)*.5);
         float reveal=1.-smoothstep(uReveal-.11,uReveal+.11,radius);
+        float rl=dot(radiance,vec3(.3,.59,.11));vec3 rg=mix(vec3(.05,.85,.38),vec3(.85,1.,.9),clamp(rl*.9,0.,1.))*rl*1.25;radiance=mix(radiance,rg,uGreen);
         radiance*=uGlowEnvelope*uOpacity*reveal*pulse*(.72+owner.g*.45);
         if(max(radiance.r,max(radiance.g,radiance.b))<.001)discard;
         gl_FragColor=vec4(radiance,0.);

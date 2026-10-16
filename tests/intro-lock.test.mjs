@@ -93,3 +93,17 @@ test('Version 3 never changes the logo\'s shape: the woven skin is clipped to th
   assert.equal(grab(v3, logoBuild), grab(v2, logoBuild), 'buildLogo is identical to Version 2');
   assert.equal(grab(v3, /const LOGO_BOX_W = [^\n]*\n/), grab(v2, /const LOGO_BOX_W = [^\n]*\n/), 'the logo box is unchanged');
 });
+
+test('Version 3 stays in natural colours until the core has absorbed the threads, then turns the whole scene green at once, with liquid magic', () => {
+  const v2 = scriptOf('v2').code, v3 = scriptOf('v3').code;
+  assert.match(v3, /const V3_PAL = \[\[255,150,60\]/, 'threads carry their own natural colours');
+  assert.match(v3, /V3\.ab0 = ASSEMBLY_FULL_T - 650; V3\.tg = V3\.ab0 \+ 780;/, 'the energy runs into the core, then the flip');
+  assert.match(v3, /REVEAL_START = Math\.max\(REVEAL_START, V3\.tg \+ 1000\)/, 'the liquid beat sits between the flip and the reveal');
+  assert.match(v3, /function v3Grade\(ts, t\)/); assert.match(v3, /function v3BuildLiquid\(\)/);
+  // one shared value drives the shard shader, the logo shader, the crystal glow and the seams
+  assert.equal((v3.match(/uGreen: V3_UG/g) || []).length, 2, 'both shard materials read the shared value');
+  assert.match(v3, /logoMesh\.material\.uniforms\.uGreen = V3_UG/);
+  assert.match(v3, /col = mix\(col, kaGreen\(col\), uGreen\);/, 'the finished logo is graded green');
+  assert.match(v3, /settleStatic\(\)\{\s*V3G = 1;/, 'reduced motion shows the finished logo already green');
+  assert.ok(!v2.includes('kaGreen') && !v2.includes('V3_UG'), 'Version 2 never sees the green grade');
+});
