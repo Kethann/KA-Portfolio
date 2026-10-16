@@ -10457,10 +10457,13 @@ function init(){
 const V3_UG = { value: reducedMotion ? 1 : 0 };
 const V3_GLSL_GREEN = `
   vec3 kaGreen(vec3 c){
-    float l = dot(c, vec3(.299,.587,.114)), k = clamp(l*1.2, 0., 1.5);
-    vec3 g = k < .5 ? mix(vec3(.006,.10,.045), vec3(.05,.74,.32), k*2.) : mix(vec3(.05,.74,.32), vec3(.80,1.,.88), clamp((k-.5)*2., 0., 1.));
-    vec3 d = (c - vec3(l)) * vec3(.10, .22, .14);   // a trace of the crystal's own colour keeps the facets reading as cut glass
-    return max(vec3(0.), g * (1. + max(0., k-1.)*.6) + d) + vec3(.9,1.,.94) * pow(clamp(l, 0., 1.), 6.) * .35;   // hot glints on the brightest facets
+    // a natural grade, like light through green glass: teal-black shadows, emerald mid-tones, yellow-green highlights
+    float l = dot(c, vec3(.299,.587,.114)), k = clamp(l*1.15, 0., 1.6);
+    vec3 g = k < .55 ? mix(vec3(.004,.035,.03), vec3(.04,.58,.27), smoothstep(0., .55, k)) : mix(vec3(.04,.58,.27), vec3(.78,1.,.55), smoothstep(.55, 1.15, k));
+    g *= 1. + max(0., k - 1.15)*.7;
+    vec3 d = (c - vec3(l)) * vec3(.08, .2, .12);   // a trace of the crystal's own colour keeps the facets reading as cut glass
+    g *= smoothstep(0., .035, l);   // true black stays black, so no glow plane ever shows its edges
+    return max(vec3(0.), g + d) + vec3(.85,1.,.8) * pow(clamp(l, 0., 1.), 7.) * .3;   // hot glints on the brightest facets
   }
 `;
 const shardVertex = `
@@ -11702,7 +11705,7 @@ replayBtn?.addEventListener('click', () => {
 // and nothing to leak early -- there's no premature-reveal bug this could ever reproduce.
 function settleStatic(){
   V3G = 1; V3_UG.value = 1; v3Lights(1);   // VERSION 3: the finished logo is green, with no liquid, tint or threads left over
-  if (V3.liq) V3.liq.visible = false; if (V3.spell) V3.spell.visible = false; if (V3.sp) V3.sp.pts.visible = false; if (V3.bg) V3.bg.style.opacity = '0.55'; if (V3.cv && !V3.hidden) v3Hide();
+  if (V3.liq) V3.liq.visible = false; if (V3.spell) V3.spell.visible = false; if (V3.sp) V3.sp.pts.visible = false; if (V3.rib) V3.rib.mesh.visible = false; if (V3.fog) V3.fog.visible = false; if (V3.vF) V3.vF.mesh.visible = false; if (V3.smoke) V3.smoke.visible = false; if (V3.vB) V3.vB.mesh.visible = false; if (V3.bg) V3.bg.style.opacity = '1'; if (V3.cv && !V3.hidden) v3Hide();
   clearSurfaceParticles();
   if(cometTrails)cometTrails.mesh.visible=false;
   if(joinSeams)joinSeams.visible=false;
@@ -11867,7 +11870,8 @@ window.__kaDebugScene = function(){
 const V3 = { cv:null, x:null, w:1, h:1, dpr:1, threads:[], links:[], parts:[], flashes:[],
   prev:'', hidden:false, burst:false, lastTs:0, low:isMobile, ks:1, cx:0, cy:0, R:200, ema:0, lvl:0,
   ab0:0, tg:0, fed:0, absorbed:false, ringAt:-1, liq:null, bg:null, lastG:-1, lastBg:-1, la:0,
-  spell:null, ring0:null, sp:null, sLast:0, sAcc:0, dAcc:0, s3Abs:false, s3Rev:false };
+  spell:null, ring0:null, sp:null, sLast:0, sAcc:0, dAcc:0, s3Abs:false, s3Rev:false,
+  rib:null, vF:null, vB:null, fog:null, arcs:[], arcT:0, fdt:0, gq:0 };
 window.__kaV3 = V3;   // read-only debugging aid: V3.ema is the average drawing time in ms, V3.lvl the quality step
 const V3_GREEN = '64,255,150', V3_MINT = '224,255,238', V3_GOLD = '255,206,112', V3_AMBER = '255,176,104', V3_WARM = '255,244,226';
 const V3_RGB = { green:[64,255,150], mint:[224,255,238], gold:[255,206,112], amber:[255,176,104], warm:[255,244,226], lime:[190,255,140],
@@ -11895,7 +11899,7 @@ function v3Resize(){
 // own. When the camera or the mouse moves, the layers slide against each other like a real hologram. Each ring traces
 // itself in with a white-hot tip (Doctor Strange conjuring), a highlight sweeps round it, and sparks peel off its rim.
 // Natural amber first; the same green as everything else once the core has drunk the energy.
-const V3_SC0 = new THREE.Color(1.0, 0.50, 0.14), V3_SC1 = new THREE.Color(0.14, 1.0, 0.48), V3_SCOL = new THREE.Color();
+const V3_SC0 = new THREE.Color(1.0, 0.50, 0.14), V3_SC1 = new THREE.Color(0.2, 1.0, 0.45), V3_SCOL = new THREE.Color();
 const V3_RING_VS = 'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}';
 const V3_RING_FS = [
   'uniform float uTime,uAmt,uDraw,uKind,uSeed,uDir;uniform vec3 uCol;varying vec2 vUv;',
@@ -11967,7 +11971,7 @@ const V3_ADD = { transparent: true, blending: THREE.CustomBlending, blendEquatio
 function v3BuildSpell(){
   const grp = new THREE.Group(); grp.visible = false; grp.userData.kaKind = 'loomSpell';
   // kind, radius (world units; the logo's half-diagonal is ~190), depth, turn speed, strength, own tilt x/y, draw order
-  [[3, 330, -95, -0.00009, 0.55, 0.10, -0.06, -1], [0, 250, -32, 0.00016, 1.0, 0, 0, -1], [1, 206, 38, -0.00024, 0.36, -0.05, 0.08, 8], [2, 132, 74, 0.00034, 0.22, 0.06, -0.04, 8]].forEach((d, i) => {
+  [[3, 245, -80, -0.00009, 0.55, 0.10, -0.06, -1], [0, 185, -28, 0.00016, 1.0, 0, 0, -1], [1, 152, 32, -0.00024, 0.36, -0.05, 0.08, 8], [2, 98, 60, 0.00034, 0.22, 0.06, -0.04, 8]].forEach((d, i) => {
     if (V3.low && d[0] === 3) return;
     const mat = new THREE.ShaderMaterial(Object.assign({
       uniforms: { uTime: { value: 0 }, uAmt: { value: 0 }, uDraw: { value: 0 }, uKind: { value: d[0] }, uSeed: { value: 0.21 + i*0.137 }, uDir: { value: Math.sign(d[3]) }, uCol: { value: new THREE.Color() } },
@@ -12036,11 +12040,323 @@ function v3SparkStep(dt){
   S.pts.material.uniforms.uPx.value = renderer.getPixelRatio()*kaLayoutH()/(2*Math.tan(THREE.MathUtils.degToRad(camera.fov)/2));
   S.pts.visible = true;
 }
+// ---- the threads as real 3D ribbons ----
+// Each thread is a strip of triangles that always faces the camera, built every frame along its 3D curve. The shader gives it
+// the look of a glowing strand: a white-hot filament with a crisp edge (anti-aliased to exactly one pixel), a coloured body
+// with a clean edge, fibres twisting round it, and a soft glow; the head and the energy pulse run brighter.
+const V3_RIB_MM = 27;   // points per thread (the most the curve ever uses, plus one)
+function v3BuildRibbons(){
+  const K = V3.threads.length, MM = V3_RIB_MM, NV = K*MM*2;
+  if (!K) return;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(NV*3), side = new Float32Array(NV), uu = new Float32Array(NV), al = new Float32Array(NV), gl = new Float32Array(NV), col = new Float32Array(NV*3);
+  for (let v = 0; v < NV; v++) side[v] = (v & 1) ? 1 : -1;
+  const idx = [];
+  for (let k = 0; k < K; k++) for (let i = 0; i < MM - 1; i++){ const a = (k*MM + i)*2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  geo.setIndex(idx);
+  const dyn = (arr, n) => { const b = new THREE.BufferAttribute(arr, n); if (b.setUsage) b.setUsage(THREE.DynamicDrawUsage); return b; };
+  geo.setAttribute('position', dyn(pos, 3)); geo.setAttribute('aSide', new THREE.BufferAttribute(side, 1)); geo.setAttribute('aU', dyn(uu, 1));
+  geo.setAttribute('aA', dyn(al, 1)); geo.setAttribute('aG', dyn(gl, 1)); geo.setAttribute('aCol', dyn(col, 3));
+  const mat = new THREE.ShaderMaterial(Object.assign({
+    uniforms: { uTime: { value: 0 } },
+    vertexShader: 'attribute float aSide,aU,aA,aG;attribute vec3 aCol;varying float vS,vU,vA,vG;varying vec3 vC;' +
+      'void main(){vS=aSide;vU=aU;vA=aA;vG=aG;vC=aCol;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    fragmentShader: [
+      'uniform float uTime;varying float vS,vU,vA,vG;varying vec3 vC;',
+      'void main(){',
+      '  if(vA<.002){gl_FragColor=vec4(0.);return;}',
+      '  float d=abs(vS),fw=max(fwidth(d),1e-4);',
+      '  float core=1.-smoothstep(.12-fw,.12+fw,d);',   // the white-hot filament
+      '  float body=1.-smoothstep(.34-fw,.34+fw*1.5,d);',   // the strand itself, with a clean edge
+      '  float glow=exp(-d*d*7.);',
+      '  float fib=.72+.28*sin(vS*7.+vU*95.+uTime*.004);',   // fibres twisting round it
+      '  vec3 col=vC*(body*.75*fib+glow*.3)+vec3(1.,.98,.92)*core*(.3+.35*min(vG,2.));',
+      '  gl_FragColor=vec4(col*vG*vA,0.);',
+      '}'].join('\n'),
+    extensions: { derivatives: true } }, V3_ADD));
+  const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; mesh.renderOrder = 7; mesh.visible = false; mesh.userData.kaKind = 'loomRibbons';
+  scene.add(mesh);
+  V3.rib = { mesh, geo, pos, uu, al, gl, col, K, MM };
+}
+// writes one thread's strip: M = its last point, alpha, colour (0-255), its u range, whether the head shows, and the energy pulse
+function v3RibWrite(k, th, M, alpha, rgb, u0, u1, head, pu0, pu1){
+  const R = V3.rib; if (!R || k >= R.K || M < 1) return;
+  const MM = R.MM, P = R.pos, cpx = camera.position.x, cpy = camera.position.y, cpz = camera.position.z, HW = 4.6;
+  const r = rgb[0]/255, g = rgb[1]/255, b = rgb[2]/255;
+  for (let i = 0; i < MM; i++){
+    const j = Math.min(i, M), jp = Math.min(j + 1, M), jm = Math.max(j - 1, 0);
+    const X = th.wx[j], Y = th.wy[j], Z = th.wz[j];
+    const tx = th.wx[jp] - th.wx[jm], ty = th.wy[jp] - th.wy[jm], tz = th.wz[jp] - th.wz[jm];
+    const vx = cpx - X, vy = cpy - Y, vz = cpz - Z;
+    let sx = ty*vz - tz*vy, sy = tz*vx - tx*vz, sz = tx*vy - ty*vx;
+    const f = j/M, wd = HW*(head ? 1 + 0.7*Math.exp(-(M - j)*0.9) : 1), sl = (Math.hypot(sx, sy, sz) || 1)/wd;
+    sx /= sl; sy /= sl; sz /= sl;
+    const v0 = (k*MM + i)*2, v1 = v0 + 1;
+    P[v0*3] = X - sx; P[v0*3 + 1] = Y - sy; P[v0*3 + 2] = Z - sz; P[v1*3] = X + sx; P[v1*3 + 1] = Y + sy; P[v1*3 + 2] = Z + sz;
+    const u = u0 + (u1 - u0)*f;
+    let gg = 1;
+    if (head) gg += 2.2*Math.exp(-(M - j)*0.8);
+    if (pu1 > pu0 && u >= pu0 && u <= pu1) gg += 2.2*Math.sin(Math.PI*(u - pu0)/(pu1 - pu0));
+    const a = i > M ? 0 : 0.85*alpha*Math.pow(f, 0.8);   // fades out towards its far end, like a comet's tail
+    R.al[v0] = R.al[v1] = a; R.gl[v0] = R.gl[v1] = gg; R.uu[v0] = R.uu[v1] = u;
+    R.col[v0*3] = R.col[v1*3] = r; R.col[v0*3 + 1] = R.col[v1*3 + 1] = g; R.col[v0*3 + 2] = R.col[v1*3 + 2] = b;
+  }
+}
+function v3RibFlush(ts){
+  const R = V3.rib; if (!R) return;
+  const at = R.geo.attributes; at.position.needsUpdate = true; at.aU.needsUpdate = true; at.aA.needsUpdate = true; at.aG.needsUpdate = true; at.aCol.needsUpdate = true;
+  R.mesh.material.uniforms.uTime.value = ts;
+}
+
+// ---- dark tendrils (the loom's roots): depth, like the branches in front of the light in the references ----
+// Dark strands with green light catching their edges grow in when the world turns green, passing close to the camera
+// round the edges of the frame, big and out of focus, so the logo sits deeper in the scene.
+// They follow the screen's own shape, so they frame the logo on a phone held upright as well as on a wide monitor.
+const V3_VSEG = 40;
+function v3BuildVines(){
+  const mk = (n, order, front) => {
+    if (!n) return null;
+    const NV = n*V3_VSEG*2, geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(NV*3), side = new Float32Array(NV), al = new Float32Array(NV), bl = new Float32Array(NV);
+    for (let v = 0; v < NV; v++) side[v] = (v & 1) ? 1 : -1;
+    const idx = [];
+    for (let k = 0; k < n; k++) for (let i = 0; i < V3_VSEG - 1; i++){ const a = (k*V3_VSEG + i)*2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    geo.setIndex(idx);
+    const dyn = (arr, m) => { const b = new THREE.BufferAttribute(arr, m); if (b.setUsage) b.setUsage(THREE.DynamicDrawUsage); return b; };
+    geo.setAttribute('position', dyn(pos, 3)); geo.setAttribute('aSide', new THREE.BufferAttribute(side, 1)); geo.setAttribute('aA', dyn(al, 1)); geo.setAttribute('aB', dyn(bl, 1));
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { uRim: { value: new THREE.Color() } },
+      vertexShader: 'attribute float aSide,aA,aB;varying float vS,vA,vB;void main(){vS=aSide;vA=aA;vB=aB;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+      fragmentShader: [
+        'uniform vec3 uRim;varying float vS,vA,vB;',
+        'void main(){',
+        '  float d=abs(vS),soft=max(vB,fwidth(d)*1.5);',
+        '  float edge=1.-smoothstep(1.-soft,1.,d);',   // crisp when in focus, soft when close to the camera
+        '  float shade=sqrt(max(0.,1.-d*d));',   // round, like a real stem
+        '  float rim=smoothstep(.5,.97,d)*(1.-vB*.6);',   // the green light wraps round its edges
+        '  vec3 col=vec3(.004,.016,.012)*(.5+.8*shade)+uRim*rim*.9+uRim*.03;',
+        '  gl_FragColor=vec4(col,edge*vA*(.94-vB*.25));',
+        '}'].join('\n'),
+      extensions: { derivatives: true }, transparent: true, depthWrite: false, depthTest: false, toneMapped: false });
+    const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; mesh.renderOrder = order; mesh.visible = false; mesh.userData.kaKind = 'loomVines';
+    scene.add(mesh);
+    return { mesh, geo, pos, al, bl, n, front, list: [] };
+  };
+  V3.vF = mk(V3.low ? 2 : 4, 10, true); V3.vB = null;   // only the out-of-focus foreground ones: far ones crossing the logo read as stray hairs
+  v3ShuffleVines();
+}
+function v3ShuffleVines(){
+  [V3.vF, V3.vB].forEach(Gp => {
+    if (!Gp) return;
+    Gp.list = [];
+    for (let k = 0; k < Gp.n; k++){
+      const r = Math.random;
+      Gp.list.push(Gp.front
+        ? { a0: (k + 0.2 + 0.6*r())/Gp.n*Math.PI*2, span: (1.3 + 0.6*r())*(r() < 0.5 ? -1 : 1), z: 230 + r()*190, rr: 0.95 + 0.12*r(), hw: 12 + r()*10, ph: r()*6.28, wf: 2 + r()*2.5, delay: r()*500, blur: 0.3 + 0.35*r() }
+        : { a0: r()*Math.PI*2, span: (1.2 + 0.9*r())*(r() < 0.5 ? -1 : 1), z: -380 + r()*240, rr: 0.45 + 0.4*r(), hw: 7 + r()*6, ph: r()*6.28, wf: 2 + r()*2.5, delay: r()*500, blur: 0.06 });
+    }
+  });
+}
+function v3UpdateVines(ts, t){
+  let A = 0;
+  if (phase === 'assembling' && V3.tg && V3.gq < 2) A = smootherStep((t - V3.tg + 100)/500) * (1 - smootherStep((t - REVEAL_START - REVEAL_DUR*0.4)/(REVEAL_DUR*0.8)));
+  const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov)/2), asp = camera.aspect, cpx = camera.position.x, cpy = camera.position.y, cpz = camera.position.z;
+  [V3.vF, V3.vB].forEach(Gp => {
+    if (!Gp) return;
+    Gp.mesh.visible = A > 0.004;
+    if (!Gp.mesh.visible) return;
+    Gp.mesh.material.uniforms.uRim.value.copy(V3_SC1).multiplyScalar(V3G);
+    const P = Gp.pos, S = V3_VSEG;
+    Gp.list.forEach((v, k) => {
+      const base = k*S*2, off = V3.gq >= 1 && (k & 1);   // a slower device keeps half of them
+      const grow = off ? 0 : smootherStep((t - V3.tg - v.delay)/1500);
+      const halfH = tanH*Math.max(80, cpz - v.z), ex = halfH*asp*v.rr, ey = halfH*v.rr;
+      let px = 0, py = 0, pz = 0, qx = 0, qy = 0, qz = 0;
+      for (let i = 0; i < S; i++){
+        const f = i/(S - 1), u = f*grow;
+        const a = v.a0 + v.span*u + 0.06*Math.sin(ts*0.0005 + v.ph);
+        const rf = 1.22 - 0.30*Math.sin(Math.PI*Math.min(1, u)) + 0.015*Math.sin(u*v.wf*6.28 + ts*0.0007 + v.ph);   // starts off-screen, dips in, sways
+        const X = Math.cos(a)*ex*rf, Y = Math.sin(a)*ey*rf, Z = v.z + 40*Math.sin(u*3 + v.ph);
+        if (i === 0){ const a2 = v.a0 + v.span*(grow/(S - 1)); qx = Math.cos(a2)*ex*rf - X; qy = Math.sin(a2)*ey*rf - Y; qz = 0; }
+        else { qx = X - px; qy = Y - py; qz = Z - pz; }
+        px = X; py = Y; pz = Z;
+        const vx = cpx - X, vy = cpy - Y, vz = cpz - Z;
+        let sx = qy*vz - qz*vy, sy = qz*vx - qx*vz, sz = qx*vy - qy*vx;
+        const w = v.hw*(0.25 + 0.75*Math.sin(Math.PI*(0.08 + 0.84*f))), sl = (Math.hypot(sx, sy, sz) || 1)/w;
+        sx /= sl; sy /= sl; sz /= sl;
+        const v0 = base + i*2, v1 = v0 + 1;
+        P[v0*3] = X - sx; P[v0*3 + 1] = Y - sy; P[v0*3 + 2] = Z - sz; P[v1*3] = X + sx; P[v1*3 + 1] = Y + sy; P[v1*3 + 2] = Z + sz;
+        const a2 = grow > 0.002 ? A : 0;
+        Gp.al[v0] = Gp.al[v1] = a2; Gp.bl[v0] = Gp.bl[v1] = v.blur;
+      }
+    });
+    const at = Gp.geo.attributes; at.position.needsUpdate = true; at.aA.needsUpdate = true; at.aB.needsUpdate = true;
+  });
+}
+
+// ---- the green world: a real atmosphere, not a tint ----
+// A backdrop far behind everything (so it moves with the camera like a real place): near-black edges, teal haze drifting
+// through it, emerald light glowing from behind the logo with a yellow-green heart, a softer second light high on the left,
+// shafts of light through the fog, a vignette and a fine dither so the dark gradient never bands.
+function v3BuildFog(){
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uAmt: { value: 0 }, uLight: { value: 1 }, uOct: { value: V3.low ? 3 : 4 }, uAsp: { value: 1 } },
+    vertexShader: V3_RING_VS,
+    fragmentShader: [
+      'uniform float uTime,uAmt,uLight,uOct,uAsp;varying vec2 vUv;',
+      'float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}',
+      'float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}',
+      'float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<5;i++){if(float(i)>=uOct)break;s+=a*n2(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return s;}',
+      'void main(){',
+      '  if(uAmt<.003){gl_FragColor=vec4(0.);return;}',
+      '  vec2 p=(vUv-.5)*vec2(uAsp,1.);float t=uTime*.001;',
+      '  vec2 L=vec2(0.,.05),L2=vec2(-.42*uAsp,.40);',
+      '  vec2 q=p*1.7;',
+      '  vec2 w=vec2(fbm(q+vec2(t*.05,0.)),fbm(q+vec2(3.1,1.7)-vec2(0.,t*.04)));',
+      '  float fog=fbm(q*1.3+1.8*w+vec2(t*.03,-t*.02));',
+      '  float d=length((p-L)*vec2(.8,1.)),d2=length(p-L2);',
+      '  float glow=exp(-d*2.4),heart=exp(-d*d*30.),glow2=exp(-d2*3.4);',
+      '  float rays=fbm(vec2(atan(p.y-L.y,p.x-L.x)*5.,d*1.2-t*.08))*glow;',
+      '  vec3 col=vec3(.003,.014,.012);',
+      '  col+=vec3(.012,.10,.085)*fog*(.55+glow*1.2);',   // teal haze
+      '  col+=vec3(.03,.40,.19)*glow*(.5+.7*fog)*uLight;',   // emerald light behind the logo
+      '  col+=vec3(.50,.85,.30)*heart*.5*uLight;',   // its yellow-green heart
+      '  col+=vec3(.04,.26,.14)*glow2*(.45+fog)*.8;',   // a softer light high on the left
+      '  col+=vec3(.06,.36,.18)*rays*rays*1.3*uLight;',   // shafts of light through the fog
+      '  col*=mix(.16,1.,smoothstep(.78,.16,length(vec2(p.x/uAsp,p.y))));',   // vignette: the edges fall to near black
+      '  col+=(h(gl_FragCoord.xy+fract(t*7.))-.5)/255.;',   // dither
+      '  gl_FragColor=vec4(col,uAmt);',
+      '}'].join('\n'),
+    transparent: true, depthWrite: false, depthTest: false, toneMapped: false });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+  m.position.z = -900; m.renderOrder = -10; m.frustumCulled = false; m.visible = false; m.userData.kaKind = 'loomFog';
+  scene.add(m); V3.fog = m;
+}
+function v3UpdateFog(ts, amt, light){
+  const F = V3.fog; if (!F) return;
+  F.visible = amt > 0.003;
+  if (!F.visible) return;
+  const halfH = Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*(camera.position.z - F.position.z)*1.25;
+  F.scale.set(halfH*2*camera.aspect, halfH*2, 1); F.position.x = camera.position.x*0.9; F.position.y = camera.position.y*0.9;
+  const u = F.material.uniforms; u.uTime.value = ts; u.uAmt.value = amt; u.uLight.value = light; u.uAsp.value = camera.aspect;
+}
+
+// ---- green lightning: once the core has drunk the energy, arcs crackle between the spell ring and the core ----
+function v3Bolt(ax, ay, az, bx, by, bz, levels, rough){
+  const n = (1 << levels) + 1, X = new Float32Array(n), Y = new Float32Array(n), Z = new Float32Array(n);
+  X[0] = ax; Y[0] = ay; Z[0] = az; X[n - 1] = bx; Y[n - 1] = by; Z[n - 1] = bz;
+  let amp = Math.hypot(bx - ax, by - ay, bz - az)*rough;
+  for (let step = n - 1; step > 1; step >>= 1, amp *= 0.55){
+    for (let i = step >> 1; i < n; i += step){
+      const a = i - (step >> 1), b = i + (step >> 1);
+      X[i] = (X[a] + X[b])/2 + (Math.random() - 0.5)*amp; Y[i] = (Y[a] + Y[b])/2 + (Math.random() - 0.5)*amp; Z[i] = (Z[a] + Z[b])/2 + (Math.random() - 0.5)*amp*0.6;
+    }
+  }
+  return { X, Y, Z, n };
+}
+function v3MakeArcs(){
+  V3.arcs.length = 0;
+  const R0 = V3.ring0; if (!R0) return;
+  const n = V3.low || V3.gq >= 2 ? 1 : (V3.gq ? 2 : 3);
+  for (let k = 0; k < n; k++){
+    const an = Math.random()*Math.PI*2;
+    R0.localToWorld(V3_TMP.set(Math.cos(an)*0.4825, Math.sin(an)*0.4825, 0));
+    const ax = V3_TMP.x, ay = V3_TMP.y, az = V3_TMP.z;
+    let bx = (Math.random() - 0.5)*30, by = (Math.random() - 0.5)*30, bz = 8;
+    if (Math.random() < 0.3){ const a2 = an + 0.6 + Math.random()*1.4; R0.localToWorld(V3_TMP.set(Math.cos(a2)*0.4825, Math.sin(a2)*0.4825, 0)); bx = V3_TMP.x; by = V3_TMP.y; bz = V3_TMP.z; }
+    const main = v3Bolt(ax, ay, az, bx, by, bz, 5, 0.2);
+    V3.arcs.push(main);
+    const j = 8 + Math.floor(Math.random()*14);   // one branch splits off
+    V3.arcs.push(v3Bolt(main.X[j], main.Y[j], main.Z[j], main.X[j] + (Math.random() - 0.5)*120, main.Y[j] + (Math.random() - 0.5)*120, main.Z[j] + (Math.random() - 0.5)*40, 3, 0.3));
+  }
+}
+function v3DrawArcs(x, ks, a){
+  const pt = { x: 0, y: 0 };
+  V3.arcs.forEach((b, bi) => {
+    const fl = a*(0.6 + 0.4*Math.random())*(bi & 1 ? 0.6 : 1);
+    x.beginPath();
+    for (let i = 0; i < b.n; i++){ v3Screen(b.X[i], b.Y[i], b.Z[i], pt); if (i) x.lineTo(pt.x, pt.y); else x.moveTo(pt.x, pt.y); }
+    x.strokeStyle = 'rgba(' + V3_GREEN + ',' + 0.14*fl + ')'; x.lineWidth = 9*ks; x.stroke();
+    x.strokeStyle = 'rgba(' + V3_GREEN + ',' + 0.55*fl + ')'; x.lineWidth = 2.6*ks; x.stroke();
+    x.strokeStyle = 'rgba(235,255,240,' + 0.95*fl + ')'; x.lineWidth = 1.1*ks; x.stroke();
+  });
+}
+
+// ---- runs well on any device: if frames come too slowly while it plays, the heaviest layers step down ----
+function v3ApplyQ(){
+  const q = V3.gq;
+  if (V3.spell) V3.spell.children.forEach(m => { const k = m.userData.kind; m.userData.off = (q >= 1 && k === 3) || (q >= 2 && k === 2); });
+  if (V3.fog) V3.fog.material.uniforms.uOct.value = q >= 1 ? 2 : (V3.low ? 3 : 4);
+  if (V3.liq) V3.liq.material.uniforms.uLite.value = q >= 2 ? 1 : 0;
+}
+function v3Govern(dt, t){
+  if (phase !== 'assembling' || t < 1200) return;
+  V3.fdt = V3.fdt ? V3.fdt*0.94 + dt*0.06 : dt;
+  if (V3.gq < 2 && V3.fdt > (V3.gq ? 30 : 24)){ V3.gq++; V3.fdt = 16; v3ApplyQ(); }
+}
+
+// ---- spell smoke seeping out of the KA ----
+// A layer in front of the logo whose source is the crystal's own silhouette: each point looks a little way below itself
+// (through swirling turbulence) for logo pixels, so wisps leave the letters and rise, curling, thinning as they climb.
+// Warm and faint while the threads weave, emerald after the flip, and a slight breath of it stays on the finished logo.
+const V3_SMOKE_W = new THREE.Color(1.0, 0.62, 0.30), V3_SMOKE_G = new THREE.Color(0.20, 1.0, 0.45);
+function v3BuildSmoke(){
+  if (reducedMotion || !logoMesh) return;
+  const dw = logoMesh.userData.dw, dh = logoMesh.userData.dh, W = dw*1.7, H = dh*1.9, offY = dh*0.3;
+  const mat = new THREE.ShaderMaterial(Object.assign({
+    uniforms: { map: { value: cutoutTex }, uTime: { value: 0 }, uAmt: { value: 0 }, uCol: { value: new THREE.Color() }, uOct: { value: V3.low ? 3 : 4 },
+      uLogo: { value: new THREE.Vector2(dw, dh) }, uSize: { value: new THREE.Vector2(W, H) }, uOffY: { value: offY } },
+    vertexShader: V3_RING_VS,
+    fragmentShader: [
+      'uniform sampler2D map;uniform float uTime,uAmt,uOct,uOffY;uniform vec3 uCol;uniform vec2 uLogo,uSize;varying vec2 vUv;',
+      'float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}',
+      'float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}',
+      'float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<4;i++){if(float(i)>=uOct)break;s+=a*n2(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return s;}',
+      'void main(){',
+      '  if(uAmt<.003){gl_FragColor=vec4(0.);return;}',
+      '  vec2 wp=(vUv-.5)*uSize+vec2(0.,uOffY);',   // relative to the logo's centre
+      '  float t=uTime*.001;',
+      '  vec2 q=wp*.018;',
+      '  vec2 warp=vec2(fbm(q+vec2(0.,-t*.35)),fbm(q+vec2(4.3,1.1)+vec2(0.,-t*.3)))-.5;',
+      '  float d=0.;',
+      '  for(int i=0;i<6;i++){',
+      '    float fi=float(i);',
+      '    vec2 sp=wp+warp*(18.+fi*16.)-vec2(sin(t*.7+fi*1.3)*5.,12.+fi*22.);',   // where this smoke rose from
+      '    vec2 luv=sp/uLogo+.5;',
+      '    float inside=step(0.,luv.x)*step(0.,luv.y)*step(luv.x,1.)*step(luv.y,1.);',
+      '    d+=smoothstep(.12,.6,texture2D(map,clamp(luv,0.,1.)).a)*inside*(1.-fi/6.)*.3;',
+      '  }',
+      '  float wisp=fbm(wp*.03+warp*2.2+vec2(0.,-t*.5));',
+      '  d*=smoothstep(.28,.78,wisp)*1.7;',   // broken into curling wisps
+      '  d*=smoothstep(1.,.5,vUv.y)*smoothstep(0.,.08,vUv.y)*smoothstep(0.,.14,vUv.x)*smoothstep(1.,.86,vUv.x);',   // thins out as it climbs
+      '  vec3 col=uCol*d+vec3(.85,1.,.9)*pow(d,3.)*.3;',
+      '  gl_FragColor=vec4(col*uAmt,0.);',
+      '}'].join('\n') }, V3_ADD));
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+  m.scale.set(W, H, 1); m.position.set(0, offY, 4); m.renderOrder = 6; m.frustumCulled = false; m.visible = false; m.userData.kaKind = 'loomSmoke';
+  scene.add(m); V3.smoke = m;
+}
+function v3UpdateSmoke(ts, t){
+  const S = V3.smoke; if (!S) return;
+  let a = 0;
+  if (phase === 'assembling'){
+    a = 0.3*smootherStep((t - 600)/1500);
+    if (V3.tg) a = lerp(a, 0.65, smootherStep((t - V3.tg)/600));
+    a = lerp(a, 0.32, smootherStep((t - REVEAL_START - REVEAL_DUR*0.4)/1800));   // settles to a slight breath
+  } else if (phase === 'held') a = 0.32 + 0.06*Math.sin(ts*0.0011);
+  else if (phase === 'disassembling') a = 0.32*Math.max(0, 1 - (ts - phaseStart)/500);
+  S.visible = a > 0.004;
+  if (!S.visible) return;
+  const u = S.material.uniforms;
+  u.uTime.value = ts; u.uAmt.value = a; u.uCol.value.copy(V3_SMOKE_W).lerp(V3_SMOKE_G, V3G); u.uOct.value = V3.gq >= 2 ? 2 : (V3.low ? 3 : 4);
+}
+
 const V3_TMP = new THREE.Vector3(), V3_TMP2 = new THREE.Vector3();
 // runs every frame BEFORE the scene is drawn: places, turns and colours the 3D spell, tilts the liquid with it, moves the sparks
 function v3Scene(ts, t){
   const S = V3.spell; if (!S || reducedMotion) return;
   const dt = V3.sLast ? Math.min(50, ts - V3.sLast) : 16; V3.sLast = ts;
+  v3Govern(dt, t);
   let a = 0, revealE = 0, sinceFlip = 0;
   if (phase === 'assembling'){
     const revealT = clamp01((t - REVEAL_START)/REVEAL_DUR); revealE = smootherStep(revealT);
@@ -12055,20 +12371,20 @@ function v3Scene(ts, t){
   S.visible = a > 0.004;
   if (S.visible){
     const flare = V3.s3Abs ? Math.exp(-Math.max(0, t - V3.tg)/320) : 0;
-    const fit = Math.min(1, Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*camera.position.z*camera.aspect*1.08/250);   // a phone held upright: the circle fits the width
+    const fit = Math.min(1, Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*camera.position.z*camera.aspect*1.08/185);   // a phone held upright: the circle fits the width
     S.scale.setScalar(fit*(0.9 + 0.1*smootherStep(t/1800) + 0.38*revealE + 0.07*Math.sin(Math.PI*sinceFlip)));
     S.rotation.set(tiltX, tiltY, 0);
     V3_SCOL.copy(V3_SC0).lerp(V3_SC1, V3G);
     S.children.forEach((m, i) => {
       const d = m.userData, u = m.material.uniforms;
-      u.uTime.value = ts; u.uAmt.value = a*d.amp*(1 + 0.9*flare)*(1 + 0.3*V3G); u.uCol.value.copy(V3_SCOL);   // green burns a touch hotter over the green world
+      u.uTime.value = ts; u.uAmt.value = a*d.amp*(1 + 0.45*flare); u.uCol.value.copy(V3_SCOL);   // green burns a touch hotter over the green world
       u.uDraw.value = smootherStep((t - 200 - i*230)/(950 + i*120));
-      m.rotation.z = d.rot0 + d.spin*ts;
+      m.rotation.z = d.rot0 + d.spin*ts; m.visible = !d.off;
     });
     // sparks peel off the main ring's rim and fly off along it
     const R0 = V3.ring0;
     if (R0 && V3.sp && a > 0.2){
-      V3.sAcc += (V3.low ? 70 : 190)*a*dt/1000;
+      V3.sAcc += (V3.low ? 70 : 190)*a*dt/1000*(V3.gq ? 0.5 : 1);
       const rgb = v3MixA([255, 176, 80], V3_RGB.green, V3G), dir = Math.sign(R0.userData.spin);
       while (V3.sAcc >= 1){
         V3.sAcc -= 1;
@@ -12093,6 +12409,8 @@ function v3Scene(ts, t){
       }
     }
   }
+  v3UpdateVines(ts, t);
+  v3UpdateSmoke(ts, t);
   v3SparkStep(dt);
 }
 
@@ -12116,7 +12434,7 @@ function v3PlanThreads(){
   order.forEach((o, r) => { arrive[o.k] = T0 + Math.pow(r/Math.max(1, K - 1), 0.9)*SPAN + Math.random()*90; });
   V3.threads = seeds.map((si, k) => {
     const dur = 780 + Math.random()*480, arr = Math.max(arrive[k], dur + 60);
-    return { shard: shards[si], k, arrive: arr, start: arr - dur, dur, hit: false, fed: false, px: new Float32Array(30), py: new Float32Array(30), ps: new Float32Array(30) };
+    return { shard: shards[si], k, arrive: arr, start: arr - dur, dur, hit: false, fed: false, px: new Float32Array(30), py: new Float32Array(30), ps: new Float32Array(30), wx: new Float32Array(30), wy: new Float32Array(30), wz: new Float32Array(30) };
   });
   V3.links = [];
   shards.forEach((s, i) => {
@@ -12191,25 +12509,25 @@ function v3Pt(th, u, ts, pluck, out){
   const cn = wv + Math.cos(ph)*hr, cm = Math.sin(ph)*hr;
   x += th.nx*cn + th.mx*cm; y += th.ny*cn + th.my*cm; z += th.mz*cm;
   V3_P.set(x, y, z).project(camera); out.x = (V3_P.x*0.5 + 0.5)*V3.w; out.y = (-V3_P.y*0.5 + 0.5)*V3.h;
-  out.s = camera.position.z / Math.max(60, camera.position.z - z);
+  out.s = camera.position.z / Math.max(60, camera.position.z - z); out.wx = x; out.wy = y; out.wz = z;
 }
 
 // ---- green liquid magic (a shader plane behind the logo) and the background tint (a div behind the 3D canvas) ----
 function v3BuildLiquid(){
   // behind the 3D canvas: a deep green wash with a glow in the middle; it stays (softer) behind the finished logo
   const bg = document.createElement('div'); bg.className = 'v3-bg'; bg.setAttribute('aria-hidden', 'true');
-  bg.style.cssText = 'position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at 50% 50%,rgba(10,110,58,.62) 0%,rgba(4,52,30,.66) 36%,rgba(0,18,11,.86) 100%);';
+  bg.style.cssText = 'position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse 70% 60% at 50% 46%,rgba(120,210,90,.30) 0%,rgba(18,120,64,.55) 22%,rgba(4,44,30,.86) 55%,rgba(1,10,8,.97) 100%);';
   stage.insertBefore(bg, stage.firstChild); V3.bg = bg;
-  if (reducedMotion){ bg.style.opacity = '0.55'; return; }
+  if (reducedMotion){ bg.style.opacity = '1'; return; }
   const SZ = 1000, oct = V3.low ? 3 : 4;   // big enough that the grown pool never meets the plane's edge
   // the liquid: a domain-warped noise field read as a HEIGHT, so it has a real surface: a normal from its slope, lit by a key
   // light (diffuse + a sharp wet highlight), a fresnel rim, light scattered inside the thick parts and caustic lines where
   // light bends through it. The plane tilts with the spell circle, so the pool lies in 3D round the logo.
   const mat = new THREE.ShaderMaterial(Object.assign({
-    uniforms: { uTime: { value: 0 }, uAmt: { value: 0 }, uGrow: { value: 0 }, uSize: { value: new THREE.Vector2(SZ, SZ) } },
+    uniforms: { uTime: { value: 0 }, uAmt: { value: 0 }, uGrow: { value: 0 }, uLite: { value: 0 }, uSize: { value: new THREE.Vector2(SZ, SZ) } },
     vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
     fragmentShader: [
-      'uniform float uTime,uAmt,uGrow;uniform vec2 uSize;varying vec2 vUv;',
+      'uniform float uTime,uAmt,uGrow,uLite;uniform vec2 uSize;varying vec2 vUv;',
       'float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}',
       'float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}',
       'float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<' + oct + ';i++){s+=a*n2(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return s;}',
@@ -12237,23 +12555,25 @@ function v3BuildLiquid(){
       '  float spec=pow(nh,110.)*1.8+pow(nh,18.)*.22;',
       '  float fres=pow(1.-n.z,2.2);',
       '  float thick=smoothstep(.45,.86,f0);',
-      '  float cs=field(p+n.xy*46.,r,uTime*1.35),caus=pow(max(0.,1.-abs(cs-.5)*3.2),6.);',
-      '  vec3 deep=vec3(0.,.12,.045),em=vec3(.04,.82,.34),lime=vec3(.62,1.,.42),mint=vec3(.88,1.,.94);',
+      '  float caus=0.;if(uLite<.5){float cs=field(p+n.xy*46.,r,uTime*1.35);caus=pow(max(0.,1.-abs(cs-.5)*3.2),6.);}',
+      '  vec3 deep=vec3(0.,.035,.022),em=vec3(.03,.58,.27),lime=vec3(.50,.92,.32),mint=vec3(.86,1.,.86);',   // a dark, natural emerald
       '  vec3 col=mix(deep,em,thick)*(.28+.95*dif)*dens*1.25;',
       '  col+=em*thick*thick*dens*.35;',
       '  col+=lime*caus*dens*.55;',
       '  col+=mint*spec*dens;',
       '  col+=lime*fres*dens*.5;',
-      '  col+=lime*meniscus*ring*arms*.75;',
+      '  col+=lime*meniscus*ring*arms*.45;',
       '  col+=em*ring*smoothstep(.28,.6,f0)*.08;',
-      '  gl_FragColor=vec4(col*uAmt,0.);',
+      '  gl_FragColor=vec4(col*uAmt*.8,0.);',
       '}'
     ].join('\n') }, V3_ADD));
   const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
   m.scale.set(SZ, SZ, 1); m.position.set(0, 0, -30); m.renderOrder = -2; m.visible = false; m.frustumCulled = false;
   m.userData.kaKind = 'loomLiquid';
   scene.add(m); V3.liq = m;
-  v3BuildSpell(); v3BuildSparks();
+  v3BuildFog(); v3BuildSpell(); v3BuildSparks(); v3BuildRibbons(); v3BuildVines(); v3BuildSmoke();
+  if (!V3.low && (navigator.hardwareConcurrency || 8) <= 4) V3.gq = 1;   // a modest machine starts one step lighter
+  v3ApplyQ();
 }
 function v3Lights(g){
   keyLight.color.copy(V3_KEY0).lerp(V3_KEY1, g);
@@ -12263,13 +12583,15 @@ function v3Lights(g){
 // the colour flip: decides how green the world is this frame and moves the liquid and the background with it
 function v3Grade(ts, t){
   let g = 0, la = 0, ba = 0;
-  if (reducedMotion){ g = 1; ba = 0.55; }
+  let light = 1;
+  if (reducedMotion){ g = 1; ba = 1; }
   else if (phase === 'assembling' && V3.tg){
     g = smootherStep((t - (V3.tg - 40))/240);   // all at once: a quarter of a second
     la = smootherStep((t - V3.tg + 60)/500) * (1 - smootherStep((t - REVEAL_START - REVEAL_DUR*0.3)/(REVEAL_DUR*0.9)));
-    ba = g * (1 - 0.45*smootherStep((t - REVEAL_START - REVEAL_DUR*0.5)/1600));   // eases down to the resting tint, never off
-  } else if (phase === 'held'){ g = 1; ba = 0.55; }   // the finished logo keeps its green world behind it
-  else if (phase === 'disassembling'){ g = 1 - smootherStep(clamp01(t/(DISASSEMBLE_DUR*0.9))); ba = 0.55*g; }
+    ba = g;   // the green world arrives with the flip...
+    light = 1 - 0.4*smootherStep((t - REVEAL_START - REVEAL_DUR*0.5)/1600);   // ...and its light settles once the logo is revealed
+  } else if (phase === 'held'){ g = 1; ba = 1; light = 0.6; }   // the finished logo stays in its green world
+  else if (phase === 'disassembling'){ g = 1 - smootherStep(clamp01(t/(DISASSEMBLE_DUR*0.9))); ba = g; light = 0.6; }
   V3G = g; V3_UG.value = g; V3.la = la;
   if (Math.abs(g - V3.lastG) > 0.002 || (g === 0) !== (V3.lastG === 0)){ V3.lastG = g; v3Lights(g); }
   if (V3.liq){
@@ -12277,7 +12599,8 @@ function v3Grade(ts, t){
     u.uAmt.value = la; u.uTime.value = ts; u.uGrow.value = V3.tg ? smootherStep((t - V3.tg)/900) : 0;
     V3.liq.visible = la > 0.004;
   }
-  if (V3.bg && Math.abs(ba - V3.lastBg) > 0.004){ V3.lastBg = ba; V3.bg.style.opacity = ba.toFixed(3); }
+  if (V3.fog) v3UpdateFog(ts, ba, light);   // the 3D atmosphere (the CSS backdrop is only for the still, reduced-motion frame)
+  else if (V3.bg && Math.abs(ba - V3.lastBg) > 0.004){ V3.lastBg = ba; V3.bg.style.opacity = ba.toFixed(3); }
 }
 
 // The woven skin: an extra texture laid ON the logo (never changing its outline: it is clipped to the logo's own alpha).
@@ -12355,8 +12678,8 @@ function v3Frame(ts, t){
   }
   V3.prev = phase;
 }
-function v3Begin(){ V3.hidden = false; V3.cv.style.display = ''; V3.parts.length = 0; V3.flashes.length = 0; V3.burst = false; V3.fed = 0; V3.absorbed = false; V3.ringAt = -1; V3.lastTs = 0; V3.s3Abs = false; V3.s3Rev = false; V3.sAcc = 0; V3.dAcc = 0; v3Shuffle(); }
-function v3Hide(){ V3.hidden = true; V3.x.clearRect(0, 0, V3.w, V3.h); V3.cv.style.display = 'none'; V3.parts.length = 0; V3.flashes.length = 0; }
+function v3Begin(){ V3.hidden = false; V3.cv.style.display = ''; V3.parts.length = 0; V3.flashes.length = 0; V3.burst = false; V3.fed = 0; V3.absorbed = false; V3.ringAt = -1; V3.lastTs = 0; V3.s3Abs = false; V3.s3Rev = false; V3.sAcc = 0; V3.dAcc = 0; V3.arcs.length = 0; V3.arcT = 0; v3Shuffle(); v3ShuffleVines(); }
+function v3Hide(){ V3.hidden = true; V3.x.clearRect(0, 0, V3.w, V3.h); V3.cv.style.display = 'none'; V3.parts.length = 0; V3.flashes.length = 0; if (V3.rib) V3.rib.mesh.visible = false; }
 
 function v3Draw(ts, t){
   const t0 = performance.now();
@@ -12364,6 +12687,7 @@ function v3Draw(ts, t){
   const dt = V3.lastTs ? Math.min(50, ts - V3.lastTs) : 16; V3.lastTs = ts;
   x.setTransform(V3.dpr, 0, 0, V3.dpr, 0, 0); x.clearRect(0, 0, w, h);
   x.globalCompositeOperation = 'lighter'; x.lineCap = 'round'; x.lineJoin = 'round';
+  if (V3.rib){ V3.rib.al.fill(0); V3.rib.mesh.visible = true; }
   const c = v3Screen(0, 0, 0, { x: 0, y: 0 }), e = v3Screen(190, 0, 0, { x: 0, y: 0 });
   const cx = c.x, cy = c.y, R = Math.max(40, Math.hypot(e.x - cx, e.y - cy));   // R: the logo's half-diagonal on screen
   V3.cx = cx; V3.cy = cy; V3.R = R;
@@ -12381,12 +12705,12 @@ function v3Draw(ts, t){
 
   // mist behind the logo: cool and faint at first, green once everything turns
   {
-    const a = (0.04 + 0.14*smootherStep(t/1400)*(0.35 + 0.65*G)) * (0.88 + 0.12*Math.sin(ts*0.0034)) * (1 - smootherStep((t - REVEAL_START - REVEAL_DUR*0.5)/1000));
+    const a = (0.04 + 0.14*smootherStep(t/1400)*(0.35 + 0.65*G)) * (V3.fog ? 1 - G : 1) * (0.88 + 0.12*Math.sin(ts*0.0034)) * (1 - smootherStep((t - REVEAL_START - REVEAL_DUR*0.5)/1000));
     if (a > 0.004 && V3.lvl < 2){ const g = x.createRadialGradient(cx, cy, 0, cx, cy, R*2.1); g.addColorStop(0, 'rgba(' + v3Mix(V3_RGB.haze, V3_RGB.green, G) + ',' + a + ')'); g.addColorStop(0.55, 'rgba(' + v3Mix(V3_RGB.hazeMid, V3_RGB.hazeGreen, G) + ',' + a*0.4 + ')'); g.addColorStop(1, 'rgba(0,40,30,0)'); x.fillStyle = g; x.fillRect(cx - R*2.2, cy - R*2.2, R*4.4, R*4.4); }
   }
   // the core's charge: grows as each thread delivers its energy, flares at the flip
   {
-    const a = (fedE*0.55 + (V3.absorbed ? 0.4*(1 - sinceFlip) : 0)) * gone, r = R*(0.16 + 0.42*fedE + (V3.absorbed ? 0.3*(1 - sinceFlip) : 0));
+    const a = (fedE*0.45 + (V3.absorbed ? 0.25*(1 - sinceFlip) : 0)) * gone, r = R*(0.16 + 0.42*fedE + (V3.absorbed ? 0.3*(1 - sinceFlip) : 0));
     if (a > 0.01){
       const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
       g.addColorStop(0, 'rgba(255,255,255,' + Math.min(1, a) + ')'); g.addColorStop(0.35, 'rgba(' + cM + ',' + a*0.6 + ')'); g.addColorStop(1, 'rgba(' + cT + ',0)');
@@ -12438,48 +12762,15 @@ function v3Draw(ts, t){
     th.pw = age*0.030;
     const pluck = age > 0 ? 11*Math.exp(-age/260) : 0;
     const px = th.px, py = th.py, ps = th.ps;
-    for (let i = 0; i <= M; i++){ v3Pt(th, u0 + (u1 - u0)*i/M, ts, pluck, pt); px[i] = pt.x; py[i] = pt.y; ps[i] = pt.s; }
+    for (let i = 0; i <= M; i++){ v3Pt(th, u0 + (u1 - u0)*i/M, ts, pluck, pt); px[i] = pt.x; py[i] = pt.y; ps[i] = pt.s; th.wx[i] = pt.wx; th.wy[i] = pt.wy; th.wz[i] = pt.wz; }
     // perspective: a thread flying past near the camera is thick and bright, one far away is fine and sits back in the haze
     const sH = Math.min(2.4, Math.max(0.35, ps[M])), sw = Math.min(2.2, Math.max(0.35, (ps[M] + ps[M >> 1])*0.5));
     alpha *= Math.min(1, 0.5 + 0.5*sw);
     const col = v3Mix(th.nat, V3_RGB.green, G);
-    x.beginPath(); x.moveTo(px[0], py[0]); for (let i = 1; i <= M; i++) x.lineTo(px[i], py[i]);
-    x.strokeStyle = 'rgba(' + col + ',' + 0.10*alpha + ')'; x.lineWidth = 7*ks*sw; x.stroke();
-    const hx = px[M], hy = py[M], tx = px[0], ty = py[0];
-    if (Math.abs(hx - tx) + Math.abs(hy - ty) > 2){
-      const g = x.createLinearGradient(tx, ty, hx, hy);
-      g.addColorStop(0, 'rgba(' + col + ',0)'); g.addColorStop(1, 'rgba(' + col + ',' + 0.62*alpha + ')');
-      x.strokeStyle = g; x.lineWidth = 2.6*ks*sw; x.stroke();
-      const g2 = x.createLinearGradient(tx, ty, hx, hy);
-      g2.addColorStop(0, 'rgba(' + cM + ',0)'); g2.addColorStop(0.82, 'rgba(' + cM + ',' + 0.5*alpha + ')'); g2.addColorStop(1, 'rgba(255,255,255,' + alpha + ')');
-      x.strokeStyle = g2; x.lineWidth = 1.05*ks*Math.max(0.6, sw); x.stroke();
-    }
-    if (!V3.low && V3.lvl === 0 && (u1 - u0) > 0.08){   // three fine strands twist round the core, like a spun thread
-      for (let sdx = -1; sdx <= 1; sdx++){
-        x.beginPath();
-        for (let i = 0; i <= M; i++){ const uu = u0 + (u1 - u0)*i/M, off = (sdx ? sdx*1.9 : 0.8)*ks*ps[i]*Math.sin(uu*26 + th.twist + sdx*2.1 + ts*0.004), ddx = i ? px[i] - px[i - 1] : px[1] - px[0], ddy = i ? py[i] - py[i - 1] : py[1] - py[0], dl = Math.hypot(ddx, ddy) || 1; const qx = px[i] - ddy/dl*off, qy = py[i] + ddx/dl*off; if (i) x.lineTo(qx, qy); else x.moveTo(qx, qy); }
-        x.strokeStyle = 'rgba(' + col + ',' + (sdx ? 0.30 : 0.22)*alpha + ')'; x.lineWidth = 0.8*ks*Math.max(0.6, sw); x.stroke();
-      }
-    }
-    if (p < 1){   // the head: a bright bead throwing off sparks, sized by how near it is
-      const hr = 16*ks*sH, gr = x.createRadialGradient(hx, hy, 0, hx, hy, hr);
-      gr.addColorStop(0, 'rgba(255,255,255,' + 0.95*alpha + ')'); gr.addColorStop(0.25, 'rgba(' + col + ',' + 0.55*alpha + ')'); gr.addColorStop(1, 'rgba(' + col + ',0)');
-      x.fillStyle = gr; x.fillRect(hx - hr*1.1, hy - hr*1.1, hr*2.2, hr*2.2);
-      if (Math.random() < 0.55) v3Part(hx, hy, (Math.random() - 0.5)*40*ks, (Math.random() - 0.5)*40*ks, 380 + Math.random()*420, (0.8 + Math.random()*1.4)*ks*sH, th.gold ? 2 : (Math.random() < 0.3 ? 1 : 0));
-    }
-    // the energy: a bright run down the thread to its piece, then straight on into the core
-    const ua = (t - ab)/380;
-    if (ua > 0 && ua < 1.05){
-      const pu1 = Math.pow(clamp01(ua), 1.5), pu0 = Math.max(0, pu1 - 0.32), N = V3.low ? 7 : 11;
-      let bx = T.x, by = T.y;
-      x.beginPath();
-      for (let i = 0; i <= N; i++){ v3Pt(th, pu0 + (pu1 - pu0)*i/N, ts, 0, pt); if (i) x.lineTo(pt.x, pt.y); else x.moveTo(pt.x, pt.y); bx = pt.x; by = pt.y; }
-      x.strokeStyle = 'rgba(' + col + ',' + 0.40*alpha + ')'; x.lineWidth = 8*ks; x.stroke();
-      x.strokeStyle = 'rgba(' + cM + ',' + 0.95*alpha + ')'; x.lineWidth = 2.3*ks; x.stroke();
-      const gr = x.createRadialGradient(bx, by, 0, bx, by, 14*ks);
-      gr.addColorStop(0, 'rgba(255,255,255,' + alpha + ')'); gr.addColorStop(0.3, 'rgba(' + col + ',' + 0.6*alpha + ')'); gr.addColorStop(1, 'rgba(' + col + ',0)');
-      x.fillStyle = gr; x.fillRect(bx - 15*ks, by - 15*ks, 30*ks, 30*ks);
-    }
+    // the strand itself is a real 3D ribbon (v3RibWrite); the energy runs down it as a bright pulse, then on into the core
+    const ua = (t - ab)/380, pu1 = ua > 0 && ua < 1.05 ? Math.pow(clamp01(ua), 1.5) : 0, pu0 = Math.max(0, pu1 - 0.32);
+    v3RibWrite(k, th, M, alpha, v3MixA(th.nat, V3_RGB.green, G), u0, u1, p < 1, pu0, pu1);
+    if (p < 1 && Math.random() < 0.55) v3Part(px[M], py[M], (Math.random() - 0.5)*40*ks, (Math.random() - 0.5)*40*ks, 380 + Math.random()*420, (0.8 + Math.random()*1.4)*ks*sH, th.gold ? 2 : (Math.random() < 0.3 ? 1 : 0));
     const cb = (t - (ab + 380))/260;
     if (cb > 0){
       const ee = clamp01(cb)*clamp01(cb), hx2 = lerp(T.x, cx, ee), hy2 = lerp(T.y, cy, ee), sx = lerp(T.x, cx, Math.max(0, ee - 0.5)), sy = lerp(T.y, cy, Math.max(0, ee - 0.5));
@@ -12529,6 +12820,12 @@ function v3Draw(ts, t){
     const q = V3.parts[i]; q.life -= dt; if (q.life <= 0){ V3.parts.splice(i, 1); continue; }
     q.x += q.vx*sec; q.y += q.vy*sec; q.vx *= (1 - 1.6*sec); q.vy = q.vy*(1 - 1.6*sec) - 14*sec;
   }
+  // green lightning between the spell ring and the core, from the flip until the reveal takes over
+  if (V3.absorbed && V3.spell && V3.spell.visible && t < REVEAL_START + REVEAL_DUR*0.35){
+    if (ts - V3.arcT > 85){ V3.arcT = ts; v3MakeArcs(); }
+    v3DrawArcs(x, ks, gone*(1 - smootherStep((t - REVEAL_START)/(REVEAL_DUR*0.35))));
+  }
+  v3RibFlush(ts);
   x.globalCompositeOperation = 'source-over';
   // if drawing keeps taking too long on this device, step down: no twisted strands/mist, fewer points and sparks
   V3.ema = V3.ema ? V3.ema*0.92 + (performance.now() - t0)*0.08 : performance.now() - t0;
@@ -13504,7 +13801,7 @@ function buildResolvedEmission(){
       uGlowEnvelope:{value:1},uGreen:V3_UG,uWH:{value:new THREE.Vector2(dw,dh)},uTime:{value:0},uMotion:{value:1},uOpacity:{value:0},uReveal:{value:-2}},
     vertexShader:`varying vec2 vUv,vBloomUv;void main(){vBloomUv=uv;vUv=uv*1.2-.1;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
     fragmentShader:`uniform sampler2D map,uOwners,uBloom;uniform vec2 uStep,uWH;uniform float uTime,uMotion,uOpacity,uReveal,uGlowEnvelope,uGreen;varying vec2 vUv,vBloomUv;
-      vec4 crystal(vec2 uv){if(uv.x<0.||uv.y<0.||uv.x>1.||uv.y>1.)return vec4(0.);return texture2D(map,uv);}
+      vec4 crystal(vec2 uv){float b=min(min(uv.x,1.-uv.x),min(uv.y,1.-uv.y));if(b<0.)return vec4(0.);vec4 t=texture2D(map,uv);return t*smoothstep(.03,.08,t.a)*smoothstep(0.,.006,b);}
       float energy(vec4 c){float l=dot(c.rgb,vec3(.299,.587,.114));return c.a*smoothstep(.12,.78,l);}
       void main(){
         vec4 c=crystal(vUv),left=crystal(vUv-vec2(uStep.x,0.)),right=crystal(vUv+vec2(uStep.x,0.));
