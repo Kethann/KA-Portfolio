@@ -30,7 +30,7 @@ export type SiteDoc = {
   passCard: PassDraft;
   stats: StatsDraft;
   sounds?: SoundSettings;
-  intro?: { version: string };
+  intro?: { version: string; bubbles?: IntroBubbles };
   skills: SkillsDraft;
   about: AboutDraft;
 };
@@ -52,6 +52,7 @@ export const SKILL_ICONS = ['design', 'arts', 'motion', 'video', 'ai', 'language
 export const SKILL_LIMITS = { categories: 14, items: 24 };
 export type SkillItem = { name: string; code: string; color: string; level: number; note: string; logo?: string; logoUrl?: string };
 export type SkillCategory = { name: string; icon: string; items: SkillItem[] };
+export type IntroBubbles = { enabled: boolean; items: { type: string; label: string; on: boolean }[] };
 export type SkillsDraft = { enabled: boolean; title: string; intro: string; categories: SkillCategory[] };
 // the checkout pass draft is exactly the card's own settings (one definition, in PassCard.tsx)
 export type PassDraft = PassSettings;
@@ -75,7 +76,7 @@ function withDefaults(d: SiteDoc): SiteDoc {
   return { ...d, notice: { ...ANNOUNCEMENT_DEFAULTS, ...(d.notice || {}) }, visibility: { protectImages: d.visibility?.protectImages ?? true, navGallery: d.visibility?.navGallery ?? true, navAbout: d.visibility?.navAbout ?? true, autoFullscreen: d.visibility?.autoFullscreen ?? false, downloadFormat: d.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png' },
     stacks: d.stacks || { loop: true, covers: {} }, layoutOverrides: d.layoutOverrides || { mobile: {}, tablet: {}, desktop: {} }, branding: d.branding || { enabled: false, logoUrl: '' },
     elementStyles: d.elementStyles || {}, socialLinks: d.socialLinks || [], passCard: { ...PASS_DRAFT_DEFAULTS, ...(d.passCard || {}) }, stats: d.stats ? { enabled: d.stats.enabled !== false, items: d.stats.items || [] } : STATS_DEFAULTS,
-    intro: { version: d.intro?.version || 'v1' },
+    intro: { version: d.intro?.version || 'v1', ...(d.intro?.bubbles ? { bubbles: d.intro.bubbles } : {}) },
     sounds: d.sounds ? { ...SOUND_DEFAULTS, ...d.sounds, categories: { ...(d.sounds.categories || {}) }, events: { ...(d.sounds.events || {}) } } : structuredClone(SOUND_DEFAULTS),
     skills: d.skills ? { enabled: d.skills.enabled !== false, title: d.skills.title || 'Skills', intro: d.skills.intro || '', categories: d.skills.categories || [] } : { enabled: true, title: 'Skills', intro: '', categories: [] }, about: d.about ? { ...aboutDefaults(), ...d.about, journey: { ...ABOUT_DEFAULT.journey, ...(d.about.journey || {}) }, reel: { ...ABOUT_DEFAULT.reel, ...(d.about.reel || {}) } } : aboutDefaults(), details: { ...d.details, customFonts: d.details?.customFonts || [] } };
 }

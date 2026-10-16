@@ -47,3 +47,19 @@ test('the Pages router serves the homepage with the chosen intro and leaves V1 u
   assert.match(router, /if \(version === 'v1' \|\| !page\.ok/);
   assert.match(router, /script\[data-intro\]/);
 });
+
+test('Version 2 (the editable copy) takes the owner\'s skill bubbles; Version 1 does not', async () => {
+  const { cleanBubbles, bubbleList, BUBBLE_TYPES } = await import('../shared/intros.js');
+  const v2 = scriptOf('v2'); assert.ok(v2); assert.match(v2.tag, /type="text\/plain"/);
+  assert.match(v2.code, /window\.KA_INTRO_BUBBLES/); assert.ok(!scriptOf('v1').code.includes('KA_INTRO_BUBBLES'), 'V1 stays untouched');
+  assert.equal(bubbleList(undefined), null, 'nothing saved = the intro as built');
+  assert.deepEqual(bubbleList({ enabled: false, items: [] }), [], 'master switch off = no bubbles');
+  const c = cleanBubbles({ enabled: true, items: [{ type: 'ps', label: '  <b>Photo</b>  ' }, { type: 'ps', label: 'dup' }, { type: 'nope', label: 'x' }, { type: 'brush', on: false }] });
+  assert.equal(c.items.length, BUBBLE_TYPES.length, 'icons left out are added back at the end');
+  assert.ok(!/[<>]/.test(c.items[0].label) && c.items[0].type === 'ps', 'labels are plain text, first listed icon comes first');
+  assert.equal(c.items.filter(x => x.type === 'ps').length, 1, 'no duplicates');
+  assert.deepEqual(bubbleList({ enabled: true, items: [{ type: 'ps', label: 'Photos' }, { type: 'brush', on: false }] }).map(b => b.type + ':' + b.label), ['ps:Photos', 'pencil:Sketch', 'design:Figma', 'uiux:UI/UX', 'type:Typography', 'image:Imaging', 'briefcase:Freelance'], 'hidden icons are left out, the rest keep their order');
+  const seed = JSON.parse(readFileSync(new URL('../server/data/portfolio.json', import.meta.url), 'utf8'));
+  const doc = validateSiteDocument({ ...seed, intro: { version: 'v2', bubbles: { enabled: false, items: [] } } }, seed, seed);
+  assert.equal(doc.intro.version, 'v2'); assert.equal(doc.intro.bubbles.enabled, false);
+});

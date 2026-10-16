@@ -13,9 +13,10 @@ import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
 import { DateTimeInput, Uploader, useSaveKey } from './common';
 import { SiteSaveBar } from './Content';
+import SettingFinder from './SettingFinder';
 import { loadSite, saveSite, thumb, updateSite, useSite, PASS_DRAFT_DEFAULTS } from './siteDoc';
-import type { SiteDoc, PassDraft, Announcement, AnnouncementItem } from './siteDoc';
-import { INTRO_VERSIONS, introVersion } from '../../../../shared/intros.js';
+import type { SiteDoc, PassDraft, Announcement, AnnouncementItem, IntroBubbles } from './siteDoc';
+import { BUBBLE_TYPES, INTRO_VERSIONS, introVersion } from '../../../../shared/intros.js';
 import { FONT_GROUPS, FONT_LIBRARY, FONT_NAMES, fontStack, googleFontsUrl } from '../../../../shared/fonts.js';
 
 const FONTS = FONT_NAMES;
@@ -36,7 +37,7 @@ type Device = keyof typeof DEVICES;
 type Section = 'identity' | 'type' | 'notice' | 'nav' | 'social' | 'elements' | 'arrange' | 'pass' | 'intro';
 
 const SECTIONS: Section[] = ['identity', 'type', 'notice', 'nav', 'social', 'elements', 'arrange', 'pass', 'intro'];
-export default function Studio({ active, route, only }: AppProps & { only?: Section }){
+export default function Studio({ active, route, only, open }: AppProps & { only?: Section }){
   const site = useSite();
   const toast = useToast();
   // #studio/pass (e.g. from a product's "Design the checkout pass" button) opens that section
@@ -55,6 +56,7 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
       <WinTools><SiteSaveBar /></WinTools>
       <div className="studio">
         <div className="studio-panel">
+          {!only && <SettingFinder open={(app, r) => app === 'studio' && r ? setSection(r as Section) : open(app, r)} />}
           {!only && <div className="studio-nav" role="tablist" aria-label="Studio sections">
             {([['identity', 'Colours & logo'], ['type', 'Fonts'], ['notice', 'Announcements'], ['nav', 'Menu & features'], ['social', 'Social links'], ['elements', 'Text styles'], ['arrange', 'Layout'], ['pass', 'Checkout pass'], ['intro', 'Intro']] as [Section, string][]).map(([k, l]) => (
               <button key={k} type="button" role="tab" aria-selected={section === k} className={section === k ? 'on' : ''} onClick={() => setSection(k)}>{l}</button>
@@ -559,6 +561,40 @@ function IntroVersions({ doc }: { doc: SiteDoc }){
         </label>
       </li>)}
     </ul>
-    {INTRO_VERSIONS.length < 2 && <p className="field-hint" style={{ margin: 0 }}>New intro versions appear here as soon as they are added to the site; Version 1 stays available alongside them.</p>}
+    <IntroBubblesCard doc={doc} active={current} />
   </div>;
+}
+
+// The skill bubbles that orbit the finished KA logo (Version 2): all on or off, which ones, their order and their words.
+function IntroBubblesCard({ doc, active }: { doc: SiteDoc; active: string }){
+  const saved = (doc as SiteDoc & { intro?: { version?: string; bubbles?: IntroBubbles } }).intro?.bubbles;
+  const b: IntroBubbles = saved || { enabled: true, items: BUBBLE_TYPES.map(x => ({ type: x.type, label: x.label, on: true })) };
+  const set = (next: IntroBubbles) => updateSite(x => ({ ...x, intro: { ...(x.intro || { version: 'v1' }), bubbles: next } } as SiteDoc));
+  const edit = (i: number, p: Partial<IntroBubbles['items'][number]>) => set({ ...b, items: b.items.map((it, j) => j === i ? { ...it, ...p } : it) });
+  const move = (i: number, d: number) => { const items = b.items.slice(), j = i + d; if (j < 0 || j >= items.length) return; [items[i], items[j]] = [items[j], items[i]]; set({ ...b, items }); };
+  const shown = b.enabled ? b.items.filter(i => i.on).length : 0;
+  return <section className="card stack" aria-labelledby="bubbles-h">
+    <div className="row" style={{ justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+      <div><h3 id="bubbles-h" style={{ margin: 0 }}>Skill bubbles around the logo</h3>
+        <p className="field-hint" style={{ margin: '4px 0 0' }}>The small round icons with their words that appear around the KA logo. {shown === 0 ? 'None will show.' : shown + ' will show.'} Press Publish changes to apply.</p></div>
+      <Switch checked={b.enabled} onChange={v => set({ ...b, enabled: v })} label="Show the bubbles" />
+    </div>
+    {active !== 'v2' && <div className="callout" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      <span className="grow">These choices are used by <b>Version 2</b>. Version 1 is locked and always shows its eight bubbles.</span>
+      <button type="button" className="btn sm primary" onClick={() => updateSite(x => ({ ...x, intro: { ...(x.intro || { version: 'v2' }), version: 'v2' } } as SiteDoc))}>Use Version 2</button>
+    </div>}
+    <ul className="list bubble-list" aria-label="Skill bubbles" style={{ opacity: b.enabled ? 1 : 0.5 }}>
+      {b.items.map((it, i) => <li key={it.type} className="row" style={{ gap: 8, alignItems: 'center' }}>
+        <Switch checked={it.on} onChange={v => edit(i, { on: v })} label={<span className="sr-only">{'Show ' + it.label}</span>} />
+        <input className="grow" value={it.label} maxLength={24} aria-label={'Words for the ' + it.type + ' bubble'} placeholder={BUBBLE_TYPES.find(x => x.type === it.type)?.label}
+          onChange={e => edit(i, { label: e.target.value })} />
+        <button type="button" className="icon-btn sm" aria-label="Move up" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
+        <button type="button" className="icon-btn sm" aria-label="Move down" disabled={i === b.items.length - 1} onClick={() => move(i, 1)}>↓</button>
+      </li>)}
+    </ul>
+    <div className="row" style={{ gap: 8 }}>
+      <button type="button" className="btn sm" onClick={() => set({ enabled: true, items: b.items.map(i => ({ ...i, on: true })) })}>Show all</button>
+      <button type="button" className="btn sm" onClick={() => set({ enabled: true, items: BUBBLE_TYPES.map(x => ({ type: x.type, label: x.label, on: true })) })}>Reset to the original eight</button>
+    </div>
+  </section>;
 }

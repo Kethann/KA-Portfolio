@@ -11,6 +11,7 @@ import { ago, bytes, dateTime } from '../format';
 import { qrMatrix, qrPath } from '../qr';
 import StoreStatusPanel from './StoreStatus';
 import { CONTROL_GROUPS, searchControls } from './controlIndex';
+import SettingFinder from './SettingFinder';
 
 type Sec = 'home' | 'security' | 'team' | 'storestatus' | 'store' | 'messages' | 'reports' | 'categories' | 'system' | 'backups' | 'audit' | 'appearance';
 // grouped by what they belong to; the group name shows above its first section
@@ -29,6 +30,7 @@ export default function Settings({ route, go, open }: AppProps){
   return (
     <div className="content-split">
       <nav className="folder-nav" aria-label="Settings sections">
+        <SettingFinder open={(app, r) => app === 'settings' ? go(r || '') : open(app, r)} />
         {sections.map(([k, l, ic, group], i) => <div key={k} className="folder-nav-item">
           {group !== sections[i - 1]?.[3] && <div className="folder-nav-group">{group}</div>}
           <button type="button" className={'folder-btn' + (k === sec ? ' on' : '')} aria-current={k === sec || undefined} onClick={() => go(k)}><Icon name={ic} size={14} /><span className="grow truncate">{l}</span></button></div>)}
