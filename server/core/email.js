@@ -200,7 +200,7 @@ export const DEFAULT_TEMPLATES = {
   contact_autoreply: { subject: 'Thanks for writing, {{name}}', body: 'Hi {{name}},\n\nThank you for getting in touch. Your message is with me, and I’ll reply personally, usually within a day or two.\n\n{{signature}}' },
   notify_confirm: { subject: 'You’re on the list', body: 'You’re on the list.\n\nYou’ll get exactly one email when {{topic_name}} launches. Nothing else.\n\n{{signature}}' },
   order_delivery: { subject: 'Your download is ready: {{product_title}}', body: 'Hi {{customer_name}},\n\nThank you for your order. {{product_title}} is ready to download.\n\n{{download_url}}\n\n{{link_terms}}\n\n{{extra_note}}\n\n{{license_text}}\n\nYour license is also attached as LICENSE.txt. Please keep this email as your proof of purchase. If the link expires, you can request a fresh one from the store with “Email me my download links”, using this email address.\n\n{{signature}}' },
-  order_receipt: { subject: 'Receipt {{invoice_number}} · order {{order_id}}', body: 'Thank you for your payment. Here is your receipt for your records.\n\n{{receipt}}\n\n{{seller_block}}\n\n{{signature}}' },
+  order_receipt: { subject: 'Receipt {{invoice_number}} · order {{order_id}}', body: 'Thank you for your payment. Here is your receipt for your records.\n\n{{receipt}}\n\n{{invoice_url}}\n\n{{seller_block}}\n\n{{signature}}' },
   resend_link: { subject: 'Your download links', body: 'Here are fresh download links for your purchases.\n\n{{links}}\n\nThese links work until {{expires}}. If you need anything, just reply to this email.\n\n{{signature}}' },
   report: { subject: '{{period}} sales report', body: '{{summary}}\n\nOpen the portal:\n{{portal_url}}' },
   alert: { subject: 'Alert: {{title}}', body: '{{body}}' },

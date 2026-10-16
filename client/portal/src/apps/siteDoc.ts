@@ -11,6 +11,7 @@ import { ABOUT_DEFAULT, ABOUT_LIMITS } from '../../../../shared/about-default.js
 export type SiteImage = { id: string; slug: string; title: string; cat: string; description: string; technologies: string[]; link: string; downloadable?: boolean; hidden?: boolean; archived?: boolean; focusX?: number; focusY?: number; zoom?: number; src?: string; widths: number[]; full: number; width?: number; height?: number };
 // The announcement: a side tab that slides open by itself and tucks away after autoClose seconds (0 = stays open), or the old top banner.
 export type Announcement = { enabled: boolean; text: string; tone: 'info' | 'warning' | 'success' | 'offer'; style: 'tab' | 'banner'; side: 'left' | 'right'; title: string; autoClose: number; linkLabel: string; linkUrl: string };
+export type AnnouncementItem = { id: string; enabled: boolean; title: string; text: string; tone: Announcement['tone']; linkLabel: string; linkUrl: string; startsAt: string; endsAt: string };
 export const ANNOUNCEMENT_DEFAULTS: Announcement = { enabled: false, text: '', tone: 'info', style: 'tab', side: 'right', title: 'Announcement', autoClose: 6, linkLabel: '', linkUrl: '' };
 // About > Featured Work as a showcase: rows alternating sides, each picture frame cross-fading through its pictures.
 export type FeaturedRow = { folder: string; slides: string[]; title: string; eyebrow: string; description: string; ratio: string; size: 'auto' | 's' | 'm' | 'l' | 'free'; width?: number; ratioW?: number; ratioH?: number; side: 'auto' | 'left' | 'right'; ctaLabel: string; ctaUrl: string };
@@ -21,6 +22,7 @@ export const featuredDefaults = (d: SiteDoc): FeaturedShow => ({ enabled: true, 
   rows: (d.stacks?.featured?.length ? d.stacks.featured : d.folders.slice(0, 2)).filter(f => d.folders.includes(f)).slice(0, 6).map(featuredRow) });
 export type SiteDoc = {
   featuredShow?: FeaturedShow | null;
+  announcements?: AnnouncementItem[];
   revision: number; details: Record<string, any> & { customFonts: { family: string; url: string }[] }; folders: string[]; images: SiteImage[];
   notice: Announcement; visibility: { navGallery: boolean; navAbout: boolean; autoFullscreen?: boolean; downloadFormat?: 'png' | 'jpeg'; protectImages?: boolean };
   stacks: { loop: boolean; loops?: Record<string, boolean>; covers: Record<string, string>; featured?: string[] }; layoutOverrides: Record<string, Record<string, { x: number; y: number; scale: number; width?: number }>>;

@@ -5,7 +5,7 @@
 //         60-second signed storage URL. No permanent public file URL ever exists.
 import { getDb } from '../core/db.js';
 import { json } from '../core/http.js';
-import { env } from '../core/env.js';
+import { siteUrl, env } from '../core/env.js';
 import { getSetting } from '../core/settings.js';
 import { randomToken, sha256hex } from '../core/crypto.js';
 import { sendEmail, escapeHtml, button, tilesHtml, panelHtml } from '../core/email.js';
@@ -14,6 +14,7 @@ import { markdownToText } from '../core/markdown.js';
 import { formatMoney } from './pricing.js';
 import { ensureLicenseCode, licenseUrl, sealSvg } from './license.js';
 import { signedFileUrl } from './drive.js';
+import { invoiceUrl } from './invoice.js';
 
 export const SIGNED_URL_SECONDS = 60;
 const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
@@ -143,6 +144,7 @@ function absImage(site, url){
 
 export async function sendReceipt(order, items){
   const store = await getSetting('store');
+  const invoiceLink = invoiceUrl(siteUrl(null), order);   // the buyer's own invoice page (print or save as PDF)
   const cur = order.currency;
   const lines = items.map(i => `${i.product_title || i.title} — ${formatMoney(i.unit_price, cur)}${i.discount ? ` (−${formatMoney(i.discount, cur)})` : ''}`).join('\n');
   const afterDiscount = order.subtotal - order.discount;
@@ -164,7 +166,8 @@ export async function sendReceipt(order, items){
   return sendEmail({
     hero: { eyebrow: 'Payment received', title: `Receipt ${inv}`, subtitle: `${v.total} paid on ${fmtDay(order.paid_at || order.created_at)}` },
     blocks: { receipt: receiptHtml, ...(sellerHtml ? { seller_block: sellerHtml } : {}) },
-    to: order.email, template: 'order_receipt', vars: v
+    buttons: { [invoiceLink]: 'View or download your invoice' },
+    to: order.email, template: 'order_receipt', vars: { ...v, invoice_url: invoiceLink }
   });
 }
 
@@ -211,7 +214,7 @@ const RESEND_HINT = (site) => `<p><small>Need a new link? Use “Email me my dow
 async function lookup(token){
   if (!TOKEN_RE.test(String(token))) return { error: 'invalid' };
   const db = await getDb();
-  const t = await db.maybeOne(`select t.*, o.status as order_status, o.public_id, p.title as product_title
+  const t = await db.maybeOne(`select t.*, o.status as order_status, o.public_id, o.invoice_number, p.title as product_title
     from download_tokens t join orders o on o.id = t.order_id join products p on p.id = t.product_id where t.token_hash = $1`, [sha256hex(token)]);
   if (!t) return { error: 'invalid' };
   if (t.revoked_at || o_blocked(t.order_status)) return { error: 'revoked', t };
@@ -280,7 +283,7 @@ export async function downloadPage(token, siteUrl, { rated = false } = {}){
   const pct = t.max_downloads ? Math.round(left / t.max_downloads * 100) : 0;
   const expiresIso = new Date(t.expires_at).toISOString();
   return page(200, `Download ${t.product_title}`, `<h1>${escapeHtml(t.product_title)}</h1>
-<p>Order ${escapeHtml(t.public_id)}</p>
+<p>Order ${escapeHtml(t.public_id)}${t.invoice_number ? ` · <a href="${escapeHtml(invoiceUrl(siteUrl, { id: t.order_id, public_id: t.public_id }))}" target="_blank" rel="noopener" style="color:#ffc795">Your invoice</a>` : ""}</p>
 <section class="live${left <= 1 || ms < 3600e3 ? ' low' : ''}" id="dl" data-token="${escapeHtml(token)}" data-expires="${expiresIso}" data-used="${t.download_count}" data-max="${t.max_downloads}" aria-label="Your download link">
 <div class="stats">
 <div class="ring" id="dl-meter" role="meter" aria-label="Downloads left" aria-valuemin="0" aria-valuemax="${t.max_downloads}" aria-valuenow="${left}">

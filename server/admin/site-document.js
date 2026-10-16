@@ -244,6 +244,20 @@ export function validateSiteDocument(input, current, seed){
     style: n.style === 'banner' ? 'banner' : 'tab', side: n.side === 'left' ? 'left' : 'right', title: text(n.title, 40) || 'Announcement',
     autoClose: Number.isFinite(autoClose) ? Math.min(30, Math.max(0, Math.round(autoClose))) : 6, linkLabel: text(n.linkLabel, 30), linkUrl: noticeLink };
   if (notice.enabled && !notice.text) throw bad('Add announcement text before turning it on, or turn it off.');
+  // the announcement list (Studio > Announcements): each one on or off, optionally only between two dates; the site shows
+  // the ones live right now, one after another in the tab (notice above keeps the tab's style, side and timing)
+  const when = (v, label) => { if (!v) return ''; const d = new Date(String(v)); if (Number.isNaN(d.getTime())) throw bad(`Choose a valid ${label} date for the announcement, or leave it empty.`); return d.toISOString(); };
+  const announcements = (Array.isArray(input.announcements) ? input.announcements : []).slice(0, 12).map((a, i) => {
+    if (!a || typeof a !== 'object') throw bad('Invalid announcement.');
+    const link = text(a.linkUrl, 300);
+    if (link && !httpUrl(link) && !/^\/[^\s]*$/.test(link)) throw bad('Announcement links must start with https://, http:// or /.');
+    const item = { id: /^[a-z0-9-]{4,40}$/i.test(String(a.id || '')) ? String(a.id) : `a${Date.now().toString(36)}${i}`, enabled: a.enabled !== false,
+      title: text(a.title, 40), text: text(a.text, 220), tone: ['warning', 'success', 'offer'].includes(a.tone) ? a.tone : 'info',
+      linkLabel: text(a.linkLabel, 30), linkUrl: link, startsAt: when(a.startsAt, 'start'), endsAt: when(a.endsAt, 'end') };
+    if (item.enabled && !item.text) throw bad('Every announcement that is on needs some text.');
+    if (item.startsAt && item.endsAt && item.endsAt <= item.startsAt) throw bad('An announcement must end after it starts.');
+    return item;
+  });
   const visibility = { navGallery: input.visibility?.navGallery !== false, navAbout: input.visibility?.navAbout !== false, autoFullscreen: input.visibility?.autoFullscreen === true, downloadFormat: input.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png', protectImages: input.visibility?.protectImages !== false };
 
   const layoutOverrides = {};
@@ -353,7 +367,7 @@ export function validateSiteDocument(input, current, seed){
   const intro = { version: introVersion(input.intro?.version) };   // which homepage intro runs (Studio > Intro)
   // a save from the portal makes the owner's skill list the authority: the one-time additions (handlers/public.js) never apply after it
   const skillsAdded = SKILLS_ADDITIONS.id;
-  return { typeV2: true, details, folders, images, notice, visibility, stacks, featuredShow, layoutOverrides, branding, elementStyles, socialLinks, passCard, stats, skills, about, sounds, intro, skillsAdded };
+  return { typeV2: true, details, folders, images, notice, announcements, visibility, stacks, featuredShow, layoutOverrides, branding, elementStyles, socialLinks, passCard, stats, skills, about, sounds, intro, skillsAdded };
 }
 
 // About > Featured Work as a showcase: rows that alternate sides (picture one side, words the other), each picture

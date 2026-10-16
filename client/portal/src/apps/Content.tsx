@@ -335,6 +335,9 @@ function Portfolio(){
     .then(live => toast.show(live ? (on ? 'Downloads allowed: live now' : 'Downloads turned off: live now') : 'Changed. Press Publish changes to put it live.', { tone: 'success' })).catch(toast.error);
   const images = useMemo(() => doc!.images.filter(i => i.cat === folder && !i.archived), [doc, folder]);
   const archivedImages = useMemo(() => doc!.images.filter(i => i.cat === folder && i.archived), [doc, folder]);
+  // every visible picture should have a description (it shows in the gallery, the full-screen viewer and Featured Work)
+  const undescribed = useMemo(() => doc!.images.filter(i => !i.archived && !i.hidden && !(i.description || '').trim()), [doc]);
+  const describeNext = () => { const next = undescribed.find(i => i.cat === folder) || undescribed[0]; if (!next) return; if (next.cat !== folder) setFolder(next.cat); setEditing(next.slug); };
   const setArchived = (slug: string, on: boolean) => void updateSiteLive(d => ({ ...d, images: d.images.map(x => x.slug === slug ? (on ? { ...x, archived: true, hidden: true } : { ...x, archived: false, hidden: false }) : x) }))
     .then(live => toast.show(live ? (on ? 'Archived: off the site now' : 'Republished: back on the site now') : (on ? 'Archived. Press Publish changes to put it live.' : 'Republished. Press Publish changes to put it live.'), { tone: 'success' })).catch(toast.error);
   const cover = doc!.stacks.covers[folder];
@@ -395,6 +398,9 @@ function Portfolio(){
             <button type="button" className="btn sm ghost" title="Turn downloads off for every image in this stack" onClick={() => setDownloads(images.map(x => x.slug), false)}>No downloads</button>
             <button type="button" className="btn sm ghost" onClick={() => setRenaming(folder)}>Rename</button><button type="button" className="btn sm ghost" onClick={removeFolder}>Remove</button></div>
         </div>
+        {undescribed.length > 0 && <div className="row desc-nudge" role="status">
+          <Icon name="info" size={14} /><span className="grow">{undescribed.length} picture{undescribed.length === 1 ? ' has' : 's have'} no description yet{undescribed.some(i => i.cat === folder) ? ` (${undescribed.filter(i => i.cat === folder).length} in this stack)` : ''}. Visitors read it in the gallery, the full-screen viewer and Featured Work.</span>
+          <button type="button" className="btn sm primary" onClick={describeNext}>Write the next one</button></div>}
         <Uploader kind="image" accept="image/png,image/jpeg,image/webp,image/avif" label={`Add images to “${folder}”`} multiple onUploaded={uploaded}>PNG, JPG, WebP or AVIF, up to 10 MB. Large images are shown sharp on 4K screens.</Uploader>
         {images.length > 0 && <div className="row" style={{ gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <Segmented label="Preview size" value={size} onChange={setSize} options={[{ value: 's', label: 'Small' }, { value: 'm', label: 'Medium' }, { value: 'l', label: 'Large' }]} />
@@ -406,7 +412,7 @@ function Portfolio(){
               <li key={i.slug} draggable onDragStart={() => setDragSlug(i.slug)} onDragEnd={() => setDragSlug(null)} onDragOver={e => e.preventDefault()}
                 onDrop={() => { if (dragSlug && dragSlug !== i.slug) moveImage(dragSlug, i.slug); }} className={(dragSlug === i.slug ? 'dragging' : '') + (i.hidden ? ' is-hidden' : '')}>
                 <button type="button" className="pf-thumb" onClick={() => setEditing(i.slug)} aria-label={`Edit ${i.title}`}><img src={thumb(i)} alt="" loading="lazy" decoding="async" style={!whole && (i.focusX !== undefined || i.focusY !== undefined || i.zoom) ? { objectPosition: `${i.focusX ?? 50}% ${i.focusY ?? 50}%`, transformOrigin: `${i.focusX ?? 50}% ${i.focusY ?? 50}%`, ...(i.zoom && i.zoom > 1 ? { transform: `scale(${i.zoom})` } : {}) } : undefined} /></button>
-                <span className="pf-badges">{i.hidden && <Badge>Hidden</Badge>}{i.downloadable === false && <Badge>No download</Badge>}{listed.has(i.slug) && <Badge tone="accent">In store</Badge>}</span>
+                <span className="pf-badges">{!i.hidden && !(i.description || '').trim() && <Badge tone="warning">No description</Badge>}{i.hidden && <Badge>Hidden</Badge>}{i.downloadable === false && <Badge>No download</Badge>}{listed.has(i.slug) && <Badge tone="accent">In store</Badge>}</span>
                 <div className="pf-meta"><span className="truncate">{i.title}</span>
                   <button type="button" className="icon-btn sm" aria-pressed={!!i.hidden} aria-label={i.hidden ? 'Show on the site' : 'Hide from the site'} title={i.hidden ? 'Hidden: show on the site' : 'Hide from the site'}
                     onClick={() => void updateSiteLive(d => ({ ...d, images: d.images.map(x => x.slug === i.slug ? { ...x, hidden: !x.hidden } : x) })).then(live => toast.show(live ? (i.hidden ? 'Shown on the site now' : 'Hidden from the site now') : 'Changed. Press Publish changes to put it live.', { tone: 'success' })).catch(toast.error)}><Icon name={i.hidden ? 'eyeOff' : 'eye'} size={13} /></button>

@@ -1122,6 +1122,8 @@ html.ka-lite .about-stat::before{ background:linear-gradient(135deg, rgba(255,25
   font-size:10px; letter-spacing:0.14em; text-transform:uppercase;
 }
 #lightbox .lb-caption .title{ font-size:16px; font-weight:600; margin-top:4px; }
+#lightbox .lb-caption .desc{ margin:6px 0 0; max-width:60ch; font-size:13.5px; line-height:1.55; color:rgba(237,235,232,.78); max-height:6.2em; overflow:auto; }
+#lightbox .lb-caption .desc[hidden]{ display:none; }
 #lightbox .lb-caption .cf-pin{ margin-top:10px; }
 .lb-btn{
   position:fixed; top:50%; transform:translateY(-50%);
@@ -2091,6 +2093,7 @@ html.ka-wallpaper #stage{ opacity:1 !important; }
   <div class="lb-caption">
     <span class="cat" id="lb-cat"></span>
     <div class="title" id="lb-title"></div>
+    <p class="desc" id="lb-desc" hidden></p>
     <button class="cf-pin" id="lb-pin" type="button">Pin</button>
     <a class="cf-pin" id="lb-download" download hidden>Download</a>
   </div>
@@ -6495,13 +6498,20 @@ function navLightbox(delta){
 }
 function renderLightbox(){
   var p = lbPosters[lbIndex];
-  lbImg.srcset = p.widths.map(function(w){ return IMG_BASE+p.slug+"-"+w+".avif "+w+"w"; }).join(", ") +
-    ", " + IMG_BASE + p.slug + "-full.avif " + p.full + "w";
-  lbImg.sizes = "90vw";
-  lbImg.src = IMG_BASE + p.slug + "-full.webp";
+  if (p.src || !(p.widths && p.widths.length)){
+    // a picture uploaded in the portal has one direct file, not the exported size set
+    lbImg.removeAttribute("srcset"); lbImg.removeAttribute("sizes"); lbImg.src = p.src || (IMG_BASE + p.slug + "-full.webp");
+  } else {
+    lbImg.srcset = p.widths.map(function(w){ return IMG_BASE+p.slug+"-"+w+".avif "+w+"w"; }).join(", ") +
+      ", " + IMG_BASE + p.slug + "-full.avif " + p.full + "w";
+    lbImg.sizes = "90vw";
+    lbImg.src = IMG_BASE + p.slug + "-full.webp";
+  }
   lbImg.alt = p.title;
   lbCat.textContent = p.cat;
   lbTitle.textContent = p.title;
+  var lbDesc = document.getElementById("lb-desc");
+  if (lbDesc){ var dtext = (p.description || "").trim(); lbDesc.textContent = dtext; lbDesc.hidden = !dtext; }
   lbPin.classList.toggle("pinned", isPinned(p.slug));
   lbPin.textContent = isPinned(p.slug) ? "Pinned" : "Pin";
   // Per-image download permission (creator panel toggle, Part A) -- default true for any project
@@ -9057,7 +9067,7 @@ function applySiteAppearance(data){
   var noticeEl = document.getElementById("site-notice");
   var noticeText = document.getElementById("site-notice-text");
   var announced = false;
-  try { announced = !!(window.kaAnnounce && window.kaAnnounce(data.notice)); } catch(e){}
+  try { announced = !!(window.kaAnnounce && window.kaAnnounce(data.notice, data.announcements)); } catch(e){}
   if (!announced && data.notice && data.notice.enabled && data.notice.text){
     // one dismissal per distinct notice message -- editing the text (or re-enabling it later)
     // shows it again, rather than a dismissal from weeks ago silently suppressing new content.
@@ -10087,6 +10097,12 @@ function sendMessage(text){
 .ka-ann-head button:hover, .ka-ann-head button[aria-pressed="true"]{ background:rgba(255,255,255,.08); color:var(--ink); }
 .ka-ann-head svg{ width:15px; height:15px; }
 .ka-ann-text{ margin:0; font:15px/1.6 var(--font-body, sans-serif); color:var(--ink); }
+.ka-ann-body{ transition:opacity .18s ease, transform .18s ease; }
+.ka-ann-body.is-swap{ opacity:0; transform:translateY(4px); }
+.ka-ann-dots{ display:flex; gap:6px; margin-top:12px; }
+.ka-ann-dots[hidden]{ display:none; }
+.ka-ann-dots button{ width:7px; height:7px; padding:0; border:0; border-radius:4px; background:rgba(255,255,255,.25); cursor:pointer; transition:width .3s ease, background .3s ease; }
+.ka-ann-dots button.is-on{ width:20px; background:var(--ann, #ff9438); }
 .ka-ann-link{ display:inline-flex; margin-top:12px; padding:9px 16px; border-radius:999px; border:1px solid color-mix(in srgb, var(--ann, #ff9438) 60%, transparent); color:#fff; text-decoration:none;
   font:600 13px/1 var(--font-body, sans-serif); background:color-mix(in srgb, var(--ann, #ff9438) 22%, transparent); }
 .ka-ann-time{ position:absolute; left:0; right:0; bottom:0; height:2px; background:var(--ann, #ff9438); transform-origin:left; transform:scaleX(0); opacity:.7; }
@@ -10128,7 +10144,9 @@ function sendMessage(text){
 .fw-title{ margin:0; font-family:var(--font-heading), serif; font-size:clamp(26px, 6.2cqi, 54px); line-height:1.04; letter-spacing:-.02em; text-wrap:balance; }
 .fw-desc{ margin:0; max-width:56ch; color:var(--ink-dim); font-size:clamp(14px, 2.15cqi, 17px); line-height:1.7; text-wrap:pretty; }
 .fw-caption{ margin:0; min-height:1.5em; font:italic 400 clamp(14px, 2.1cqi, 17px)/1.5 var(--font-sub, var(--font-heading)), serif; color:#f3dcc6; transition:opacity calc(var(--fw-fade, 1.6s) * .5) cubic-bezier(.45,0,.55,1); }
-.fw-caption.is-out{ opacity:0; }
+.fw-caption.is-out, .fw-pdesc.is-out{ opacity:0; }
+.fw-pdesc{ margin:-4px 0 0; max-width:56ch; min-height:1.6em; font-size:clamp(13px, 1.9cqi, 15px); line-height:1.6; color:rgba(237,235,232,.66); transition:opacity calc(var(--fw-fade, 1.6s) * .5) cubic-bezier(.45,0,.55,1); }
+.fw-pdesc:empty{ display:none; }
 .fw-foot{ display:flex; flex-wrap:wrap; align-items:center; gap:14px 18px; margin-top:4px; }
 .fw-cta{ display:inline-flex; align-items:center; gap:8px; padding:11px 20px; border-radius:999px; border:1px solid rgba(255,148,56,.5); color:#fff; text-decoration:none;
   font:600 14px/1 var(--font-body, sans-serif); background:linear-gradient(135deg, rgba(255,148,56,.3), rgba(255,148,56,.08)); cursor:pointer; transition:background .25s ease, transform .25s ease; }
@@ -10411,13 +10429,52 @@ function sendMessage(text){
     }
   }
   function closeAnn(){ if (!ann) return; clearTimeout(annTimer); ann.classList.remove("is-open", "is-counting"); ann.querySelector(".ka-ann-tab").setAttribute("aria-expanded", "false"); }
-  window.kaAnnounce = function(n){
-    if (!n || !n.enabled || !n.text || n.style === "banner"){ if (ann) ann.hidden = true; return false; }
+  // Announcements (portal: Studio > Announcements): every one that is on and inside its dates right now, shown one
+  // after another in the tab (dots to switch, a gentle auto-advance while open). n holds the tab's style, side and timing;
+  // a site saved before the list existed still shows its single notice.
+  var annItems = [], annAt = 0, annRotate = 0, annLast = null;
+  function liveAnnouncements(n, list){
+    var now = Date.now();
+    var live = (Array.isArray(list) ? list : []).filter(function(a){
+      return a && a.enabled !== false && a.text && (!a.startsAt || Date.parse(a.startsAt) <= now) && (!a.endsAt || Date.parse(a.endsAt) > now);
+    });
+    if (!live.length && n && n.enabled && n.text) live = [n];
+    return live;
+  }
+  function showAnn(i){
+    if (!ann || !annItems.length) return;
+    annAt = (i + annItems.length) % annItems.length;
+    var a = annItems[annAt], tone = ["warning", "success", "offer"].indexOf(a.tone) >= 0 ? a.tone : "info";
+    ann.dataset.tone = tone;
+    var body = ann.querySelector(".ka-ann-body");
+    body.classList.add("is-swap");
+    setTimeout(function(){
+      ann.querySelector(".ka-ann-tabtext").textContent = a.title || "Announcement";
+      ann.querySelector(".ka-ann-title").textContent = a.title || "Announcement";
+      ann.querySelector(".ka-ann-text").textContent = a.text;
+      var link = ann.querySelector(".ka-ann-link");
+      if (a.linkUrl && a.linkLabel){ link.hidden = false; link.textContent = a.linkLabel; link.href = a.linkUrl; if (/^https?:/.test(a.linkUrl) && a.linkUrl.indexOf(location.host) < 0){ link.target = "_blank"; link.rel = "noopener noreferrer"; } else { link.removeAttribute("target"); } }
+      else link.hidden = true;
+      var dots = ann.querySelector(".ka-ann-dots");
+      dots.hidden = annItems.length < 2;
+      dots.replaceChildren.apply(dots, annItems.map(function(_, k){ var b = el("button", k === annAt ? "is-on" : ""); b.type = "button"; b.setAttribute("aria-label", "Announcement " + (k + 1) + " of " + annItems.length); b.addEventListener("click", function(){ showAnn(k); restartRotate(); }); return b; }));
+      body.classList.remove("is-swap");
+    }, ann.classList.contains("is-open") && !REDUCED ? 180 : 0);
+  }
+  function restartRotate(){
+    clearInterval(annRotate);
+    if (annItems.length > 1 && !REDUCED) annRotate = setInterval(function(){ if (ann && ann.classList.contains("is-open") && !ann.matches(":hover")) showAnn(annAt + 1); }, 6500);
+  }
+  window.kaAnnounce = function(n, list){
+    annLast = [n, list];
+    var items = liveAnnouncements(n, list);
+    if (!items.length || (n && n.style === "banner" && !(Array.isArray(list) && list.length))){ if (ann) ann.hidden = true; annItems = []; clearInterval(annRotate); return false; }
     if (!ann){
-      ann = el("aside", "ka-announce"); ann.setAttribute("aria-label", "Announcement");
+      ann = el("aside", "ka-announce"); ann.setAttribute("aria-label", "Announcements");
       ann.innerHTML = '<button type="button" class="ka-ann-tab" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg><i aria-hidden="true"></i><span class="ka-ann-tabtext sr"></span></button>' +
         '<div class="ka-ann-panel"><p class="ka-ann-head"><span class="ka-ann-title"></span><button type="button" class="ka-ann-pin" aria-pressed="false" aria-label="Keep it open" title="Keep it open">' + ICON_PIN + '</button>' +
-        '<button type="button" class="ka-ann-close" aria-label="Tuck it away" title="Tuck it away">' + ICON_X + '</button></p><p class="ka-ann-text"></p><a class="ka-ann-link" hidden></a><span class="ka-ann-time" aria-hidden="true"></span></div>';
+        '<button type="button" class="ka-ann-close" aria-label="Tuck it away" title="Tuck it away">' + ICON_X + '</button></p><div class="ka-ann-body"><p class="ka-ann-text"></p><a class="ka-ann-link" hidden></a></div>' +
+        '<div class="ka-ann-dots" hidden></div><span class="ka-ann-time" aria-hidden="true"></span></div>';
       document.body.appendChild(ann);
       ann.querySelector(".ka-ann-tab").addEventListener("click", function(){ ann.classList.contains("is-open") ? closeAnn() : openAnn(false); });
       ann.querySelector(".ka-ann-close").addEventListener("click", function(){ annPinned = false; ann.querySelector(".ka-ann-pin").setAttribute("aria-pressed", "false"); closeAnn(); });
@@ -10427,17 +10484,17 @@ function sendMessage(text){
       ann.addEventListener("focusin", function(){ clearTimeout(annTimer); ann.classList.remove("is-counting"); });
       ann.addEventListener("pointerleave", function(){ if (ann.classList.contains("is-open") && !annPinned && (ann.__auto || 0) > 0) openAnn(true, 3); });
       document.addEventListener("keydown", function(e){ if (e.key === "Escape" && ann && ann.classList.contains("is-open") && !annPinned) closeAnn(); });
+      // scheduled announcements start and end on time on an open page
+      setInterval(function(){ if (annLast) window.kaAnnounce(annLast[0], annLast[1]); }, 60000);
     }
-    var tone = ["warning", "success", "offer"].indexOf(n.tone) >= 0 ? n.tone : "info";
-    ann.hidden = false; ann.dataset.side = n.side === "left" ? "left" : "right"; ann.dataset.tone = tone; ann.__auto = n.autoClose;
-    ann.querySelector(".ka-ann-tabtext").textContent = n.title || "Announcement";
-    ann.querySelector(".ka-ann-title").textContent = n.title || "Announcement";
-    ann.querySelector(".ka-ann-text").textContent = n.text;
-    var link = ann.querySelector(".ka-ann-link");
-    if (n.linkUrl && n.linkLabel){ link.hidden = false; link.textContent = n.linkLabel; link.href = n.linkUrl; if (/^https?:/.test(n.linkUrl) && n.linkUrl.indexOf(location.host) < 0){ link.target = "_blank"; link.rel = "noopener noreferrer"; } else { link.removeAttribute("target"); } }
-    else link.hidden = true;
-    // slides open by itself once for each new announcement, a moment after the page settles
-    var key = "ka_ann_" + (n.title || "") + "|" + n.text, auto = n.autoClose > 0 ? n.autoClose : 0;
+    var o = n || {};
+    ann.hidden = false; ann.dataset.side = o.side === "left" ? "left" : "right"; ann.__auto = o.autoClose;
+    var same = annItems.length === items.length && annItems.every(function(a, k){ return a.text === items[k].text && a.title === items[k].title; });
+    annItems = items;
+    if (!same) showAnn(Math.min(annAt, items.length - 1));
+    restartRotate();
+    // slides open by itself once for each new set of announcements, a moment after the page settles
+    var key = "ka_ann_" + items.map(function(a){ return (a.title || "") + "|" + a.text; }).join("¦"), auto = o.autoClose > 0 ? o.autoClose : 0;
     if (store("ka_ann_seen") !== key){
       store("ka_ann_seen", key);
       setTimeout(function(){ openAnn(true, auto || 0); if (!auto){ annPinned = true; ann.querySelector(".ka-ann-pin").setAttribute("aria-pressed", "true"); } }, REDUCED ? 300 : 2600);
@@ -10502,6 +10559,7 @@ function sendMessage(text){
       copy.appendChild(el("h3", "fw-title", r.title || r.folder));
       if (r.description) copy.appendChild(el("p", "fw-desc", r.description));
       var caption = show.captions ? el("p", "fw-caption", pics[0].title || "") : null; if (caption) copy.appendChild(caption);
+      var pdesc = show.captions ? el("p", "fw-pdesc", (pics[0].description || "").trim()) : null; if (pdesc) copy.appendChild(pdesc);
       var foot = el("div", "fw-foot");
       var cta = el(r.ctaUrl ? "a" : "button", "fw-cta", r.ctaLabel || "View the work");
       if (r.ctaUrl){ cta.href = r.ctaUrl; if (/^https?:/.test(r.ctaUrl) && r.ctaUrl.indexOf(location.host) < 0){ cta.target = "_blank"; cta.rel = "noopener noreferrer"; } }
@@ -10517,7 +10575,7 @@ function sendMessage(text){
       }
       copy.appendChild(foot);
       row.append(frame, copy); fw.el.appendChild(row);
-      var state = { row: row, frame: frame, imgs: imgs, pics: pics, at: 0, caption: caption, dots: dots, count: count, fixed: fixed, visible: false, timer: 0, delay: idx * 1300 };
+      var state = { row: row, frame: frame, imgs: imgs, pics: pics, at: 0, caption: caption, pdesc: pdesc, dots: dots, count: count, fixed: fixed, visible: false, timer: 0, delay: idx * 1300 };
       fw.rows.push(state);
       var open = function(){
         var list = pics.slice(), at = state.at;
@@ -10556,7 +10614,9 @@ function sendMessage(text){
         s.imgs[s.at].classList.remove("is-on"); img.classList.add("is-on");
         s.imgs.forEach(function(x, k){ x.alt = k === next ? (s.pics[k].title || "") : ""; });
         s.at = next;
-        if (s.caption){ s.caption.classList.add("is-out"); setTimeout(function(){ s.caption.textContent = s.pics[next].title || ""; s.caption.classList.remove("is-out"); }, show.fade * 500); }
+        if (s.caption){ s.caption.classList.add("is-out"); if (s.pdesc) s.pdesc.classList.add("is-out");
+          setTimeout(function(){ s.caption.textContent = s.pics[next].title || ""; s.caption.classList.remove("is-out");
+            if (s.pdesc){ s.pdesc.textContent = (s.pics[next].description || "").trim(); s.pdesc.classList.remove("is-out"); } }, show.fade * 500); }
         if (s.dots) Array.prototype.forEach.call(s.dots.children, function(d, k){ d.classList.toggle("is-on", k === next); });
         if (s.count) s.count.textContent = String(next + 1).padStart(2, "0") + " / " + String(s.imgs.length).padStart(2, "0");
         if (!s.fixed) fitFrame(s, next);

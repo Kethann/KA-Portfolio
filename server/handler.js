@@ -11,6 +11,7 @@ import { registerLegal } from './handlers/legal.js';
 import { registerLicense } from './handlers/license.js';
 import { registerStoreAccess } from './store/access.js';
 import { threads, threadsSeen } from './handlers/threads.js';
+import { buyerInvoice } from './store/invoice.js';
 
 import { registerAuth, requireAdmin } from './admin/auth.js';
 import { registerTeam } from './admin/team.js';
@@ -56,6 +57,7 @@ route('GET', '/api/intro', pub.intro);
 route('GET', '/api/live', pub.liveVersion);
 route('POST', '/api/contact', pub.contact);
 route('POST', '/api/messages/threads', threads);
+route('GET', '/api/invoice/:id', buyerInvoice);
 route('POST', '/api/messages/threads/seen', threadsSeen);
 route('POST', '/api/notify', pub.notify);
 route('POST', '/api/assistant', assistant);

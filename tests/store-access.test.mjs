@@ -156,3 +156,33 @@ test('emails: a link on its own line becomes a labelled button, and everything s
   assert.ok(html.includes('href="https://shop.test/?thread=abc&amp;x=1"'));
   assert.ok(html.includes('Read the conversation on the site'));
 });
+
+test('invoices: the buyer opens theirs by a signed link only; the amount is written in words', async () => {
+  const { invoiceUrl, amountInWords } = await import('../server/store/invoice.js');
+  const [o] = (await app.pg.query(`select id, public_id from orders order by created_at limit 1`)).rows;
+  await app.pg.query(`update orders set invoice_number = 41, license_holder = 'Pat Buyer' where id = $1`, [o.id]);
+  const url = new URL(invoiceUrl('http://shop.test', o));
+  const ok = await app.call('GET', url.pathname + url.search);
+  assert.equal(ok.status, 200);
+  assert.match(ok.headers.get('content-type'), /text\/html/);
+  assert.match(ok.text, /INV-000041/); assert.match(ok.text, /Pat Buyer/); assert.match(ok.text, /GST is not charged/);
+  assert.match(ok.headers.get('content-security-policy'), /script-src 'nonce-/);
+  const forged = await app.call('GET', url.pathname + '?t=' + '0'.repeat(32));
+  assert.equal(forged.status, 404);
+  assert.equal((await app.call('GET', '/api/invoice/' + o.public_id)).status, 404, 'no signature, no invoice');
+  assert.equal(amountInWords(149900, 'INR'), 'One thousand four hundred and ninety-nine rupees only');
+  assert.equal(amountInWords(12345678950, 'INR'), 'Twelve crore thirty-four lakh fifty-six thousand seven hundred and eighty-nine rupees and fifty paise only');
+  assert.equal(amountInWords(2999, 'USD'), 'Twenty-nine US dollars and ninety-nine cents only');
+});
+
+test('announcements: several, each on/off with dates; bad links and backwards dates are refused', async () => {
+  const doc = (await admin('GET', '/api/admin/site')).json;
+  const save = (announcements) => admin('PUT', '/api/admin/site', { ...doc, announcements });
+  assert.equal((await save([{ text: 'Hi', linkUrl: 'javascript:x', linkLabel: 'go' }])).status, 400);
+  assert.equal((await save([{ text: 'Hi', startsAt: '2026-12-02T00:00:00Z', endsAt: '2026-12-01T00:00:00Z' }])).status, 400);
+  const res = await save([{ id: 'sale', title: 'Sale', text: '20% off', tone: 'offer', linkUrl: '/?page=store', linkLabel: 'Shop' }, { enabled: false, text: '' }]);
+  assert.equal(res.status, 200, res.text);
+  assert.equal(res.json.announcements.length, 2);
+  assert.deepEqual([res.json.announcements[0].id, res.json.announcements[0].tone], ['sale', 'offer']);
+  assert.equal((await app.call('GET', '/api/portfolio')).json.announcements[0].text, '20% off');
+});

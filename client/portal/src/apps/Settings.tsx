@@ -140,12 +140,39 @@ function uaLabel(ua: string | null){
 
 const hoursLabel = (h: number) => h % 24 === 0 && h >= 24 ? `${h / 24} day${h === 24 ? '' : 's'}` : `${h} hour${h === 1 ? '' : 's'}`;
 
+// Are payments real yet? Test keys take no money; live keys pay into the bank account linked in Razorpay.
+type PayStatus = { configured: boolean; mode: 'live' | 'test' | null; webhook: boolean; international: boolean; seller: { name: boolean; address: boolean; taxId: boolean; supportEmail: boolean }; tax: boolean };
+function PaymentsStatus(){
+  const s = useLoad<PayStatus>('/payments/status');
+  if (!s.data) return null;
+  const p = s.data, live = p.mode === 'live';
+  const steps: [boolean, string][] = [
+    [p.configured, 'Razorpay keys are set on the server'],
+    [live, 'Live keys (rzp_live_…), so payments are real and reach your bank'],
+    [p.webhook, 'Webhook secret set, so payments confirm even if a buyer closes the tab'],
+    [p.seller.name && p.seller.address, 'Your name and address (printed on every invoice)'],
+    [p.seller.supportEmail, 'A support email for buyers']
+  ];
+  return (
+    <section className={'card stack pay-status ' + (live ? 'is-live' : 'is-test')}>
+      <div className="row" style={{ gap: 12, alignItems: 'center' }}>
+        <span className="pay-dot" aria-hidden="true" />
+        <div className="grow"><h3 style={{ margin: 0 }}>{!p.configured ? 'Payments are not set up' : live ? 'Payments are live' : 'Payments are in TEST mode'}</h3>
+          <p className="muted" style={{ margin: '2px 0 0' }}>{live ? 'Buyers pay for real; Razorpay settles the money to your linked bank account.' : 'Checkout works, but no real money is taken and nothing reaches your bank until you switch to live keys.'}</p></div>
+        <Badge tone={live ? 'success' : 'warning'}>{live ? 'LIVE' : p.configured ? 'TEST' : 'NOT SET'}</Badge>
+      </div>
+      <ul className="pay-steps">{steps.map(([ok, label]) => <li key={label} className={ok ? 'ok' : ''}><span aria-hidden="true">{ok ? '✓' : '○'}</span>{label}</li>)}</ul>
+    </section>
+  );
+}
+
 function StoreSettings({ go }: { go: (r: string) => void }){
   const { s, v, setV, dirty, save } = useSettingsDoc<any>('store');
   if (s.error && !s.data) return <ErrorState message={s.error} retry={s.reload} />;
   if (!v) return <SkeletonRows rows={8} />;
   const set = (k: string, x: unknown) => setV({ ...v, [k]: x });
   return <>
+    <PaymentsStatus />
     <Section title="Payments">
       <p className="field-hint" style={{ margin: 0 }}>The store is <b>{v.enabled === false ? 'closed' : 'open'}</b>. Open or close it, and choose who may still buy while it is closed, in <button type="button" className="link-btn" onClick={() => go('storestatus')}>Store status &amp; access</button>.</p>
       <Switch checked={v.allowCouponStacking} onChange={x => set('allowCouponStacking', x)} label="Allow more than one discount code per order" />

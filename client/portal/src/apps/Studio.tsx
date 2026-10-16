@@ -11,10 +11,10 @@ import type { AppProps } from './registry';
 import { Badge, ErrorState, Field, Segmented, SkeletonRows, Switch, useConfirm, useToast } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
-import { Uploader, useSaveKey } from './common';
+import { DateTimeInput, Uploader, useSaveKey } from './common';
 import { SiteSaveBar } from './Content';
 import { loadSite, saveSite, thumb, updateSite, useSite, PASS_DRAFT_DEFAULTS } from './siteDoc';
-import type { SiteDoc, PassDraft, Announcement } from './siteDoc';
+import type { SiteDoc, PassDraft, Announcement, AnnouncementItem } from './siteDoc';
 import { INTRO_VERSIONS, introVersion } from '../../../../shared/intros.js';
 import { FONT_GROUPS, FONT_LIBRARY, FONT_NAMES, fontStack, googleFontsUrl } from '../../../../shared/fonts.js';
 
@@ -56,7 +56,7 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
       <div className="studio">
         <div className="studio-panel">
           {!only && <div className="studio-nav" role="tablist" aria-label="Studio sections">
-            {([['identity', 'Colour'], ['type', 'Type'], ['notice', 'Announcement'], ['nav', 'Nav & downloads'], ['social', 'Links'], ['elements', 'Elements'], ['arrange', 'Arrange'], ['pass', 'Checkout pass'], ['intro', 'Intro']] as [Section, string][]).map(([k, l]) => (
+            {([['identity', 'Colour'], ['type', 'Type'], ['notice', 'Announcements'], ['nav', 'Nav & downloads'], ['social', 'Links'], ['elements', 'Elements'], ['arrange', 'Arrange'], ['pass', 'Checkout pass'], ['intro', 'Intro']] as [Section, string][]).map(([k, l]) => (
               <button key={k} type="button" role="tab" aria-selected={section === k} className={section === k ? 'on' : ''} onClick={() => setSection(k)}>{l}</button>
             ))}
           </div>}
@@ -144,30 +144,68 @@ export default function Studio({ active, route, only }: AppProps & { only?: Sect
 const fam = (f: string) => fontStack(f);
 // The whole library's stylesheet, added once: only the fonts actually drawn (the picked ones, and options as they show) download.
 let libraryLinked = false;
-// The announcement: by default a tab on the side of the screen. It slides open on its own when a visitor arrives,
-// stays for a few seconds, then tucks back into the tab; visitors can open it again or pin it open.
+// Announcements: as many as you like, each switched on or off and optionally only between two dates. On the site
+// they share one small megaphone tab on the side of the screen: it slides open by itself, shows the live ones one
+// after another, then tucks away; visitors can open it again or pin it open.
+const annLocal = (iso?: string) => iso ? new Date(new Date(iso).getTime() + 330 * 60e3).toISOString().slice(0, 16) : '';
+const annIso = (v: string) => v ? new Date(v + ':00+05:30').toISOString() : '';
+function annStatus(a: AnnouncementItem): [string, 'success' | 'info' | 'neutral' | 'warning']{
+  const now = Date.now();
+  if (!a.enabled) return ['Off', 'neutral'];
+  if (!a.text.trim()) return ['Needs text', 'warning'];
+  if (a.startsAt && Date.parse(a.startsAt) > now) return ['Scheduled', 'info'];
+  if (a.endsAt && Date.parse(a.endsAt) <= now) return ['Ended', 'neutral'];
+  return ['Live', 'success'];
+}
 function AnnouncementForm(){
   const { doc } = useSite();
+  const [open, setOpen] = useState<string | null>(null);
   if (!doc) return null;
   const n = doc.notice;
-  const set = <K extends keyof Announcement>(k: K, v: Announcement[K]) => updateSite(x => ({ ...x, notice: { ...x.notice, [k]: v } }));
+  // a site saved before the list existed: its single notice becomes the first announcement
+  const list: AnnouncementItem[] = doc.announcements ?? (n.text ? [{ id: 'legacy', enabled: n.enabled, title: n.title, text: n.text, tone: n.tone, linkLabel: n.linkLabel, linkUrl: n.linkUrl, startsAt: '', endsAt: '' }] : []);
+  const setN = <K extends keyof Announcement>(k: K, v: Announcement[K]) => updateSite(x => ({ ...x, notice: { ...x.notice, [k]: v } }));
+  const setList = (fn: (l: AnnouncementItem[]) => AnnouncementItem[]) => updateSite(x => ({ ...x, announcements: fn(x.announcements ?? list), notice: { ...x.notice, enabled: false } }));
+  const setItem = (id: string, patch: Partial<AnnouncementItem>) => setList(l => l.map(a => a.id === id ? { ...a, ...patch } : a));
+  const add = () => { const id = 'a' + Date.now().toString(36); setList(l => [...l, { id, enabled: true, title: 'Announcement', text: '', tone: 'info', linkLabel: '', linkUrl: '', startsAt: '', endsAt: '' }]); setOpen(id); };
+  const move = (i: number, by: -1 | 1) => setList(l => { const c = l.slice(), j = i + by; if (j < 0 || j >= c.length) return l; [c[i], c[j]] = [c[j], c[i]]; return c; });
+  const live = list.filter(a => annStatus(a)[0] === 'Live').length;
   return <>
-    <Switch checked={n.enabled} onChange={v => set('enabled', v)} label="Show an announcement on the site" />
-    <Field label="Style"><Segmented label="Style" value={n.style} onChange={v => set('style', v)} options={[{ value: 'tab', label: 'Side tab (slides open, then tucks away)' }, { value: 'banner', label: 'Banner at the top' }]} /></Field>
-    <div className="form-grid">
-      <Field label="Title" hint="Shown on the tab"><input value={n.title} maxLength={40} onChange={e => set('title', e.target.value)} placeholder="Announcement" /></Field>
-      <Field label="Tone"><select value={n.tone} onChange={e => set('tone', e.target.value as Announcement['tone'])}><option value="info">Info</option><option value="success">Good news</option><option value="offer">Offer</option><option value="warning">Warning</option></select></Field>
+    <div className="row between"><div><div className="eyebrow">Announcements</div><p className="field-hint" style={{ margin: 0 }}>{live ? `${live} live on the site now` : 'None live right now'} · {list.length} in all</p></div>
+      <button type="button" className="btn primary sm" onClick={add} disabled={list.length >= 12}><Icon name="plus" /> New announcement</button></div>
+    {!list.length && <p className="muted">No announcements yet. Add one: it appears as a small megaphone tab on the side of the site.</p>}
+    <ul className="ann-list">{list.map((a, i) => { const [st, tone] = annStatus(a), isOpen = open === a.id; return (
+      <li key={a.id} className={'ann-item' + (isOpen ? ' open' : '')} data-tone={a.tone}>
+        <div className="ann-row">
+          <Switch checked={a.enabled} onChange={v => setItem(a.id, { enabled: v })} label="" />
+          <button type="button" className="ann-sum grow" onClick={() => setOpen(isOpen ? null : a.id)} aria-expanded={isOpen}>
+            <b className="truncate">{a.title || 'Announcement'}</b><span className="truncate faint">{a.text || 'No text yet'}</span></button>
+          <Badge tone={tone}>{st}</Badge>
+          <button type="button" className="icon-btn sm" aria-label="Move up" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
+          <button type="button" className="icon-btn sm" aria-label="Move down" disabled={i === list.length - 1} onClick={() => move(i, 1)}>↓</button>
+          <button type="button" className="icon-btn sm" aria-label={`Delete ${a.title || 'announcement'}`} onClick={() => setList(l => l.filter(x => x.id !== a.id))}><Icon name="trash" size={13} /></button>
+        </div>
+        {isOpen && <div className="ann-edit stack">
+          <div className="form-grid">
+            <Field label="Title" hint="Shown at the top of the panel"><input value={a.title} maxLength={40} onChange={e => setItem(a.id, { title: e.target.value })} /></Field>
+            <Field label="Tone"><select value={a.tone} onChange={e => setItem(a.id, { tone: e.target.value as AnnouncementItem['tone'] })}><option value="info">Info</option><option value="success">Good news</option><option value="offer">Offer</option><option value="warning">Warning</option></select></Field>
+          </div>
+          <Field label="Text" hint={`${a.text.length}/220 · plain text`}><textarea rows={3} maxLength={220} value={a.text} onChange={e => setItem(a.id, { text: e.target.value })} placeholder="e.g. New poster packs are out. 20% off this week with code LAUNCH20." /></Field>
+          <div className="form-grid">
+            <Field label="Button label" hint="Optional"><input value={a.linkLabel} maxLength={30} onChange={e => setItem(a.id, { linkLabel: e.target.value })} placeholder="Shop now" /></Field>
+            <Field label="Button link" hint="https://… or /?page=store"><input value={a.linkUrl} maxLength={300} onChange={e => setItem(a.id, { linkUrl: e.target.value })} placeholder="/?page=store" /></Field>
+            <Field label="Starts" hint="Optional, India time"><DateTimeInput label="Starts" value={annLocal(a.startsAt)} onChange={v => setItem(a.id, { startsAt: annIso(v) })} /></Field>
+            <Field label="Ends" hint="Optional"><DateTimeInput label="Ends" value={annLocal(a.endsAt)} min={annLocal(a.startsAt) || undefined} onChange={v => setItem(a.id, { endsAt: annIso(v) })} /></Field>
+          </div>
+        </div>}
+      </li>); })}</ul>
+    <div className="stack"><div className="eyebrow">The tab</div>
+      <div className="form-grid">
+        <Field label="Side of the screen"><Segmented label="Side" value={n.side} onChange={v => setN('side', v)} options={[{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }]} /></Field>
+        <Field label={n.autoClose ? `Tucks away after ${n.autoClose} s` : 'Stays open until closed'} hint="0 keeps it open"><input type="range" min={0} max={30} step={1} value={n.autoClose} onChange={e => setN('autoClose', Number(e.target.value))} /></Field>
+      </div>
+      <p className="field-hint">Each visitor sees it slide open once for every new set of announcements; after that it waits in the tab. With several live, they change every few seconds and visitors can switch with the dots.</p>
     </div>
-    <Field label="Text" hint={`${n.text.length}/220 · plain text`}><textarea rows={3} maxLength={220} value={n.text} onChange={e => set('text', e.target.value)} placeholder="e.g. New poster packs are out. 20% off this week with code LAUNCH20." /></Field>
-    <div className="form-grid">
-      <Field label="Button label" hint="Optional"><input value={n.linkLabel} maxLength={30} onChange={e => set('linkLabel', e.target.value)} placeholder="Shop now" /></Field>
-      <Field label="Button link" hint="https://… or a page like /?page=store"><input value={n.linkUrl} maxLength={300} onChange={e => set('linkUrl', e.target.value)} placeholder="/?page=store" /></Field>
-    </div>
-    {n.style === 'tab' && <div className="form-grid">
-      <Field label="Side"><Segmented label="Side" value={n.side} onChange={v => set('side', v)} options={[{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }]} /></Field>
-      <Field label={n.autoClose ? `Tucks away after ${n.autoClose} s` : 'Stays open until closed'} hint="0 keeps it open"><input type="range" min={0} max={30} step={1} value={n.autoClose} onChange={e => set('autoClose', Number(e.target.value))} /></Field>
-    </div>}
-    <p className="field-hint">Each visitor sees it slide open once per new announcement; after that it waits in the tab. Visitors can pin it open with the pin button.</p>
   </>;
 }
 

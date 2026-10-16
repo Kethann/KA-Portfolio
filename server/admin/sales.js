@@ -12,6 +12,8 @@ import { issueToken, sendReceipt, productTerms } from '../store/delivery.js';
 import { onDaily, onWeekly } from '../jobs/hooks.js';
 import { mapDbError } from './catalog.js';
 import { audit } from './auth.js';
+import { loadInvoice, invoiceResponse } from '../store/invoice.js';
+import * as razorpay from '../store/razorpay.js';
 
 const TZ = 'Asia/Kolkata';
 // Reports group by India time. IST is a fixed +05:30 (no daylight saving), so shifting the stored UTC time by
@@ -190,36 +192,16 @@ export async function revokeLink(ctx){
 }
 
 // Printable invoice (browser "Save as PDF").
-export async function invoice(ctx){
-  const db = await getDb();
-  const o = await db.maybeOne('select * from orders where id = $1', [ctx.params.id]);
-  if (!o || !o.invoice_number) throw new HttpError(404, 'This order has no invoice.');
-  const items = await db.query('select * from order_items where order_id = $1', [o.id]);
+// Settings > Payments: is Razorpay set up, and in test or live mode (key names only, never values)
+export async function paymentsStatus(){
   const store = await getSetting('store');
-  const cur = o.currency, m = (v) => escapeHtml(formatMoney(v, cur));
-  // Same wording as the emailed receipt: inclusive tax is shown as the part of the total that is tax.
-  let taxLabel = store.taxLabel || 'Tax', taxText = formatMoney(o.tax, cur);
-  if (store.taxEnabled && store.taxInclusive && store.taxRateBp){
-    const after = o.subtotal - o.discount;
-    const net = Math.floor((after * 10000 + Math.floor((10000 + store.taxRateBp) / 2)) / (10000 + store.taxRateBp));
-    taxLabel = `${taxLabel} included (${store.taxRateBp / 100}%)`; taxText = formatMoney(after - net, cur);
-  }
-  const date = new Intl.DateTimeFormat('en-IN', { timeZone: TZ, dateStyle: 'long' }).format(new Date(o.paid_at || o.created_at));
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Invoice INV-${String(o.invoice_number).padStart(6, '0')}</title><meta name="robots" content="noindex">
-<style>body{font:14px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1d1a1c;max-width:760px;margin:40px auto;padding:0 24px}h1{font:600 26px Georgia,serif;margin:0}
-table{width:100%;border-collapse:collapse;margin:24px 0}th,td{padding:8px 6px;border-bottom:1px solid #e6dcd3;text-align:left}td.r,th.r{text-align:right}.muted{color:#7a6f68}
-.top{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap}.tot td{font-weight:700}@media print{button{display:none}body{margin:0}}</style></head><body>
-<button onclick="print()" style="float:right">Print / Save as PDF</button>
-<div class="top"><div><h1>Invoice</h1><div class="muted">INV-${String(o.invoice_number).padStart(6, '0')} · ${escapeHtml(date)}</div></div>
-<div><strong>${escapeHtml(store.sellerName || env('SITE_NAME', 'Kethan Artzz'))}</strong><br>${escapeHtml(store.sellerAddress || '').replace(/\n/g, '<br>')}${store.sellerTaxId ? `<br>Tax ID: ${escapeHtml(store.sellerTaxId)}` : ''}</div></div>
-<p><strong>Billed to</strong><br>${escapeHtml(o.email)}<br><span class="muted">Order ${escapeHtml(o.public_id)} · Payment ${escapeHtml(o.razorpay_payment_id || '')}</span></p>
-<table><thead><tr><th>Item</th><th class="r">Price</th><th class="r">Discount</th><th class="r">Amount</th></tr></thead><tbody>
-${items.map(i => `<tr><td>${escapeHtml(i.title)}${i.license_key ? ` <span class="muted">(${escapeHtml(i.license_key)} license)</span>` : ''}</td><td class="r">${m(i.unit_price)}</td><td class="r">${m(i.discount)}</td><td class="r">${m(i.total)}</td></tr>`).join('')}
-</tbody><tfoot><tr><td colspan="3" class="r">Subtotal</td><td class="r">${m(o.subtotal)}</td></tr><tr><td colspan="3" class="r">Discount</td><td class="r">−${m(o.discount)}</td></tr>
-<tr><td colspan="3" class="r">${escapeHtml(taxLabel)}</td><td class="r">${escapeHtml(taxText)}</td></tr><tr class="tot"><td colspan="3" class="r">Total paid (${cur})</td><td class="r">${m(o.total)}</td></tr></tfoot></table>
-${o.status === 'refunded' ? `<p><strong>Refunded</strong> ${m(o.refund_amount || o.total)}</p>` : ''}</body></html>`;
-  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex',
-    'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'self'" } });
+  return json({ configured: razorpay.isConfigured(), mode: razorpay.isConfigured() ? razorpay.mode() : null, webhook: !!env('RAZORPAY_WEBHOOK_SECRET'), international: store.international !== false,
+    seller: { name: !!store.sellerName, address: !!store.sellerAddress, taxId: !!store.sellerTaxId, supportEmail: !!store.supportEmail }, tax: !!store.taxEnabled });
+}
+export async function invoice(ctx){
+  const data = await loadInvoice(ctx.params.id);
+  if (!data) throw new HttpError(404, 'This order has no invoice.');
+  return invoiceResponse(data, { owner: true });
 }
 
 // ---- coupons -------------------------------------------------------------------------------------
@@ -364,6 +346,7 @@ export function registerSales(route){
   route('POST', '/api/admin/orders/:id/receipt', resendReceipt, a);
   route('POST', '/api/admin/orders/:id/refund', refund, a);
   route('GET', '/api/admin/orders/:id/invoice', invoice, a);
+  route('GET', '/api/admin/payments/status', paymentsStatus, a);
   route('POST', '/api/admin/links/:id/revoke', revokeLink, a);
   route('GET', '/api/admin/coupons', listCoupons, a);
   route('POST', '/api/admin/coupons', saveCoupon, a);

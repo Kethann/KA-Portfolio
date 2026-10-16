@@ -475,6 +475,14 @@
 .feat-pic[aria-pressed="true"]::after{ content:attr(data-n); position:absolute; right:3px; top:3px; min-width:16px; height:16px; border-radius:8px; background:var(--accent); color:var(--accent-contrast); font:700 10px/16px var(--font-ui); text-align:center; }
 @media (max-width:640px){ .feat-row, .feat-row.flip{ grid-template-columns:1fr; } .feat-row.flip .feat-frame{ order:0; } }
 @media (prefers-reduced-motion: reduce){ .feat-frame img{ transition:none; } }
+.desc-nudge{ gap:10px; padding:10px 12px; border-radius:var(--r-sm); border:1px solid color-mix(in srgb, var(--warning) 45%, var(--border)); background:var(--warning-soft); font-size:var(--fs-sm); }
+.ann-list{ list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+.ann-item{ border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface-1); overflow:hidden; border-left:3px solid #ff9438; }
+.ann-item[data-tone="warning"]{ border-left-color:#ffb347; } .ann-item[data-tone="success"]{ border-left-color:#6fe0a8; } .ann-item[data-tone="offer"]{ border-left-color:#ff7eb6; }
+.ann-row{ display:flex; align-items:center; gap:8px; padding:8px 10px; }
+.ann-sum{ display:grid; text-align:left; min-width:0; border:0; background:none; color:var(--text); padding:2px 4px; cursor:pointer; font-size:var(--fs-sm); }
+.ann-sum span{ font-size:12px; }
+.ann-edit{ padding:4px 12px 14px; border-top:1px solid var(--border); }
 .topic-list{ list-style:none; margin:0; padding:0; display:grid; gap:6px; }
 .topic-list input{ flex:1; min-width:0; }
 
@@ -539,3 +547,11 @@
   background:linear-gradient(90deg, var(--success), color-mix(in srgb, var(--success) 60%, #fff)); }
 .storage-bar.is-warn > i{ background:linear-gradient(90deg, var(--warning), color-mix(in srgb, var(--warning) 60%, #fff)); }
 .storage-bar.is-bad > i{ background:linear-gradient(90deg, var(--danger), color-mix(in srgb, var(--danger) 60%, #fff)); }
+
+/* ---- Settings > Payments: test / live status and the go-live checklist ---- */
+.pay-status.is-live{ border-color:color-mix(in srgb, var(--success) 45%, var(--border)); background:linear-gradient(135deg, var(--success-soft), var(--surface-1) 60%); }
+.pay-status.is-test{ border-color:color-mix(in srgb, var(--warning) 50%, var(--border)); background:linear-gradient(135deg, var(--warning-soft), var(--surface-1) 60%); }
+.pay-dot{ width:12px; height:12px; border-radius:50%; background:var(--warning); box-shadow:0 0 0 4px var(--warning-soft); }
+.pay-status.is-live .pay-dot{ background:var(--success); box-shadow:0 0 0 4px var(--success-soft); }
+.pay-steps{ list-style:none; margin:0; padding:0; display:grid; gap:6px; font-size:var(--fs-sm); color:var(--text-2); }
+.pay-steps li{ display:flex; gap:8px; } .pay-steps li span{ width:16px; color:var(--text-3); } .pay-steps li.ok span{ color:var(--success); font-weight:700; }
