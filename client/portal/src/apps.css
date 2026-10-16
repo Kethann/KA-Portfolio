@@ -437,6 +437,10 @@
 .sbp-sign b{ font:800 15px/1 var(--font-display); letter-spacing:.24em; color:#ffb877; }
 .sbp-sign span{ font-size:12px; color:#e8d6c4; }
 @keyframes sbp-sway{ 50%{ transform:rotate(8deg); } }
+.sbp-panda3d{ position:absolute; left:calc(50% + 18px); top:2px; width:64px; height:70px; }
+.sbp-panda3d-host{ position:absolute; inset:0; display:block; }
+.sbp-panda3d-host canvas{ display:block; width:100%; height:100%; }
+.sbp-panda3d .sbp-panda{ left:12px; top:16px; }
 @media (prefers-reduced-motion: reduce){ .sbp-panda, .store-pill.is-closed .store-pill-dot{ animation:none; } }
 .pass-add{ display:flex; flex-wrap:wrap; gap:var(--sp-2); align-items:center; }
 .pass-add input{ min-width:180px; }

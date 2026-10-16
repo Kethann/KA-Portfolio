@@ -9978,36 +9978,72 @@ function sendMessage(text){
    Store status (the closed board + the panda), the side announcement tab, the Featured Work showcase,
    the contact form's Regarding ticks, replies popping up on the visitor's device, and the in-app browser helper. */
 
-/* ---- store closed: a sign hanging from a thread, swinging gently; the store behind it rests (blurred, not usable) ---- */
+/* ---- store closed: a lit wooden sign hanging on two ropes, the 3D panda napping on it, a live countdown; the store behind rests (blurred, not usable) ---- */
 #section-store{ position:relative; }
-.shop-root.is-locked{ filter:blur(6px) saturate(.6); opacity:.35; pointer-events:none; user-select:none; transition:filter .6s ease, opacity .6s ease; }
-.store-closed{ position:relative; z-index:3; display:grid; justify-items:center; gap:18px; margin:6px auto 42px; padding:0 16px; text-align:center; max-width:620px;
-  opacity:0; transform:translateY(-14px); transition:opacity .7s cubic-bezier(.22,.8,.24,1), transform .7s cubic-bezier(.22,.8,.24,1); }
+.shop-root.is-locked{ filter:blur(7px) saturate(.55); opacity:.32; pointer-events:none; user-select:none; transition:filter .7s ease, opacity .7s ease; }
+.store-closed{ position:relative; z-index:3; display:grid; justify-items:center; gap:20px; margin:0 auto 46px; padding:0 16px; text-align:center; max-width:640px;
+  opacity:0; transform:translateY(-18px); transition:opacity .8s cubic-bezier(.22,.8,.24,1), transform .8s cubic-bezier(.22,.8,.24,1); }
 .store-closed.is-in{ opacity:1; transform:none; }
 .store-closed[hidden]{ display:none; }
-.sc-hang{ position:relative; display:grid; justify-items:center; transform-origin:50% 0; animation:sc-swing 5.2s cubic-bezier(.45,0,.55,1) infinite; padding-top:46px; }
-.sc-hang::before, .sc-hang::after{ content:""; position:absolute; top:0; width:2px; height:56px; background:linear-gradient(#efdab9aa, #c89a6a); border-radius:2px; }
-.sc-hang::before{ left:calc(50% - 70px); transform:rotate(14deg); transform-origin:50% 0; }
-.sc-hang::after{ right:calc(50% - 70px); transform:rotate(-14deg); transform-origin:50% 0; }
-.sc-nail{ position:absolute; top:-6px; left:50%; width:12px; height:12px; margin-left:-6px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #fff3, #8a6a4a 40%, #3a2a1c); box-shadow:0 2px 6px #0008; }
-.sc-sign{ position:relative; min-width:min(360px, 84vw); padding:22px 30px 20px; border-radius:18px;
-  background:linear-gradient(160deg, #3a2a1e 0%, #22180f 60%, #1a120c 100%); border:2px solid #8a6038;
-  box-shadow:0 0 0 6px rgba(138,96,56,.18), 0 22px 50px -10px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,214,170,.18); }
-.sc-sign::before{ content:""; position:absolute; inset:7px; border-radius:12px; border:1px dashed rgba(255,190,130,.28); pointer-events:none; }
-.sc-lock{ position:absolute; top:-20px; left:50%; width:40px; height:40px; margin-left:-20px; display:grid; place-items:center; border-radius:12px;
-  background:linear-gradient(160deg, #ffcf8a, #c27a2c); color:#2a1a0c; box-shadow:0 8px 18px -6px #000c, inset 0 1px 0 #fff8; }
-.sc-lock svg{ width:20px; height:20px; }
-.sc-word{ display:block; margin:14px 0 6px; font:800 clamp(30px, 6vw, 46px)/1 var(--font-heading, serif); letter-spacing:.2em; padding-left:.2em; color:#ffb877;
-  text-shadow:0 0 18px rgba(255,148,56,.45), 0 2px 0 #5a3416; }
-.sc-title{ display:block; font:600 clamp(16px, 2.2vw, 20px)/1.3 var(--font-heading, serif); color:#fbe9d6; }
+.sc-scene{ position:relative; display:grid; justify-items:center; padding-top:8px; }
+/* a soft pool of light from above, like a lamp over a shop door */
+.sc-spot{ position:absolute; top:-40px; left:50%; width:min(560px, 92vw); height:330px; translate:-50% 0; pointer-events:none;
+  background:radial-gradient(50% 60% at 50% 18%, rgba(255,196,140,.16), transparent 70%); filter:blur(2px); }
+.sc-hang{ position:relative; display:grid; justify-items:center; transform-origin:50% 0; animation:sc-swing 5.6s cubic-bezier(.45,0,.55,1) infinite; }
+.sc-nail{ position:relative; z-index:2; width:14px; height:14px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #fff6, #9a7752 40%, #3a2a1c); box-shadow:0 3px 8px #000a; }
+.sc-ropes{ width:240px; height:70px; margin:-8px 0 -10px; overflow:visible; }
+.sc-ropes path{ fill:none; stroke:#c9a273; stroke-width:2.4; stroke-linecap:round; filter:drop-shadow(0 2px 2px #0008); stroke-dasharray:3 2.2; }
+.sc-sign{ position:relative; min-width:min(380px, 86vw); padding:26px 34px 22px; border-radius:20px; isolation:isolate;
+  background:
+    repeating-linear-gradient(176deg, rgba(255,220,180,.035) 0 2px, transparent 2px 9px),
+    radial-gradient(120% 90% at 30% 0%, #4a3322, transparent 60%),
+    linear-gradient(170deg, #3d2b1d 0%, #261a11 58%, #1b120b 100%);
+  border:2px solid #8c6239;
+  box-shadow:0 0 0 6px rgba(140,98,57,.16), 0 26px 60px -12px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,214,170,.22), inset 0 -10px 24px rgba(0,0,0,.35); }
+.sc-sign::before{ content:""; position:absolute; inset:8px; border-radius:13px; border:1px dashed rgba(255,190,130,.26); pointer-events:none; }
+.sc-ring{ position:absolute; top:-7px; width:14px; height:14px; border-radius:50%; border:3px solid #b98d5d; background:#1b120b; box-shadow:0 2px 4px #0009; }
+.sc-ring.l{ left:44px; } .sc-ring.r{ right:44px; }
+.sc-lock{ position:absolute; top:-22px; left:50%; width:44px; height:44px; margin-left:-22px; display:grid; place-items:center; border-radius:13px;
+  background:linear-gradient(160deg, #ffd59a, #c27a2c); color:#2a1a0c; box-shadow:0 10px 20px -8px #000d, inset 0 1px 0 #fff9; transition:background .5s ease, transform .5s cubic-bezier(.34,1.56,.64,1); }
+.sc-lock svg{ width:22px; height:22px; overflow:visible; }
+.sc-shackle{ transition:transform .55s cubic-bezier(.34,1.56,.64,1); transform-origin:16px 11px; }
+.sc-word{ position:relative; display:grid; margin:16px 0 6px; font:800 clamp(32px, 6.4vw, 50px)/1 var(--font-heading, serif); letter-spacing:.22em; padding-left:.22em; }
+.sc-word > span{ grid-area:1 / 1; transition:opacity .5s ease, transform .6s cubic-bezier(.22,.8,.24,1), filter .5s ease; }
+.sc-w-closed{ color:#ffb877; text-shadow:0 0 22px rgba(255,148,56,.5), 0 2px 0 #5a3416; }
+.sc-w-open{ color:#8ff0b8; text-shadow:0 0 24px rgba(80,230,150,.6), 0 2px 0 #10402a; opacity:0; transform:translateY(10px) scale(.9); filter:blur(4px); }
+.sc-title{ display:block; font:600 clamp(16px, 2.2vw, 20px)/1.35 var(--font-heading, serif); color:#fbe9d6; }
 .sc-emoji[hidden]{ display:none; }
-.sc-emoji{ display:block; font-size:44px; line-height:1; margin:10px 0 2px; animation:sc-sob 2.6s ease-in-out infinite; }
-.sc-msg{ margin:0; max-width:52ch; color:var(--ink-dim); font-size:15px; line-height:1.65; }
-.sc-when{ display:inline-flex; gap:8px; align-items:center; padding:8px 16px; border-radius:999px; border:1px solid rgba(255,148,56,.35); background:rgba(255,148,56,.1);
-  font:600 12px/1 var(--font-mono, monospace); letter-spacing:.08em; color:#ffd9b8; }
-.sc-when b{ font-variant-numeric:tabular-nums; color:#fff; }
-.sc-zz{ position:absolute; left:calc(62% + 22px); top:-62px; font:700 14px/1 var(--font-mono, monospace); color:#cfe3ff; opacity:0; pointer-events:none; }
-.store-closed.has-panda .sc-zz{ animation:sc-zz 3.4s ease-in-out infinite; }
+.sc-emoji{ display:block; font-size:46px; line-height:1; margin:10px 0 2px; animation:sc-sob 2.6s ease-in-out infinite; }
+/* "z z Z" drifting up from the napping panda (it sits on the sign, right of centre) */
+.sc-zz{ position:absolute; left:calc(62% + 20px); top:-70px; display:flex; gap:3px; font:700 13px/1 var(--font-mono, monospace); color:#cfe3ff; pointer-events:none; }
+.sc-zz i{ font-style:normal; opacity:0; }
+.store-closed.has-panda .sc-zz i{ animation:sc-zz 3.6s ease-in-out infinite; }
+.sc-zz i:nth-child(2){ animation-delay:.5s !important; font-size:15px; } .sc-zz i:nth-child(3){ animation-delay:1s !important; font-size:18px; }
+.sc-msg{ margin:0; max-width:52ch; color:var(--ink-dim); font-size:15.5px; line-height:1.7; }
+/* the countdown */
+.sc-count{ display:grid; gap:12px; justify-items:center; }
+.sc-count[hidden], .sc-soon[hidden]{ display:none; }
+.sc-count-label{ margin:0; font:600 11px/1 var(--font-mono, monospace); letter-spacing:.24em; text-transform:uppercase; color:#e7c5a0; }
+.sc-tiles{ display:flex; gap:clamp(8px, 2vw, 14px); }
+.sc-tile{ position:relative; width:clamp(64px, 16vw, 84px); padding:12px 0 10px; border-radius:16px; display:grid; gap:6px; justify-items:center; overflow:hidden;
+  background:linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02)); border:1px solid rgba(255,190,130,.26);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 14px 30px -18px rgba(0,0,0,.9); }
+.sc-tile[hidden]{ display:none; }
+.sc-tile::after{ content:""; position:absolute; left:0; right:0; top:50%; height:1px; background:rgba(0,0,0,.35); }
+.sc-tile b{ font:700 clamp(26px, 6vw, 36px)/1 var(--font-mono, monospace); color:#fff; font-variant-numeric:tabular-nums; letter-spacing:.02em; text-shadow:0 0 18px rgba(255,170,100,.35); }
+.sc-tile span{ font:600 10px/1 var(--font-mono, monospace); letter-spacing:.16em; text-transform:uppercase; color:var(--ink-dim); }
+.sc-tile.tick b{ animation:sc-tick .5s cubic-bezier(.22,.8,.24,1); }
+.sc-date{ margin:0; font-size:13px; color:var(--ink-dim); }
+.sc-soon{ display:inline-flex; align-items:center; gap:10px; margin:0; padding:10px 18px; border-radius:999px; border:1px solid rgba(120,230,170,.4); background:rgba(80,200,140,.1); color:#bff5d6; font-weight:600; font-size:14px; }
+.sc-dot{ width:8px; height:8px; border-radius:50%; background:#6fe0a8; box-shadow:0 0 0 0 rgba(111,224,168,.6); animation:sc-ping 1.6s ease-out infinite; }
+/* reopening: the sign turns to OPEN, the lock springs open, then the board lifts away */
+.store-closed.is-opening .sc-w-closed{ opacity:0; transform:translateY(-10px) scale(.94); filter:blur(4px); }
+.store-closed.is-opening .sc-w-open{ opacity:1; transform:none; filter:none; }
+.store-closed.is-opening .sc-shackle{ transform:translateY(-3px) rotate(-28deg); }
+.store-closed.is-opening .sc-lock{ background:linear-gradient(160deg, #b9f5d2, #3fae74); transform:translateY(-4px) scale(1.08); }
+.store-closed.is-opening .sc-zz{ display:none; }
+.store-closed.is-opening .sc-sign{ border-color:#4fbf86; transition:border-color .5s ease; }
+.store-closed.is-opening:not(.is-in){ transform:translateY(-40px); }
 .sc-access{ display:grid; gap:10px; justify-items:center; width:100%; }
 .sc-access-toggle{ background:none; border:0; color:#ffcf9e; font:600 13px/1.4 var(--font-body, sans-serif); text-decoration:underline; text-underline-offset:3px; cursor:pointer; padding:6px; }
 .sc-access-form{ display:flex; gap:8px; width:min(420px, 100%); }
@@ -10016,10 +10052,13 @@ function sendMessage(text){
 .sc-btn{ height:42px; padding:0 18px; border-radius:12px; border:1px solid rgba(255,148,56,.55); background:linear-gradient(135deg, rgba(255,148,56,.35), rgba(255,148,56,.14)); color:#fff; font:600 14px var(--font-body, sans-serif); cursor:pointer; white-space:nowrap; }
 .sc-btn:hover{ background:linear-gradient(135deg, rgba(255,148,56,.5), rgba(255,148,56,.2)); }
 .sc-note{ min-height:1.4em; margin:0; font-size:13px; color:var(--ink-dim); }
-@keyframes sc-swing{ 0%,100%{ transform:rotate(-1.8deg); } 50%{ transform:rotate(1.8deg); } }
+@keyframes sc-swing{ 0%,100%{ transform:rotate(-1.6deg); } 50%{ transform:rotate(1.6deg); } }
 @keyframes sc-sob{ 0%,100%{ transform:translateY(0) rotate(-4deg); } 50%{ transform:translateY(3px) rotate(4deg); } }
-@keyframes sc-zz{ 0%{ opacity:0; transform:translate(0,8px) scale(.7); } 30%{ opacity:.9; } 100%{ opacity:0; transform:translate(16px,-26px) scale(1.15); } }
-@media (prefers-reduced-motion: reduce){ .sc-hang, .sc-emoji, .store-closed.has-panda .sc-zz{ animation:none; } .store-closed{ transition:none; } }
+@keyframes sc-zz{ 0%{ opacity:0; transform:translate(0,8px) scale(.7); } 30%{ opacity:.95; } 100%{ opacity:0; transform:translate(14px,-28px) scale(1.15); } }
+@keyframes sc-tick{ 0%{ opacity:0; transform:translateY(-35%); } 100%{ opacity:1; transform:none; } }
+@keyframes sc-ping{ 80%,100%{ box-shadow:0 0 0 10px rgba(111,224,168,0); } }
+@media (max-width:480px){ .sc-sign{ padding:24px 22px 20px; } .sc-ring.l{ left:28px; } .sc-ring.r{ right:28px; } .sc-ropes{ width:200px; } }
+@media (prefers-reduced-motion: reduce){ .sc-hang, .sc-emoji, .store-closed.has-panda .sc-zz i, .sc-dot, .sc-tile.tick b{ animation:none; } .store-closed{ transition:none; } .sc-zz i{ opacity:.8; } }
 
 /* ---- the announcement: a tab on the side that slides open, then tucks away ---- */
 .ka-announce{ position:fixed; top:50%; z-index:72; display:flex; align-items:stretch; translate:0 -50%; max-width:min(380px, calc(100vw - 24px));
@@ -10242,11 +10281,21 @@ function sendMessage(text){
     if (board) return board;
     var section = document.getElementById("section-store"); if (!section) return null;
     board = el("div", "store-closed"); board.id = "store-closed"; board.hidden = true; board.setAttribute("role", "region"); board.setAttribute("aria-label", "The store is closed");
+    var tile = function(u, label){ return '<div class="sc-tile" data-u="' + u + '"><b>00</b><span>' + label + '</span></div>'; };
     board.innerHTML =
-      '<div class="sc-hang"><span class="sc-nail" aria-hidden="true"></span>' +
-        '<div class="sc-sign"><span class="sc-lock" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>' +
-        '<span class="sc-zz" aria-hidden="true">z Z</span><span class="sc-emoji" aria-hidden="true" hidden>😢</span><b class="sc-word">CLOSED</b><span class="sc-title"></span></div></div>' +
-      '<p class="sc-msg"></p><span class="sc-when" hidden>Back in <b></b></span>' +
+      '<div class="sc-scene"><span class="sc-spot" aria-hidden="true"></span>' +
+        '<div class="sc-hang"><span class="sc-nail" aria-hidden="true"></span>' +
+          '<svg class="sc-ropes" viewBox="0 0 240 70" aria-hidden="true"><path d="M120 4 C 104 26, 74 50, 42 66"/><path d="M120 4 C 136 26, 166 50, 198 66"/></svg>' +
+          '<div class="sc-sign"><span class="sc-ring l" aria-hidden="true"></span><span class="sc-ring r" aria-hidden="true"></span>' +
+            '<span class="sc-lock" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path class="sc-shackle" d="M8 11V8a4 4 0 0 1 8 0v3"/><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M12 15.2v2"/></svg></span>' +
+            '<span class="sc-zz" aria-hidden="true"><i>z</i><i>z</i><i>Z</i></span><span class="sc-emoji" aria-hidden="true" hidden>😢</span>' +
+            '<b class="sc-word"><span class="sc-w-closed">CLOSED</span><span class="sc-w-open" aria-hidden="true">OPEN</span></b><span class="sc-title"></span></div>' +
+        '</div></div>' +
+      '<p class="sc-msg"></p>' +
+      '<div class="sc-count" hidden><p class="sc-count-label">Reopening in</p>' +
+        '<div class="sc-tiles" role="timer" aria-live="off">' + tile("d", "days") + tile("h", "hours") + tile("m", "minutes") + tile("s", "seconds") + '</div>' +
+        '<p class="sc-date"></p></div>' +
+      '<p class="sc-soon" hidden><span class="sc-dot" aria-hidden="true"></span>Opening any moment now…</p>' +
       '<div class="sc-access" hidden><button type="button" class="sc-access-toggle">Have special access? Get your link</button>' +
         '<form class="sc-access-form" hidden novalidate><input type="email" required autocomplete="email" placeholder="you@example.com" aria-label="Your email"><button type="submit" class="sc-btn">Email me</button></form>' +
         '<p class="sc-note" role="status" aria-live="polite"></p></div>';
@@ -10265,33 +10314,65 @@ function sendMessage(text){
     return board;
   }
   function onStorePage(){ var s = document.getElementById("section-store"); return !!s && !s.hidden; }
-  function fmtLeft(ms){
-    var m = Math.max(0, Math.round(ms / 60000)), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mm = m % 60;
-    return d ? d + "d " + h + "h" : h ? h + "h " + mm + "m" : mm + "m";
-  }
   function pandaTo(target){ window.__kaPandaVisit = target; if (target){ var bub = document.querySelector("#assistant-launcher .panda-bubble.show"); if (bub) bub.classList.remove("show"); } try { document.dispatchEvent(new CustomEvent("ka-panda-visit", { detail: { target: target } })); } catch(e){} }
+  // the live countdown: days / hours / minutes / seconds, each digit pair easing in when it changes;
+  // at zero the board says it is opening any moment and checks the store every 20 seconds
+  var soonPoll = 0;
+  function startCountdown(b, at){
+    clearInterval(countdown); clearInterval(soonPoll);
+    var box = b.querySelector(".sc-count"), soon = b.querySelector(".sc-soon");
+    if (isNaN(at)){ box.hidden = true; soon.hidden = true; return; }
+    var d = new Date(at), opts = { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" };
+    try { b.querySelector(".sc-date").textContent = "Reopens " + d.toLocaleString(undefined, opts) + " · your time"; } catch(e){ b.querySelector(".sc-date").textContent = ""; }
+    var set = function(u, v){ var t = b.querySelector('.sc-tile[data-u="' + u + '"]'), s = String(v).padStart(2, "0"), n = t.querySelector("b");
+      if (n.textContent !== s){ n.textContent = s; if (!REDUCED){ t.classList.remove("tick"); void t.offsetWidth; t.classList.add("tick"); } } };
+    var tick = function(){
+      var left = at - Date.now();
+      if (left <= 0){
+        box.hidden = true; soon.hidden = false; clearInterval(countdown);
+        if (!soonPoll) soonPoll = setInterval(function(){ if (window.kaPublicConfig && window.kaPublicConfig.refresh) window.kaPublicConfig.refresh(); refreshStore(); }, 20000);
+        return;
+      }
+      box.hidden = false; soon.hidden = true;
+      var s = Math.floor(left / 1000), days = Math.floor(s / 86400);
+      b.querySelector('.sc-tile[data-u="d"]').hidden = days === 0;
+      set("d", days); set("h", Math.floor(s / 3600) % 24); set("m", Math.floor(s / 60) % 60); set("s", s % 60);
+    };
+    tick(); countdown = setInterval(tick, 1000);
+  }
+  function unlockRoot(){ var root = document.getElementById("store-root"); if (root){ root.classList.remove("is-locked"); root.removeAttribute("inert"); root.removeAttribute("aria-hidden"); } }
   function applyStore(cfg){
     var st = cfg && cfg.store; storeState = st || null;
     var closed = !!st && st.enabled === false && !st.access;
     var root = document.getElementById("store-root");
     if (!closed){
-      if (board && boardShown){ board.classList.remove("is-in"); setTimeout(function(){ if (!boardShown) board.hidden = true; }, 500); }
-      boardShown = false; clearInterval(countdown);
-      if (root){ root.classList.remove("is-locked"); root.removeAttribute("inert"); root.removeAttribute("aria-hidden"); }
-      pandaTo(null);
+      clearInterval(countdown); clearInterval(soonPoll); soonPoll = 0;
+      if (board && boardShown){
+        boardShown = false;
+        if (onStorePage() && !REDUCED){
+          // reopening while someone is looking: the sign turns to OPEN, the lock springs open, the panda wakes and
+          // jumps back to the chat, then the board lifts away and the store comes into focus
+          board.classList.add("is-opening");
+          setTimeout(function(){ pandaTo(null); }, 900);
+          setTimeout(function(){ board.classList.remove("is-in"); unlockRoot(); }, 2100);
+          setTimeout(function(){ if (!boardShown){ board.hidden = true; board.classList.remove("is-opening"); } }, 2800);
+          if (window.kaToast) setTimeout(function(){ window.kaToast("We’re open! Happy shopping.", "ok"); }, 700);
+          return;
+        }
+        board.classList.remove("is-in"); setTimeout(function(){ if (!boardShown) board.hidden = true; }, 500);
+      }
+      unlockRoot(); pandaTo(null);
       return;
     }
     var b = buildBoard(); if (!b) return;
     var c = st.closed || {}, scene = c.scene === "emoji" ? "emoji" : "panda";
+    b.classList.remove("is-opening");
     b.querySelector(".sc-title").textContent = c.title || "The store is taking a nap";
     b.querySelector(".sc-msg").textContent = c.message || "";
     b.querySelector(".sc-emoji").hidden = scene !== "emoji";
     b.classList.toggle("has-panda", scene === "panda");
     b.querySelector(".sc-access").hidden = !c.emailAccess;
-    var when = b.querySelector(".sc-when"), at = c.reopensAt ? Date.parse(c.reopensAt) : NaN;
-    clearInterval(countdown);
-    var tick = function(){ var left = at - Date.now(); when.hidden = !(left > 0); if (left > 0) when.querySelector("b").textContent = fmtLeft(left); };
-    if (!isNaN(at)){ tick(); countdown = setInterval(tick, 30000); } else when.hidden = true;
+    startCountdown(b, c.reopensAt ? Date.parse(c.reopensAt) : NaN);
     if (root){ root.classList.add("is-locked"); root.setAttribute("inert", ""); root.setAttribute("aria-hidden", "true"); }
     b.hidden = false; boardShown = true;
     requestAnimationFrame(function(){ b.classList.add("is-in"); });

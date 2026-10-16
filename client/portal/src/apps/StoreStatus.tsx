@@ -1,7 +1,7 @@
 // Store status: open or close the store in one tap, the words on the "closed" board, and special access while it
 // is closed (by email: they get a link in their inbox; by device: a private link or QR code that unlocks that browser).
 // Used in Settings > Store status and, as a compact switch, on the Overview.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLoad } from '../hooks';
 import { del, post } from '../api';
 import { AsyncButton, Badge, Empty, ErrorState, Field, Segmented, SkeletonRows, Switch, useConfirm, useToast } from '../ui';
@@ -93,7 +93,7 @@ export default function StoreStatusPanel(){
       <h3>The closed board</h3>
       <p className="muted" style={{ marginTop: -6 }}>What visitors see on the Store page while it is closed. The panda leaves the chat button and hangs this sign.</p>
       <div className="store-board-preview" data-scene={st.closedScene} aria-hidden="true">
-        <span className="sbp-thread" /><span className="sbp-panda">{st.closedScene === 'emoji' ? '😢' : '🐼'}</span>
+        <span className="sbp-thread" />{st.closedScene === 'emoji' ? <span className="sbp-panda">😢</span> : <Panda3D />}
         <div className="sbp-sign"><b>CLOSED</b><span>{st.closedTitle || 'The store is taking a nap'}</span></div>
       </div>
       <Field label="Headline"><input value={st.closedTitle} maxLength={80} onChange={e => set('closedTitle', e.target.value)} placeholder="The store is taking a nap" /></Field>
@@ -132,6 +132,20 @@ export default function StoreStatusPanel(){
     </section>
     {shown?.link && <PassLink pass={shown} onClose={() => setShown(null)} onCopy={copy} />}
   </>;
+}
+
+// The same 3D panda as on the website (client/src/panda.ts), resting on the board preview; the emoji stays only
+// if 3D can't run here. Loaded on demand, so the portal stays light until this page is opened.
+function Panda3D(){
+  const host = useRef<HTMLSpanElement>(null), wrap = useRef<HTMLSpanElement>(null);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let dispose: (() => void) | null = null, gone = false;
+    import('../../../src/panda').then(m => host.current && wrap.current ? m.mountPanda(host.current, wrap.current) : null)
+      .then(d => { if (gone) d?.(); else { dispose = d || null; setReady(!!d); } }).catch(() => setReady(false));
+    return () => { gone = true; dispose?.(); };
+  }, []);
+  return <span ref={wrap} className="sbp-panda3d" aria-hidden="true"><span ref={host} className="sbp-panda3d-host" />{!ready && <span className="sbp-panda">🐼</span>}</span>;
 }
 
 function PassLink({ pass, onClose, onCopy }: { pass: StorePass; onClose: () => void; onCopy: (t: string) => void }){
