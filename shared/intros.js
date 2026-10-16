@@ -32,7 +32,7 @@ export const INTRO_VERSIONS = [
     name: 'The Timeline Loom',
     label: 'Version 3',
     locked: false,
-    description: 'Loki-style green magic: glowing timeline threads rush in from every side, curl and sew the logo together, each stitch flaring and spreading light to its neighbours inside a turning spell circle, then a ring of green fire reveals the crystal. Skill bubbles work here too.',
+    description: 'Loki / Doctor Strange magic in real 3D: multiversal threads in their natural colours coil in from deep space and stitch the logo inside a layered 3D spell circle; the core drinks their energy and everything turns green: liquid emerald magic, 3D sparks, and the logo revealed green on a green-tinted world. Skill bubbles work here too.',
   },
 ];
 export const INTRO_IDS = INTRO_VERSIONS.map(v => v.id);
