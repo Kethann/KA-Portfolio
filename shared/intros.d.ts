@@ -7,3 +7,7 @@ export function introVersion(id: unknown): string;
 export const BUBBLE_TYPES: { type: string; label: string }[];
 export function cleanBubbles(input: unknown): { enabled: boolean; items: { type: string; label: string; on: boolean }[] } | null;
 export function bubbleList(input: unknown): { type: string; label: string }[] | null;
+export interface IntroWorld { enabled: boolean; strength: number; smoke: boolean; spread: number }
+export const WORLD_DEFAULT: IntroWorld;
+export function cleanWorld(input: unknown): IntroWorld | null;
+export function worldSettings(input: unknown): { strength: number; smoke: boolean; spread: number } | null;

@@ -136,7 +136,7 @@ export async function createDevServer({ port = Number(env('PORT', 9878)), host =
         // like the Pages router: run the chosen intro version with the owner's skill bubbles
         try {
           const [html, info] = await Promise.all([readFile(resolve(root, 'index.html'), 'utf8'), handle(new Request(new URL('/api/intro', url)), platform).then(r => r.json())]);
-          const out = applyIntroToHtml(html, info.version, info.bubbles);
+          const out = applyIntroToHtml(html, info.version, info.bubbles, info.world);
           res.writeHead(200, { ...SECURITY, 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-cache' });
           return res.end(out);
         } catch { /* fall back to the file as built */ }

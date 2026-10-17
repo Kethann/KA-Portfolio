@@ -9908,6 +9908,28 @@ const isMobile = window.matchMedia('(max-width: 760px)').matches || /Mobi|Androi
 // effect in THIS scene too (shard glow halo, ambient shards, cursor dust, comet trails), not just
 // the nebula's star/galaxy counts.
 const perfScale = isMobile && ((navigator.deviceMemory||4)<=2 || (navigator.hardwareConcurrency||4)<=4) ? 0.55 : 1;
+// [mobile scroll fix] On phones the address bar slides away and back while the page scrolls, and every slide changes
+// window.innerHeight. The intro re-framed its camera, canvas and overlay on each of those changes, so the logo crept up and
+// was resized while scrolling. On touch screens the scene is now sized once to the LARGE viewport (the height with the bar
+// hidden, like CSS 100lvh) and only re-measured when the width changes (rotation, split screen); the bar coming and going,
+// or the keyboard opening, no longer moves anything. kaLayoutH() here shadows the page-wide one for this intro only.
+const v3Touch = isMobile || (window.matchMedia('(pointer: coarse)').matches && (navigator.maxTouchPoints || 0) > 0);
+let v3FixW = 0, v3FixH = 0;
+function v3LargeVH(){
+  const p = document.createElement('div');
+  p.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:100vh;height:100lvh;visibility:hidden;pointer-events:none;';
+  (document.body || document.documentElement).appendChild(p);
+  const h = p.getBoundingClientRect().height; p.remove(); return h;
+}
+function kaLayoutH(){
+  const h = window.kaLayoutH();
+  if (!v3Touch) return h;
+  const w = window.kaLayoutW();
+  if (w !== v3FixW || !v3FixH || h > v3FixH + 1){ v3FixW = w; v3FixH = Math.max(h, Math.round(v3LargeVH()) || 0); }
+  return v3FixH;
+}
+// the stage (and so every canvas in it) is pinned to that height instead of following the moving bottom edge
+function v3PinStage(){ if (v3Touch && stage){ stage.style.bottom = 'auto'; stage.style.height = kaLayoutH() + 'px'; } }
 
 // ---------------------------------------------------------------- easing --
 function easeInCubic(t){ return t*t*t; }
@@ -9942,6 +9964,7 @@ function lerp3(a, b, t){ return { x: lerp(a.x,b.x,t), y: lerp(a.y,b.y,t), z: ler
 
 // -------------------------------------------------------------- renderer --
 const stage = document.getElementById('stage');
+v3PinStage();
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x050506, 0.00095);
 
@@ -11476,7 +11499,7 @@ function sampleCutoutAlpha(u,v){
   return logoAlphaMap.data[(y*logoAlphaMap.w+x)*4+3]/255;
 }
 function queueSurfacePointer(e){
-  mouse.x=e.clientX/kaLayoutW()*2-1;mouse.y=e.clientY/kaLayoutH()*2-1;
+  if(e.pointerType!=='touch'){mouse.x=e.clientX/kaLayoutW()*2-1;mouse.y=e.clientY/kaLayoutH()*2-1;}
   if(reducedMotion||document.hidden)return;
   const path=e.composedPath?e.composedPath():[e.target];
   if(path.some(node=>node.matches&&node.matches('a,button,input,textarea,select,nav,[role="dialog"],.site-section'))){surfacePointer.pending=false;surfacePointer.lastX=NaN;return;}
@@ -11671,6 +11694,7 @@ function onResize(){
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(renderPixelRatio());
   renderer.setSize(kaLayoutW(), kaLayoutH());
+  v3PinStage();
   v3Resize();
   if (icons.length) layoutIcons();
   // the static (reduced-motion) path has no frame() loop to naturally repaint after this --
@@ -11888,8 +11912,9 @@ function v3Resize(){
   if (!V3.cv) return;
   const w = kaLayoutW(), h = kaLayoutH();
   V3.w = w; V3.h = h;
-  V3.dpr = Math.min(window.devicePixelRatio || 1, V3.low ? 1 : 1.25, Math.sqrt((V3.low ? 0.9e6 : 1.8e6) / Math.max(1, w*h)));
+  V3.dpr = Math.min(window.devicePixelRatio || 1, V3.low ? (perfScale < 1 ? 1.25 : 1.75) : 1.5, Math.sqrt((V3.low ? 1.6e6 : 3.2e6) / Math.max(1, w*h)));
   V3.cv.width = Math.round(w*V3.dpr); V3.cv.height = Math.round(h*V3.dpr);
+  V3.cv.style.width = w + 'px'; V3.cv.style.height = h + 'px';
   V3.x.setTransform(V3.dpr, 0, 0, V3.dpr, 0, 0);
   V3.ks = Math.max(0.8, Math.min(1.6, Math.min(w, h) / 760));
 }
@@ -12204,9 +12229,11 @@ function v3BuildFog(){
     vertexShader: V3_RING_VS,
     fragmentShader: [
       'uniform float uTime,uAmt,uLight,uOct,uAsp;varying vec2 vUv;',
-      'float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}',
-      'float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}',
-      'float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<5;i++){if(float(i)>=uOct)break;s+=a*n2(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return s;}',
+      'float h(vec2 p){vec3 p3=fract(vec3(p.xyx)*.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}',
+      'float ign(vec2 c){return fract(52.9829189*fract(dot(c,vec2(.06711056,.00583715))));}',
+      'float dith(){vec2 c=gl_FragCoord.xy;return (ign(c)+ign(c+vec2(37.,17.))-1.)/255.;}',
+      'float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*f*(f*(f*6.-15.)+10.);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}',
+      'float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<5;i++){if(float(i)>=uOct)break;s+=a*n2(p);p=mat2(.8,-.6,.6,.8)*p*2.03+vec2(1.7,9.2);a*=.5;}return s;}',
       'void main(){',
       '  if(uAmt<.003){gl_FragColor=vec4(0.);return;}',
       '  vec2 p=(vUv-.5)*vec2(uAsp,1.);float t=uTime*.001;',
@@ -12216,7 +12243,8 @@ function v3BuildFog(){
       '  float fog=fbm(q*1.3+1.8*w+vec2(t*.03,-t*.02));',
       '  float d=length((p-L)*vec2(.8,1.)),d2=length(p-L2);',
       '  float glow=exp(-d*2.4),heart=exp(-d*d*30.),glow2=exp(-d2*3.4);',
-      '  float rays=fbm(vec2(atan(p.y-L.y,p.x-L.x)*5.,d*1.2-t*.08))*glow;',
+      '  vec2 rv=p-L;float rl=length(rv);vec2 dir=rv/max(rl,1e-4);',
+      '  float rays=fbm(dir*2.6+vec2(d*1.2-t*.08,-d*.9+t*.06))*glow*smoothstep(0.,.05,rl);',
       '  vec3 col=vec3(.003,.014,.012);',
       '  col+=vec3(.012,.10,.085)*fog*(.55+glow*1.2);',   // teal haze
       '  col+=vec3(.03,.30,.15)*glow*(.5+.7*fog)*uLight;',   // emerald light behind the logo
@@ -12224,7 +12252,7 @@ function v3BuildFog(){
       '  col+=vec3(.04,.26,.14)*glow2*(.45+fog)*.8;',   // a softer light high on the left
       '  col+=vec3(.06,.36,.18)*rays*rays*.8*uLight;',   // shafts of light through the fog
       '  col*=mix(.16,1.,smoothstep(.78,.16,length(vec2(p.x/uAsp,p.y))));',   // vignette: the edges fall to near black
-      '  col+=(h(gl_FragCoord.xy+fract(t*7.))-.5)/255.;',   // dither
+      '  col=max(col+dith(),0.);',   // dither: the deep greens fade to black without contour bands
       '  gl_FragColor=vec4(col,uAmt);',
       '}'].join('\n'),
     transparent: true, depthWrite: false, depthTest: false, toneMapped: false });
@@ -12304,20 +12332,24 @@ function v3BuildSmoke(){
   if (reducedMotion || !logoMesh) return;
   const dw = logoMesh.userData.dw, dh = logoMesh.userData.dh, W = dw*1.7, H = dh*1.9, offY = dh*0.3;
   // a small, soft copy of the logo's silhouette: the smoke rises from this, so its edges are never hard
-  const img = cutoutTex.image, sw = 112, sh = Math.max(16, Math.round(sw*dh/dw)), sc = document.createElement('canvas');
+  const img = cutoutTex.image, sw = 200, sh = Math.max(24, Math.round(sw*dh/dw)), sc = document.createElement('canvas');
   sc.width = sw; sc.height = sh;
-  const sg = sc.getContext('2d'); if ('filter' in sg) sg.filter = 'blur(2px)'; if (img) sg.drawImage(img, 0, 0, sw, sh);
+  const sg = sc.getContext('2d', { willReadFrequently: true }); if (img) sg.drawImage(img, 0, 0, sw, sh);
+  try { v3BlurAlpha(sg, sw, sh, 4, 3); } catch (e) { if ('filter' in sg){ sg.clearRect(0, 0, sw, sh); sg.filter = 'blur(6px)'; if (img) sg.drawImage(img, 0, 0, sw, sh); } }
   const soft = new THREE.CanvasTexture(sc); soft.generateMipmaps = false; soft.minFilter = soft.magFilter = THREE.LinearFilter;
+  soft.wrapS = soft.wrapT = THREE.ClampToEdgeWrapping;
   const mat = new THREE.ShaderMaterial(Object.assign({
     uniforms: { map: { value: soft }, uTime: { value: 0 }, uAmt: { value: 0 }, uCol: { value: new THREE.Color() }, uOct: { value: V3.low ? 3 : 4 },
       uLogo: { value: new THREE.Vector2(dw, dh) }, uSize: { value: new THREE.Vector2(W, H) }, uOffY: { value: offY },
-      uM: { value: new THREE.Vector2() }, uMV: { value: new THREE.Vector2() }, uMA: { value: 0 } },
+      uM: { value: new THREE.Vector2() }, uMV: { value: new THREE.Vector2() }, uMA: { value: 0 }, uTaps: { value: V3.low ? 10 : 12 } },
     vertexShader: V3_RING_VS,
     fragmentShader: [
-      'uniform sampler2D map;uniform float uTime,uAmt,uOct,uOffY,uMA;uniform vec3 uCol;uniform vec2 uLogo,uSize,uM,uMV;varying vec2 vUv;',
-      'float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}',
-      'float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}',
-      'float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<4;i++){if(float(i)>=uOct)break;s+=a*n2(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return s;}',
+      'uniform sampler2D map;uniform float uTime,uAmt,uOct,uOffY,uMA,uTaps;uniform vec3 uCol;uniform vec2 uLogo,uSize,uM,uMV;varying vec2 vUv;',
+      'float h(vec2 p){vec3 p3=fract(vec3(p.xyx)*.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}',
+      'float ign(vec2 c){return fract(52.9829189*fract(dot(c,vec2(.06711056,.00583715))));}',
+      'float dith(){vec2 c=gl_FragCoord.xy;return (ign(c)+ign(c+vec2(37.,17.))-1.)/255.;}',
+      'float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*f*(f*(f*6.-15.)+10.);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}',
+      'float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<4;i++){if(float(i)>=uOct)break;s+=a*n2(p);p=mat2(.8,-.6,.6,.8)*p*2.03+vec2(1.7,9.2);a*=.5;}return s;}',
       'void main(){',
       '  if(uAmt<.003){gl_FragColor=vec4(0.);return;}',
       '  vec2 wp=(vUv-.5)*uSize+vec2(0.,uOffY);',   // relative to the logo's centre
@@ -12326,25 +12358,49 @@ function v3BuildSmoke(){
       '  float t=uTime*.001;',
       '  vec2 q=wp*.018;',
       '  vec2 warp=vec2(fbm(q+vec2(0.,-t*.35)),fbm(q+vec2(4.3,1.1)+vec2(0.,-t*.3)))-.5;',
-      '  float d=0.;',
-      '  for(int i=0;i<9;i++){',
-      '    float fi=float(i);',
-      '    vec2 sp=wp+warp*(12.+fi*11.)-vec2(sin(t*.7+fi*1.3)*4.,6.+fi*13.);',   // where this smoke rose from
+      '  float d=0.,jit=ign(gl_FragCoord.xy);',
+      '  for(int i=0;i<12;i++){',
+      '    float fi=float(i);if(fi>=uTaps)break;',
+      '    float k=(fi+jit)/uTaps;',   // 0..1 down the column of smoke below this point, continuous
+      '    vec2 sp=wp+warp*(12.+k*88.)-vec2(sin(t*.7+k*10.4)*4.,6.+k*104.);',   // where this smoke rose from
       '    vec2 luv=sp/uLogo+.5;',
-      '    float inside=smoothstep(0.,.05,luv.x)*smoothstep(0.,.05,luv.y)*smoothstep(1.,.95,luv.x)*smoothstep(1.,.95,luv.y);',
-      '    d+=texture2D(map,clamp(luv,0.,1.)).a*inside*(1.-fi/9.)*.2;',
+      '    float inside=smoothstep(0.,.06,luv.x)*smoothstep(0.,.06,luv.y)*smoothstep(1.,.94,luv.x)*smoothstep(1.,.94,luv.y);',
+      '    d+=texture2D(map,clamp(luv,0.,1.)).a*inside*(1.-k*.89);',
       '  }',
+      '  d*=1.8/uTaps;',
       '  float wisp=fbm(wp*.022+warp*1.5+vec2(0.,-t*.42));',
       '  d*=mix(.3,1.,smoothstep(.15,.9,wisp))*1.5;',   // soft curling wisps, never cut off
       '  d*=smoothstep(1.,.45,vUv.y)*smoothstep(0.,.1,vUv.y)*smoothstep(0.,.18,vUv.x)*smoothstep(1.,.82,vUv.x);',   // thins out as it climbs
       '  d=1.-exp(-d*1.4);',   // saturates softly instead of clipping
       '  vec3 col=uCol*d*.8+vec3(.85,1.,.9)*d*d*.14;',
-      '  col+=step(.002,d)*(h(gl_FragCoord.xy+fract(t*3.))-.5)/255.;',   // dither: no banding in the faint parts
-      '  gl_FragColor=vec4(col*uAmt,0.);',
+      '  col*=uAmt;',
+      '  gl_FragColor=vec4(col+dith()*step(.0008,col.g+col.r),0.);',   // dither on the final light: no banding in the faint parts
       '}'].join('\n') }, V3_ADD));
   const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
   m.scale.set(W, H, 1); m.position.set(0, offY, 4); m.renderOrder = 6; m.frustumCulled = false; m.visible = false; m.userData.kaKind = 'loomSmoke';
   scene.add(m); V3.smoke = m; V3.smk = { x: 0, y: 0, vx: 0, vy: 0, a: 0, ts: 0 };
+}
+// a soft copy of the silhouette's alpha: three box passes (close to a gaussian), the same on every browser
+function v3BlurAlpha(g, w, h, r, passes){
+  const id = g.getImageData(0, 0, w, h), px = id.data, n = w*h;
+  let a = new Float32Array(n), b = new Float32Array(n);
+  for (let i = 0; i < n; i++) a[i] = px[i*4 + 3];
+  const k = 1/(2*r + 1);
+  const run = (src, dst, len, count, step, stride) => {
+    for (let l = 0; l < count; l++){
+      const o = l*stride; let s = 0;
+      for (let x = 0; x <= r && x < len; x++) s += src[o + x*step];
+      for (let x = 0; x < len; x++){
+        dst[o + x*step] = s*k;
+        const add = x + r + 1, sub = x - r;
+        if (add < len) s += src[o + add*step];
+        if (sub >= 0) s -= src[o + sub*step];
+      }
+    }
+  };
+  for (let p = 0; p < passes; p++){ run(a, b, w, h, 1, w); run(b, a, h, w, w, 1); }
+  for (let i = 0; i < n; i++){ px[i*4] = px[i*4 + 1] = px[i*4 + 2] = 255; px[i*4 + 3] = Math.round(a[i]); }
+  g.putImageData(id, 0, 0);
 }
 function v3UpdateSmoke(ts, t){
   const S = V3.smoke; if (!S) return;
@@ -12376,7 +12432,7 @@ function v3UpdateSmoke(ts, t){
   const vl = Math.hypot(K.vx, K.vy), vs = vl > 600 ? 600/vl : 1;
   u.uM.value.set(K.x, K.y); u.uMV.value.set(K.vx*vs, K.vy*vs); u.uMA.value = K.a;
   u.uAmt.value = a*(1 + 0.45*K.a);   // stirring the smoke thickens it a touch
-  u.uTime.value = ts; u.uCol.value.copy(V3_SMOKE_W).lerp(V3_SMOKE_G, V3G); u.uOct.value = V3.gq >= 2 ? 2 : (V3.low ? 3 : 4);
+  u.uTime.value = ts; u.uCol.value.copy(V3_SMOKE_W).lerp(V3_SMOKE_G, V3G); u.uOct.value = V3.gq >= 2 ? 3 : (V3.low ? 3 : 4); u.uTaps.value = V3.gq >= 2 ? 8 : (V3.low ? 10 : 12);
 }
 
 // ---- space dust: fine points stream out of the core in every direction (some towards the camera), scatter and fade ----
@@ -12630,9 +12686,11 @@ function v3BuildLiquid(){
     vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
     fragmentShader: [
       'uniform float uTime,uAmt,uGrow,uLite;uniform vec2 uSize;varying vec2 vUv;',
-      'float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}',
-      'float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}',
-      'float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<' + oct + ';i++){s+=a*n2(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return s;}',
+      'float h(vec2 p){vec3 p3=fract(vec3(p.xyx)*.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}',
+      'float ign(vec2 c){return fract(52.9829189*fract(dot(c,vec2(.06711056,.00583715))));}',
+      'float dith(){vec2 c=gl_FragCoord.xy;return (ign(c)+ign(c+vec2(37.,17.))-1.)/255.;}',
+      'float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*f*(f*(f*6.-15.)+10.);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}',
+      'float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<' + oct + ';i++){s+=a*n2(p);p=mat2(.8,-.6,.6,.8)*p*2.03+vec2(1.7,9.2);a*=.5;}return s;}',
       'float field(vec2 p,float r,float tm){',
       '  float sw=3.4/(1.+r*.011)+tm*.00035,ca=cos(sw),sa=sin(sw);',
       '  vec2 q=mat2(ca,-sa,sa,ca)*p;',
@@ -12666,7 +12724,8 @@ function v3BuildLiquid(){
       '  col+=lime*fres*dens*.5;',
       '  col+=lime*meniscus*ring*arms*.2;',
       '  col+=em*ring*smoothstep(.28,.6,f0)*.08;',
-      '  gl_FragColor=vec4(col*uAmt*.62,0.);',
+      '  col*=uAmt*.62;',
+      '  gl_FragColor=vec4(col+dith()*step(.0008,col.g),0.);',
       '}'
     ].join('\n') }, V3_ADD));
   const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
@@ -12723,8 +12782,10 @@ function v3BuildSkin(){
     vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
     fragmentShader: [
       'uniform sampler2D map;uniform float uTime,uAmt,uWipeY,uWipeBand;uniform vec2 uLogoWH;varying vec2 vUv;',
-      'float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}',
-      'float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}',
+      'float h(vec2 p){vec3 p3=fract(vec3(p.xyx)*.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}',
+      'float ign(vec2 c){return fract(52.9829189*fract(dot(c,vec2(.06711056,.00583715))));}',
+      'float dith(){vec2 c=gl_FragCoord.xy;return (ign(c)+ign(c+vec2(37.,17.))-1.)/255.;}',
+      'float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*f*(f*(f*6.-15.)+10.);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}',
       'void main(){',
       '  vec4 tex=texture2D(map,vUv);',
       '  if(tex.a<.02)discard;',   // exactly the logo's own outline: nothing outside it is ever touched
@@ -14567,6 +14628,129 @@ function updateCamera(globalProgress, ts, dt){
   camera.fov = fovCompensated;
   camera.updateProjectionMatrix();
 }
+
+// ---- the green world (Studio > Intro > Green world, off unless the owner switches it on) ----
+// Once the logo is revealed its green-and-black atmosphere spreads slowly outward from the logo and takes over the whole
+// homepage: the background behind every section (the nebula is re-coloured green, then darkened), soft emerald light,
+// drifting smoke, and the accents. The owner's settings arrive as window.KA_INTRO_WORLD (set by the Pages router) and are
+// refreshed from the site settings the page loads anyway (ka-portfolio-updated), so a change in the portal applies live.
+// Everything here is CSS gradients and transforms (no pixels to scale up, so it stays smooth at any size); a fine grain over
+// the gradients stops them banding on 8-bit screens.
+function v3WorldCfg(w){
+  if (!w || typeof w !== 'object' || w.enabled === false) return null;
+  const n = (x, lo, hi, d) => { const k = Number(x); return Number.isFinite(k) ? Math.min(hi, Math.max(lo, k)) : d; };
+  return { strength: n(w.strength, 10, 100, 70)/100, smoke: w.smoke !== false, spread: n(w.spread, 2, 30, 8) };
+}
+const V3W = { cfg: v3WorldCfg(window.KA_INTRO_WORLD), el: null, css: null, started: false, raf: 0 };
+function v3WorldCss(){
+  if (V3W.css) return;
+  const s = document.createElement('style'); s.id = 'ka-green-world-css';
+  s.textContent = `
+#ka-green-world{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;contain:strict;opacity:0;transition:opacity 1.2s ease;}
+#ka-green-world.on{opacity:1;}
+#ka-green-world>div{position:absolute;inset:0;}
+#ka-green-world .kgw-shade{background:radial-gradient(ellipse 85% 70% at 50% 40%,rgba(5,44,27,.50) 0%,rgba(2,22,13,.82) 48%,rgba(0,6,3,.96) 100%);opacity:var(--kgw-k,.7);}
+#ka-green-world .kgw-glow{background:radial-gradient(ellipse 55% 42% at 50% 42%,rgba(40,210,120,.16),transparent 70%),radial-gradient(ellipse 40% 34% at 12% 18%,rgba(30,170,100,.12),transparent 70%),radial-gradient(ellipse 46% 36% at 92% 78%,rgba(24,150,90,.10),transparent 70%);opacity:var(--kgw-k,.7);}
+#ka-green-world .kgw-smoke{opacity:calc(.45 + var(--kgw-k,.7)*.55);}
+#ka-green-world .kgw-smoke i{position:absolute;left:50%;top:50%;width:var(--s);height:calc(var(--s)*.62);margin:calc(var(--s)*-.31) 0 0 calc(var(--s)*-.5);border-radius:50%;
+  background:radial-gradient(ellipse 50% 50% at 42% 50%,rgba(70,235,150,.11) 0%,rgba(30,170,100,.06) 38%,transparent 70%),radial-gradient(ellipse 38% 44% at 64% 46%,rgba(120,255,180,.06) 0%,transparent 72%);
+  transform:translate3d(var(--x),var(--y),0) rotate(var(--r)) scale(1);animation:kgw-drift var(--d) ease-in-out var(--dl) infinite alternate;will-change:transform,opacity;}
+@keyframes kgw-drift{0%{transform:translate3d(var(--x),var(--y),0) rotate(var(--r)) scale(1);opacity:.55;}
+  50%{opacity:1;}
+  100%{transform:translate3d(calc(var(--x) + var(--mx)),calc(var(--y) + var(--my)),0) rotate(calc(var(--r) + 28deg)) scale(1.25);opacity:.7;}}
+#ka-green-world .kgw-grain{opacity:.022;background-size:128px 128px;}
+html[data-ka-green-world] #nebula-bg,html[data-ka-green-world] #ember-layer{filter:grayscale(1) sepia(1) hue-rotate(96deg) saturate(2.1) brightness(.82);}
+#nebula-bg.kgw-t,#ember-layer.kgw-t{transition:filter var(--kgw-t,8s) ease-in-out;}
+html[data-ka-green-world]{--amber:#3DF59A !important;--accent-glass:linear-gradient(180deg,rgba(64,230,140,.55),rgba(14,150,84,.42)) !important;
+  --glass-bg:linear-gradient(135deg,rgba(226,255,238,.12),rgba(255,255,255,.022) 38%,rgba(80,230,150,.05) 78%,rgba(220,255,236,.08)),rgba(10,26,18,.30) !important;
+  --glass-highlight:inset 0 1px 0 rgba(226,255,238,.30),inset 1px 0 0 rgba(200,255,226,.08),inset 0 -1px 0 rgba(120,240,170,.10) !important;}
+html[data-ka-green-world] body{background:radial-gradient(ellipse at 50% -10%,#07160e 0%,#020805 55%,#010302 100%);}
+@media (prefers-reduced-motion: reduce){#ka-green-world .kgw-smoke i{animation:none;}#ka-green-world{transition:none;}}
+`;
+  document.head.appendChild(s); V3W.css = s;
+}
+// a tile of fine grain, made once (a data URL of a 128 px canvas)
+function v3WorldGrain(){
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d'), im = g.createImageData(128, 128), d = im.data;
+  for (let i = 0; i < d.length; i += 4){ const v = (Math.random()*255) | 0; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+  g.putImageData(im, 0, 0);
+  try { return c.toDataURL('image/png'); } catch (e) { return ''; }
+}
+function v3WorldBuild(){
+  if (V3W.el) return V3W.el;
+  v3WorldCss();
+  const el = document.createElement('div'); el.id = 'ka-green-world'; el.setAttribute('aria-hidden', 'true');
+  const shade = document.createElement('div'); shade.className = 'kgw-shade';
+  const glow = document.createElement('div'); glow.className = 'kgw-glow';
+  const smoke = document.createElement('div'); smoke.className = 'kgw-smoke';
+  // big soft wisps of smoke, each drifting on its own slow loop
+  [[120, -30, -18, 14, -8, 64, 0, -12], [96, 26, 20, -16, -10, 52, -9, 40], [140, 8, 34, -10, -16, 76, -21, 75], [88, -36, 30, 18, -12, 58, -33, 150],
+   [110, 34, -32, -14, 12, 70, -45, 210], [76, 0, -2, 12, -14, 46, -15, 300]].forEach(([s, x, y, mx, my, d, dl, r]) => {
+    const i = document.createElement('i');
+    i.style.cssText = '--s:' + s + 'vmax;--x:' + x + 'vw;--y:' + y + 'vh;--mx:' + mx + 'vw;--my:' + my + 'vh;--d:' + d + 's;--dl:' + dl + 's;--r:' + r + 'deg;';
+    smoke.appendChild(i);
+  });
+  const grain = document.createElement('div'); grain.className = 'kgw-grain';
+  const url = v3WorldGrain(); if (url) grain.style.backgroundImage = 'url(' + url + ')';
+  el.append(shade, glow, smoke, grain);
+  const neb = document.getElementById('nebula-bg');
+  if (neb && neb.parentNode) neb.parentNode.insertBefore(el, neb.nextSibling); else document.body.insertBefore(el, document.body.firstChild);
+  V3W.el = el; return el;
+}
+function v3WorldStyle(){
+  const c = V3W.cfg, el = V3W.el; if (!c || !el) return;
+  el.style.setProperty('--kgw-k', c.strength.toFixed(2));
+  el.querySelector('.kgw-smoke').style.display = c.smoke ? '' : 'none';
+}
+// the green grows from the logo outwards: a soft-edged circle in a mask, widened every frame for the spread time, then
+// the mask is removed (nothing left to work out per frame once the whole screen is green)
+function v3WorldSpread(ms){
+  const el = V3W.el, root = document.documentElement;
+  const tinted = [document.getElementById('nebula-bg'), document.getElementById('ember-layer')].filter(Boolean);
+  root.style.setProperty('--kgw-t', (ms/1000).toFixed(2) + 's');
+  tinted.forEach(n => n.classList.add('kgw-t'));
+  el.classList.add('on');
+  requestAnimationFrame(() => root.setAttribute('data-ka-green-world', ''));   // the background tint fades over the same time
+  if (reducedMotion || ms < 50){ el.style.webkitMaskImage = el.style.maskImage = 'none'; return; }
+  const t0 = performance.now(), feather = 0.22;
+  const step = (now) => {
+    const p = smootherStep((now - t0)/ms);
+    const w = window.innerWidth, h = window.innerHeight, cx = w/2, cy = Math.min(h, kaLayoutH())/2;
+    const far = Math.hypot(Math.max(cx, w - cx), Math.max(cy, h - cy))*(1 + feather) + 40;
+    const r = p*far, inner = Math.max(0, r - far*feather);
+    const m = 'radial-gradient(circle at ' + cx.toFixed(0) + 'px ' + cy.toFixed(0) + 'px, #000 ' + inner.toFixed(1) + 'px, rgba(0,0,0,.5) ' + ((inner + r)/2).toFixed(1) + 'px, transparent ' + r.toFixed(1) + 'px)';
+    el.style.webkitMaskImage = m; el.style.maskImage = m;
+    if (p < 1) V3W.raf = requestAnimationFrame(step);
+    else { el.style.webkitMaskImage = el.style.maskImage = 'none'; V3W.raf = 0; }
+  };
+  el.style.webkitMaskImage = el.style.maskImage = 'radial-gradient(circle, transparent 0, transparent 1px)';
+  V3W.raf = requestAnimationFrame(step);
+}
+// While the page sits at the top, the intro's own green fog already fills the screen, so the spread waits for the first
+// scroll: the green then visibly grows over the page as the hero fades away (straight away if the page is already scrolled).
+function v3WorldStart(){
+  if (V3W.started || !V3W.cfg || document.documentElement.classList.contains('ka-wallpaper')) return;
+  V3W.started = true;
+  v3WorldBuild(); v3WorldStyle();
+  const go = () => { window.removeEventListener('scroll', onScroll); if (V3W.started) v3WorldSpread(V3W.cfg.spread*1000); };
+  const onScroll = () => { if (window.scrollY > 8) go(); };
+  if (window.scrollY > 8 || reducedMotion) go(); else window.addEventListener('scroll', onScroll, { passive: true });
+}
+function v3WorldStop(){
+  if (!V3W.started) return;
+  V3W.started = false; cancelAnimationFrame(V3W.raf); V3W.raf = 0;
+  document.documentElement.removeAttribute('data-ka-green-world');
+  if (V3W.el){ V3W.el.classList.remove('on'); }
+}
+window.addEventListener('ka-sequence-complete', v3WorldStart, { once: true });
+window.addEventListener('ka-portfolio-updated', (e) => {
+  const doc = e && e.detail; if (!doc || typeof doc !== 'object') return;
+  V3W.cfg = v3WorldCfg(doc.intro && doc.intro.world && doc.intro.world.enabled === true ? doc.intro.world : null);
+  if (!V3W.cfg){ v3WorldStop(); return; }
+  if (V3W.started) v3WorldStyle();
+  else if (sequenceCompleteFired) v3WorldStart();
+});
 
 // kick off asset loading
 })();

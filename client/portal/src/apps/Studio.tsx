@@ -15,8 +15,8 @@ import { DateTimeInput, Uploader, useSaveKey } from './common';
 import { SiteSaveBar } from './Content';
 import SettingFinder from './SettingFinder';
 import { loadSite, saveSite, thumb, updateSite, useSite, PASS_DRAFT_DEFAULTS } from './siteDoc';
-import type { SiteDoc, PassDraft, Announcement, AnnouncementItem, IntroBubbles } from './siteDoc';
-import { BUBBLE_TYPES, INTRO_VERSIONS, introVersion } from '../../../../shared/intros.js';
+import type { SiteDoc, PassDraft, Announcement, AnnouncementItem, IntroBubbles, IntroWorld } from './siteDoc';
+import { BUBBLE_TYPES, INTRO_VERSIONS, WORLD_DEFAULT, introVersion } from '../../../../shared/intros.js';
 import { FONT_GROUPS, FONT_LIBRARY, FONT_NAMES, fontStack, googleFontsUrl } from '../../../../shared/fonts.js';
 
 const FONTS = FONT_NAMES;
@@ -548,7 +548,8 @@ function PassPreview({ doc }: { doc: SiteDoc }){
 // Studio > Intro: which homepage intro runs. V1 (the KA crystal) is locked: it can always be chosen again, never edited.
 function IntroVersions({ doc }: { doc: SiteDoc }){
   const current = introVersion((doc as SiteDoc & { intro?: { version?: string } }).intro?.version);
-  const pick = (id: string) => updateSite(x => ({ ...x, intro: { version: id } } as SiteDoc));
+  // switching versions keeps the bubbles and the green world the owner already set up
+  const pick = (id: string) => updateSite(x => ({ ...x, intro: { ...(x.intro || {}), version: id } } as SiteDoc));
   return <div className="stack">
     <p className="field-hint" style={{ margin: 0 }}>The intro that plays when someone opens the homepage. Choose a version and press Publish changes; you can switch back to any version at any time. Version 1 is locked: it stays exactly as it is, so it is always there to return to.</p>
     <ul className="list intro-versions" role="radiogroup" aria-label="Homepage intro">
@@ -561,8 +562,34 @@ function IntroVersions({ doc }: { doc: SiteDoc }){
         </label>
       </li>)}
     </ul>
+    <GreenWorldCard doc={doc} active={current} />
     <IntroBubblesCard doc={doc} active={current} />
   </div>;
+}
+
+// Version 3's green world: after the logo is revealed, its green-and-black atmosphere slowly spreads from the logo over the
+// whole homepage (the background behind every section, the accents, drifting smoke). Off unless the owner switches it on.
+function GreenWorldCard({ doc, active }: { doc: SiteDoc; active: string }){
+  const w: IntroWorld = { ...WORLD_DEFAULT, ...(doc.intro?.world || {}) };
+  const set = (p: Partial<IntroWorld>) => updateSite(x => ({ ...x, intro: { ...(x.intro || { version: 'v1' }), world: { ...WORLD_DEFAULT, ...(x.intro?.world || {}), ...p } } } as SiteDoc));
+  return <section className="card stack" aria-labelledby="world-h">
+    <div className="row" style={{ justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+      <div><h3 id="world-h" style={{ margin: 0 }}>Green world over the homepage</h3>
+        <p className="field-hint" style={{ margin: '4px 0 0' }}>Version 3 only. Once the logo is revealed, its green light spreads slowly outward from the logo and fills the whole homepage: the background behind every section turns green and black, the accents turn green, and soft smoke drifts behind the content. Press Publish changes to apply.</p></div>
+      <Switch checked={w.enabled} onChange={v => set({ enabled: v })} label="Turn the site green" />
+    </div>
+    {active !== 'v3' && <div className="callout" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      <span className="grow">This works with <b>Version 3</b>. The other versions keep the site's own colours.</span>
+      <button type="button" className="btn sm primary" onClick={() => updateSite(x => ({ ...x, intro: { ...(x.intro || {}), version: 'v3' } } as SiteDoc))}>Use Version 3</button>
+    </div>}
+    <div className="stack" style={{ opacity: w.enabled ? 1 : 0.5 }}>
+      <Field label={`How green: ${w.strength}%`} hint="Low keeps more of the original background showing through; high is a deep green-and-black world.">
+        <input type="range" min={10} max={100} step={5} value={w.strength} disabled={!w.enabled} onChange={e => set({ strength: Number(e.target.value) })} /></Field>
+      <Field label={`How slowly it spreads: ${w.spread} s`} hint="The time the green takes to grow from the logo to the edges of the screen.">
+        <input type="range" min={2} max={30} step={1} value={w.spread} disabled={!w.enabled} onChange={e => set({ spread: Number(e.target.value) })} /></Field>
+      <Switch checked={w.smoke} disabled={!w.enabled} onChange={v => set({ smoke: v })} label="Drifting green smoke behind the content" />
+    </div>
+  </section>;
 }
 
 // The skill bubbles that orbit the finished KA logo (Version 2): all on or off, which ones, their order and their words.

@@ -1,6 +1,6 @@
 // Public site endpoints: config, portfolio document, contact form, notify-me list.
 import { SOUND_DEFAULTS } from '../../shared/sounds.js';
-import { introVersion, bubbleList, cleanBubbles } from '../../shared/intros.js';
+import { introVersion, bubbleList, cleanBubbles, cleanWorld, worldSettings } from '../../shared/intros.js';
 import { SKILLS_ADDITIONS } from '../admin/site-document.js';
 import { json, readJson, HttpError } from '../core/http.js';
 import { env } from '../core/env.js';
@@ -103,7 +103,7 @@ async function withSkillAdditions(value, revision){
 export async function loadSiteDocument(){
   const loaded = await getSettingWithRevision('site');
   const { value, revision } = loaded.value ? await withSkillAdditions(loaded.value, loaded.revision) : loaded;
-  if (value) return { ...value, stats: value.stats || STATS_DEFAULT, skills: value.skills || SKILLS_DEFAULT, about: value.about || ABOUT_DEFAULT, sounds: value.sounds || SOUND_DEFAULTS, intro: { version: introVersion(value.intro?.version), ...(cleanBubbles(value.intro?.bubbles) ? { bubbles: cleanBubbles(value.intro?.bubbles) } : {}) }, revision };   // sites saved before About numbers / Skills existed
+  if (value) return { ...value, stats: value.stats || STATS_DEFAULT, skills: value.skills || SKILLS_DEFAULT, about: value.about || ABOUT_DEFAULT, sounds: value.sounds || SOUND_DEFAULTS, intro: { version: introVersion(value.intro?.version), ...(cleanBubbles(value.intro?.bubbles) ? { bubbles: cleanBubbles(value.intro?.bubbles) } : {}), ...(cleanWorld(value.intro?.world) ? { world: cleanWorld(value.intro?.world) } : {}) }, revision };   // sites saved before About numbers / Skills existed
   const initial = { ...seed };
   delete initial.revision;
   const rev = await setSetting('site', initial, 0);
@@ -126,7 +126,7 @@ export async function portfolio(){
 // which homepage intro to run: read by the Pages router (pages/_worker.js) before it serves the page
 export async function intro(){
   const doc = await loadSiteDocument();
-  return json({ version: introVersion(doc?.intro?.version), bubbles: bubbleList(doc?.intro?.bubbles) }, 200, { 'cache-control': 'public, max-age=30' });
+  return json({ version: introVersion(doc?.intro?.version), bubbles: bubbleList(doc?.intro?.bubbles), world: worldSettings(doc?.intro?.world) }, 200, { 'cache-control': 'public, max-age=30' });
 }
 
 const NAME_MAX = 100;

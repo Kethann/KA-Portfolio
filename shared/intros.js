@@ -67,3 +67,19 @@ export function bubbleList(input){
   if (!b.enabled) return [];
   return b.items.filter(i => i.on).map(i => ({ type: i.type, label: i.label }));
 }
+
+// Version 3's green world (Studio > Intro > Green world): once the logo is revealed, its green-and-black atmosphere spreads out
+// from the logo over the whole homepage (the background behind every section, the accents, drifting smoke).
+// Nothing saved = off, so the site keeps its own colours unless the owner switches it on.
+export const WORLD_DEFAULT = { enabled: false, strength: 70, smoke: true, spread: 8 };
+const wNum = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.round(Math.min(hi, Math.max(lo, n))) : d; };
+/** a saved green-world setting made safe: strength 10-100 (%), spread 2-30 (seconds), smoke on or off */
+export function cleanWorld(input){
+  if (!input || typeof input !== 'object') return null;
+  return { enabled: input.enabled === true, strength: wNum(input.strength, 10, 100, WORLD_DEFAULT.strength), smoke: input.smoke !== false, spread: wNum(input.spread, 2, 30, WORLD_DEFAULT.spread) };
+}
+/** what the homepage gets: null = no green world */
+export function worldSettings(input){
+  const w = cleanWorld(input);
+  return w && w.enabled ? { strength: w.strength, smoke: w.smoke, spread: w.spread } : null;
+}

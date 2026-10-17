@@ -8,7 +8,7 @@ import { SKILL_LOGOS } from '../../shared/skill-logos.js';
 import { ABOUT_DEFAULT, ABOUT_LIMITS } from '../../shared/about-default.js';
 
 import { FONT_NAMES } from '../../shared/fonts.js';
-import { introVersion, cleanBubbles } from '../../shared/intros.js';
+import { introVersion, cleanBubbles, cleanWorld } from '../../shared/intros.js';
 import { SOUND_EVENT_IDS, SOUND_CATEGORIES, SOUND_LIBRARY, SOUND_DEFAULTS } from '../../shared/sounds.js';
 
 export const FONT_CHOICES = FONT_NAMES;   // the shared library (studio, portal, homepage) + system-ui
@@ -373,6 +373,7 @@ export function validateSiteDocument(input, current, seed){
   const sounds = validateSounds(input.sounds);
   const intro = { version: introVersion(input.intro?.version) };   // which homepage intro runs (Studio > Intro)
   const bubbles = cleanBubbles(input.intro?.bubbles); if (bubbles) intro.bubbles = bubbles;   // the V1 skill bubbles (only stored once customised)
+  const world = cleanWorld(input.intro?.world); if (world) intro.world = world;   // Version 3's green world over the homepage (only stored once set)
   // a save from the portal makes the owner's skill list the authority: the one-time additions (handlers/public.js) never apply after it
   const skillsAdded = SKILLS_ADDITIONS.id;
   return { typeV2: true, details, folders, images, notice, announcements, visibility, stacks, featuredShow, layoutOverrides, branding, elementStyles, socialLinks, passCard, stats, skills, about, sounds, intro, skillsAdded };

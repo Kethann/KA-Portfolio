@@ -30,7 +30,7 @@ export type SiteDoc = {
   passCard: PassDraft;
   stats: StatsDraft;
   sounds?: SoundSettings;
-  intro?: { version: string; bubbles?: IntroBubbles };
+  intro?: { version: string; bubbles?: IntroBubbles; world?: IntroWorld };
   skills: SkillsDraft;
   about: AboutDraft;
 };
@@ -53,6 +53,7 @@ export const SKILL_LIMITS = { categories: 14, items: 24 };
 export type SkillItem = { name: string; code: string; color: string; level: number; note: string; logo?: string; logoUrl?: string };
 export type SkillCategory = { name: string; icon: string; items: SkillItem[] };
 export type IntroBubbles = { enabled: boolean; items: { type: string; label: string; on: boolean }[] };
+export type IntroWorld = { enabled: boolean; strength: number; smoke: boolean; spread: number };
 export type SkillsDraft = { enabled: boolean; title: string; intro: string; categories: SkillCategory[] };
 // the checkout pass draft is exactly the card's own settings (one definition, in PassCard.tsx)
 export type PassDraft = PassSettings;
