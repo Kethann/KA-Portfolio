@@ -28,7 +28,7 @@ test('wrangler.jsonc: Worker entry, D1 + migrations, R2, cron, and only dynamic 
   assert.equal(wrangler.main, 'server/platform/cloudflare.js');
   assert.ok(wrangler.compatibility_flags.includes('nodejs_compat'));
   assert.equal(wrangler.assets.directory, './dist');
-  for (const p of ['/api/*', '/legal', '/legal/*', '/license', '/license/*', '/__storage/*', '/__storage-upload/*']) assert.ok(wrangler.assets.run_worker_first.includes(p), p);
+  for (const p of ['/api/*', '/legal', '/legal/*', '/license', '/license/*', '/agreement/*', '/__storage/*', '/__storage-upload/*']) assert.ok(wrangler.assets.run_worker_first.includes(p), p);
   const d1 = wrangler.d1_databases.find(d => d.binding === 'DB');
   assert.equal(d1.migrations_dir, 'migrations');
   assert.ok(wrangler.r2_buckets.find(b => b.binding === 'FILES'));

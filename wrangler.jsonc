@@ -21,6 +21,7 @@
 			"/legal/*",
 			"/license",
 			"/license/*",
+			"/agreement/*",
 			"/__storage/*",
 			"/__storage-upload/*"
 		]
