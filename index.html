@@ -18753,6 +18753,8 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
 .ka-ann-head button:hover, .ka-ann-head button[aria-pressed="true"]{ background:rgba(255,255,255,.08); color:var(--ink); }
 .ka-ann-head svg{ width:15px; height:15px; }
 .ka-ann-text{ margin:0; font:15px/1.6 var(--font-body, sans-serif); color:var(--ink); }
+.ka-ann-note{ margin:6px 0 0; font:12.5px/1.5 var(--font-body, sans-serif); color:var(--ink-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ka-ann-note[hidden]{ display:none; }
 .ka-ann-body{ transition:opacity .18s ease, transform .18s ease; }
 .ka-ann-body.is-swap{ opacity:0; transform:translateY(4px); }
 .ka-ann-dots{ display:flex; gap:6px; margin-top:12px; }
@@ -18889,7 +18891,7 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
   opacity:0; transform:translateY(18px) scale(.98); transition:opacity .5s cubic-bezier(.22,.8,.24,1), transform .5s cubic-bezier(.22,.8,.24,1); }
 .ka-reply.is-in{ opacity:1; transform:none; }
 .ka-reply-head{ display:flex; align-items:center; gap:12px; padding:16px 16px 12px; border-bottom:1px solid rgba(255,255,255,.08); }
-.ka-reply-av{ width:38px; height:38px; flex:none; border-radius:12px; display:grid; place-items:center; background:linear-gradient(135deg, #f0b37c, #b8703c); color:#1b130d; font:800 13px/1 var(--font-body, sans-serif); }
+.ka-reply-av{ width:38px; height:38px; flex:none; border-radius:12px; display:block; object-fit:contain; padding:4px; box-sizing:border-box; background:radial-gradient(circle at 50% 40%, #2a1d16, #120c09); border:1px solid rgba(240,179,124,.35); }
 .ka-reply-head b{ display:block; font-size:14px; } .ka-reply-head > div span{ display:block; font-size:12px; color:var(--ink-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ka-reply-head > div{ flex:1; min-width:0; }
 .ka-reply-x{ width:32px; height:32px; border:0; border-radius:10px; background:transparent; color:var(--ink-dim); cursor:pointer; font-size:20px; line-height:1; }
@@ -19161,6 +19163,7 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
       ann.querySelector(".ka-ann-tabtext").textContent = a.title || "Announcement";
       ann.querySelector(".ka-ann-title").textContent = a.title || "Announcement";
       ann.querySelector(".ka-ann-text").textContent = a.text;
+      var noteEl = ann.querySelector(".ka-ann-note"); noteEl.textContent = a.note || ""; noteEl.hidden = !a.note;
       var link = ann.querySelector(".ka-ann-link");
       link.onclick = a.action ? function(e){ e.preventDefault(); a.action(); } : null;
       if (a.action){ link.hidden = false; link.textContent = a.linkLabel || "Read it"; link.href = "#"; link.removeAttribute("target"); }
@@ -19185,7 +19188,7 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
       ann = el("aside", "ka-announce"); ann.setAttribute("aria-label", "Announcements");
       ann.innerHTML = '<button type="button" class="ka-ann-tab" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg><i aria-hidden="true"></i><span class="ka-ann-tabtext sr"></span></button>' +
         '<div class="ka-ann-panel"><p class="ka-ann-head"><span class="ka-ann-title"></span><button type="button" class="ka-ann-pin" aria-pressed="false" aria-label="Keep it open" title="Keep it open">' + ICON_PIN + '</button>' +
-        '<button type="button" class="ka-ann-close" aria-label="Tuck it away" title="Tuck it away">' + ICON_X + '</button></p><div class="ka-ann-body"><p class="ka-ann-text"></p><a class="ka-ann-link" hidden></a></div>' +
+        '<button type="button" class="ka-ann-close" aria-label="Tuck it away" title="Tuck it away">' + ICON_X + '</button></p><div class="ka-ann-body"><p class="ka-ann-text"></p><p class="ka-ann-note" hidden></p><a class="ka-ann-link" hidden></a></div>' +
         '<div class="ka-ann-dots" hidden></div><span class="ka-ann-time" aria-hidden="true"></span></div>';
       document.body.appendChild(ann);
       ann.querySelector(".ka-ann-tab").addEventListener("click", function(){ ann.classList.contains("is-open") ? closeAnn() : openAnn(false); });
@@ -19560,9 +19563,9 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
     if (replyBox) replyBox.remove();
     replyBox = el("div", "ka-reply"); replyBox.setAttribute("role", "dialog"); replyBox.setAttribute("aria-label", "A reply to your message");
     var head = el("div", "ka-reply-head"), who = el("div");
-    head.appendChild(el("span", "ka-reply-av", "KA"));
-    who.appendChild(el("b", "", fresh.length ? "Kethan replied to your message" : "Your conversation"));
-    who.appendChild(el("span", "", t.subject || "Your message"));
+    var av = el("img", "ka-reply-av"); av.src = "/images/ka-logo.png"; av.alt = ""; av.width = av.height = 38; head.appendChild(av);
+    who.appendChild(el("b", "", fresh.length ? "Kethan replied to your message" : "Your conversation with Kethan"));
+    who.appendChild(el("span", "", "About: " + (t.subject || "your message")));
     var x = el("button", "ka-reply-x", "×"); x.type = "button"; x.setAttribute("aria-label", "Close");
     head.append(who, x);
     var body = el("div", "ka-reply-body");
@@ -19591,7 +19594,7 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
     var weekAgo = Date.now() - 7 * 864e5;
     return all.filter(function(t){ var r = t.replies.slice(-1)[0]; return r && Date.parse(r.sentAt) > weekAgo; }).slice(-3).reverse().map(function(t){
       var r = t.replies.slice(-1)[0], isNew = unread(t).length > 0;
-      return { title: isNew ? "New reply from Kethan" : "Reply from Kethan", tone: "success", isNew: isNew, text: (t.subject ? "Re: " + t.subject + " · " : "") + String(r.body || "").replace(/\s+/g, " ").slice(0, 140), linkLabel: "Read the reply",
+      return { title: isNew ? "New reply from Kethan" : "Reply from Kethan", tone: "success", isNew: isNew, text: "“" + String(r.body || "").replace(/\s+/g, " ").trim().slice(0, 140) + (String(r.body || "").length > 140 ? "…”" : "”"), note: "About your message: " + (t.subject || "your message"), linkLabel: "Read the reply",
         action: function(){ showThread(t, false); refreshTab(); } };
     });
   }
