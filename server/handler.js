@@ -10,7 +10,7 @@ import { registerCheckout } from './handlers/checkout.js';
 import { registerLegal } from './handlers/legal.js';
 import { registerLicense } from './handlers/license.js';
 import { registerStoreAccess } from './store/access.js';
-import { threads, threadsSeen } from './handlers/threads.js';
+import { threads, threadsSeen, threadsPush } from './handlers/threads.js';
 import { buyerInvoice } from './store/invoice.js';
 
 import { registerAuth, requireAdmin } from './admin/auth.js';
@@ -59,6 +59,7 @@ route('POST', '/api/contact', pub.contact);
 route('POST', '/api/messages/threads', threads);
 route('GET', '/api/invoice/:id', buyerInvoice);
 route('POST', '/api/messages/threads/seen', threadsSeen);
+route('POST', '/api/messages/threads/push', threadsPush);
 route('POST', '/api/notify', pub.notify);
 route('POST', '/api/assistant', assistant);
 route('GET', '/api/health', async () => json({ ok: true }));

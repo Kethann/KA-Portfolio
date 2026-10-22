@@ -1,6 +1,11 @@
 <!doctype html>
-<title>KA Crystal Reconstruction</title>
 <meta charset="utf-8">
+<title>Kethan Artzz</title>
+<meta property="og:title" content="Kethan Artzz">
+<meta property="og:site_name" content="Kethan Artzz">
+<meta property="og:type" content="website">
+<meta name="twitter:title" content="Kethan Artzz">
+<meta name="application-name" content="Kethan Artzz">
 <script>
 // ==================================================================== API BASE CONFIG ==
 // Every /api/* call in this file (portfolio, visit counter, contact, assistant, upscaler) goes
@@ -1634,6 +1639,7 @@ html.ka-no-panda #panda-mascot, html.ka-no-panda .panda-bubble, html.ka-no-panda
         </span>
         <h3 class="cc-result-title" tabindex="-1"></h3>
         <p class="cc-result-text" role="status" aria-live="polite"></p>
+        <button type="button" class="cc-notify" id="cc-notify" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span>Notify me on this device when Kethan replies</span></button>
         <button type="button" class="contact-submit cc-action" id="cc-action"></button>
       </div>
      </div>
@@ -10109,6 +10115,10 @@ let logoAlphaMap = null;
 let icons = [];
 let phase = 'shattered';   // shattered | assembling | held | disassembling
 let phaseStart = 0;
+// VERSION 3: the animation clock stops while the hero is scrolled away or the tab is hidden, and carries on from the same
+// instant when it comes back. (Before, only the phase timer was shifted: the fog, smoke, dust, glow and circle all ran off
+// the raw clock, so coming back cut straight to a different state, like a new clip starting.)
+let heroPausedTotal = 0;
 let sequenceCompleteFired = false; // see the 'ka-sequence-complete' dispatch below -- fires once, ever
 // Bubble retract/expand (see setBubbles/updateIcons): bubblesRetracted is the logical target
 // state each bubble animates toward; bubbleAutoRetractArmed latches true the one time the
@@ -10454,7 +10464,7 @@ function init(){
   updateSkillCallouts();
   renderer.render(scene, camera);
   phase = 'shattered';
-  phaseStart = performance.now();
+  phaseStart = performance.now() - heroPausedTotal;
   if(document.hidden)heroPausedAt=phaseStart;
   scheduleHero();
 }
@@ -11716,7 +11726,7 @@ const bootVeil = document.getElementById('boot-veil'); // GOD MODE v9: dark-boot
 replayBtn?.addEventListener('click', () => {
   if (phase !== 'held') return;
   phase = 'disassembling';
-  phaseStart = performance.now();
+  phaseStart = performance.now() - heroPausedTotal;
   replayBtn?.classList.remove('on');
   clearSurfaceParticles();
 });
@@ -11925,9 +11935,19 @@ function v3Resize(){
 // itself in with a white-hot tip (Doctor Strange conjuring), a highlight sweeps round it, and sparks peel off its rim.
 // Natural amber first; the same green as everything else once the core has drunk the energy.
 const V3_SC0 = new THREE.Color(1.0, 0.50, 0.14), V3_SC1 = new THREE.Color(0.2, 1.0, 0.45), V3_SCOL = new THREE.Color();
+// The circle's own colours: the deep-space nebula of the multiverse (Kang's violet and gold, cyan, magenta, indigo) instead of
+// one flat amber. Each ring drifts between its two colours round its circumference. After the flip they lean towards the
+// green world (teal and emerald) without losing their nebula character, so the circle never turns into one flat green.
+const V3_NEB = {   // kind -> [colour A, colour B]
+  0: [new THREE.Color(0.62, 0.40, 1.00), new THREE.Color(0.32, 0.80, 1.00)],   // the main ring: violet and cyan
+  1: [new THREE.Color(0.95, 0.42, 0.88), new THREE.Color(0.46, 0.42, 1.00)],   // the star: magenta and indigo
+  2: [new THREE.Color(0.34, 0.95, 0.92), new THREE.Color(0.36, 0.56, 1.00)],   // the hexagram: teal and blue
+  3: [new THREE.Color(0.40, 0.36, 0.95), new THREE.Color(0.85, 0.66, 0.36)] }; // the far halo: indigo and a thread of gold
+const V3_NEB_G = [new THREE.Color(0.22, 1.00, 0.70), new THREE.Color(0.30, 0.82, 1.00)];   // the green world's teal and cyan
+const V3_NEB_K = 0.55;   // how far the circle leans into the green world after the flip
 const V3_RING_VS = 'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}';
 const V3_RING_FS = [
-  'uniform float uTime,uAmt,uDraw,uKind,uSeed,uDir;uniform vec3 uCol;varying vec2 vUv;',
+  'uniform float uTime,uAmt,uDraw,uKind,uSeed,uDir;uniform vec3 uCol,uCol2;varying vec2 vUv;',
   'const float PI=3.14159265,TAU=6.28318531;',
   'float PW;',   // the size of one screen pixel in disc units: every line is anti-aliased to exactly that, so nothing blurs
   'float hs(float n){return fract(sin(n*12.9898+uSeed*78.233)*43758.5453);}',
@@ -11955,7 +11975,7 @@ const V3_RING_FS = [
   '      if(hs(ci)<.7)d=min(d,seg(q,vec2(0.,-.8),vec2(0.,.8)));',
   '      for(int k=0;k<4;k++){float fk=float(k);if(hs(ci*7.1+fk)>.4){float y0=(hs(ci*3.3+fk)*2.-1.)*.75,dx=(hs(ci*5.7+fk)<.5?-1.:1.)*(.3+.5*hs(ci*9.1+fk)),y1=y0+(hs(ci*2.9+fk)*2.-1.)*.6;d=min(d,seg(q,vec2(0.,y0),vec2(dx,y1)));}}',
   '      if(hs(ci+.5)>.78)d=min(d,abs(length(q-vec2(0.,.35))-.3));',
-  '      c+=lnw(d,.055,PW*13.9)*.95;g+=gw(d,24.)*.10;',
+  '      c+=lnw(d,.042,PW*13.9)*.7;g+=gw(d,24.)*.06;',
   '    }',
   '    float na=floor(a/(TAU/8.)+.5)*(TAU/8.);vec2 nc=.665*vec2(cos(na),sin(na));',
   '    float nd=length(p-nc);c+=ln(nd-.042,.0024)+ln(nd,.011);g+=gw(nd-.042,70.)*.5;',
@@ -11985,9 +12005,10 @@ const V3_RING_FS = [
   '  float tip=exp(-abs(an-uDraw)*55.)*(1.-step(.999,uDraw))*step(.001,uDraw);',   // ...with a white-hot tip
   '  float sweep=pow(.5+.5*cos(a-uTime*.0017*uDir),28.);',
   '  float fl=.88+.12*sin(uTime*.011+r*37.+uSeed*9.);',
-  '  vec3 hot=vec3(1.,.97,.9);',
-  '  vec3 col=(mix(hot,uCol,.6)*c*(.45+.8*sweep)+uCol*(c*.7+g*.4*(1.+sweep)))*drawn*fl;',
-  '  col+=(hot+uCol)*tip*(c*2.2+g*1.1);',
+  '  vec3 hot=vec3(1.,.95,.86);',
+  '  vec3 nc=mix(uCol,uCol2,.5+.5*sin(a*2.+uSeed*6.3+uTime*.00035+r*2.4));',   // the nebula drifting round the ring
+  '  vec3 col=(mix(hot,nc,.72)*c*(.42+.62*sweep)+nc*(c*.62+g*.26*(1.+sweep)))*drawn*fl;',   // softer glow: it frames the logo, never outshines it
+  '  col+=(hot*.7+nc)*tip*(c*1.8+g*.8);',
   '  gl_FragColor=vec4(col*uAmt,0.);',
   '}'
 ].join('\n');
@@ -11996,14 +12017,14 @@ const V3_ADD = { transparent: true, blending: THREE.CustomBlending, blendEquatio
 function v3BuildSpell(){
   const grp = new THREE.Group(); grp.visible = false; grp.userData.kaKind = 'loomSpell';
   // kind, radius (world units; the logo's half-diagonal is ~190), depth, turn speed, strength, own tilt x/y, draw order
-  [[3, 245, -80, -0.00009, 0.55, 0.10, -0.06, -1], [0, 185, -28, 0.00016, 1.0, 0, 0, -1], [1, 152, 32, -0.00024, 0.36, -0.05, 0.08, 8], [2, 98, 60, 0.00034, 0.22, 0.06, -0.04, 8]].forEach((d, i) => {
+  [[3, 245, -80, -0.00009, 0.42, 0.10, -0.06, -1], [0, 185, -28, 0.00016, 0.78, 0, 0, -1], [1, 152, 32, -0.00024, 0.20, -0.05, 0.08, 8], [2, 98, 60, 0.00034, 0.12, 0.06, -0.04, 8]].forEach((d, i) => {
     if (V3.low && d[0] === 3) return;
     const mat = new THREE.ShaderMaterial(Object.assign({
-      uniforms: { uTime: { value: 0 }, uAmt: { value: 0 }, uDraw: { value: 0 }, uKind: { value: d[0] }, uSeed: { value: 0.21 + i*0.137 }, uDir: { value: Math.sign(d[3]) }, uCol: { value: new THREE.Color() } },
+      uniforms: { uTime: { value: 0 }, uAmt: { value: 0 }, uDraw: { value: 0 }, uKind: { value: d[0] }, uSeed: { value: 0.21 + i*0.137 }, uDir: { value: Math.sign(d[3]) }, uCol: { value: new THREE.Color() }, uCol2: { value: new THREE.Color() } },
       vertexShader: V3_RING_VS, fragmentShader: V3_RING_FS, extensions: { derivatives: true } }, V3_ADD));
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
     m.scale.set(d[1]*2, d[1]*2, 1); m.position.z = d[2]; m.rotation.set(d[5], d[6], 0); m.renderOrder = d[7]; m.frustumCulled = false;
-    m.userData = { spin: d[3], amp: d[4], rot0: Math.random()*6.28, kind: d[0] };
+    m.userData = { spin: d[3], amp: d[4], rot0: Math.random()*6.28, kind: d[0], tx: d[5], ty: d[6] };
     grp.add(m); if (d[0] === 0) V3.ring0 = m;
   });
   scene.add(grp); V3.spell = grp;
@@ -12244,14 +12265,17 @@ function v3BuildFog(){
       '  float d=length((p-L)*vec2(.8,1.)),d2=length(p-L2);',
       '  float glow=exp(-d*2.4),heart=exp(-d*d*30.),glow2=exp(-d2*3.4);',
       '  vec2 rv=p-L;float rl=length(rv);vec2 dir=rv/max(rl,1e-4);',
-      '  float rays=fbm(dir*2.6+vec2(d*1.2-t*.08,-d*.9+t*.06))*glow*smoothstep(0.,.05,rl);',
+      '  float ra=t*.021,rb=-t*.034+1.7;',   // two layers of shafts turning slowly in opposite directions, like light through moving glass
+      '  vec2 sh1=mat2(cos(ra),-sin(ra),sin(ra),cos(ra))*dir,sh2=mat2(cos(rb),-sin(rb),sin(rb),cos(rb))*dir;',
+      '  float rays=smoothstep(.36,.78,fbm(sh1*2.6+vec2(d*1.1-t*.05,0.))*.62+fbm(sh2*3.7+vec2(4.1,d*.8-t*.03))*.38)*exp(-d*1.7)*smoothstep(0.,.05,rl);',   // defined shafts, reaching further out
+      '  rays*=.86+.14*sin(t*.29)+.06*sin(t*.71+1.1);',   // their strength breathes, slowly
       '  vec3 col=vec3(.003,.014,.012);',
-      '  col+=vec3(.012,.10,.085)*fog*(.55+glow*1.2);',   // teal haze
+      '  col+=vec3(.010,.075,.062)*fog*(.45+glow*1.1);',   // teal haze
       '  col+=vec3(.03,.30,.15)*glow*(.5+.7*fog)*uLight;',   // emerald light behind the logo
       '  col+=vec3(.50,.85,.30)*heart*.3*uLight;',   // its yellow-green heart
       '  col+=vec3(.04,.26,.14)*glow2*(.45+fog)*.8;',   // a softer light high on the left
-      '  col+=vec3(.06,.36,.18)*rays*rays*.8*uLight;',   // shafts of light through the fog
-      '  col*=mix(.16,1.,smoothstep(.78,.16,length(vec2(p.x/uAsp,p.y))));',   // vignette: the edges fall to near black
+      '  col+=vec3(.04,.30,.15)*rays*.22*(.3+uLight);',   // faint shafts: the darkness stays dark   // shafts of light through the fog
+      '  col*=mix(.05,1.,smoothstep(.72,.12,length(vec2(p.x/uAsp,p.y))));',   // vignette: the edges fall to near black
       '  col=max(col+dith(),0.);',   // dither: the deep greens fade to black without contour bands
       '  gl_FragColor=vec4(col,uAmt);',
       '}'].join('\n'),
@@ -12314,7 +12338,7 @@ function v3DrawArcs(x, ks, a){
 function v3ApplyQ(){
   const q = V3.gq;
   if (V3.spell) V3.spell.children.forEach(m => { const k = m.userData.kind; m.userData.off = (q >= 1 && k === 3) || (q >= 2 && k === 2); });
-  if (V3.fog) V3.fog.material.uniforms.uOct.value = q >= 1 ? 2 : (V3.low ? 3 : 4);
+  if (V3.fog) V3.fog.material.uniforms.uOct.value = q >= 1 ? 3 : (V3.low ? 3 : 4);   // never below 3: two octaves read as blotches
   if (V3.liq) V3.liq.material.uniforms.uLite.value = q >= 2 ? 1 : 0;
 }
 function v3Govern(dt, t){
@@ -12341,15 +12365,16 @@ function v3BuildSmoke(){
   const mat = new THREE.ShaderMaterial(Object.assign({
     uniforms: { map: { value: soft }, uTime: { value: 0 }, uAmt: { value: 0 }, uCol: { value: new THREE.Color() }, uOct: { value: V3.low ? 3 : 4 },
       uLogo: { value: new THREE.Vector2(dw, dh) }, uSize: { value: new THREE.Vector2(W, H) }, uOffY: { value: offY },
-      uM: { value: new THREE.Vector2() }, uMV: { value: new THREE.Vector2() }, uMA: { value: 0 }, uTaps: { value: V3.low ? 10 : 12 } },
+      uM: { value: new THREE.Vector2() }, uMV: { value: new THREE.Vector2() }, uMA: { value: 0 }, uTaps: { value: V3.low ? 10 : 12 }, uSeedV: V3_GLOW_SEED },
     vertexShader: V3_RING_VS,
     fragmentShader: [
-      'uniform sampler2D map;uniform float uTime,uAmt,uOct,uOffY,uMA,uTaps;uniform vec3 uCol;uniform vec2 uLogo,uSize,uM,uMV;varying vec2 vUv;',
+      'uniform sampler2D map;uniform float uTime,uAmt,uOct,uOffY,uMA,uTaps;uniform vec3 uCol;uniform vec2 uLogo,uSize,uM,uMV,uSeedV;varying vec2 vUv;',
       'float h(vec2 p){vec3 p3=fract(vec3(p.xyx)*.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}',
       'float ign(vec2 c){return fract(52.9829189*fract(dot(c,vec2(.06711056,.00583715))));}',
       'float dith(){vec2 c=gl_FragCoord.xy;return (ign(c)+ign(c+vec2(37.,17.))-1.)/255.;}',
       'float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*f*(f*(f*6.-15.)+10.);return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}',
       'float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<4;i++){if(float(i)>=uOct)break;s+=a*n2(p);p=mat2(.8,-.6,.6,.8)*p*2.03+vec2(1.7,9.2);a*=.5;}return s;}',
+      'float spotsAt(vec2 uv,float tm){vec2 p=uv*vec2(3.1,4.3)+uSeedV;float n=n2(p+vec2(tm*.11,-tm*.08))*.62+n2(p*2.3+vec2(5.2,1.7)-vec2(tm*.06,tm*.13))*.38;return smoothstep(.56,.8,n);}',
       'void main(){',
       '  if(uAmt<.003){gl_FragColor=vec4(0.);return;}',
       '  vec2 wp=(vUv-.5)*uSize+vec2(0.,uOffY);',   // relative to the logo's centre
@@ -12365,7 +12390,7 @@ function v3BuildSmoke(){
       '    vec2 sp=wp+warp*(12.+k*88.)-vec2(sin(t*.7+k*10.4)*4.,6.+k*104.);',   // where this smoke rose from
       '    vec2 luv=sp/uLogo+.5;',
       '    float inside=smoothstep(0.,.06,luv.x)*smoothstep(0.,.06,luv.y)*smoothstep(1.,.94,luv.x)*smoothstep(1.,.94,luv.y);',
-      '    d+=texture2D(map,clamp(luv,0.,1.)).a*inside*(1.-k*.89);',
+      '    d+=texture2D(map,clamp(luv,0.,1.)).a*inside*(1.-k*.89)*mix(.3,1.5,spotsAt(luv,t));',   // rises mostly where the edge is alight
       '  }',
       '  d*=1.8/uTaps;',
       '  float wisp=fbm(wp*.022+warp*1.5+vec2(0.,-t*.42));',
@@ -12409,7 +12434,8 @@ function v3UpdateSmoke(ts, t){
     a = 0.3*smootherStep((t - 600)/1500);
     if (V3.tg) a = lerp(a, 0.65, smootherStep((t - V3.tg)/600));
     a = lerp(a, 0.32, smootherStep((t - REVEAL_START - REVEAL_DUR*0.4)/1800));   // settles to a slight breath
-  } else if (phase === 'held') a = 0.32 + 0.06*Math.sin(ts*0.0011);
+    V3.endSmk = a;
+  } else if (phase === 'held') a = lerp(V3.endSmk ?? 0.32, 0.32 + 0.06*Math.sin(ts*0.0011), v3HeldBlend(ts));
   else if (phase === 'disassembling') a = 0.32*Math.max(0, 1 - (ts - phaseStart)/500);
   S.visible = a > 0.004;
   if (!S.visible) return;
@@ -12524,31 +12550,45 @@ function v3Scene(ts, t){
     }
     if (revealT > 0 && !V3.s3Rev){ V3.s3Rev = true; v3SparkBurst(0, 0, 12, V3.low ? 110 : 280, 540, V3_RGB.green); }
   }
-  const tiltX = -0.52*(1 - revealE) + 0.04*Math.sin(ts*0.0005), tiltY = 0.16*Math.sin(ts*0.00031)*(1 - revealE);
+  const tiltX = -0.30*(1 - revealE) + 0.03*Math.sin(ts*0.0005), tiltY = 0.10*Math.sin(ts*0.00031)*(1 - revealE);
   S.visible = a > 0.004;
   if (S.visible){
     const flare = V3.s3Abs ? Math.exp(-Math.max(0, t - V3.tg)/320) : 0;
-    const fit = Math.min(1, Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*camera.position.z*camera.aspect*1.08/185);   // a phone held upright: the circle fits the width
-    S.scale.setScalar(fit*(0.9 + 0.1*smootherStep(t/1800) + 0.38*revealE + 0.07*Math.sin(Math.PI*sinceFlip)));
-    S.rotation.set(tiltX, tiltY, 0);
-    V3_SCOL.copy(V3_SC0).lerp(V3_SC1, V3G);
+    // Sized to the logo, not the screen: the main ring's rim sits just outside the KA's corners. It only shrinks when the
+    // screen is too narrow to hold it (the outermost ring in view, with a small margin).
+    const halfW = Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*camera.position.z*camera.aspect;
+    const logoR = Math.hypot(logoMesh.userData.dw, logoMesh.userData.dh)/2;
+    const outerR = S.children.some(m => m.userData.kind === 3 && !m.userData.off) ? 241 : 179;
+    const fit = Math.min(logoR*1.05/179, halfW*0.96/outerR);
+    S.scale.setScalar(fit*(0.97 + 0.03*smootherStep(t/1800) + 0.10*revealE + 0.03*Math.sin(Math.PI*sinceFlip)));
+    // The tilt turns each ring about its OWN centre. Tilting the whole group (as before) swung the rings, which sit at
+    // different depths, up and down by different amounts, so they drifted off the logo's centre.
+    S.rotation.set(0, 0, 0);
+    const nk = V3G*V3_NEB_K, gs = S.scale.x;
     S.children.forEach((m, i) => {
-      const d = m.userData, u = m.material.uniforms;
-      u.uTime.value = ts; u.uAmt.value = a*d.amp*(1 + 0.45*flare); u.uCol.value.copy(V3_SCOL);   // green burns a touch hotter over the green world
+      const d = m.userData, u = m.material.uniforms, pair = V3_NEB[d.kind] || V3_NEB[0];
+      u.uTime.value = ts; u.uAmt.value = a*d.amp*(1 + 0.3*flare);
+      u.uCol.value.copy(pair[0]).lerp(V3_NEB_G[0], nk); u.uCol2.value.copy(pair[1]).lerp(V3_NEB_G[1], nk);
       u.uDraw.value = smootherStep((t - 200 - i*230)/(950 + i*120));
-      m.rotation.z = d.rot0 + d.spin*ts; m.visible = !d.off;
+      m.rotation.set(d.tx + tiltX, d.ty + tiltY, d.rot0 + d.spin*ts); m.visible = !d.off;
+      // a tilted circle in perspective looks bigger on its near half, so its visible centre sinks below the logo's: lift it
+      // by exactly that much (and sideways for the side-to-side tilt), so every ring looks centred on the KA
+      const R = m.scale.x*0.5*gs, D = Math.max(200, camera.position.z - m.position.z*gs);
+      const sx = Math.sin(d.tx + tiltX), cx = Math.cos(d.tx + tiltX), sy = Math.sin(d.ty + tiltY), cy = Math.cos(d.ty + tiltY);
+      m.position.y = -R*R*cx*sx*D/(D*D - R*R*sx*sx)/gs;
+      m.position.x = R*R*cy*sy*D/(D*D - R*R*sy*sy)/gs;
     });
     // sparks peel off the main ring's rim and fly off along it
     const R0 = V3.ring0;
     if (R0 && V3.sp && a > 0.2){
-      V3.sAcc += (V3.low ? 70 : 190)*a*dt/1000*(V3.gq ? 0.5 : 1);
-      const rgb = v3MixA([255, 176, 80], V3_RGB.green, V3G), dir = Math.sign(R0.userData.spin);
+      V3.sAcc += (V3.low ? 45 : 120)*a*dt/1000*(V3.gq ? 0.5 : 1);
+      const neb = Math.random() < 0.5 ? [196, 164, 255] : [130, 214, 255], rgb = v3MixA(neb, [110, 255, 196], V3G*V3_NEB_K), dir = Math.sign(R0.userData.spin);
       while (V3.sAcc >= 1){
         V3.sAcc -= 1;
         const an = Math.random()*Math.PI*2, c = Math.cos(an), s = Math.sin(an);
         R0.localToWorld(V3_TMP.set(c*0.4825, s*0.4825, 0));
         V3_TMP2.set(-s*dir, c*dir, 0).transformDirection(R0.matrixWorld);
-        const sp = 90 + Math.random()*190, out = 25 + Math.random()*45;
+        const sp = 70 + Math.random()*150, out = 18 + Math.random()*36;
         v3Spark(V3_TMP.x, V3_TMP.y, V3_TMP.z, V3_TMP2.x*sp + c*out, V3_TMP2.y*sp + s*out, V3_TMP2.z*sp + (Math.random() - 0.5)*40, 380 + Math.random()*700, 1.8 + Math.random()*2.8, rgb);
       }
     }
@@ -12757,7 +12797,11 @@ function v3Grade(ts, t){
     la = smootherStep((t - V3.tg + 60)/1000) * (1 - smootherStep((t - REVEAL_START - REVEAL_DUR*0.2)/(REVEAL_DUR*1.2)));   // rises and drains away slowly
     ba = smootherStep((t - V3.tg + 40)/1400);   // the green world eases in after the flip...
     light = 0.75 - 0.3*smootherStep((t - REVEAL_START - REVEAL_DUR*0.5)/2200);   // ...and its light eases down once the logo is revealed
-  } else if (phase === 'held'){ g = 1; ba = 1; light = 0.45; }   // the finished logo stays in its green world
+    V3.endLight = light; V3.endLa = la;
+  } else if (phase === 'held'){   // the finished logo stays in its green world, eased in from wherever the intro left it
+    const hb = v3HeldBlend(ts);
+    g = 1; ba = 1; light = lerp(V3.endLight ?? 0.45, 0.30, hb);   // a dim resting light: green on near-black la = (V3.endLa || 0)*(1 - hb);
+  }
   else if (phase === 'disassembling'){ g = 1 - smootherStep(clamp01(t/(DISASSEMBLE_DUR*0.9))); ba = 1 - smootherStep(clamp01(t/DISASSEMBLE_DUR)); light = 0.45; }
   V3G = g; V3_UG.value = g; V3.la = la;
   if ((g > 0.5) !== V3.worldGreen){ V3.worldGreen = g > 0.5; document.documentElement.toggleAttribute('data-ka-world', false); if (V3.worldGreen) document.documentElement.setAttribute('data-ka-world', 'green'); }   // the page's cursor trail turns green too
@@ -12821,14 +12865,17 @@ function v3BuildSkin(){
   if (reducedMotion){ mat.uniforms.uAmt.value = 0.22; mat.uniforms.uWipeY.value = 2; v3Skin.visible = true; }   // still, no animation
 }
 // how strong the skin is: dark until the reveal, a blaze as the logo is revealed, then a calm living shimmer
+// how far the finished logo has eased out of the intro (0 at the hand-off, 1 about 1.6 s later)
+function v3HeldBlend(ts){ return phase === 'held' ? smootherStep((ts - phaseStart)/1600) : 0; }
 function v3UpdateSkin(ts, t){
   if (!v3Skin || reducedMotion) return;
   let a = 0;
   if (phase === 'assembling'){
     const q = clamp01((t - REVEAL_START)/REVEAL_DUR), env = Math.sin(Math.PI*clamp01((t - REVEAL_START)/(REVEAL_DUR*2.4)));
     a = q > 0 ? 0.85*smootherStep(q) + 0.75*env : 0;   // a blaze with the reveal that settles into the held shimmer, with no jump
+    V3.endSkin = a;
   } else if (phase === 'held'){
-    a = 0.85 + 0.15*Math.sin(ts*0.0013);
+    a = lerp(V3.endSkin ?? 0.85, 0.85 + 0.15*Math.sin(ts*0.0013), v3HeldBlend(ts));
   } else if (phase === 'disassembling'){
     a = Math.max(0, 1 - (ts - phaseStart)/450)*0.85;
   }
@@ -12842,13 +12889,17 @@ function v3Frame(ts, t){
   if (!V3.cv) return;
   if (phase === 'assembling'){
     if (V3.prev !== 'assembling') v3Begin();
-    v3Draw(ts, t);
+    v3Draw(ts, t); V3.endT = t;
   } else if (phase === 'held'){
-    if (!V3.hidden && ts - phaseStart > 500) v3Hide();
+    const k = ts - phaseStart;
+    if (!V3.hidden){
+      if (k < 1400){ v3Draw(ts, (V3.endT || 0) + k); V3.cv.style.opacity = (1 - smootherStep(k/1400)).toFixed(3); }
+      else { v3Hide(); V3.cv.style.opacity = ''; }
+    }
   }
   V3.prev = phase;
 }
-function v3Begin(){ V3.hidden = false; V3.cv.style.display = ''; V3.parts.length = 0; V3.flashes.length = 0; V3.burst = false; V3.fed = 0; V3.absorbed = false; V3.ringAt = -1; V3.lastTs = 0; V3.s3Abs = false; V3.s3Rev = false; V3.sAcc = 0; V3.dAcc = 0; V3.arcs.length = 0; V3.arcT = 0; v3Shuffle(); v3ShuffleVines(); }
+function v3Begin(){ V3.hidden = false; V3.cv.style.display = ''; V3.cv.style.opacity = ''; V3.parts.length = 0; V3.flashes.length = 0; V3.burst = false; V3.fed = 0; V3.absorbed = false; V3.ringAt = -1; V3.lastTs = 0; V3.s3Abs = false; V3.s3Rev = false; V3.sAcc = 0; V3.dAcc = 0; V3.arcs.length = 0; V3.arcT = 0; v3Shuffle(); v3ShuffleVines(); }
 function v3Hide(){ V3.hidden = true; V3.x.clearRect(0, 0, V3.w, V3.h); V3.cv.style.display = 'none'; V3.parts.length = 0; V3.flashes.length = 0; if (V3.rib) V3.rib.mesh.visible = false; }
 
 function v3Draw(ts, t){
@@ -13017,7 +13068,7 @@ function syncHero(){
     if(!heroPausedAt)heroPausedAt=performance.now();
     cancelAnimationFrame(heroFrame);heroFrame=0;
   }else{
-    if(heroPausedAt){phaseStart+=performance.now()-heroPausedAt;heroPausedAt=0;lastFrameT=0;}
+    if(heroPausedAt){heroPausedTotal+=performance.now()-heroPausedAt;heroPausedAt=0;lastFrameT=0;}
     scheduleHero();
   }
 }
@@ -13026,6 +13077,7 @@ window.addEventListener('pagehide',()=>{cancelAnimationFrame(heroFrame);heroFram
 window.addEventListener('pageshow',syncHero);
 function frame(ts){
   heroFrame=0;
+  ts -= heroPausedTotal;   // the paused stretch never happened, as far as the animation is concerned
   if (!motionLoopActive) return; // [v26 Task 4] cleanly stops the loop once reduced-motion is toggled on mid-session -- no further work, no further scheduling
   if(document.hidden || (phase==='held'&&!heroVisible)){syncHero();return;}
   scheduleHero();
@@ -13968,9 +14020,15 @@ function buildResolvedEmission(){
   const bloomTexture=new THREE.CanvasTexture(bloomCanvas);bloomTexture.generateMipmaps=false;bloomTexture.minFilter=THREE.LinearFilter;
   const mat=new THREE.ShaderMaterial({
     uniforms:{uBloom:{value:bloomTexture},map:{value:cutoutTex},uOwners:{value:owners},uStep:{value:new THREE.Vector2(3/CUT_W,3/CUT_H)},
-      uGlowEnvelope:{value:1},uGreen:V3_UG,uWH:{value:new THREE.Vector2(dw,dh)},uTime:{value:0},uMotion:{value:1},uOpacity:{value:0},uReveal:{value:-2}},
+      uGlowEnvelope:{value:1},uGreen:V3_UG,uWH:{value:new THREE.Vector2(dw,dh)},uTime:{value:0},uMotion:{value:1},uOpacity:{value:0},uReveal:{value:-2},uSeedV:V3_GLOW_SEED},
     vertexShader:`varying vec2 vUv,vBloomUv;void main(){vBloomUv=uv;vUv=uv*1.2-.1;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
-    fragmentShader:`uniform sampler2D map,uOwners,uBloom;uniform vec2 uStep,uWH;uniform float uTime,uMotion,uOpacity,uReveal,uGlowEnvelope,uGreen;varying vec2 vUv,vBloomUv;
+    fragmentShader:`uniform sampler2D map,uOwners,uBloom;uniform vec2 uStep,uWH,uSeedV;uniform float uTime,uMotion,uOpacity,uReveal,uGlowEnvelope,uGreen;varying vec2 vUv,vBloomUv;
+      float gh(vec2 p){vec3 p3=fract(vec3(p.xyx)*.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}
+      float gn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*f*(f*(f*6.-15.)+10.);return mix(mix(gh(i),gh(i+vec2(1.,0.)),f.x),mix(gh(i+vec2(0.,1.)),gh(i+vec2(1.,1.)),f.x),f.y);}
+      // a few stretches of the KA's edge are alight at a time and drift along it; each pulse picks a new set (uSeedV)
+      float edgeSpots(vec2 uv,float tm){vec2 p=uv*vec2(3.1,4.3)+uSeedV;
+        float n=gn(p+vec2(tm*.11,-tm*.08))*.62+gn(p*2.3+vec2(5.2,1.7)-vec2(tm*.06,tm*.13))*.38;
+        return smoothstep(.56,.8,n);}
       vec4 crystal(vec2 uv){float b=min(min(uv.x,1.-uv.x),min(uv.y,1.-uv.y));if(b<0.)return vec4(0.);vec4 t=texture2D(map,uv);return t*smoothstep(.03,.08,t.a)*smoothstep(0.,.006,b);}
       float energy(vec4 c){float l=dot(c.rgb,vec3(.299,.587,.114));return c.a*smoothstep(.12,.78,l);}
       void main(){
@@ -13986,13 +14044,14 @@ function buildResolvedEmission(){
         float phase=owner.r*6.2831853,frequency=.45+owner.b*.55;
         float pulse=1.+uMotion*.075*sin(uTime*frequency+phase);
         float sparkle=uMotion*pow(max(0.,sin(uTime*(frequency+.13)+phase)),48.);
-        float hot=(crack*.8+edge*.35+center*.16)*c.a;
+        float spot=uMotion>.5?edgeSpots(vUv,uTime):.5;   // VERSION 3: the glow leaves the KA from random stretches of its edge, not all round it
+        float hot=(crack*.8+edge*.35*mix(.35,1.6,spot)+center*.16)*c.a;
         vec3 radiance=vec3(1.,.96,.84)*hot*(.75+sparkle*.35)+vec3(1.,.64,.12)*near*.24+vec3(1.,.24,.025)*far*.16;
         vec4 bloom=texture2D(uBloom,vBloomUv);
         // A visible soft halo outside the silhouette; restrained spill over sharp interior facets.
         float bloomEnergy=dot(bloom.rgb,vec3(.5,.35,.15))*bloom.a;
         vec3 haloColor=mix(vec3(1.,.24,.025),vec3(1.,.65,.14),smoothstep(.12,.65,bloom.a));
-        radiance+=haloColor*bloomEnergy*1.4*(1.-c.a*.82);
+        radiance+=haloColor*bloomEnergy*1.4*(1.-c.a*.82)*mix(.1,1.9,spot);
         // Suppress all source RGB in dark transparent texels; only a soft sampled halo remains.
         float radius=length((vUv-.5)*uWH)/(length(uWH)*.5);
         float reveal=1.-smoothstep(uReveal-.11,uReveal+.11,radius);
@@ -14016,18 +14075,18 @@ function buildResolvedEmission(){
 function setShardGlowHalo(index,x,y,z,w,h,mag){if(shardGlow)shardGlow.energies[index]=Math.max(0,mag||0);}
 // Active-frame time only: no timers, hidden-tab jumps, or opacity changes to the crystal.
 const finalGlowCycle={stage:'initial',elapsed:0,duration:5000};
+// VERSION 3: where on the KA's edge the glow comes from; re-rolled each pulse (shared by the emission and the smoke)
+const V3_GLOW_SEED={value:new THREE.Vector2(Math.random()*40,Math.random()*40)};
+
+// VERSION 3: one unbroken breath. From the reveal's full glow it settles (over 5 s) into two slow, unrelated waves, so it
+// never repeats exactly and never switches off; the glowing stretches of the edge drift on their own (edgeSpots).
 function advanceFinalGlow(dt,resting,still){
   const cycle=finalGlowCycle;
-  if(!resting||still){cycle.stage='initial';cycle.elapsed=0;cycle.duration=5000;return 1;}
+  if(!resting||still){cycle.stage='initial';cycle.elapsed=0;return 1;}
   cycle.elapsed+=Math.min(250,Math.max(0,dt));
-  while(cycle.elapsed>=cycle.duration){
-    cycle.elapsed-=cycle.duration;
-    if(cycle.stage==='wait'){cycle.stage='pulse';cycle.duration=5000;}
-    else{cycle.stage='wait';cycle.duration=3000+Math.random()*5000;}
-  }
-  if(cycle.stage==='wait')return 0;
-  if(cycle.stage==='initial')return 1-smootherStep(cycle.elapsed/5000);
-  return cycle.elapsed<1400?smootherStep(cycle.elapsed/1400):1-smootherStep((cycle.elapsed-1400)/3600);
+  const s=cycle.elapsed/1000;
+  const breath=.64+.22*Math.sin(s*.52)+.14*Math.sin(s*.21+1.3);
+  return lerp(1,breath,smootherStep(s/5));
 }
 function updateCrystalEmission(ts,staticPose=false,dt=0){
   if(!shardGlow)return;
@@ -14746,7 +14805,8 @@ function v3WorldStop(){
 window.addEventListener('ka-sequence-complete', v3WorldStart, { once: true });
 window.addEventListener('ka-portfolio-updated', (e) => {
   const doc = e && e.detail; if (!doc || typeof doc !== 'object') return;
-  V3W.cfg = v3WorldCfg(doc.intro && doc.intro.world && doc.intro.world.enabled === true ? doc.intro.world : null);
+  const v3 = !doc.intro || !doc.intro.version || doc.intro.version === 'v3' || window.parent !== window;   // a preview keeps the intro it was asked for
+  V3W.cfg = v3 ? v3WorldCfg(doc.intro && doc.intro.world && doc.intro.world.enabled === true ? doc.intro.world : null) : null;
   if (!V3W.cfg){ v3WorldStop(); return; }
   if (V3W.started) v3WorldStyle();
   else if (sequenceCompleteFired) v3WorldStart();
@@ -17186,12 +17246,28 @@ Object.keys(CONTACT_RULES).forEach(function(key){
 updateContactSubmitState();
 // Bot check (Cloudflare Turnstile): loaded the first time someone starts using the form, not on
 // page load, so the hero never waits for it. Invisible unless Cloudflare needs an interaction.
-var contactTurnstile = null, contactTurnstileLoading = false;
+var contactTurnstile = null, contactTurnstileLoading = null;
 function ensureContactTurnstile(){
-  if (contactTurnstile || contactTurnstileLoading || !window.kaTurnstile) return;
-  contactTurnstileLoading = true;
-  window.kaTurnstile(document.getElementById("contact-turnstile")).then(function(w){ contactTurnstile = w; })
-    .catch(function(){}).then(function(){ contactTurnstileLoading = false; });
+  if (contactTurnstile) return Promise.resolve(contactTurnstile);
+  if (contactTurnstileLoading) return contactTurnstileLoading;
+  if (!window.kaTurnstile) return Promise.resolve(null);
+  contactTurnstileLoading = window.kaTurnstile(document.getElementById("contact-turnstile")).then(function(w){ contactTurnstile = w; return w; })
+    .catch(function(){ return null; }).then(function(w){ contactTurnstileLoading = null; return w; });
+  return contactTurnstileLoading;
+}
+// The check runs in the background while the visitor types; a fast sender waits here (up to 8 s) for its pass
+// instead of sending without one (which the server refuses).
+function contactToken(){
+  return ensureContactTurnstile().then(function(w){
+    if (!w) return "";
+    if (!w.live || w.token()) return w.token();
+    return new Promise(function(resolve){
+      var waited = 0, t = setInterval(function(){
+        waited += 200;
+        if (w.token() || waited >= 8000){ clearInterval(t); resolve(w.token()); }
+      }, 200);
+    });
+  });
 }
 contactForm.addEventListener("focusin", ensureContactTurnstile);
 contactForm.addEventListener("pointerdown", ensureContactTurnstile);
@@ -17206,8 +17282,7 @@ contactForm.addEventListener("submit", function(e){
     subject: kaTopicsSubject(),
     topics: kaTopics().picked.concat(kaTopics().other ? ["Other"] : []),
     message: (data.get("message") || "").toString().trim(),
-    website: (data.get("website") || "").toString(), // honeypot -- left empty by real visitors
-    turnstileToken: contactTurnstile ? contactTurnstile.token() : ""
+    website: (data.get("website") || "").toString() // honeypot -- left empty by real visitors
   };
   var allValid = Object.keys(CONTACT_RULES).reduce(function(acc, key){
     return validateContactField(key) && acc;
@@ -17225,15 +17300,19 @@ contactForm.addEventListener("submit", function(e){
   contactStatus.dataset.state = "";
   var card = document.getElementById("contact-card");
   var controller = ("AbortController" in window) ? new AbortController() : null;
-  var abortTimer = controller ? setTimeout(function(){ controller.abort(); }, KaRocket.config().timeoutMs) : 0;
+  var abortTimer = 0;
   // The API answer is the only thing that decides success or error; the rocket never does.
-  var request = fetch(kaApiUrl("/api/contact"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    signal: controller ? controller.signal : undefined,
+  var request = contactToken().then(function(token){
+    payload.turnstileToken = token || "";
+    abortTimer = controller ? setTimeout(function(){ controller.abort(); }, KaRocket.config().timeoutMs) : 0;
+    return fetch(kaApiUrl("/api/contact"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller ? controller.signal : undefined,
+    });
   }).then(function(res){
-    return res.json().then(function(body){ return { ok: res.ok, body: body }; });
+    return res.json().catch(function(){ return {}; }).then(function(body){ return { ok: res.ok, body: body }; });
   }).then(function(result){
     if (!result.ok) throw new Error((result.body && result.body.error) || "Something went wrong -- please try again.");
     // this device keeps the conversation, so the reply pops up here too
@@ -17249,6 +17328,12 @@ contactForm.addEventListener("submit", function(e){
     return outcome;
   });
   KaRocket.send(submitBtn, card, request).then(function(outcome){
+    var bell = document.getElementById("cc-notify");
+    if (bell){
+      var alerts = window.kaReplyAlerts;
+      bell.hidden = !(outcome.ok && alerts && alerts.supported() && !alerts.on());
+      bell.disabled = false; bell.querySelector("span").textContent = "Notify me on this device when Kethan replies";
+    }
     contactStatus.textContent = outcome.ok ? "Message sent -- thanks for reaching out, I'll get back to you soon." : outcome.message;
     contactStatus.dataset.state = outcome.ok ? "ok" : "error";
     if (outcome.fallback) {                      // no card turn happened: reset here like before
@@ -17259,6 +17344,12 @@ contactForm.addEventListener("submit", function(e){
   }).then(function(){
     contactSending = false;
     updateContactSubmitState();
+  });
+});
+document.getElementById("cc-notify").addEventListener("click", function(){
+  var bell = this; bell.disabled = true;
+  window.kaReplyAlerts.enable().then(function(ok){
+    bell.querySelector("span").textContent = ok ? "Done: you\u2019ll be notified here when Kethan replies" : "Notifications are blocked in this browser. The reply will still come by email.";
   });
 });
 // Result-face button: "Send another message" (after success) / "Try again" (after an error) turns the card back to the form.
@@ -18757,20 +18848,27 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
 .contact-topics legend{ padding:0; margin:0 0 10px; font:inherit; color:rgba(237,235,232,0.78); }
 .contact-topics legend small{ margin-left:8px; font-size:10px; letter-spacing:.12em; opacity:.7; }
 .topic-grid{ display:flex; flex-wrap:wrap; gap:8px; }
-.topic-chip{ position:relative; display:inline-flex; }
-.topic-chip input{ position:absolute; opacity:0; inset:0; margin:0; cursor:pointer; }
-.topic-chip span{ display:inline-flex; align-items:center; gap:7px; padding:9px 14px; border-radius:999px; border:1px solid rgba(255,255,255,.16); background:rgba(0,0,0,.35);
+.topic-chip{ position:relative; display:inline-flex; border-radius:999px; transition:transform .2s ease; -webkit-tap-highlight-color:transparent; }
+.topic-chip input, .contact-form .topic-chip input{ position:absolute; z-index:1; opacity:0; inset:0; width:100%; height:100%; min-width:0; margin:0; padding:0; border:0; cursor:pointer; appearance:none; -webkit-appearance:none; }
+.topic-chip span{ pointer-events:none; user-select:none; -webkit-user-select:none; display:inline-flex; align-items:center; gap:7px; padding:9px 14px; border-radius:999px; border:1px solid rgba(255,255,255,.16); background:rgba(0,0,0,.35);
   font:500 13px/1.2 var(--font-body, sans-serif); letter-spacing:0; text-transform:none; color:var(--ink); transition:background .2s ease, border-color .2s ease, transform .2s ease; }
 .topic-chip span::before{ content:""; width:15px; height:15px; flex:none; border-radius:5px; border:1.5px solid rgba(255,255,255,.4); background:transparent center/11px no-repeat; transition:background-color .2s ease, border-color .2s ease; }
 .topic-chip input:checked + span{ border-color:rgba(255,148,56,.75); background:rgba(255,148,56,.16); }
 .topic-chip input:checked + span::before{ border-color:#ff9438; background-color:#ff9438;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231a120c' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.2 4.2L19 7'/%3E%3C/svg%3E"); }
 .topic-chip input:focus-visible + span{ outline:2px solid #ff9438; outline-offset:2px; }
-.topic-chip:active span{ transform:scale(.97); }
+.topic-chip:active{ transform:scale(.97); }
 .topic-other{ display:grid; grid-template-rows:0fr; transition:grid-template-rows .45s cubic-bezier(.22,.8,.24,1), margin .45s ease; margin-top:0; }
 .topic-other.is-open{ grid-template-rows:1fr; margin-top:10px; }
 .topic-other > div{ overflow:hidden; }
 .contact-topics[aria-invalid="true"] .topic-chip span{ border-color:rgba(255,120,110,.5); }
+/* after sending: opt in to a notification on this device when the reply comes */
+.cc-notify{ display:inline-flex; align-items:center; gap:9px; margin:0 auto 14px; padding:10px 16px; border-radius:999px; border:1px solid rgba(255,255,255,.18); background:rgba(0,0,0,.32); color:var(--ink, #edebe8); font:500 13.5px/1.3 var(--font-body, sans-serif); cursor:pointer; transition:background .2s ease, border-color .2s ease; }
+.cc-notify[hidden]{ display:none; }
+.cc-notify:hover:not(:disabled){ border-color:rgba(255,148,56,.7); background:rgba(255,148,56,.14); }
+.cc-notify:disabled{ cursor:default; opacity:.85; }
+.cc-notify svg{ width:16px; height:16px; flex:none; color:#ff9438; }
+.cc-notify:focus-visible{ outline:2px solid #ff9438; outline-offset:2px; }
 
 /* ---- a reply from Kethan, on the device that sent the message ---- */
 .ka-reply{ position:fixed; left:max(16px, env(safe-area-inset-left)); bottom:max(18px, env(safe-area-inset-bottom)); z-index:90; width:min(400px, calc(100vw - 32px)); max-height:min(70vh, 560px);
@@ -19023,14 +19121,23 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
   // after another in the tab (dots to switch, a gentle auto-advance while open). n holds the tab's style, side and timing;
   // a site saved before the list existed still shows its single notice.
   var annItems = [], annAt = 0, annRotate = 0, annLast = null;
+  // Replies to this visitor's contact messages (see "replies on this device" below) are added in front of the owner's
+  // announcements, so a reply also shows in the tab; they leave once read.
+  var annReplies = [];
   function liveAnnouncements(n, list){
     var now = Date.now();
     var live = (Array.isArray(list) ? list : []).filter(function(a){
       return a && a.enabled !== false && a.text && (!a.startsAt || Date.parse(a.startsAt) <= now) && (!a.endsAt || Date.parse(a.endsAt) > now);
     });
-    if (!live.length && n && n.enabled && n.text) live = [n];
-    return live;
+    if (!live.length && n && n.enabled && n.text && n.style !== "banner") live = [n];
+    return annReplies.concat(live);
   }
+  window.kaAnnounceReplies = function(items){
+    annReplies = (items || []).slice(0, 3);
+    var last = annLast || [null, []];
+    window.kaAnnounce(last[0], last[1]);
+    if (annReplies.some(function(a){ return a.isNew; }) && ann){ showAnn(0); openAnn(false); annPinned = true; ann.querySelector(".ka-ann-pin").setAttribute("aria-pressed", "true"); }
+  };
   function showAnn(i){
     if (!ann || !annItems.length) return;
     annAt = (i + annItems.length) % annItems.length;
@@ -19043,7 +19150,9 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
       ann.querySelector(".ka-ann-title").textContent = a.title || "Announcement";
       ann.querySelector(".ka-ann-text").textContent = a.text;
       var link = ann.querySelector(".ka-ann-link");
-      if (a.linkUrl && a.linkLabel){ link.hidden = false; link.textContent = a.linkLabel; link.href = a.linkUrl; if (/^https?:/.test(a.linkUrl) && a.linkUrl.indexOf(location.host) < 0){ link.target = "_blank"; link.rel = "noopener noreferrer"; } else { link.removeAttribute("target"); } }
+      link.onclick = a.action ? function(e){ e.preventDefault(); a.action(); } : null;
+      if (a.action){ link.hidden = false; link.textContent = a.linkLabel || "Read it"; link.href = "#"; link.removeAttribute("target"); }
+      else if (a.linkUrl && a.linkLabel){ link.hidden = false; link.textContent = a.linkLabel; link.href = a.linkUrl; if (/^https?:/.test(a.linkUrl) && a.linkUrl.indexOf(location.host) < 0){ link.target = "_blank"; link.rel = "noopener noreferrer"; } else { link.removeAttribute("target"); } }
       else link.hidden = true;
       var dots = ann.querySelector(".ka-ann-dots");
       dots.hidden = annItems.length < 2;
@@ -19058,7 +19167,8 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
   window.kaAnnounce = function(n, list){
     annLast = [n, list];
     var items = liveAnnouncements(n, list);
-    if (!items.length || (n && n.style === "banner" && !(Array.isArray(list) && list.length))){ if (ann) ann.hidden = true; annItems = []; clearInterval(annRotate); return false; }
+    var ownCount = items.length - annReplies.length;
+    if (!items.length){ if (ann) ann.hidden = true; annItems = []; clearInterval(annRotate); return false; }
     if (!ann){
       ann = el("aside", "ka-announce"); ann.setAttribute("aria-label", "Announcements");
       ann.innerHTML = '<button type="button" class="ka-ann-tab" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg><i aria-hidden="true"></i><span class="ka-ann-tabtext sr"></span></button>' +
@@ -19084,8 +19194,8 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
     if (!same) showAnn(Math.min(annAt, items.length - 1));
     restartRotate();
     // slides open by itself once for each new set of announcements, a moment after the page settles
-    var key = "ka_ann_" + items.map(function(a){ return (a.title || "") + "|" + a.text; }).join("¦"), auto = o.autoClose > 0 ? o.autoClose : 0;
-    if (store("ka_ann_seen") !== key){
+    var key = "ka_ann_" + items.slice(annReplies.length).map(function(a){ return (a.title || "") + "|" + a.text; }).join("¦"), auto = o.autoClose > 0 ? o.autoClose : 0;
+    if (ownCount > 0 && store("ka_ann_seen") !== key){
       store("ka_ann_seen", key);
       setTimeout(function(){ openAnn(true, auto || 0); if (!auto){ annPinned = true; ann.querySelector(".ka-ann-pin").setAttribute("aria-pressed", "true"); } }, REDUCED ? 300 : 2600);
     }
@@ -19328,10 +19438,52 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
   // ---------------------------------------------------------------- contact: Regarding ticks + replies on this device
   var THREADS_KEY = "ka_threads", SHOWN_KEY = "ka_replies_shown";
   function threads(){ try { return JSON.parse(store(THREADS_KEY) || "[]").filter(function(t){ return t && typeof t.k === "string"; }); } catch(e){ return []; } }
-  function saveThreads(list){ store(THREADS_KEY, JSON.stringify(list.slice(-12))); }
+  function saveThreads(list){ store(THREADS_KEY, JSON.stringify(list.slice(-12))); syncWorkerKeys(list.slice(-12)); }
+  // the notification worker (/ka-sw.js) reads the same keys from a small cache entry (it can't see localStorage)
+  function syncWorkerKeys(list){
+    try { if (window.caches) caches.open("ka-threads").then(function(c){ return c.put("/__ka/threads", new Response(JSON.stringify(list.map(function(t){ return t.k; })), { headers: { "Content-Type": "application/json" } })); }).catch(function(){}); } catch(e){}
+  }
+  // ---- notifications on this device: real push when the site has keys (works with the site closed), otherwise a
+  // system notification while the site is open in the background. Always opt-in: only after a tap on "Notify me".
+  var PUSH_OK = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window && window.isSecureContext;
+  function b64uBytes(s){ var b = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), out = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) out[i] = b.charCodeAt(i); return out; }
+  function workerReg(){ return navigator.serviceWorker.register("/ka-sw.js", { scope: "/" }).then(function(){ return navigator.serviceWorker.ready; }); }
+  function pushSubscribe(keys){
+    return window.kaPublicConfig().then(function(cfg){
+      var key = cfg && cfg.contact && cfg.contact.pushKey;
+      if (!key || !PUSH_OK) return false;
+      return workerReg().then(function(reg){
+        return reg.pushManager.getSubscription().then(function(sub){ return sub || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uBytes(key) }); });
+      }).then(function(sub){ return post("/api/messages/threads/push", { keys: keys, endpoint: sub.endpoint }).then(function(){ return true; }); });
+    }).catch(function(){ return false; });
+  }
+  window.kaReplyAlerts = {
+    supported: function(){ return "Notification" in window && Notification.permission !== "denied"; },
+    on: function(){ return "Notification" in window && Notification.permission === "granted" && store("ka_reply_alerts") === "1"; },
+    // ask once, from a tap; resolves true when this device will be told about replies
+    enable: function(){
+      if (!("Notification" in window)) return Promise.resolve(false);
+      var ask = Notification.permission === "granted" ? Promise.resolve("granted") : Promise.resolve(Notification.requestPermission());
+      return ask.then(function(p){
+        if (p !== "granted") return false;
+        store("ka_reply_alerts", "1");
+        syncWorkerKeys(threads());
+        return pushSubscribe(threads().map(function(t){ return t.k; })).then(function(){ return true; });
+      }).catch(function(){ return false; });
+    }
+  };
+  function systemNotify(t, r){
+    if (!window.kaReplyAlerts.on() || !document.hidden) return;
+    var opts = { body: String(r.body || "").replace(/\s+/g, " ").slice(0, 160), tag: "ka-reply", icon: "/images/ka-logo.png", data: { url: "/?thread=" + encodeURIComponent(t.key) } };
+    try {
+      if (PUSH_OK && navigator.serviceWorker.controller) navigator.serviceWorker.ready.then(function(reg){ reg.showNotification("Kethan replied to your message", opts); });
+      else { var n = new Notification("Kethan replied to your message", opts); n.onclick = function(){ window.focus(); showThread(t, false); n.close(); }; }
+    } catch(e){}
+  }
   window.kaRememberThread = function(key, subject){
     if (!key) return;
     var list = threads().filter(function(t){ return t.k !== key; }); list.push({ k: key, s: String(subject || "").slice(0, 120), at: Date.now() }); saveThreads(list);
+    if (window.kaReplyAlerts && window.kaReplyAlerts.on()) pushSubscribe([key]);   // already said yes on this device: this conversation too
   };
   var replyBox = null;
   function shown(){ try { return JSON.parse(store(SHOWN_KEY) || "[]"); } catch(e){ return []; } }
@@ -19368,21 +19520,39 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
     return true;
   }
   var checking = false;
+  function unread(t){ var seen = shown(); return t.replies.filter(function(r){ return seen.indexOf(r.id) < 0; }); }
+  function tabItems(all){
+    var weekAgo = Date.now() - 7 * 864e5;
+    return all.filter(function(t){ var r = t.replies.slice(-1)[0]; return r && Date.parse(r.sentAt) > weekAgo; }).slice(-3).reverse().map(function(t){
+      var r = t.replies.slice(-1)[0], isNew = unread(t).length > 0;
+      return { title: isNew ? "New reply from Kethan" : "Reply from Kethan", tone: "success", isNew: isNew, text: (t.subject ? "Re: " + t.subject + " · " : "") + String(r.body || "").replace(/\s+/g, " ").slice(0, 140), linkLabel: "Read the reply",
+        action: function(){ showThread(t, false); refreshTab(); } };
+    });
+  }
+  var lastAll = [];
+  function refreshTab(){ if (window.kaAnnounceReplies) window.kaAnnounceReplies(tabItems(lastAll)); }
   function checkReplies(focusKey){
     var list = threads(); if (!list.length || checking) return;
     checking = true;
     post("/api/messages/threads", { keys: list.map(function(t){ return t.k; }) }).then(function(r){
       checking = false;
       var all = (r.threads || []);
-      if (focusKey){ var f = all.filter(function(t){ return t.key === focusKey; })[0]; if (f){ showThread(f, false); return; } }
-      for (var i = all.length - 1; i >= 0; i--) if (showThread(all[i], true)) return;
+      if (focusKey){ var f = all.filter(function(t){ return t.key === focusKey; })[0]; if (f){ showThread(f, false); lastAll = all; refreshTab(); return; } }
+      var notified = store("ka_replies_notified") || "";
+      all.forEach(function(t){ unread(t).forEach(function(rp){ if (notified.indexOf(rp.id) < 0){ systemNotify(t, rp); notified = (notified + "," + rp.id).slice(-2000); } }); });
+      store("ka_replies_notified", notified);
+      lastAll = all;
+      refreshTab();
+      if (!document.hidden) for (var i = all.length - 1; i >= 0; i--) if (showThread(all[i], true)){ refreshTab(); return; }
     }).catch(function(){ checking = false; });
   }
   // a reply link from the email: keep the conversation on this device too, and open it
   var linkThread = params.get("thread");
   if (linkThread && /^[0-9a-f-]{36}\.[0-9a-f]{32}$/.test(linkThread)){ window.kaRememberThread(linkThread, ""); dropParam("thread"); setTimeout(function(){ checkReplies(linkThread); }, 2400); }
   else if (threads().length) setTimeout(checkReplies, 5000);
-  setInterval(function(){ if (!document.hidden) checkReplies(); }, 90000);
+  // every 45 s while the page is open (also in a background tab when notifications are on), and at once on return
+  setInterval(function(){ if (!document.hidden || window.kaReplyAlerts.on()) checkReplies(); }, 45000);
+  if (threads().length) syncWorkerKeys(threads());
   document.addEventListener("visibilitychange", function(){ if (!document.hidden) setTimeout(checkReplies, 800); });
 })();
 </script>
@@ -19825,6 +19995,8 @@ footer.site-footer{border:0;box-shadow:none;flex-wrap:wrap;gap:16px 24px;backgro
 .footer-copyright{flex-basis:100%;text-align:center;margin:4px 0 0;font-size:11px;letter-spacing:.06em;color:var(--ink-dim);}
 .assistant-panel{min-height:0;max-height:calc(100dvh - 208px);}
 #panda-mascot.panda-traveler{position:fixed;left:0;top:0;bottom:auto;z-index:74;transform:none;transition:none;pointer-events:none;}
+/* landed on the store's closed sign: part of the sign itself, so it scrolls and swings with it and stays under the nav */
+#panda-mascot.panda-perched{position:absolute;left:0;top:0;bottom:auto;z-index:4;transition:none;pointer-events:none;opacity:1;}
 .panda-thread{position:fixed;inset:0;width:100%;height:100%;z-index:73;pointer-events:none;overflow:hidden;}
 .panda-thread path{fill:none;stroke:#efdab9;stroke-width:1;stroke-opacity:.65;}
 @media(max-width:600px){.assistant-panel{top:auto;max-height:calc(100dvh - max(16px,env(safe-area-inset-bottom)) - 190px);}}

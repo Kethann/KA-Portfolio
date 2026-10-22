@@ -6,7 +6,7 @@ import { str, stringArray, uuid as vUuid } from '../core/validate.js';
 import { audit } from './auth.js';
 import { siteUrl } from '../core/env.js';
 import { getSetting } from '../core/settings.js';
-import { threadUrl } from '../handlers/threads.js';
+import { threadUrl, pushReply } from '../handlers/threads.js';
 
 const STATUSES = ['new', 'read', 'done', 'spam'];
 
@@ -90,7 +90,10 @@ export async function reply(ctx){
   if (!res.ok) throw new HttpError(502, 'The reply couldn’t be sent. It’s saved; check the email settings and try again.');
   await db.query(`update messages set replied_at = now(), status = case when $2 then 'done' else status end where id = $1`, [id, b.markDone !== false]);
   await audit(ctx, 'message_replied', id);
-  return json({ ok: true });
+  // the reply also wakes the device they wrote from, when they allowed notifications there
+  let pushed = 0;
+  if (onSite){ try { pushed = await pushReply(id); } catch { /* the email already went */ } }
+  return json({ ok: true, pushed });
 }
 
 // ---- canned replies ------------------------------------------------------------------------------

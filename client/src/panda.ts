@@ -126,9 +126,25 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
     // Detach only while travelling to/from the open conversation.
     const visiting=travel.stage==='idle'&&!travel.open&&visit.stage!=='idle';
     const travelling=travel.stage!=='idle'||visiting;
-    const parent=travelling?document.body:launcher;
+    // Landed on the board, the panda becomes part of the sign: it scrolls, swings and is clipped exactly with it (no
+    // frame of lag while the page scrolls, never floating over the nav or the rest of the page). It only flies free
+    // over the page during the jetpack flight itself.
+    const sign=visiting&&visit.stage==='sit'&&visit.target instanceof HTMLElement&&visit.target.isConnected&&visit.target.offsetWidth>0?visit.target:null;
+    const parent=sign||(travelling?document.body:launcher);
     if(host.parentElement!==parent)parent.appendChild(host);
-    host.classList.toggle('panda-traveler',travelling);
+    host.classList.toggle('panda-perched',!!sign);
+    host.classList.toggle('panda-traveler',travelling&&!sign);
+    if(sign){
+      const width=host.offsetWidth,height=host.offsetHeight;
+      visitStep(dt,lastPosition,width,height);   // keeps the calm sitting pose (jets off, facing front, touchdown settling)
+      // on the board's top edge, a little right of its centre, feet just over the rim (the sign's own coordinates)
+      host.style.transform=`translate3d(${(sign.offsetWidth*.62-width/2).toFixed(2)}px,${(-height*.78).toFixed(2)}px,0)`;
+      host.style.opacity='1';host.dataset.travel='visit-sit';
+      if(thread)thread.style.opacity='0';
+      const r=host.getBoundingClientRect();lastPosition={x:r.left,y:r.top};lastTurn=0;   // where the flight home starts from
+      idleSettled=false;
+      return 0;
+    }
     const launch=launcher.getBoundingClientRect(),rect=host.getBoundingClientRect();
     const width=host.offsetWidth||rect.width,height=host.offsetHeight||rect.height;
     // Perch above the open chat; if it fills the top of the screen (tablet side panel), hang beside it;
@@ -199,15 +215,18 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
     if(target===visit.target)return;
     const flying=visit.stage!=='idle';
     visit.target=target;visit.t=0;
-    if(target){visit.from=flying?{...lastPosition}:null;visit.stage='leap';}
-    else if(visit.stage!=='idle'){visit.stage='back';visit.from={...lastPosition};}
+    // a flight that starts from a sign scrolled far off screen begins just past the screen's edge instead, so it comes straight into view
+    const vw=innerWidth,vh=window.visualViewport?.height||innerHeight,size=host.offsetHeight||70;
+    const start={x:Math.max(-size,Math.min(vw,lastPosition.x)),y:Math.max(-size,Math.min(vh,lastPosition.y))};
+    if(target){visit.from=flying?start:null;visit.stage='leap';}
+    else if(visit.stage!=='idle'){visit.stage='back';visit.from=start;}
     movePanda(0);schedule();
   }) as EventListener,{signal});
   // a visit asked for before the panda finished loading (the page keeps the latest request)
   const asked=(globalThis as unknown as {__kaPandaVisit?:Element|null}).__kaPandaVisit;
   if(asked&&asked.isConnected){visit.target=asked;visit.stage='leap';visit.from=null;}
   let clock=createActivityClock(crypto.getRandomValues(new Uint32Array(1))[0]);
-  function canRender(){return !disposed&&!lost&&!document.hidden&&(visible||travel.stage!=='idle'||visit.stage!=='idle')&&host.isConnected;}
+  function canRender(){return !disposed&&!lost&&!document.hidden&&(visible||travel.stage!=='idle'||(visit.stage!=='idle'&&visit.stage!=='sit'))&&host.isConnected;}   // napping on a sign that has scrolled away: nothing to draw
   function draw(dt:number){
     if(!character)return;
     const climbing=movePanda(dt);
@@ -267,7 +286,7 @@ export async function mountPanda(host: HTMLElement, launcher: HTMLElement, optio
   renderer.domElement.addEventListener('webglcontextrestored',()=>{clearTimeout(lostTimer);lost=false;resize();host.classList.add('is-ready');schedule();},{signal});
   function dispose(){
     if(disposed)return;disposed=true;pause();abort.abort();observer.disconnect();sizeObserver.disconnect();
-    thread?.remove();greeting?.remove();host.classList.remove('panda-traveler');document.documentElement?.removeAttribute?.('data-ka-nap');
+    thread?.remove();greeting?.remove();host.classList.remove('panda-traveler','panda-perched');document.documentElement?.removeAttribute?.('data-ka-nap');
     if(panel){if(originalStyle===null)host.removeAttribute('style');else if(originalStyle!==undefined)host.setAttribute('style',originalStyle);originalParent?.appendChild(host);}
     character?.dispose();contact.geometry.dispose();contact.material.dispose();renderer.dispose();renderer.domElement.remove();
     host.classList.remove('is-ready');owners.delete(host);

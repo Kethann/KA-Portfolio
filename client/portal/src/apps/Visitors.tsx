@@ -83,7 +83,7 @@ function Live({ active }: { active: boolean }){
       {!s.data.live.length ? <Empty icon="visitors" title="Nobody right now">This updates by itself.</Empty> : (
         <ul className="list live-list" aria-live="polite">{s.data.live.map(v => (
           <li key={v.session_id}><span className="live-flag" aria-hidden="true">{flag(v.country)}</span>
-            <span className="grow truncate"><b>{v.city || (v.country ? regionName(v.country) : 'Unknown place')}</b> <span className="faint">· {v.path.replace('/?page=', '') || 'home'}</span></span>
+            <span className="grow truncate">{v.name && <><b className="visitor-name">{v.name}</b> · </>}<b>{v.city || (v.country ? regionName(v.country) : 'Unknown place')}</b> <span className="faint">· {v.path.replace('/?page=', '') || 'home'}</span></span>
             <Badge>{[v.device_vendor, v.device_model].filter(Boolean).join(' ') || v.device_type || 'device'}</Badge><span className="faint p-hide-sm" style={{ fontSize: 12 }}>{[v.browser, v.os].filter(Boolean).join(' · ')}{v.referrer ? ` · from ${v.referrer.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}` : ''}</span>
             <span className="faint" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{ago(v.last_seen_at)}</span></li>
         ))}</ul>
@@ -124,6 +124,7 @@ function Log(){
   };
   const cols: Column<any>[] = [
     { key: 'when', label: 'When', width: '120px', render: r => <span title={dateTime(r.visited_at)}>{ago(r.visited_at)}</span> },
+    { key: 'name', label: 'Name', width: '0.9fr', render: r => r.name ? <b className="truncate visitor-name" title={r.name}>{r.name}</b> : <span className="faint">—</span> },
     { key: 'where', label: 'Where', width: '1.3fr', render: r => <span className="truncate" title={[r.city, r.region, r.postal, r.isp].filter(Boolean).join(' · ')}>{flag(r.country)} {r.city ? `${r.city}${r.region ? ', ' + r.region : ''}` : r.country || 'Unknown'}</span> },
     { key: 'ip', label: 'IP', width: '1fr', render: r => <span className="mono truncate">{r.ip}</span> },
     { key: 'page', label: 'Page', width: '1fr', hideBelow: 720, render: r => <span className="truncate">{r.path}</span> },
@@ -140,7 +141,7 @@ function Log(){
   return (
     <div className="app" style={{ minHeight: 0, flex: 1 }}>
       <div className="app-toolbar">
-        <SearchBox value={q} onChange={setQ} placeholder="IP, city, page, browser…" label="Search the visit log" />
+        <SearchBox value={q} onChange={setQ} placeholder="Name, IP, city, page, browser…" label="Search the visit log" />
         <Segmented label="Show" value={view} onChange={setView} options={[{ value: 'visits', label: 'Visits' }, { value: 'visitors', label: 'Visitors' }]} />
         <button type="button" className={'btn sm' + (markedOnly ? ' primary' : ' ghost')} aria-pressed={markedOnly} onClick={() => setMarkedOnly(m => !m)}>★ Marked</button>
         <button type="button" className={'btn sm' + (savedOnly ? ' primary' : ' ghost')} aria-pressed={savedOnly} onClick={() => setSavedOnly(m => !m)} title="Visits you saved permanently"><Icon name="lock" size={12} /> Saved</button>
@@ -171,7 +172,7 @@ function Log(){
               ['IP', open.ip], ['Location', [open.city, open.region, open.postal, open.country].filter(Boolean).join(', ') || 'Unknown'], ['Location source', open.geo_provider || 'platform / IP estimate'],
               ['Network', open.isp || '—'], ['Time zone', open.timezone || '—'], ['Language', open.language || '—'],
               ['Device', [open.device_type, open.device_vendor, open.device_model].filter(Boolean).join(' · ')], ['System', `${open.os || '—'} ${open.os_version || ''}`], ['Browser', `${open.browser || '—'} ${open.browser_version || ''}`],
-              ['Screen', open.screen_w ? `${open.screen_w} × ${open.screen_h}` : '—'], ['Visitor', `${open.visitor_id}${open.is_new ? ' (first visit)' : ''}`], ['Bot', open.is_bot ? 'yes' : 'no']].map(([k, v]) => <Fragment key={k}><dt>{k}</dt><dd className={k === 'IP' || k === 'Visitor' ? 'mono' : ''}>{v}</dd></Fragment>)}
+              ['Screen', open.screen_w ? `${open.screen_w} × ${open.screen_h}` : '—'], ['Visitor', `${open.name ? open.name + ' · ' : ''}${open.visitor_id}${open.is_new ? ' (first visit)' : ''}`], ['Bot', open.is_bot ? 'yes' : 'no']].map(([k, v]) => <Fragment key={k}><dt>{k}</dt><dd className={k === 'IP' || k === 'Visitor' ? 'mono' : ''}>{v}</dd></Fragment>)}
           </dl>
           <VisitorHistory visitorId={open.visitor_id} onChanged={s.reload} onDeleted={n => afterDelete(`Deleted ${n} visit${n === 1 ? '' : 's'} from this visitor`)} />
           {open.latitude != null && open.longitude != null && <section className="card stack" aria-label="Location map">
@@ -198,19 +199,30 @@ function VisitorHistory({ visitorId, onChanged, onDeleted }: { visitorId: string
   const [label, setLabel] = useState('follow-up');
   const [note, setNote] = useState('');
   const [seen, setSeen] = useState<string | null>(null);
+  const [name, setName] = useState('');
   const d = h.data;
-  if (d && seen !== d.visitor){ setSeen(d.visitor); setLabel(d.mark?.label || 'follow-up'); setNote(d.mark?.note || ''); }
+  if (d && seen !== d.visitor){ setSeen(d.visitor); setLabel(d.mark?.label || 'follow-up'); setNote(d.mark?.note || ''); setName(d.name || ''); }
+  // an optional name of your own for this visitor (shown in the log and Live now, and searchable)
+  const saveName = async (value: string) => {
+    try { await put('/visitors/name', { visitorId, name: value.trim() }); toast.show(value.trim() ? `Named “${value.trim()}”` : 'Name removed', { tone: 'success' }); await h.reload(); onChanged(); }
+    catch (e) { toast.error(e); }
+  };
   const save = async (marked: boolean) => {
     try { await put('/visitors/mark', { visitorId, marked, label, note }); toast.show(marked ? 'Visitor marked' : 'Mark removed', { tone: 'success' }); await h.reload(); onChanged(); }
     catch (e) { toast.error(e); }
   };
   return (
     <section className="card stack" aria-label="Visitor history" style={{ marginTop: 'var(--sp-4)' }}>
-      <div className="row between"><b>This visitor’s history</b>{d && <Badge tone={d.score >= 60 ? 'success' : d.score >= 30 ? 'accent' : 'neutral'}>Engagement {d.score}/100</Badge>}</div>
+      <div className="row between"><b>{d?.name ? `${d.name}’s history` : 'This visitor’s history'}</b>{d && <Badge tone={d.score >= 60 ? 'success' : d.score >= 30 ? 'accent' : 'neutral'}>Engagement {d.score}/100</Badge>}</div>
       {h.error && !d ? <p className="field-error">{h.error}</p> : !d ? <SkeletonRows rows={3} /> : <>
         <p className="faint" style={{ margin: 0 }}>{d.total} visit{d.total === 1 ? '' : 's'} in {d.sessions} session{d.sessions === 1 ? '' : 's'} · first seen {dateTime(d.firstSeen)} · {d.minutes} min in total
           {d.places.length ? ` · ${d.places.join(' · ')}` : ''}{d.ips.length > 1 ? ` · ${d.ips.length} IP addresses` : ''}</p>
         {d.pages.length > 0 && <p className="faint" style={{ margin: 0 }}>Pages: {d.pages.map((p: any) => `${p.path} ×${p.n}`).join(', ')}</p>}
+        <form className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }} onSubmit={e => { e.preventDefault(); void saveName(name); }}>
+          <input aria-label="Name for this visitor (optional)" value={name} maxLength={60} placeholder="Name this visitor (optional), e.g. Priya from the studio" onChange={e => setName(e.target.value)} style={{ flex: '1 1 220px', minWidth: 160 }} />
+          <AsyncButton className="btn sm" disabled={name.trim() === (d.name || '')} onClick={() => saveName(name)}>{d.name ? 'Rename' : 'Save name'}</AsyncButton>
+          {d.name && <AsyncButton className="btn sm ghost" onClick={async () => { setName(''); await saveName(''); }}>Remove name</AsyncButton>}
+        </form>
         <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <select aria-label="Mark as" value={label} onChange={e => setLabel(e.target.value)} style={{ width: 'auto' }}>{LABELS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
           <input aria-label="Note about this visitor" value={note} maxLength={300} placeholder="Note (optional)" onChange={e => setNote(e.target.value)} style={{ flex: '1 1 200px', minWidth: 140 }} />

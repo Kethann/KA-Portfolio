@@ -14,7 +14,7 @@ import { WinTools } from '../shell/Window';
 import { DateTimeInput, Uploader, useSaveKey } from './common';
 import { SiteSaveBar } from './Content';
 import SettingFinder from './SettingFinder';
-import { loadSite, saveSite, thumb, updateSite, useSite, PASS_DRAFT_DEFAULTS } from './siteDoc';
+import { loadSite, saveSite, savedIntro, thumb, updateSite, useSite, PASS_DRAFT_DEFAULTS } from './siteDoc';
 import type { SiteDoc, PassDraft, Announcement, AnnouncementItem, IntroBubbles, IntroWorld } from './siteDoc';
 import { BUBBLE_TYPES, INTRO_VERSIONS, WORLD_DEFAULT, introVersion } from '../../../../shared/intros.js';
 import { FONT_GROUPS, FONT_LIBRARY, FONT_NAMES, fontStack, googleFontsUrl } from '../../../../shared/fonts.js';
@@ -393,6 +393,7 @@ function Preview({ doc, device, setDevice, arrange, onSelect }: { doc: SiteDoc; 
   const [scale, setScale] = useState(0.5);
   const [nonce, setNonce] = useState(0);
   const dev = DEVICES[device];
+  const introId = introVersion(doc.intro?.version);   // a new version reloads the preview with that intro
   const send = (msg: unknown) => frame.current?.contentWindow?.postMessage(msg, location.origin);
   const selectRef = useRef(onSelect); selectRef.current = onSelect;
   useEffect(() => {
@@ -409,7 +410,7 @@ function Preview({ doc, device, setDevice, arrange, onSelect }: { doc: SiteDoc; 
     addEventListener('message', on);
     return () => removeEventListener('message', on);
   }, []);
-  useEffect(() => setReady(false), [device]);   // a new frame must announce itself again
+  useEffect(() => setReady(false), [device, introId]);   // a new frame must announce itself again
   // stream the draft (debounced)
   useEffect(() => { if (!ready) return; const t = setTimeout(() => send({ type: 'ka-preview-data', data: doc }), 120); return () => clearTimeout(t); }, [doc, ready]);
   useEffect(() => { if (ready) send({ type: 'ka-preview-edit-mode', enabled: arrange }); }, [arrange, ready]);
@@ -427,7 +428,7 @@ function Preview({ doc, device, setDevice, arrange, onSelect }: { doc: SiteDoc; 
       </div>
       <div ref={box} className="preview-stage">
         <div className="device" style={{ width: dev.w * scale, height: dev.h * scale }}>
-          <iframe key={`${device}-${nonce}`} ref={frame} src="/?preview=1" title="Live preview of the homepage" style={{ width: dev.w, height: dev.h, transform: `scale(${scale})` }} />
+          <iframe key={`${device}-${nonce}-${introId}`} ref={frame} src={`/?preview=1&intro=${introId}`} title="Live preview of the homepage" style={{ width: dev.w, height: dev.h, transform: `scale(${scale})` }} />
         </div>
       </div>
     </div>
@@ -548,40 +549,42 @@ function PassPreview({ doc }: { doc: SiteDoc }){
 // Studio > Intro: which homepage intro runs. V1 (the KA crystal) is locked: it can always be chosen again, never edited.
 function IntroVersions({ doc }: { doc: SiteDoc }){
   const current = introVersion((doc as SiteDoc & { intro?: { version?: string } }).intro?.version);
+  const live = introVersion(savedIntro(useSite().saved)?.version);
   // switching versions keeps the bubbles and the green world the owner already set up
   const pick = (id: string) => updateSite(x => ({ ...x, intro: { ...(x.intro || {}), version: id } } as SiteDoc));
   return <div className="stack">
-    <p className="field-hint" style={{ margin: 0 }}>The intro that plays when someone opens the homepage. Choose a version and press Publish changes; you can switch back to any version at any time. Version 1 is locked: it stays exactly as it is, so it is always there to return to.</p>
+    <p className="field-hint" style={{ margin: 0 }}>The intro that plays when someone opens the homepage. Choose a version: its own settings open right under it, and the preview plays your choice straight away. Press <b>Publish changes</b> to put it on the live site. Version 1 is locked, so it is always there to return to.</p>
     <ul className="list intro-versions" role="radiogroup" aria-label="Homepage intro">
-      {INTRO_VERSIONS.map(v => <li key={v.id}>
+      {INTRO_VERSIONS.map(v => <li key={v.id} className={current === v.id ? 'is-current' : ''}>
         <label className="intro-version">
           <input type="radio" name="intro-version" checked={current === v.id} onChange={() => pick(v.id)} />
           <span className="grow"><b>{v.label} · {v.name}</b><span className="faint" style={{ display: 'block', fontSize: 12.5, marginTop: 2 }}>{v.description}</span></span>
           {v.locked && <Badge tone="info">Locked</Badge>}
-          {current === v.id && <Badge tone="success">Active</Badge>}
+          {live === v.id && <Badge tone="success">Live</Badge>}
+          {current === v.id && live !== v.id && <Badge tone="warning">Not published yet</Badge>}
         </label>
+        {current === v.id && v.id === 'v3' && <div className="intro-version-settings stack"><GreenWorldCard doc={doc} /><IntroBubblesCard doc={doc} /></div>}
+        {current === v.id && v.id === 'v2' && <div className="intro-version-settings stack"><IntroBubblesCard doc={doc} /></div>}
       </li>)}
     </ul>
-    <GreenWorldCard doc={doc} active={current} />
-    <IntroBubblesCard doc={doc} active={current} />
   </div>;
 }
 
 // Version 3's green world: after the logo is revealed, its green-and-black atmosphere slowly spreads from the logo over the
 // whole homepage (the background behind every section, the accents, drifting smoke). Off unless the owner switches it on.
-function GreenWorldCard({ doc, active }: { doc: SiteDoc; active: string }){
+function GreenWorldCard({ doc }: { doc: SiteDoc }){
   const w: IntroWorld = { ...WORLD_DEFAULT, ...(doc.intro?.world || {}) };
-  const set = (p: Partial<IntroWorld>) => updateSite(x => ({ ...x, intro: { ...(x.intro || { version: 'v1' }), world: { ...WORLD_DEFAULT, ...(x.intro?.world || {}), ...p } } } as SiteDoc));
+  const savedOn = savedIntro(useSite().saved)?.world?.enabled === true;
+  const set = (p: Partial<IntroWorld>) => updateSite(x => ({ ...x, intro: { ...(x.intro || { version: 'v3' }), world: { ...WORLD_DEFAULT, ...(x.intro?.world || {}), ...p } } } as SiteDoc));
   return <section className="card stack" aria-labelledby="world-h">
     <div className="row" style={{ justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-      <div><h3 id="world-h" style={{ margin: 0 }}>Green world over the homepage</h3>
-        <p className="field-hint" style={{ margin: '4px 0 0' }}>Version 3 only. Once the logo is revealed, its green light spreads slowly outward from the logo and fills the whole homepage: the background behind every section turns green and black, the accents turn green, and soft smoke drifts behind the content. Press Publish changes to apply.</p></div>
-      <Switch checked={w.enabled} onChange={v => set({ enabled: v })} label="Turn the site green" />
+      <div className="grow" style={{ minWidth: 220 }}><h3 id="world-h" style={{ margin: 0 }}>Green world over the homepage</h3>
+        <p className="field-hint" style={{ margin: '4px 0 0' }}>Once the logo is revealed, its green light spreads slowly outward and fills the whole homepage: the background behind every section turns green and black, the accents turn green, and soft smoke drifts behind the content. Turning it on or off shows in the preview at once; Publish changes puts it on the live site (open pages switch within a few seconds).</p></div>
+      <span className="row" style={{ gap: 8 }}>
+        <Switch checked={w.enabled} onChange={v => set({ enabled: v })} label={w.enabled ? 'Green: on' : 'Green: off'} />
+        {w.enabled !== savedOn && <Badge tone="warning">Publish to apply</Badge>}
+      </span>
     </div>
-    {active !== 'v3' && <div className="callout" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-      <span className="grow">This works with <b>Version 3</b>. The other versions keep the site's own colours.</span>
-      <button type="button" className="btn sm primary" onClick={() => updateSite(x => ({ ...x, intro: { ...(x.intro || {}), version: 'v3' } } as SiteDoc))}>Use Version 3</button>
-    </div>}
     <div className="stack" style={{ opacity: w.enabled ? 1 : 0.5 }}>
       <Field label={`How green: ${w.strength}%`} hint="Low keeps more of the original background showing through; high is a deep green-and-black world.">
         <input type="range" min={10} max={100} step={5} value={w.strength} disabled={!w.enabled} onChange={e => set({ strength: Number(e.target.value) })} /></Field>
@@ -593,7 +596,7 @@ function GreenWorldCard({ doc, active }: { doc: SiteDoc; active: string }){
 }
 
 // The skill bubbles that orbit the finished KA logo (Version 2): all on or off, which ones, their order and their words.
-function IntroBubblesCard({ doc, active }: { doc: SiteDoc; active: string }){
+function IntroBubblesCard({ doc }: { doc: SiteDoc }){
   const saved = (doc as SiteDoc & { intro?: { version?: string; bubbles?: IntroBubbles } }).intro?.bubbles;
   const b: IntroBubbles = saved || { enabled: true, items: BUBBLE_TYPES.map(x => ({ type: x.type, label: x.label, on: true })) };
   const set = (next: IntroBubbles) => updateSite(x => ({ ...x, intro: { ...(x.intro || { version: 'v1' }), bubbles: next } } as SiteDoc));
@@ -606,10 +609,6 @@ function IntroBubblesCard({ doc, active }: { doc: SiteDoc; active: string }){
         <p className="field-hint" style={{ margin: '4px 0 0' }}>The small round icons with their words that appear around the KA logo. {shown === 0 ? 'None will show.' : shown + ' will show.'} Press Publish changes to apply.</p></div>
       <Switch checked={b.enabled} onChange={v => set({ ...b, enabled: v })} label="Show the bubbles" />
     </div>
-    {active === 'v1' && <div className="callout" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-      <span className="grow">These choices work in <b>Version 2</b> and <b>Version 3</b>. Version 1 is locked and always shows its eight bubbles.</span>
-      <button type="button" className="btn sm primary" onClick={() => updateSite(x => ({ ...x, intro: { ...(x.intro || { version: 'v3' }), version: 'v3' } } as SiteDoc))}>Use Version 3</button>
-    </div>}
     <ul className="list bubble-list" aria-label="Skill bubbles" style={{ opacity: b.enabled ? 1 : 0.5 }}>
       {b.items.map((it, i) => <li key={it.type} className="row" style={{ gap: 8, alignItems: 'center' }}>
         <Switch checked={it.on} onChange={v => edit(i, { on: v })} label={<span className="sr-only">{'Show ' + it.label}</span>} />

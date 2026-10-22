@@ -9,7 +9,6 @@ import { AsyncButton, Badge, Empty, ErrorState, Field, Modal, Segmented, Skeleto
 import { Icon } from '../icons';
 import { ago, bytes, dateTime } from '../format';
 import { qrMatrix, qrPath } from '../qr';
-import StoreStatusPanel from './StoreStatus';
 import { CONTROL_GROUPS, searchControls } from './controlIndex';
 import SettingFinder from './SettingFinder';
 
@@ -18,7 +17,6 @@ type Sec = 'home' | 'security' | 'team' | 'storestatus' | 'store' | 'messages' |
 const SECTIONS: [Sec, string, string, string][] = [
   ['home', 'Control Center', 'search', 'Start'],
   ['security', 'Account & security', 'shield', 'Account'], ['team', 'Team', 'visitors', 'Account'], ['appearance', 'Appearance', 'studio', 'Account'],
-  ['storestatus', 'Store status & access', 'lock', 'Store'], ['store', 'Payments & tax', 'products', 'Store'], ['categories', 'Categories', 'tag', 'Store'],
   ['messages', 'Messages & contact form', 'messages', 'People'], ['reports', 'Email reports', 'reports', 'People'],
   ['system', 'System status', 'info', 'System'], ['backups', 'Backups', 'archive', 'System'], ['audit', 'Activity log', 'list', 'System']];
 
@@ -27,6 +25,9 @@ export default function Settings({ route, go, open }: AppProps){
   const isOwner = me.data?.role === 'owner';
   const sections = SECTIONS.filter(s => s[0] !== 'team' || isOwner);   // only owners manage the team
   const sec: Sec = sections.some(s => s[0] === route) ? route as Sec : 'home';
+  // the store's settings live in the Store app now (with its live preview); old links still land there
+  const moved = ({ storestatus: '', store: 'payments', categories: 'categories' } as Record<string, string>)[route];
+  useEffect(() => { if (moved !== undefined) open('store', moved || undefined); }, [moved]);
   return (
     <div className="content-split">
       <nav className="folder-nav" aria-label="Settings sections">
@@ -36,8 +37,8 @@ export default function Settings({ route, go, open }: AppProps){
           <button type="button" className={'folder-btn' + (k === sec ? ' on' : '')} aria-current={k === sec || undefined} onClick={() => go(k)}><Icon name={ic} size={14} /><span className="grow truncate">{l}</span></button></div>)}
       </nav>
       <div className="app-main"><div style={{ maxWidth: 820, width: '100%' }} className="stack-lg">
-        {sec === 'home' ? <ControlCenter open={(app, r) => app === 'settings' ? go(r || '') : open(app, r)} /> : sec === 'security' ? <Security /> : sec === 'team' ? <Team /> : sec === 'storestatus' ? <StoreStatusPanel /> : sec === 'store' ? <StoreSettings go={go} /> : sec === 'messages' ? <MessageSettings /> : sec === 'reports' ? <ReportSettings />
-          : sec === 'categories' ? <Categories /> : sec === 'system' ? <System /> : sec === 'backups' ? <Backups /> : sec === 'audit' ? <Audit /> : <Appearance />}
+        {sec === 'home' ? <ControlCenter open={(app, r) => app === 'settings' ? go(r || '') : open(app, r)} /> : sec === 'security' ? <Security /> : sec === 'team' ? <Team /> : sec === 'messages' ? <MessageSettings /> : sec === 'reports' ? <ReportSettings />
+          : sec === 'system' ? <System /> : sec === 'backups' ? <Backups /> : sec === 'audit' ? <Audit /> : <Appearance />}
       </div></div>
     </div>
   );
@@ -193,7 +194,7 @@ function PaymentsStatus(){
   );
 }
 
-function StoreSettings({ go }: { go: (r: string) => void }){
+export function StoreSettings({ go }: { go: (r: string) => void }){
   const { s, v, setV, dirty, save } = useSettingsDoc<any>('store');
   if (s.error && !s.data) return <ErrorState message={s.error} retry={s.reload} />;
   if (!v) return <SkeletonRows rows={8} />;
@@ -324,7 +325,7 @@ function ReportSettings(){
   </>;
 }
 
-function Categories(){
+export function Categories(){
   const s = useLoad<{ categories: { id: string; kind: string; name: string; slug: string; used: number }[] }>('/categories');
   const [n, setN] = useState({ kind: 'artifacts', name: '' });
   const [edit, setEdit] = useState<{ id: string; name: string } | null>(null);

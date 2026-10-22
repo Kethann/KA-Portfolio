@@ -247,7 +247,7 @@ THREE_SRC_CDN = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.
 THREE_SRC_LOCAL = "three.min.local.js"  # swapped in for local testing only
 
 html = r"""<!doctype html>
-<title>KA Crystal Reconstruction</title>
+<title>Kethan Artzz</title>
 <meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">

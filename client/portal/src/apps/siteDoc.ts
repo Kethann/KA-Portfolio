@@ -77,7 +77,8 @@ function withDefaults(d: SiteDoc): SiteDoc {
   return { ...d, notice: { ...ANNOUNCEMENT_DEFAULTS, ...(d.notice || {}) }, visibility: { protectImages: d.visibility?.protectImages ?? true, navGallery: d.visibility?.navGallery ?? true, navAbout: d.visibility?.navAbout ?? true, autoFullscreen: d.visibility?.autoFullscreen ?? false, downloadFormat: d.visibility?.downloadFormat === 'jpeg' ? 'jpeg' : 'png' },
     stacks: d.stacks || { loop: true, covers: {} }, layoutOverrides: d.layoutOverrides || { mobile: {}, tablet: {}, desktop: {} }, branding: d.branding || { enabled: false, logoUrl: '' },
     elementStyles: d.elementStyles || {}, socialLinks: d.socialLinks || [], passCard: { ...PASS_DRAFT_DEFAULTS, ...(d.passCard || {}) }, stats: d.stats ? { enabled: d.stats.enabled !== false, items: d.stats.items || [] } : STATS_DEFAULTS,
-    intro: { version: d.intro?.version || 'v1', ...(d.intro?.bubbles ? { bubbles: d.intro.bubbles } : {}) },
+    // keep every intro setting (the bubbles AND Version 3's green world): dropping one here unpublished it on the next save
+    intro: { version: d.intro?.version || 'v1', ...(d.intro?.bubbles ? { bubbles: d.intro.bubbles } : {}), ...(d.intro?.world ? { world: d.intro.world } : {}) },
     sounds: d.sounds ? { ...SOUND_DEFAULTS, ...d.sounds, categories: { ...(d.sounds.categories || {}) }, events: { ...(d.sounds.events || {}) } } : structuredClone(SOUND_DEFAULTS),
     skills: d.skills ? { enabled: d.skills.enabled !== false, title: d.skills.title || 'Skills', intro: d.skills.intro || '', categories: d.skills.categories || [] } : { enabled: true, title: 'Skills', intro: '', categories: [] }, about: d.about ? { ...aboutDefaults(), ...d.about, journey: { ...ABOUT_DEFAULT.journey, ...(d.about.journey || {}) }, reel: { ...ABOUT_DEFAULT.reel, ...(d.about.reel || {}) } } : aboutDefaults(), details: { ...d.details, customFonts: d.details?.customFonts || [] } };
 }
@@ -113,6 +114,12 @@ export function saveSite(): Promise<void>{
 export async function keepMineOverTheirs(){
   const latest = await get<SiteDoc>('/site');
   if (state.doc) emit({ doc: { ...state.doc, revision: latest.revision } });
+}
+/** the intro settings as last published (the store keeps the saved document as text) */
+const introCache: { text: string; value: SiteDoc['intro'] | null } = { text: '', value: null };
+export function savedIntro(saved: string){
+  if (introCache.text !== saved){ introCache.text = saved; try { introCache.value = saved ? JSON.parse(saved)?.intro || null : null; } catch { introCache.value = null; } }
+  return introCache.value;
 }
 export function useSite(){
   const s = useSyncExternalStore(f => { subs.add(f); return () => subs.delete(f); }, () => state);

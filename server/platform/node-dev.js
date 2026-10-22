@@ -136,7 +136,8 @@ export async function createDevServer({ port = Number(env('PORT', 9878)), host =
         // like the Pages router: run the chosen intro version with the owner's skill bubbles
         try {
           const [html, info] = await Promise.all([readFile(resolve(root, 'index.html'), 'utf8'), handle(new Request(new URL('/api/intro', url)), platform).then(r => r.json())]);
-          const out = applyIntroToHtml(html, info.version, info.bubbles, info.world);
+          const asked = url.searchParams.get('preview') === '1' ? url.searchParams.get('intro') : null;   // Studio preview: the draft's intro
+          const out = asked && /^v\d{1,3}$/.test(asked) ? applyIntroToHtml(html, asked, info.bubbles, null) : applyIntroToHtml(html, info.version, info.bubbles, info.world);
           res.writeHead(200, { ...SECURITY, 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-cache' });
           return res.end(out);
         } catch { /* fall back to the file as built */ }
@@ -155,7 +156,7 @@ export async function createDevServer({ port = Number(env('PORT', 9878)), host =
         res.writeHead(301, { Location: '/portal/' }); return res.end();
       }
       if (path === '/portal'){ res.writeHead(301, { Location: '/portal/' }); return res.end(); }
-      for (const f of ['robots.txt', 'favicon.ico', 'manifest.webmanifest']) if (path === '/' + f){ const file = resolve(root, 'dist', f); if (await sendFile(res, file, 'public, max-age=3600')) return; }
+      for (const f of ['robots.txt', 'favicon.ico', 'manifest.webmanifest', 'ka-sw.js']) if (path === '/' + f){ const file = resolve(root, 'dist', f); if (await sendFile(res, file, 'public, max-age=3600')) return; }
       res.writeHead(404, { ...SECURITY, 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('Not found');
     } catch (err){

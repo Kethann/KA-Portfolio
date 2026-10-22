@@ -61,6 +61,8 @@ kbd{ font:500 var(--fs-2xs)/1 var(--font-mono); padding:3px 5px; border-radius:4
 .mb-spacer{ flex:1; }
 .mb-clock{ padding:0 8px; color:var(--text); font-variant-numeric:tabular-nums; white-space:nowrap; }
 .mb-pill{ font-variant-numeric:tabular-nums; }
+.mb-site{ text-decoration:none; border:1px solid var(--border); }
+.mb-site:hover{ background:var(--surface-hover, rgba(255,255,255,.06)); }
 .mb-pill.warn{ color:var(--warning); }
 .live-dot{ width:7px; height:7px; border-radius:50%; background:var(--text-3); }
 .live-dot.on{ background:var(--success); box-shadow:0 0 0 0 rgba(79,208,138,.6); animation:ping 2s var(--ease-out) infinite; }

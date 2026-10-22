@@ -9,6 +9,7 @@ export type AppDef = { id: string; section: AppSection; title: string; icon: str
 
 export const APPS: AppDef[] = [
   { id: 'overview', section: 'Home', title: 'Overview', icon: 'overview', tile: ['#ffb168', '#e5661b'], size: [1040, 700], keywords: 'dashboard home sales today kpi', Component: lazy(() => import('./Overview')) },
+  { id: 'store', section: 'Store', title: 'Store', icon: 'lock', tile: ['#ffc58a', '#d9781f'], size: [1240, 780], keywords: 'store shop open close closed board panda countdown reopen access pass guest payments razorpay gst tax invoice business categories preview', Component: lazy(() => import('./Store')) },
   { id: 'products', section: 'Store', title: 'Products', icon: 'products', tile: ['#9aa7ff', '#5561e8'], size: [1100, 720], keywords: 'artzz artifacts catalog items prices publish', Component: lazy(() => import('./Products')) },
   { id: 'orders', section: 'Store', title: 'Orders', icon: 'orders', tile: ['#6fe0a8', '#1d9d62'], size: [1080, 700], keywords: 'sales payments refunds invoices buyers', Component: lazy(() => import('./Orders')) },
   { id: 'reports', section: 'Store', title: 'Reports', icon: 'reports', tile: ['#7fd4ff', '#237fd1'], size: [1000, 700], keywords: 'revenue analytics csv export charts', Component: lazy(() => import('./Reports')) },
@@ -26,7 +27,7 @@ export const APPS: AppDef[] = [
   { id: 'license', section: 'Site', title: 'License card', icon: 'license', tile: ['#f2c27b', '#c27a1f'], size: [1120, 740], keywords: 'license card pass signature font seal qr scan text checkout ticket holder', Component: lazy(() => import('./License')) },
   { id: 'legal', section: 'Site', title: 'Licenses & Legal', icon: 'legal', tile: ['#cfc7bd', '#7d746a'], size: [1000, 700], keywords: 'license terms privacy refunds delivery policy', Component: lazy(() => import('./Legal')) },
   { id: 'map', section: 'System', title: 'System map', icon: 'grid', tile: ['#b9f3d0', '#2f9e6f'], size: [1240, 780], keywords: 'map diagram database tables schema connections how it works architecture relations', Component: lazy(() => import('./SystemMap')) },
-  { id: 'settings', section: 'System', title: 'Settings', icon: 'settings', tile: ['#b9b3ad', '#5c5650'], size: [960, 680], keywords: 'account password 2fa sessions store open closed close access pass guest tax email system backups audit theme contact topics', Component: lazy(() => import('./Settings')) }
+  { id: 'settings', section: 'System', title: 'Settings', icon: 'settings', tile: ['#b9b3ad', '#5c5650'], size: [960, 680], keywords: 'account password 2fa sessions email system backups audit theme contact topics', Component: lazy(() => import('./Settings')) }
 ];
 // the dock order: section by section, in the order each section first appears above
 export const SECTIONS: AppSection[] = ['Home', 'Store', 'People', 'Site', 'System'];

@@ -24,7 +24,7 @@ async function chosenIntro(request, env, ctx){
     const v = typeof version === 'string' && /^v\d{1,3}$/.test(version) ? version : 'v1';
     const b = Array.isArray(bubbles) ? bubbles.slice(0, 8).map(i => ({ type: String(i && i.type || '').slice(0, 20), label: String(i && i.label || '').slice(0, 24) })) : null;
     const world = cleanWorld(rawWorld);
-    ctx.waitUntil(cache.put(INTRO_CACHE, new Response(JSON.stringify({ version: v, bubbles: b, world }), { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=60' } })));
+    ctx.waitUntil(cache.put(INTRO_CACHE, new Response(JSON.stringify({ version: v, bubbles: b, world }), { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=10' } })));
     return { version: v, bubbles: b, world };
   } catch { return NONE; }
 }
@@ -33,7 +33,12 @@ export default {
     const url = new URL(request.url), path = url.pathname;
     if (/^\/(api\/|legal(\/|$)|license(\/|$)|__storage\/|__storage-upload\/)/.test(path)) return env.SITE.fetch(request);
     if (request.method === 'GET' && (path === '/' || path === '/index.html')){
-      const [page, { version, bubbles, world }] = await Promise.all([env.ASSETS.fetch(request), chosenIntro(request, env, ctx)]);
+      const chosen = await Promise.all([env.ASSETS.fetch(request), chosenIntro(request, env, ctx)]);
+      const page = chosen[0];
+      let { version, bubbles, world } = chosen[1];
+      // the portal's Studio preview plays the draft's intro (?preview=1&intro=v3); its green world arrives with the draft
+      const asked = url.searchParams.get('preview') === '1' ? url.searchParams.get('intro') : null;
+      if (asked && /^v\d{1,3}$/.test(asked)){ version = asked; world = null; }
       if (!page.ok || !(page.headers.get('content-type') || '').includes('text/html')) return page;
       try {
         // only the chosen intro is sent: the others are dropped from the page (about 260-340 KB each), so it loads much

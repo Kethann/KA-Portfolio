@@ -65,7 +65,7 @@ export function renderInvoice(order, items, store, { owner = false, nonce = '' }
 .bar button{border:0;border-radius:999px;padding:11px 22px;font:600 14px var(--f);font-family:inherit;color:#1a0f08;background:linear-gradient(135deg,#f0b27c,#c97a43);cursor:pointer;box-shadow:0 8px 20px -10px rgba(120,60,20,.6)}
 .sheet{max-width:820px;margin:14px auto 40px;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 30px 60px -30px rgba(60,30,10,.35)}
 .head{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;padding:30px 36px;background:#16121a;background-image:radial-gradient(120% 140% at 0% 0%,#3a2516 0%,#16121a 60%);color:#f6ece2}
-.brand{display:flex;gap:14px;align-items:center}.mark{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(135deg,#f0b37c,#b8703c);color:#1b130d;font:800 17px/1 var(--f);letter-spacing:.04em}
+.brand{display:flex;gap:14px;align-items:center}.mark{width:52px;height:52px;flex:none;border-radius:14px;display:block;object-fit:contain;padding:5px;box-sizing:border-box;background:radial-gradient(circle at 50% 40%,#2a1d16,#120c09);border:1px solid rgba(240,179,124,.35);box-shadow:0 6px 18px -8px rgba(240,140,60,.55)}
 .brand b{display:block;font:600 19px/1.2 Georgia,'Times New Roman',serif}.brand span{font-size:12px;color:#d8c3ae}
 .doc{text-align:right}.doc h1{margin:0;font:600 28px/1.1 Georgia,serif;letter-spacing:-.01em}.doc div{font-size:13px;color:#d8c3ae;margin-top:4px}
 .paid{display:inline-block;margin-top:10px;padding:4px 12px;border-radius:999px;background:rgba(111,224,168,.16);border:1px solid rgba(111,224,168,.5);color:#9ff0c4;font:700 11px/1.4 var(--f);letter-spacing:.16em}
@@ -87,7 +87,7 @@ td{padding:12px 8px;border-bottom:1px solid #efe4da;vertical-align:top}.r{text-a
 </style></head><body>
 <div class="bar"><button type="button" id="print">Print / Save as PDF</button></div>
 <main class="sheet">
-<header class="head"><div class="brand"><span class="mark">${escapeHtml(sellerName.split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || 'KA')}</span><div><b>${escapeHtml(sellerName)}</b><span>${escapeHtml(store.supportEmail || env('OWNER_EMAIL', '') || '')}</span></div></div>
+<header class="head"><div class="brand"><img class="mark" src="/images/ka-logo.png" alt="" width="52" height="52"><div><b>${escapeHtml(sellerName)}</b><span>${escapeHtml(store.supportEmail || env('OWNER_EMAIL', '') || '')}</span></div></div>
 <div class="doc"><h1>${title}</h1><div>${invoiceNumber(order.invoice_number)} · ${escapeHtml(date)}</div><span class="paid">PAID</span></div></header>
 <section class="body">
 <div class="parties">

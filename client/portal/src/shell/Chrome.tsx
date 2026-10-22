@@ -129,6 +129,8 @@ export function MenuBar({ theme, setTheme, accent, setAccent, pulse, onPalette, 
         ...(openWins.length ? openWins.map(w => ({ label: APP[w.id].title, checked: w.id === f, run: () => desk.focus(w.id) })) : [{ label: 'No open windows', disabled: true }])
       ]} />
       <div className="mb-spacer" />
+      <a className="mb-pill mb-site" href="/" target="_blank" rel="noopener" title={`Open the public website in a new tab (${ALT}+V)`} aria-label="View the public website (opens in a new tab)">
+        <Icon name="external" size={13} /><span className="mb-hide-sm">View site</span></a>
       {pulse?.needsAttention > 0 && <button type="button" className="mb-pill warn" onClick={() => desk.open('orders', 'attention')} title="Orders that need a look"><Icon name="alert" size={13} /> {pulse.needsAttention}</button>}
       <button type="button" className="mb-pill" onClick={() => desk.open('visitors', 'live')} title="Visitors in the last 5 minutes" aria-label={`${pulse?.liveVisitors ?? 0} live visitors`}>
         <span className={'live-dot' + (pulse?.liveVisitors ? ' on' : '')} aria-hidden="true" />{pulse?.liveVisitors ?? '–'}
@@ -307,7 +309,7 @@ export function Palette({ onClose, commands }: { onClose: () => void; commands: 
 export function Shortcuts({ onClose }: { onClose: () => void }){
   const rows: [string, string][] = [
     [`${MOD} K`, 'Search and commands'], [`${ALT} 1 … 9, 0`, 'Open the first ten dock apps'], [`${ALT} W`, 'Close the front window'], [`${ALT} M`, 'Minimise the front window'],
-    [`${ALT} \``, 'Switch between windows'], [`${ALT} T`, 'Switch dark / light'], [`${ALT} ,`, 'Settings'], ['?', 'This list'], ['Esc', 'Close dialogs and menus'],
+    [`${ALT} \``, 'Switch between windows'], [`${ALT} T`, 'Switch dark / light'], [`${ALT} ,`, 'Settings'], [`${ALT} V`, 'View the public website'], ['?', 'This list'], ['Esc', 'Close dialogs and menus'],
     ['↑ ↓ Enter', 'Move through tables and open a row'], ['Double-click title bar', 'Zoom a window'], ['Drag to screen edge', 'Tile left / right or maximise']
   ];
   return (
@@ -401,6 +403,7 @@ export function useChrome({ email, onSignedOut }: { email: string; onSignedOut: 
         if (e.code === 'KeyM' && desk.focused){ e.preventDefault(); desk.minimize(desk.focused); return; }
         if (e.code === 'KeyT'){ e.preventDefault(); toggleTheme(); return; }
         if (e.code === 'Comma'){ e.preventDefault(); desk.open('settings'); return; }
+        if (e.code === 'KeyV'){ e.preventDefault(); window.open('/', '_blank', 'noopener'); return; }
         if (e.code === 'Backquote'){ e.preventDefault(); desk.cycle(e.shiftKey ? -1 : 1); return; }
       }
       if (e.key === '?' && !typing(e.target) && !e.ctrlKey && !e.metaKey){ e.preventDefault(); setSheet(true); }

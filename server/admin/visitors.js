@@ -45,27 +45,34 @@ export async function live(){
       select v.*, row_number() over (partition by session_id order by visited_at desc) as rn
       from visits v where last_seen_at > strftime('%Y-%m-%dT%H:%M:%fZ','now','-5 minutes') and not is_bot) where rn = 1`);
   rows.sort((a, b) => new Date(b.last_seen_at) - new Date(a.last_seen_at));
-  return json({ live: rows.slice(0, 100), count: rows.length });
+  const { names } = await readNames();
+  return json({ live: rows.slice(0, 100).map(r => ({ ...r, name: names[r.visitor_id] || null })), count: rows.length });
 }
 
-function logFilter(url){
+function logFilter(url, names = {}){
   const where = [], args = [];
   const add = (sql, v) => { args.push(v); where.push(sql.replaceAll('?', `$${args.length}`)); };
   if (url.searchParams.get('from') || url.searchParams.get('to')){ const r = range(url); add('visited_at >= ?', r.start); add('visited_at < ?', r.end); }
   const bots = url.searchParams.get('bots');
   if (bots === 'only') where.push('is_bot'); else if (bots !== 'include') where.push('not is_bot');
   const q = (url.searchParams.get('q') || '').trim().slice(0, 80);
-  if (q){ args.push(`%${q.toLowerCase().replace(/[\\%_]/g, (m) => '\\' + m)}%`); const i = args.length; where.push(`(ip like $${i} or lower(coalesce(country,'')) like $${i} or lower(coalesce(city,'')) like $${i} or lower(path) like $${i} or lower(referrer) like $${i} or visitor_id like $${i} or lower(coalesce(browser,'')) like $${i})`); }
+  if (q){
+    args.push(`%${q.toLowerCase().replace(/[\\%_]/g, (m) => '\\' + m)}%`); const i = args.length;
+    // the names the owner gave visitors are searchable too
+    const named = Object.keys(names).filter(v => names[v].toLowerCase().includes(q.toLowerCase()));
+    args.push(JSON.stringify(named)); const j = args.length;
+    where.push(`(ip like $${i} or lower(coalesce(country,'')) like $${i} or lower(coalesce(city,'')) like $${i} or lower(path) like $${i} or lower(referrer) like $${i} or visitor_id like $${i} or lower(coalesce(browser,'')) like $${i} or visitor_id in (select value from json_each($${j})))`);
+  }
   const country = url.searchParams.get('country');
   if (country && /^[A-Z]{2}$/.test(country)) add('country = ?', country);
   if (url.searchParams.get('saved') === '1') where.push('kept');   // only the visits the owner saved
   return { w: where.length ? 'where ' + where.join(' and ') : '', args };
 }
 export async function log(ctx){
-  const { w, args } = logFilter(ctx.url);
+  const [{ marks }, { names }] = await Promise.all([readMarks(), readNames()]);
+  const { w, args } = logFilter(ctx.url, names);
   const limit = Math.min(1000, Math.max(1, Number(ctx.url.searchParams.get('limit')) || 300));
   const offset = Math.max(0, Number(ctx.url.searchParams.get('offset')) || 0);
-  const { marks } = await readMarks();
   let where = w, qargs = args;
   if (ctx.url.searchParams.get('marked') === '1'){          // only visitors the owner has marked
     qargs = [...args, JSON.stringify(Object.keys(marks))];
@@ -82,20 +89,23 @@ export async function log(ctx){
           row_number() over (partition by visitor_id order by visited_at desc, id desc) as rn from visits ${where}) g
         where rn = 1 order by visited_at desc limit ${limit + 1} offset ${offset}`, qargs)
     : await db.query(`select ${cols}, (select provider from ip_geo_cache c where c.ip = visits.ip) as geo_provider from visits ${where} order by visited_at desc, id desc limit ${limit + 1} offset ${offset}`, qargs);
-  return json({ rows: rows.slice(0, limit).map(r => ({ ...r, mark: marks[r.visitor_id] || null })), hasMore: rows.length > limit });
+  return json({ rows: rows.slice(0, limit).map(r => ({ ...r, mark: marks[r.visitor_id] || null, name: names[r.visitor_id] || null })), hasMore: rows.length > limit });
 }
 export async function logCsv(ctx){
-  const { w, args } = logFilter(ctx.url);
+  const { names } = await readNames();
+  const { w, args } = logFilter(ctx.url, names);
   const db = await getDb();
   const rows = await db.query(`select * from visits ${w} order by visited_at desc limit 50000`, args);
   const cols = ['visited_at', 'session_id', 'visitor_id', 'is_new', 'path', 'referrer', 'duration_ms', 'ip', 'country', 'region', 'city', 'timezone', 'language', 'device_type', 'device_vendor', 'device_model', 'os', 'os_version', 'browser', 'browser_version', 'screen_w', 'screen_h', 'is_bot', 'user_agent', 'postal', 'latitude', 'longitude', 'isp', 'continent', 'location_accuracy', 'location_source']
     .map(k => ({ label: k, get: (r) => r[k] }));
+  cols.splice(3, 0, { label: 'name', get: (r) => names[r.visitor_id] || '' });
   return new Response(csv(rows, cols), { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="visitors-${new Date().toISOString().slice(0, 10)}.csv"`, 'Cache-Control': 'no-store' } });
 }
 
 // ---- one visitor's history, and marking visitors for follow-up -----------------------------------
 const VISITOR_ID = /^[A-Za-z0-9_-]{8,40}$/;
 const MARK_LABELS = ['follow-up', 'interested', 'client', 'ignore'];
+async function readNames(){ const { value, revision } = await getSettingWithRevision('visitorNames'); return { names: value && typeof value === 'object' ? value : {}, revision }; }
 async function readMarks(){ const { value, revision } = await getSettingWithRevision('visitorMarks'); return { marks: value && typeof value === 'object' ? value : {}, revision }; }
 
 // Everything this device (visitor id) has done: first and last visit, every visit, pages, places and an engagement score from 0 to 100.
@@ -115,8 +125,8 @@ export async function history(ctx){
   const minutes = (Number(tot.ms) || 0) / 60000;
   // engagement: returning matters most, then pages seen, then time spent
   const score = tot.total ? Math.min(100, Math.round(Math.min(40, (tot.sessions - 1) * 12) + Math.min(30, tot.pages * 5) + Math.min(30, minutes * 3))) : 0;
-  const { marks } = await readMarks();
-  return json({ visitor: v, total: tot.total, sessions: tot.sessions, firstSeen: tot.first_seen, lastSeen: tot.last_seen, minutes: Math.round(minutes * 10) / 10,
+  const [{ marks }, { names }] = await Promise.all([readMarks(), readNames()]);
+  return json({ visitor: v, name: names[v] || '', total: tot.total, sessions: tot.sessions, firstSeen: tot.first_seen, lastSeen: tot.last_seen, minutes: Math.round(minutes * 10) / 10,
     score, pages: pageRows.map(r => ({ path: r.path, n: r.n })), places: placeRows.map(r => [r.city, r.country].filter(Boolean).join(', ')), ips: ipRows.map(r => r.ip), visits: rows, mark: marks[v] || null });
 }
 
@@ -139,6 +149,22 @@ export async function markVisitor(ctx){
   return json({ ok: true, mark: next[v] || null });
 }
 
+// Give a visitor a name of your own (optional): shown in the log and the live list, and searchable. An empty name removes it.
+export async function nameVisitor(ctx){
+  const b = await readJson(ctx.request, 2048);
+  const v = String(b.visitorId || '');
+  if (!VISITOR_ID.test(v)) throw new HttpError(400, 'Unknown visitor.');
+  const name = str(b.name, { name: 'Name', max: 60 }).replace(/[<>]/g, '').trim();
+  const { names, revision } = await readNames();
+  const next = { ...names };
+  if (name) next[v] = name; else delete next[v];
+  if (name && !names[v] && Object.keys(next).length > 2000) throw new HttpError(409, 'You have named 2000 visitors. Remove some names first.');
+  const rev = await setSetting('visitorNames', next, revision || 0);
+  if (rev === null) throw new HttpError(409, 'The names changed in another window. Try again.', { code: 'stale' });
+  await audit(ctx, name ? 'visitor_named' : 'visitor_name_removed', v);
+  return json({ ok: true, name: next[v] || '' });
+}
+
 // ---- deleting history -----------------------------------------------------------------------------------------
 // One visit, one visitor (every visit from that device, and their mark), or a bulk clear. Deleting is permanent.
 export async function deleteVisit(ctx){
@@ -156,6 +182,8 @@ export async function deleteVisitor(ctx){
   const removed = (await db.query('delete from visits where visitor_id = $1 returning 1', [v])).length;
   const { marks, revision } = await readMarks();
   if (marks[v]){ const next = { ...marks }; delete next[v]; await setSetting('visitorMarks', next, revision || 0); }
+  const nm = await readNames();
+  if (nm.names[v]){ const next = { ...nm.names }; delete next[v]; await setSetting('visitorNames', next, nm.revision || 0); }
   await audit(ctx, 'visitor_history_deleted', v, { removed });
   return json({ ok: true, removed });
 }
@@ -210,6 +238,7 @@ export function registerVisitors(route){
   route('GET', '/api/admin/visitors/log', log, a);
   route('GET', '/api/admin/visitors/history', history, a);
   route('PUT', '/api/admin/visitors/mark', markVisitor, a);
+  route('PUT', '/api/admin/visitors/name', nameVisitor, a);
   route('DELETE', '/api/admin/visitors/visit/:id', deleteVisit, a);
   route('DELETE', '/api/admin/visitors/visitor', deleteVisitor, a);
   route('POST', '/api/admin/visitors/clear', clearVisits, a);
