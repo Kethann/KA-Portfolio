@@ -24,6 +24,8 @@
 // origin than this page -- browsers never send/accept cookies cross-origin without it, with or
 // without CORS headers. See server/app.js for the matching Access-Control-Allow-* response side.
 var KA_API_BASE = "";
+// older browsers (before 2020) lack Element.replaceChildren, used by the announcement tab and the site sections
+if (typeof Element !== "undefined" && !Element.prototype.replaceChildren) Element.prototype.replaceChildren = function(){ while (this.firstChild) this.removeChild(this.firstChild); for (var i = 0; i < arguments.length; i++) this.appendChild(typeof arguments[i] === "string" ? document.createTextNode(arguments[i]) : arguments[i]); };
 // Intro skill bubbles (Version 2): the Pages router sets window.KA_INTRO_BUBBLES; otherwise the copy this browser saved last time is used.
 try { if (!Array.isArray(window.KA_INTRO_BUBBLES)) { var kaB = JSON.parse(localStorage.getItem("ka.introBubbles") || "null"); if (Array.isArray(kaB)) window.KA_INTRO_BUBBLES = kaB; } } catch (e) {}
 // ?wallpaper=1 inside the portal (Wallpaper app): only the intro is shown, rendered sharper, and its frames stay
@@ -18737,22 +18739,28 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
 .ka-ann-tab{ pointer-events:auto; flex:none; align-self:center; position:relative; width:30px; height:30px; display:grid; place-items:center; padding:0; border:var(--glass-border); border-width:1px 0 1px 1px;
   border-radius:15px 0 0 15px; background:var(--glass-bg-heavy); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur); color:var(--ann, #ff9438); cursor:pointer; box-shadow:var(--glass-shadow);
   transition:width .25s ease, background .25s ease; }
-.ka-ann-tab:hover{ background:color-mix(in srgb, var(--ann, #ff9438) 18%, var(--glass-bg-heavy)); }
+.ka-ann-tab:hover{ background:rgba(var(--ann-rgb, 255,148,56), .18); background:color-mix(in srgb, var(--ann, #ff9438) 18%, var(--glass-bg-heavy)); }
 .ka-ann-tab svg{ width:14px; height:14px; }
 .ka-ann-tab .sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 .ka-announce[data-side="left"] .ka-ann-tab{ border-width:1px 1px 1px 0; border-radius:0 15px 15px 0; }
 .ka-ann-tab i{ position:absolute; top:5px; right:5px; width:5px; height:5px; border-radius:50%; background:var(--ann, #ff9438); box-shadow:0 0 0 0 var(--ann, #ff9438); animation:ann-ping 2.4s ease-out infinite; }
 .ka-announce.is-open .ka-ann-tab i{ display:none; }
-.ka-ann-panel{ pointer-events:auto; position:relative; padding:18px 20px 16px; min-width:0; width:min(336px, calc(100vw - 68px)); border:var(--glass-border); border-right:0;
-  background:var(--glass-bg-heavy); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur); box-shadow:var(--glass-highlight), var(--glass-shadow); color:var(--ink); }
-.ka-announce[data-side="left"] .ka-ann-panel{ border-right:var(--glass-border); border-left:0; }
-.ka-ann-panel::before{ content:""; position:absolute; inset:0 auto 0 0; width:3px; background:var(--ann, #ff9438); }
-.ka-ann-head{ display:flex; align-items:center; gap:8px; margin:0 0 8px; font:700 11px/1 var(--font-mono, monospace); letter-spacing:.18em; text-transform:uppercase; color:var(--ann, #ff9438); }
-.ka-ann-head span{ flex:1; }
-.ka-ann-head button{ width:28px; height:28px; display:grid; place-items:center; border:0; border-radius:8px; background:transparent; color:var(--ink-dim); cursor:pointer; }
-.ka-ann-head button:hover, .ka-ann-head button[aria-pressed="true"]{ background:rgba(255,255,255,.08); color:var(--ink); }
-.ka-ann-head svg{ width:15px; height:15px; }
-.ka-ann-text{ margin:0; font:15px/1.6 var(--font-body, sans-serif); color:var(--ink); }
+/* a floating card: off the screen edge, soft corners, a glow in the item's colour */
+.ka-ann-panel{ pointer-events:auto; position:relative; overflow:hidden; padding:16px 18px 18px; min-width:0; width:min(340px, calc(100vw - 76px)); margin:0 12px 0 8px;
+  border-radius:22px; border:1px solid rgba(var(--ann-rgb, 255,148,56), .28); color:var(--ink);
+  background:radial-gradient(130% 90% at 0% 0%, rgba(var(--ann-rgb, 255,148,56), .16), rgba(var(--ann-rgb, 255,148,56), 0) 62%), var(--glass-bg-heavy);
+  backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 18px 44px -14px rgba(0,0,0,.65), 0 0 0 1px rgba(0,0,0,.25); }
+.ka-announce[data-side="left"] .ka-ann-panel{ margin:0 8px 0 12px; }
+.ka-ann-head{ display:flex; align-items:center; gap:10px; margin:0 0 10px; font:700 10.5px/1.2 var(--font-mono, monospace); letter-spacing:.16em; text-transform:uppercase; color:var(--ann, #ff9438); }
+.ka-ann-head span{ flex:1; min-width:0; }
+.ka-ann-badge{ width:32px; height:32px; flex:none; display:grid; place-items:center; border-radius:50%; color:var(--ann, #ff9438);
+  background:rgba(var(--ann-rgb, 255,148,56), .14); box-shadow:inset 0 0 0 1px rgba(var(--ann-rgb, 255,148,56), .35); }
+.ka-ann-badge svg{ width:16px; height:16px; }
+.ka-ann-head button{ width:30px; height:30px; flex:none; display:grid; place-items:center; border:0; border-radius:50%; background:rgba(255,255,255,.04); color:var(--ink-dim); cursor:pointer; transition:background .2s ease, color .2s ease; }
+.ka-ann-head button:hover, .ka-ann-head button[aria-pressed="true"]{ background:rgba(255,255,255,.1); color:var(--ink); }
+.ka-ann-head button svg{ width:14px; height:14px; }
+.ka-ann-text{ margin:0; font:15.5px/1.55 var(--font-body, sans-serif); color:var(--ink); overflow-wrap:anywhere; }
 .ka-ann-note{ margin:6px 0 0; font:12.5px/1.5 var(--font-body, sans-serif); color:var(--ink-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .ka-ann-note[hidden]{ display:none; }
 .ka-ann-body{ transition:opacity .18s ease, transform .18s ease; }
@@ -18761,11 +18769,18 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
 .ka-ann-dots[hidden]{ display:none; }
 .ka-ann-dots button{ width:7px; height:7px; padding:0; border:0; border-radius:4px; background:rgba(255,255,255,.25); cursor:pointer; transition:width .3s ease, background .3s ease; }
 .ka-ann-dots button.is-on{ width:20px; background:var(--ann, #ff9438); }
-.ka-ann-link{ display:inline-flex; margin-top:12px; padding:9px 16px; border-radius:999px; border:1px solid color-mix(in srgb, var(--ann, #ff9438) 60%, transparent); color:#fff; text-decoration:none;
-  font:600 13px/1 var(--font-body, sans-serif); background:color-mix(in srgb, var(--ann, #ff9438) 22%, transparent); }
-.ka-ann-time{ position:absolute; left:0; right:0; bottom:0; height:2px; background:var(--ann, #ff9438); transform-origin:left; transform:scaleX(0); opacity:.7; }
+/* the button: filled in the item's colour, with an arrow that nudges on hover */
+.ka-ann-link{ display:inline-flex; align-items:center; gap:8px; margin-top:14px; padding:10px 16px 10px 18px; border-radius:999px; border:0; color:#0f0c0b; text-decoration:none;
+  font:700 13px/1 var(--font-body, sans-serif); background:var(--ann, #ff9438); box-shadow:0 8px 22px -10px rgba(var(--ann-rgb, 255,148,56), .9); transition:transform .2s ease, box-shadow .2s ease; }
+.ka-ann-link::after{ content:"\2192"; font-size:14px; transition:transform .2s ease; }
+.ka-ann-link:hover{ transform:translateY(-1px); box-shadow:0 12px 26px -10px rgba(var(--ann-rgb, 255,148,56), 1); }
+.ka-ann-link:hover::after{ transform:translateX(3px); }
+.ka-ann-link:focus-visible{ outline:2px solid var(--ann, #ff9438); outline-offset:3px; }
+.ka-ann-link[hidden]{ display:none; }
+/* the tuck-away timer: a thin rounded bar inside the card */
+.ka-ann-time{ position:absolute; left:18px; right:18px; bottom:8px; height:3px; border-radius:3px; background:var(--ann, #ff9438); transform-origin:left; transform:scaleX(0); opacity:.55; }
 .ka-announce.is-counting .ka-ann-time{ animation:ann-time var(--ann-s, 6s) linear forwards; }
-.ka-announce[data-tone="warning"]{ --ann:#ffb347; } .ka-announce[data-tone="success"]{ --ann:#6fe0a8; } .ka-announce[data-tone="offer"]{ --ann:#ff7eb6; } .ka-announce[data-tone="info"]{ --ann:#ff9438; }
+.ka-announce[data-tone="warning"]{ --ann:#ffb347; --ann-rgb:255,179,71; } .ka-announce[data-tone="success"]{ --ann:#6fe0a8; --ann-rgb:111,224,168; } .ka-announce[data-tone="offer"]{ --ann:#ff7eb6; --ann-rgb:255,126,182; } .ka-announce[data-tone="info"]{ --ann:#ff9438; --ann-rgb:255,148,56; }
 @keyframes ann-ping{ 0%{ box-shadow:0 0 0 0 color-mix(in srgb, var(--ann, #ff9438) 70%, transparent); } 80%,100%{ box-shadow:0 0 0 9px transparent; } }
 @keyframes ann-time{ to{ transform:scaleX(1); } }
 @media (max-width:600px){
@@ -18775,9 +18790,11 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
   .ka-announce.is-open{ transform:none; }
   .ka-ann-tab{ width:26px; height:26px; }
   .ka-ann-tab svg{ width:12px; height:12px; }
-  .ka-ann-panel{ width:min(320px, calc(100vw - 44px)); }
+  .ka-ann-panel{ width:min(320px, calc(100vw - 54px)); margin:0 10px 0 6px; border-radius:20px; }
+  .ka-announce[data-side="left"] .ka-ann-panel{ margin:0 6px 0 10px; }
 }
-@media (prefers-reduced-motion: reduce){ .ka-announce{ transition:none; } .ka-ann-tab i{ animation:none; } }
+@supports not (translate: 0 0){ .ka-announce{ top:auto; bottom:110px; } }
+@media (prefers-reduced-motion: reduce){ .ka-announce{ transition:none; } .ka-ann-tab i{ animation:none; } .ka-ann-link, .ka-ann-link::after{ transition:none; } }
 
 /* ---- Featured Work showcase: rows down the page, zig-zag; pictures cross-fade in place (no sliding) ---- */
 .fw-show{ display:grid; gap:clamp(48px, 7vw, 96px); margin-top:clamp(24px, 4vw, 44px); }
@@ -19119,6 +19136,8 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
   var ann = null, annTimer = 0, annPinned = false;
   var ICON_PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/></svg>';
   var ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+  var ICON_MEGA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>';
+  var ICON_REPLY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 11h7M8.5 14h4"/></svg>';
   function openAnn(auto, seconds){
     if (!ann) return;
     clearTimeout(annTimer);
@@ -19162,6 +19181,7 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
     setTimeout(function(){
       ann.querySelector(".ka-ann-tabtext").textContent = a.title || "Announcement";
       ann.querySelector(".ka-ann-title").textContent = a.title || "Announcement";
+      ann.querySelector(".ka-ann-badge").innerHTML = a.action ? ICON_REPLY : ICON_MEGA;
       ann.querySelector(".ka-ann-text").textContent = a.text;
       var noteEl = ann.querySelector(".ka-ann-note"); noteEl.textContent = a.note || ""; noteEl.hidden = !a.note;
       var link = ann.querySelector(".ka-ann-link");
@@ -19187,7 +19207,7 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
     if (!ann){
       ann = el("aside", "ka-announce"); ann.setAttribute("aria-label", "Announcements");
       ann.innerHTML = '<button type="button" class="ka-ann-tab" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg><i aria-hidden="true"></i><span class="ka-ann-tabtext sr"></span></button>' +
-        '<div class="ka-ann-panel"><p class="ka-ann-head"><span class="ka-ann-title"></span><button type="button" class="ka-ann-pin" aria-pressed="false" aria-label="Keep it open" title="Keep it open">' + ICON_PIN + '</button>' +
+        '<div class="ka-ann-panel"><p class="ka-ann-head"><b class="ka-ann-badge" aria-hidden="true"></b><span class="ka-ann-title"></span><button type="button" class="ka-ann-pin" aria-pressed="false" aria-label="Keep it open" title="Keep it open">' + ICON_PIN + '</button>' +
         '<button type="button" class="ka-ann-close" aria-label="Tuck it away" title="Tuck it away">' + ICON_X + '</button></p><div class="ka-ann-body"><p class="ka-ann-text"></p><p class="ka-ann-note" hidden></p><a class="ka-ann-link" hidden></a></div>' +
         '<div class="ka-ann-dots" hidden></div><span class="ka-ann-time" aria-hidden="true"></span></div>';
       document.body.appendChild(ann);
