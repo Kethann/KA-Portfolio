@@ -12,15 +12,15 @@ import { useDebounced, useLoad, usePref } from '../hooks';
 import { TZ } from '../format';
 import { useFullscreen } from './fullscreen';
 import { useRotation } from './rotate';
-import { ChartBar, ChatCircleText, DownloadSimple, FilmSlate, Gauge, GearSix, GlobeHemisphereWest, Images, Lightbulb, Package, Palette as PaletteGlyph, Receipt, Scales, Ticket, TreeStructure } from '@phosphor-icons/react';
+import { ChartBar, ChatCircleText, Handshake, Storefront, DownloadSimple, FilmSlate, Gauge, GearSix, GlobeHemisphereWest, Images, Lightbulb, Package, Palette as PaletteGlyph, Receipt, Scales, Ticket, TreeStructure } from '@phosphor-icons/react';
 import type { Icon as PhIcon } from '@phosphor-icons/react';
 
 // App tiles use Phosphor's two-tone ("duotone") glyphs: modern, and they read like iOS icons on glass.
 const GLYPH: Record<string, PhIcon> = { overview: Gauge, products: Package, orders: Receipt, reports: ChartBar, coupons: Ticket, downloads: DownloadSimple,
-  visitors: GlobeHemisphereWest, messages: ChatCircleText, tips: Lightbulb, studio: PaletteGlyph, content: Images, legal: Scales, settings: GearSix, wallpaper: FilmSlate, map: TreeStructure };
+  visitors: GlobeHemisphereWest, messages: ChatCircleText, tips: Lightbulb, studio: PaletteGlyph, content: Images, legal: Scales, agreements: Handshake, store: Storefront, settings: GearSix, wallpaper: FilmSlate, map: TreeStructure };
 // "Obsidian glass": every tile is the same dark glass; each app is told apart by its symbol's soft colour.
 const HUE: Record<string, string> = { overview: '#FFB26B', products: '#A5B4FC', orders: '#6EE7B7', reports: '#7DD3FC', coupons: '#F9A8D4', downloads: '#BEF264',
-  visitors: '#5EEAD4', messages: '#93C5FD', tips: '#FDE68A', studio: '#D8B4FE', content: '#FDBA74', legal: '#E7E5E4', settings: '#D6D3D1', wallpaper: '#9AD8FF', map: '#86EFAC' };
+  visitors: '#5EEAD4', messages: '#93C5FD', tips: '#FDE68A', studio: '#D8B4FE', content: '#FDBA74', legal: '#E7E5E4', agreements: '#F6D58C', store: '#FFC58A', settings: '#D6D3D1', wallpaper: '#9AD8FF', map: '#86EFAC' };
 import logo from '../assets/ka-logo.png';
 
 export type Theme = 'system' | 'dark' | 'light';

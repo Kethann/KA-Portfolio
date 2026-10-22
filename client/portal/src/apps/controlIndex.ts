@@ -45,6 +45,8 @@ export const CONTROLS: Control[] = [
   { group: 'Store & money', title: 'Checkout pass design', desc: 'The animated pass shown at checkout.', app: 'studio', route: 'pass', keywords: 'checkout pass card' },
   { group: 'Store & money', title: 'Licenses and legal pages', desc: 'License terms, privacy, refund and delivery policies.', app: 'legal', keywords: 'legal terms privacy refund policy license' },
   { group: 'Store & money', title: 'Sales reports', desc: 'Revenue charts and CSV export.', app: 'reports', keywords: 'report revenue csv analytics' },
+  { group: 'People & messages', title: 'Project agreements', desc: 'Contracts clients sign online: advance, cancellation fee, ownership, e-signature.', app: 'agreements', keywords: 'agreement contract terms sign signature client project advance deposit cancellation' },
+  { group: 'People & messages', title: 'Default agreement terms', desc: 'Your legal name, advance %, cancellation fees, payment details and extra clauses.', app: 'agreements', route: 'defaults', keywords: 'agreement contract default terms legal name advance percent cancellation payment upi bank clauses jurisdiction' },
   // ---- People & messages
   { group: 'People & messages', title: 'Contact form topics', desc: 'The “Regarding” ticks and replies shown on the visitor’s device.', app: 'settings', route: 'messages', keywords: 'contact form topics regarding reply device' },
   { group: 'People & messages', title: 'Auto-reply and business hours', desc: 'Automatic replies and away messages.', app: 'settings', route: 'messages', keywords: 'auto reply away business hours' },

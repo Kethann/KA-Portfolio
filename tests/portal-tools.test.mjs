@@ -80,7 +80,8 @@ test('Control Center: every setting opens an app and section that really exist',
     settings: [...read('../client/portal/src/apps/Settings.tsx').matchAll(/\['([a-z]+)', '[^']+', '[a-z]+', '[A-Za-z &]+'\]/g)].map(m => m[1]),
     studio: (/const SECTIONS: Section\[\] = \[([^\]]+)\]/.exec(read('../client/portal/src/apps/Studio.tsx'))[1].match(/'([a-z]+)'/g) || []).map(s => s.slice(1, -1)),
     content: ['portfolio', 'featured', 'text', 'upscaler', 'emails'], assistant: ['knowledge', 'repeats', 'logs', 'playground', 'settings'], visitors: ['live', 'log'],
-    store: [...read('../client/portal/src/apps/Store.tsx').matchAll(/\['([a-z]+)', '[^']+'\]/g)].map(m => m[1])
+    store: [...read('../client/portal/src/apps/Store.tsx').matchAll(/\['([a-z]+)', '[^']+'\]/g)].map(m => m[1]),
+    agreements: ['defaults']
   };
   const entries = [...idx.matchAll(/title: '([^']+)'[^}]*?app: '([a-z]+)'(?:, route: '([a-z]+)')?/g)];
   assert.ok(entries.length >= 40, 'the index lists the settings');

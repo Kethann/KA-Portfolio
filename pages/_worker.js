@@ -31,7 +31,7 @@ async function chosenIntro(request, env, ctx){
 export default {
   async fetch(request, env, ctx){
     const url = new URL(request.url), path = url.pathname;
-    if (/^\/(api\/|legal(\/|$)|license(\/|$)|__storage\/|__storage-upload\/)/.test(path)) return env.SITE.fetch(request);
+    if (/^\/(api\/|legal(\/|$)|license(\/|$)|agreement\/|__storage\/|__storage-upload\/)/.test(path)) return env.SITE.fetch(request);
     if (request.method === 'GET' && (path === '/' || path === '/index.html')){
       const chosen = await Promise.all([env.ASSETS.fetch(request), chosenIntro(request, env, ctx)]);
       const page = chosen[0];

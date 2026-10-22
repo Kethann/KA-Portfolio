@@ -55,6 +55,7 @@ export const DEFAULTS = {
   reports: { daily: false, weekly: true, email: '' },
   visitors: { retentionDays: 365 },   // visits older than this are deleted daily (0 = keep forever)
   deliveryEmails: {},                 // per product: { <product id>: { subject, note, attachments: [{ name, path, bytes }] } } (Products > Delivery email)
+  agreements: {},                    // Agreements > Default terms (shared/agreement.js cleans and completes it)
   visitorMarks: {},                   // visitors the owner has marked: { <visitor id>: { label, note, at } } (kept for follow-up; at most 500)
   site: null,                         // the portfolio document (seeded on first read)
   system: { lastHeartbeat: null, lastBackup: null }

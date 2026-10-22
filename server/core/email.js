@@ -207,6 +207,9 @@ export const DEFAULT_TEMPLATES = {
   alert: { subject: 'Alert: {{title}}', body: '{{body}}' },
   reply: { subject: 'Re: {{subject}}', body: 'Hi {{name}},\n\n{{body}}\n\n{{thread_url}}\n\nYou can also simply reply to this email.\n\n{{signature}}' },
   store_access: { subject: 'Your early access to the store', body: 'Hi,\n\nThe store is closed to the public right now, but you have special access. Open the link below on the device you want to shop from, and the store opens for you.\n\n{{link}}\n\nThe link is personal to you, so please don’t share it.\n\n{{signature}}' },
+  agreement_request: { subject: 'Your project agreement: {{title}}', body: 'Hi {{name}},\n\nThank you for choosing to work with me. Before we begin, here is the project agreement for “{{title}}” ({{number}}). It sets out the scope, the fee of {{fee}}, the {{advance_percent}}% advance ({{advance}}) that starts the work, and what happens if plans change along the way.\n\nPlease read it and sign it online. It takes about two minutes:\n{{link}}\n\nThe link is personal to you, so please don’t share it. If anything doesn’t look right, just reply to this email before signing and I’ll update it.\n\n{{signature}}' },
+  agreement_signed: { subject: 'Signed: {{title}} ({{number}})', body: 'Hi {{name}},\n\nThank you for signing. We’re all set. Your copy of the agreement is attached to this email, and you can open the signed agreement (and save it as a PDF) at any time:\n{{link}}\n\nNext step: the advance of {{advance}} starts the work.\n{{payment}}\n\nPlease keep this email for your records.\n\n{{signature}}' },
+  agreement_owner: { subject: '{{headline}}', body: '{{details}}\n\nOpen it in the portal:\n{{portal_url}}' },
   launch: { subject: '{{topic_title}} is live', body: 'Hi,\n\n{{topic_name}} is live, and you asked to be the first to know.\n\n{{link}}\n\n{{message}}\n\nThis was the one email you signed up for. There won’t be more about it.\n\n{{signature}}' }
 };
 
@@ -220,10 +223,13 @@ const HEROES = {
   report: { eyebrow: 'Sales report', tone: 'neutral', title: '{{period}} report' },
   alert: { eyebrow: 'Alert', tone: 'bad', title: '{{title}}' },
   reply: { eyebrow: 'A reply to your message', tone: 'neutral', title: 'Re: {{subject}}', subtitle: 'It also pops up on the site, on the device you wrote from.' },
+  agreement_request: { eyebrow: 'Project agreement · {{number}}', title: '{{title}}', subtitle: 'Please read and sign it online before we start.' },
+  agreement_signed: { eyebrow: 'Agreement signed · {{number}}', tone: 'neutral', title: 'Thank you for signing', subtitle: 'Your copy is attached.' },
+  agreement_owner: { eyebrow: 'Agreements', tone: 'neutral', title: '{{headline}}' },
   store_access: { eyebrow: 'Special access', title: 'You’re on the guest list', subtitle: 'The store is open for you while it is closed to everyone else.' }
 };
 // emails to the owner: no "Questions about your order?" footer or store button
-const OWNER_TEMPLATES = new Set(['contact_notify', 'report', 'alert']);
+const OWNER_TEMPLATES = new Set(['contact_notify', 'report', 'alert', 'agreement_owner']);
 
 export async function loadTemplate(key){
   const db = await getDb();

@@ -150,6 +150,7 @@ function Detail({ id, go, open, onChanged }: { id: string; go: (r: string) => vo
               <option value="">Insert saved reply…</option>{canned.data.canned.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select>}</div>
           <textarea aria-label="Reply text" rows={6} value={reply} onChange={e => setReply(e.target.value)} placeholder="Write your reply. Your email signature is added automatically." />
           <div className="row"><span className="faint grow" style={{ fontSize: 12 }}>{m.source === 'contact' ? 'Emailed to them, and it pops up on the site on the device they wrote from. Their replies come to your email.' : 'Sent from your store address; their replies come to your email.'}</span>
+            <button type="button" className="btn ghost" onClick={() => open('agreements', 'new:' + id)} title="Prepare a project agreement for this person"><Icon name="legal" /> Agreement</button>
             <AsyncButton className="btn primary" disabled={!reply.trim()} onClick={async () => { const r = await post<{ pushed?: number }>(`/messages/${id}/reply`, { body: reply }); setReply(''); toast.show(r?.pushed ? `Reply sent by email, and it popped up on their ${r.pushed === 1 ? 'device' : r.pushed + ' devices'}` : 'Reply sent by email. It also shows on the site, on the device they wrote from', { tone: 'success' }); s.reload(); onChanged(); }}><Icon name="send" /> Send</AsyncButton></div>
         </section>
       )}

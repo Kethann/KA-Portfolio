@@ -10,6 +10,7 @@ import { registerCheckout } from './handlers/checkout.js';
 import { registerLegal } from './handlers/legal.js';
 import { registerLicense } from './handlers/license.js';
 import { registerStoreAccess } from './store/access.js';
+import { registerAgreements } from './admin/agreements.js';
 import { threads, threadsSeen, threadsPush } from './handlers/threads.js';
 import { buyerInvoice } from './store/invoice.js';
 
@@ -49,6 +50,7 @@ registerAssistantAdmin(route);
 registerSocial(route);
 registerUsage(route);
 registerStoreAccess(route);
+registerAgreements(route);
 
 // ---- public site
 route('GET', '/api/public-config', pub.publicConfig);
