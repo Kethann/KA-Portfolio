@@ -20,7 +20,8 @@ test('full viewport paint obeys framebuffer limits at desktop, tablet, mobile an
   for(const [w,h] of [[1920,1080],[1440,900],[1366,768],[768,1024],[390,844]]){
     for(const zoom of [1,1.25,1.5,2]){
       const ratio=logic.renderBudget(w,h,2*zoom);
-      assert(w*h*ratio*ratio<=(w<600?1500000:4000000)+.01);
+      assert(w*h*ratio*ratio<=Math.max(w<600?1500000:8800000,w<600?0:w*h)+.01);
+      if(w>=600)assert(ratio>=1,'never below the screen\'s own resolution on desktop');
     }
   }
 });

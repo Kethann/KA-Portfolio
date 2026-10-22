@@ -375,7 +375,7 @@ export class SceneRunner {
         }
       }
       this.last = now;
-      const dpr = Math.min(1.5, window.devicePixelRatio || 1) * this.quality;
+      const dpr = Math.min(2, window.devicePixelRatio || 1) * this.quality;
       this.painter.draw(this.scene.id, Math.max(2, Math.round(st.w * dpr)), Math.max(2, Math.round(st.h * dpr)), this.time(), st.intensity, st.seed, colsOf(st.pal));
     } else {
       if (!st.d.inited2d){ st.d.inited2d = true; if (st.d.glReady) this.scene.init?.(st); }

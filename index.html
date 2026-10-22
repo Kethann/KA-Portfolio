@@ -2430,7 +2430,13 @@ try {
 } catch (e) { renderer = null; }
 if (!renderer) return; // CSS fallback (already painted) stands as-is.
 renderer.setClearColor(0x050506, 1);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1 : 1.5));
+// sharp on every screen: never below the screen's own resolution on desktop, up to 2x on high-density screens (4K-sized budget)
+function heroRatio(w, h){
+  var d = window.devicePixelRatio || 1, lite = !!window.kaLite;
+  var cap = lite ? 1 : (isMobile ? 1.5 : 2), budget = isMobile ? 2000000 : 8800000;
+  return Math.max(isMobile ? 0.75 : Math.min(d, 1), Math.min(d, cap, Math.sqrt(budget / Math.max(1, w * h))));
+}
+renderer.setPixelRatio(heroRatio(kaLayoutW(), kaLayoutH()));
 container.appendChild(renderer.domElement);
 
 var scene = new THREE.Scene();
@@ -2715,7 +2721,7 @@ if (!reducedMotion){
 
 function resize(){
   var w = kaLayoutW(), h = kaLayoutH();
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,isMobile?1:1.5,Math.sqrt((isMobile?900000:2200000)/Math.max(1,w*h))));
+  renderer.setPixelRatio(heroRatio(w, h));
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h, false);
@@ -9986,9 +9992,10 @@ const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
 function renderPixelRatio(){
   // Refresh on browser zoom / monitor changes, bounded by framebuffer cost.
   const pixels = Math.max(1, kaLayoutW() * kaLayoutH());
-  const budget = isMobile ? 2400000 : ((navigator.hardwareConcurrency || 4) >= 8 ? 9500000 : 6000000);
+  const budget = isMobile ? 2400000 : ((navigator.hardwareConcurrency || 4) >= 8 ? 14000000 : 9000000);
   const zoom = 1;
-  return Math.min((window.devicePixelRatio || 1) * zoom, 2, Math.sqrt(budget / pixels));
+  // never below the screen's own resolution on desktop (a 1440p or 4K monitor stays crisp), up to 2x on high-density screens
+  return Math.max(isMobile ? 0 : Math.min(window.devicePixelRatio || 1, 1), Math.min((window.devicePixelRatio || 1) * zoom, 2, Math.sqrt(budget / pixels)));
 }
 renderer.setPixelRatio(renderPixelRatio());
 renderer.setSize(kaLayoutW(), kaLayoutH());
@@ -10058,7 +10065,10 @@ atlasTex = loader.load(ATLAS_SRC, onAssetLoad, undefined, function(e){ console.e
 atlasTex.minFilter = THREE.LinearFilter;
 atlasTex.magFilter = THREE.LinearFilter;
 cutoutTex = loader.load(CUTOUT_SRC, onAssetLoad, undefined, function(e){ console.error('The crystal cutout texture failed to load.', e); });
-cutoutTex.minFilter = THREE.LinearFilter;
+// the finished logo is a large image drawn much smaller: smooth mip levels keep its edges clean (no jaggies or shimmer)
+// at every screen size. WebGL 2 (every current browser) can mip any image size; WebGL 1 keeps the plain filter.
+cutoutTex.minFilter = renderer.capabilities.isWebGL2 ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
+cutoutTex.generateMipmaps = !!renderer.capabilities.isWebGL2;
 cutoutTex.magFilter = THREE.LinearFilter;
 atlasTex.anisotropy = cutoutTex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 // GOD MODE v5: the HARD CONTAINMENT runtime mask texture (containMaskTex) that used to load
@@ -11332,8 +11342,10 @@ function drawIconGlyph(g, type, s){
 }
 
 function makeIconTexture(type){
-  const size=256,c=document.createElement('canvas');c.width=c.height=size;
+  // drawn at twice the size (crisp on large and high-density screens) and smoothed down with mip levels
+  const size=256,c=document.createElement('canvas');c.width=c.height=size*2;
   const g=c.getContext('2d'),r=103;
+  g.scale(2,2);
   g.translate(size/2,size/2);
   const glass=g.createRadialGradient(-36,-48,4,0,0,r);
   glass.addColorStop(0,'rgba(220,233,246,0.24)');
@@ -11350,7 +11362,7 @@ function makeIconTexture(type){
   sheen.addColorStop(0,'rgba(255,255,255,0.28)');sheen.addColorStop(1,'rgba(255,255,255,0)');
   g.fillStyle=sheen;g.beginPath();g.ellipse(-31,-51,53,27,-.3,0,Math.PI*2);g.fill();
   g.strokeStyle='#f2dec8';g.fillStyle='#edc9ab';drawIconGlyph(g,type,58);
-  const texture=new THREE.CanvasTexture(c);texture.minFilter=THREE.LinearFilter;return texture;
+  const texture=new THREE.CanvasTexture(c);texture.minFilter=THREE.LinearMipmapLinearFilter;texture.generateMipmaps=true;texture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());return texture;
 }
 
 const ICON_SIZE = 46;
@@ -11925,7 +11937,7 @@ function v3Resize(){
   if (!V3.cv) return;
   const w = kaLayoutW(), h = kaLayoutH();
   V3.w = w; V3.h = h;
-  V3.dpr = Math.min(window.devicePixelRatio || 1, V3.low ? (perfScale < 1 ? 1.25 : 1.75) : 1.5, Math.sqrt((V3.low ? 1.6e6 : 3.2e6) / Math.max(1, w*h)));
+  V3.dpr = Math.max(V3.low ? 0 : Math.min(window.devicePixelRatio || 1, 1), Math.min(window.devicePixelRatio || 1, V3.low ? (perfScale < 1 ? 1.25 : 1.75) : 2, Math.sqrt((V3.low ? 1.6e6 : 9e6) / Math.max(1, w*h))));
   V3.cv.width = Math.round(w*V3.dpr); V3.cv.height = Math.round(h*V3.dpr);
   V3.cv.style.width = w + 'px'; V3.cv.style.height = h + 'px';
   V3.x.setTransform(V3.dpr, 0, 0, V3.dpr, 0, 0);
@@ -16887,7 +16899,7 @@ var KaRocket = (function(){
     return new Promise(function(resolve, reject){
       var vw = window.innerWidth, vh = window.innerHeight, small = vw < 600;
       var dpr = 1;
-      var pixelBudget = (navigator.deviceMemory||4)<=2 ? 1000000 : 2500000;
+      var pixelBudget = (navigator.deviceMemory||4)<=2 ? 1000000 : 8800000;
       var br = button.getBoundingClientRect(), W = Math.max(60, Math.round(br.width)), H = Math.max(24, Math.round(br.height));
       var paint = buttonPaint(button), L = cfg.fold.length * (small ? .85 : 1);
       var stages = foldStages(W, H, L), cy = stages.cy;
@@ -16915,7 +16927,7 @@ var KaRocket = (function(){
       if(!ctx){layer.remove();reject(new Error("Canvas unavailable"));return;}
       function fit(){
         vw = window.innerWidth; vh = window.innerHeight;
-        dpr = Math.min(window.devicePixelRatio||1,2,Math.sqrt(pixelBudget/Math.max(1,vw*vh)));   // soft dots gain nothing past 2x
+        dpr = Math.max((navigator.deviceMemory||4)<=2 ? 0 : Math.min(window.devicePixelRatio||1,1), Math.min(window.devicePixelRatio||1,2,Math.sqrt(pixelBudget/Math.max(1,vw*vh))));   // never below native; soft dots gain nothing past 2x
         canvas.width = Math.round(vw * dpr); canvas.height = Math.round(vh * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
@@ -19747,7 +19759,7 @@ var TRAIL_LIFETIME = coarsePointer.matches ? 620 : 850;
 var rawX = 0, rawY = 0, rawTime = 0, havePointer = false, lastPushTime = 0;
 function resizeTrail(){
   var pixels = kaLayoutW() * kaLayoutH();
-  var dpr = Math.min(window.devicePixelRatio || 1, 1.25, Math.sqrt(1200000 / Math.max(1,pixels)));
+  var dpr = Math.max(Math.min(window.devicePixelRatio || 1, 1), Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(8800000 / Math.max(1,pixels))));   // a crisp line on any screen size
   trailCanvas.width = Math.round(kaLayoutW()*dpr);
   trailCanvas.height = Math.round(kaLayoutH()*dpr);
   tctx.setTransform(dpr,0,0,dpr,0,0);

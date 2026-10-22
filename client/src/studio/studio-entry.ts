@@ -172,8 +172,8 @@ class Studio {
   // ---- geometry: the drawing keeps its own "world" size; the view letterboxes it on resize ----
   resize(){
     const vw = window.innerWidth, vh = window.innerHeight;
-    const budget = (navigator as unknown as { deviceMemory?: number }).deviceMemory && (navigator as unknown as { deviceMemory: number }).deviceMemory <= 4 ? 2_500_000 : 5_000_000;
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(budget / (vw * vh)));
+    const budget = (navigator as unknown as { deviceMemory?: number }).deviceMemory && (navigator as unknown as { deviceMemory: number }).deviceMemory <= 4 ? 2_500_000 : 8_800_000;
+    this.dpr = Math.max(Math.min(window.devicePixelRatio || 1, 1), Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(budget / (vw * vh))));   // never below native
     this.scale = Math.min(vw / session.world.w, vh / session.world.h);
     this.offX = (vw - session.world.w * this.scale) / 2; this.offY = (vh - session.world.h * this.scale) / 2;
     for (const c of [this.bgC, this.inkC, this.liveC]){ c.width = Math.round(vw * this.dpr); c.height = Math.round(vh * this.dpr); c.style.width = vw + 'px'; c.style.height = vh + 'px'; }

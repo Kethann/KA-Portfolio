@@ -11,7 +11,8 @@ export const artworkSources=[
 ];
 
 export function renderBudget(width:number,height:number,pixelRatio:number){
-  return Math.min(pixelRatio,2,Math.sqrt((width<600?1500000:4000000)/Math.max(1,width*height)));
+  // never below the screen's own resolution on desktop; up to 2x on high-density screens (4K-sized budget)
+  return Math.max(width<600?0:Math.min(pixelRatio,1),Math.min(pixelRatio,2,Math.sqrt((width<600?1500000:8800000)/Math.max(1,width*height))));
 }
 export function transitionState(time:number){
   const index=Math.floor(Math.max(0,time)/26),phase=Math.max(0,time)-index*26;

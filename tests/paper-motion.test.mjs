@@ -72,7 +72,7 @@ test('retina trail resolution adapts to screen and memory budget',async()=>{
     const h=harness(settings), result={ok:true};
     const flight=h.api.fly(h.button,h.card,Promise.resolve(result));
     const canvas=h.nodes.find(n=>n.className==='rk-trail');
-    const budget=settings.memory<=2?1000000:2500000;
+    const budget=settings.memory<=2?1000000:8800000;   // 4K-sized; low-memory devices keep the small budget
     assert.ok(canvas.width*canvas.height<=budget+5000);
     if(settings.width===390) assert.equal(canvas.width,780); // soft dots are capped at 2x
     h.window.innerWidth+=1;h.step(1);
