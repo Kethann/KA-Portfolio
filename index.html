@@ -18794,6 +18794,17 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
   .ka-announce[data-side="left"] .ka-ann-panel{ margin:0 6px 0 10px; }
 }
 @supports not (translate: 0 0){ .ka-announce{ top:auto; bottom:110px; } }
+/* short screens (phones in landscape): the card sits low, beside the chat button rather than over it, clear of the
+   menu bar at the top, and a little more compact; a very long announcement scrolls inside the card */
+@media (max-height:520px) and (min-width:601px){
+  .ka-announce{ top:auto; bottom:12px; translate:none; }
+  .ka-announce[data-side="right"] .ka-ann-panel{ margin-right:88px; }
+  .ka-ann-panel{ padding:12px 14px 14px; max-height:calc(100vh - 110px); overflow-y:auto; }
+  .ka-ann-head{ margin-bottom:6px; }
+  .ka-ann-badge{ width:28px; height:28px; }
+  .ka-ann-text{ font-size:14px; line-height:1.5; }
+  .ka-ann-link{ margin-top:10px; padding:8px 14px 8px 16px; }
+}
 @media (prefers-reduced-motion: reduce){ .ka-announce{ transition:none; } .ka-ann-tab i{ animation:none; } .ka-ann-link, .ka-ann-link::after{ transition:none; } }
 
 /* ---- Featured Work showcase: rows down the page, zig-zag; pictures cross-fade in place (no sliding) ---- */
