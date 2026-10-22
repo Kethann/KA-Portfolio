@@ -1621,7 +1621,6 @@ html.ka-no-panda #panda-mascot, html.ka-no-panda .panda-bubble, html.ka-no-panda
           <div class="topic-other" id="topic-other"><div>
             <input type="text" id="contact-subject" name="subject" autocomplete="off" maxlength="120" placeholder="Tell me what it's about" aria-label="Other: what is it about?" aria-describedby="err-subject" tabindex="-1">
           </div></div>
-          <p class="topic-note" id="topic-note" hidden>For projects and commissions: once we’ve talked it through, you’ll get a short project agreement to sign online, and work starts after a <b id="topic-note-adv">10%</b> advance.</p>
           <span class="field-error" id="err-subject"></span>
         </fieldset>
         <label class="field-full" for="contact-message">Message
@@ -1640,7 +1639,10 @@ html.ka-no-panda #panda-mascot, html.ka-no-panda .panda-bubble, html.ka-no-panda
         </span>
         <h3 class="cc-result-title" tabindex="-1"></h3>
         <p class="cc-result-text" role="status" aria-live="polite"></p>
-        <button type="button" class="cc-notify" id="cc-notify" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span>Notify me on this device when Kethan replies</span></button>
+        <div class="cc-notify-wrap" id="cc-notify-wrap" hidden aria-live="polite">
+          <button type="button" class="cc-notify" id="cc-notify"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span>Notify me on this device when Kethan replies</span></button>
+          <p class="cc-notify-help" id="cc-notify-help" hidden></p>
+        </div>
         <button type="button" class="contact-submit cc-action" id="cc-action"></button>
       </div>
      </div>
@@ -17215,11 +17217,7 @@ document.getElementById("topic-grid").addEventListener("change", function(e){
   input.tabIndex = open ? 0 : -1;
   if (open && e.target.value === "__other") setTimeout(function(){ input.focus({ preventScroll: true }); }, 200);
   validateContactField("subject"); updateContactSubmitState();
-  // a project or commission: say up front that an agreement and an advance come before the work
-  var note = document.getElementById("topic-note");
-  if (note) note.hidden = !kaTopics().picked.some(function(t){ return /project|commission|poster design|collab/i.test(t); });
 });
-if (window.kaPublicConfig) window.kaPublicConfig().then(function(c){ var a = c && c.contact && c.contact.advancePercent, el = document.getElementById("topic-note-adv"); if (el && typeof a === "number") el.textContent = a + "%"; });
 function validateContactField(key){
   var rule = CONTACT_RULES[key];
   var value = rule.el.value.trim();
@@ -17281,6 +17279,7 @@ contactForm.addEventListener("submit", function(e){
   if(contactSending)return;
   var submitBtn = contactForm.querySelector(".contact-submit");
   var data = new FormData(contactForm);
+  if (window.kaReplyAlerts) window.kaReplyAlerts.ask();   // notifications for the reply are on by default: the browser asks once, now
   var payload = {
     name: (data.get("name") || "").toString().trim(),
     email: (data.get("email") || "").toString().trim(),
@@ -17333,12 +17332,7 @@ contactForm.addEventListener("submit", function(e){
     return outcome;
   });
   KaRocket.send(submitBtn, card, request).then(function(outcome){
-    var bell = document.getElementById("cc-notify");
-    if (bell){
-      var alerts = window.kaReplyAlerts;
-      bell.hidden = !(outcome.ok && alerts && alerts.supported() && !alerts.on());
-      bell.disabled = false; bell.querySelector("span").textContent = "Notify me on this device when Kethan replies";
-    }
+    if (window.kaReplyAlerts) window.kaReplyAlerts.render(outcome.ok);
     contactStatus.textContent = outcome.ok ? "Message sent -- thanks for reaching out, I'll get back to you soon." : outcome.message;
     contactStatus.dataset.state = outcome.ok ? "ok" : "error";
     if (outcome.fallback) {                      // no card turn happened: reset here like before
@@ -17351,12 +17345,7 @@ contactForm.addEventListener("submit", function(e){
     updateContactSubmitState();
   });
 });
-document.getElementById("cc-notify").addEventListener("click", function(){
-  var bell = this; bell.disabled = true;
-  window.kaReplyAlerts.enable().then(function(ok){
-    bell.querySelector("span").textContent = ok ? "Done: you\u2019ll be notified here when Kethan replies" : "Notifications are blocked in this browser. The reply will still come by email.";
-  });
-});
+document.getElementById("cc-notify").addEventListener("click", function(){ if (window.kaReplyAlerts) window.kaReplyAlerts.tap(); });
 // Result-face button: "Send another message" (after success) / "Try again" (after an error) turns the card back to the form.
 function resetContactForm(){
   contactForm.reset();
@@ -18866,9 +18855,6 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
 .topic-other{ display:grid; grid-template-rows:0fr; transition:grid-template-rows .45s cubic-bezier(.22,.8,.24,1), margin .45s ease; margin-top:0; }
 .topic-other.is-open{ grid-template-rows:1fr; margin-top:10px; }
 .topic-other > div{ overflow:hidden; }
-.topic-note{ margin:10px 0 0; padding:10px 14px; border-radius:12px; border:1px solid rgba(255,148,56,.3); background:rgba(255,148,56,.07); font:400 13px/1.5 var(--font-body, sans-serif); letter-spacing:0; text-transform:none; color:rgba(237,235,232,.82); }
-.topic-note[hidden]{ display:none; }
-.topic-note b{ color:#ffb87a; font-weight:600; }
 .contact-topics[aria-invalid="true"] .topic-chip span{ border-color:rgba(255,120,110,.5); }
 /* after sending: opt in to a notification on this device when the reply comes */
 .cc-notify{ display:inline-flex; align-items:center; gap:9px; margin:0 auto 14px; padding:10px 16px; border-radius:999px; border:1px solid rgba(255,255,255,.18); background:rgba(0,0,0,.32); color:var(--ink, #edebe8); font:500 13.5px/1.3 var(--font-body, sans-serif); cursor:pointer; transition:background .2s ease, border-color .2s ease; }
@@ -18877,6 +18863,12 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
 .cc-notify:disabled{ cursor:default; opacity:.85; }
 .cc-notify svg{ width:16px; height:16px; flex:none; color:#ff9438; }
 .cc-notify:focus-visible{ outline:2px solid #ff9438; outline-offset:2px; }
+.cc-notify-wrap{ display:grid; justify-items:center; gap:8px; margin:0 auto 14px; max-width:460px; }
+.cc-notify-wrap[hidden]{ display:none; }
+.cc-notify-wrap .cc-notify{ margin:0; }
+.cc-notify-wrap[data-state="granted"] .cc-notify svg{ color:#6fe0a8; }
+.cc-notify-help{ margin:0; font:400 12.5px/1.55 var(--font-body, sans-serif); color:rgba(237,235,232,.66); text-align:center; }
+.cc-notify-help[hidden]{ display:none; }
 
 /* ---- a reply from Kethan, on the device that sent the message ---- */
 .ka-reply{ position:fixed; left:max(16px, env(safe-area-inset-left)); bottom:max(18px, env(safe-area-inset-bottom)); z-index:90; width:min(400px, calc(100vw - 32px)); max-height:min(70vh, 560px);
@@ -19452,7 +19444,7 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
     try { if (window.caches) caches.open("ka-threads").then(function(c){ return c.put("/__ka/threads", new Response(JSON.stringify(list.map(function(t){ return t.k; })), { headers: { "Content-Type": "application/json" } })); }).catch(function(){}); } catch(e){}
   }
   // ---- notifications on this device: real push when the site has keys (works with the site closed), otherwise a
-  // system notification while the site is open in the background. Always opt-in: only after a tap on "Notify me".
+  // system notification while the site is open in the background. On by default: the browser is asked when Send is pressed.
   var PUSH_OK = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window && window.isSecureContext;
   function b64uBytes(s){ var b = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), out = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) out[i] = b.charCodeAt(i); return out; }
   function workerReg(){ return navigator.serviceWorker.register("/ka-sw.js", { scope: "/" }).then(function(){ return navigator.serviceWorker.ready; }); }
@@ -19465,21 +19457,75 @@ html[data-ka-nap] .store-closed.has-panda .sc-zz{ opacity:1; }
       }).then(function(sub){ return post("/api/messages/threads/push", { keys: keys, endpoint: sub.endpoint }).then(function(){ return true; }); });
     }).catch(function(){ return false; });
   }
+  // Reply notifications are ON by default: pressing Send asks the browser once (a tap is needed for that question).
+  // granted → this device is told about replies (push, or a system notification while the site is open);
+  // dismissed → a button asks again; blocked → the browser won't ask again by itself, so the visitor gets the exact steps
+  // for their browser and a "Try again" that checks the setting (and turns on by itself the moment it is allowed).
+  var HAS_N = "Notification" in window;
+  var perm = function(){ return HAS_N ? Notification.permission : "unsupported"; };
+  var asking = null, lastOk = false;
+  function ua(){ return navigator.userAgent || ""; }
+  function isIOS(){ return /iPad|iPhone|iPod/.test(ua()) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); }
+  function standalone(){ return (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true; }
+  function unblockSteps(){
+    var u = ua();
+    if (/Android/i.test(u)) return "Tap the icon left of the address bar (or ⋮ › Settings › Site settings), open Notifications and choose Allow. Then tap Try again.";
+    if (/Firefox\//.test(u)) return "Click the icon left of the address bar, clear “Blocked” next to Notifications, then click Try again.";
+    if (/Safari\//.test(u) && !/Chrome|Chromium|Edg\//.test(u)) return "Open Safari › Settings › Websites › Notifications, set this site to Allow, then click Try again.";
+    return "Click the icon left of the address bar, then Site settings (or Permissions), set Notifications to Allow, then click Try again.";
+  }
+  function turnOn(){
+    store("ka_reply_alerts", "1");
+    syncWorkerKeys(threads());
+    return pushSubscribe(threads().map(function(t){ return t.k; })).then(function(){ return true; }, function(){ return true; });
+  }
   window.kaReplyAlerts = {
-    supported: function(){ return "Notification" in window && Notification.permission !== "denied"; },
-    on: function(){ return "Notification" in window && Notification.permission === "granted" && store("ka_reply_alerts") === "1"; },
-    // ask once, from a tap; resolves true when this device will be told about replies
-    enable: function(){
-      if (!("Notification" in window)) return Promise.resolve(false);
-      var ask = Notification.permission === "granted" ? Promise.resolve("granted") : Promise.resolve(Notification.requestPermission());
-      return ask.then(function(p){
-        if (p !== "granted") return false;
-        store("ka_reply_alerts", "1");
-        syncWorkerKeys(threads());
-        return pushSubscribe(threads().map(function(t){ return t.k; })).then(function(){ return true; });
-      }).catch(function(){ return false; });
+    supported: function(){ return HAS_N; },
+    on: function(){ return perm() === "granted" && store("ka_reply_alerts") !== "0"; },
+    // from the Send tap: ask the browser now, while the tap still counts (only when it hasn't been answered yet)
+    ask: function(){
+      if (perm() !== "default" || asking) return;
+      try { asking = Promise.resolve(Notification.requestPermission()).catch(function(){ return perm(); }); } catch(e){ asking = null; }
+    },
+    // the bell button: ask (again), or after a block, check whether it has been allowed in the browser settings
+    tap: function(){
+      if (perm() === "granted"){ turnOn().then(function(){ window.kaReplyAlerts.render(true); }); return; }
+      if (perm() === "default"){ asking = null; window.kaReplyAlerts.ask(); }
+      window.kaReplyAlerts.render(true, true);
+    },
+    // the result face of the contact card: show the state that is true right now
+    render: function(ok, tapped){
+      lastOk = ok;
+      var wrap = document.getElementById("cc-notify-wrap"), bell = document.getElementById("cc-notify"), help = document.getElementById("cc-notify-help");
+      if (!wrap) return;
+      var p = perm(), label = bell.querySelector("span");
+      wrap.hidden = !ok; if (!ok) return;
+      if (asking && p === "default"){ bell.disabled = true; label.textContent = "Allow notifications in the box your browser shows…"; help.hidden = true;
+        asking.then(function(){ asking = null; window.kaReplyAlerts.render(lastOk); }); return; }
+      bell.disabled = false; help.hidden = true; wrap.dataset.state = p;
+      if (p === "granted"){
+        if (store("ka_reply_alerts") !== "1") turnOn();
+        bell.disabled = true; label.textContent = "Notifications are on: you’ll be told here when Kethan replies";
+      } else if (p === "default"){
+        label.textContent = "Turn on notifications for the reply";
+      } else if (p === "denied"){
+        label.textContent = "Try again";
+        help.hidden = false; help.textContent = (tapped ? "Notifications are still blocked for this site. " : "Notifications are blocked for this site in your browser. ") + unblockSteps() + " The reply also comes by email either way.";
+      } else if (isIOS() && !standalone()){
+        bell.hidden = true; help.hidden = false;
+        help.textContent = "On iPhone and iPad, notifications work once the site is on your Home Screen: tap Share › Add to Home Screen, open it from there and send from it. The reply also comes by email.";
+        return;
+      } else { wrap.hidden = true; return; }
+      bell.hidden = false;
     }
   };
+  // the moment notifications are allowed (from the browser settings, or the box), turn them on without another tap
+  try {
+    if (navigator.permissions && navigator.permissions.query) navigator.permissions.query({ name: "notifications" }).then(function(st){
+      st.onchange = function(){ if (perm() === "granted") turnOn(); window.kaReplyAlerts.render(lastOk); };
+    }).catch(function(){});
+  } catch(e){}
+  if (perm() === "granted" && threads().length && store("ka_reply_alerts") !== "0") turnOn();
   function systemNotify(t, r){
     if (!window.kaReplyAlerts.on() || !document.hidden) return;
     var opts = { body: String(r.body || "").replace(/\s+/g, " ").slice(0, 160), tag: "ka-reply", icon: "/images/ka-logo.png", data: { url: "/?thread=" + encodeURIComponent(t.key) } };

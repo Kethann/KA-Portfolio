@@ -14,7 +14,6 @@ import { demoPaymentsEnabled } from '../store/orders.js';
 import { storeState, publicStore } from '../store/access.js';
 import { threadKey } from './threads.js';
 import { pushPublicKey } from '../core/webpush.js';
-import { cleanDefaults } from '../../shared/agreement.js';
 // bundled with the code (the Worker has no file system to read it from at runtime)
 import seed from '../portfolio-seed.json' with { type: 'json' };
 import { STATS_DEFAULT, SKILLS_DEFAULT, ABOUT_DEFAULT } from '../admin/site-document.js';
@@ -40,7 +39,7 @@ export async function bumpLiveVersion(){
 export function currencyFor(country){ return country === 'IN' ? 'INR' : 'USD'; }
 
 export async function publicConfig(ctx){
-  const [upscaler, assistant, state, messages, agreements] = await Promise.all([getSetting('upscaler'), getSetting('assistant'), storeState(ctx.request), getSetting('messages'), getSetting('agreements')]);
+  const [upscaler, assistant, state, messages] = await Promise.all([getSetting('upscaler'), getSetting('assistant'), storeState(ctx.request), getSetting('messages')]);
   const country = ctx.geo?.country || null;
   return json({
     turnstileSiteKey: env('TURNSTILE_SITE_KEY') || '',
@@ -48,7 +47,7 @@ export async function publicConfig(ctx){
     country,
     suggestedCurrency: currencyFor(country),
     store: publicStore(state),
-    contact: { topics: (messages.contactTopics || []).slice(0, 12), replyOnSite: messages.replyOnSite !== false, pushKey: messages.replyOnSite !== false ? pushPublicKey() : '', advancePercent: cleanDefaults(agreements || {}).advancePercent },
+    contact: { topics: (messages.contactTopics || []).slice(0, 12), replyOnSite: messages.replyOnSite !== false, pushKey: messages.replyOnSite !== false ? pushPublicKey() : '' },
     demoPayments: demoPaymentsEnabled(),
     upscaler: { comingSoon: upscaler.comingSoon, title: upscaler.title, badge: upscaler.badge, text: upscaler.text, notifyEnabled: upscaler.notifyEnabled },
     assistant: { enabled: !!assistant.enabled, greeting: assistant.greeting, suggestions: assistant.suggestions }
