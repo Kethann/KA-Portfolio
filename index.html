@@ -1061,6 +1061,17 @@ html.ka-lite .about-stat::before{ background:linear-gradient(135deg, rgba(255,25
 }
 .fav-chip:hover{ color:var(--ink); }
 .fav-chip.active{ color:var(--amber); border-color:var(--amber); }
+/* Stacks / Mosaic switch beside the ALL / PINNED filters: one pill, the chosen view lit */
+.view-switch{ display:inline-flex; margin-left:8px; padding:3px; gap:2px; border:1px solid var(--line); border-radius:999px; }
+.view-chip{ display:inline-flex; align-items:center; gap:6px; background:transparent; border:0; border-radius:999px; padding:4px 12px 4px 9px;
+  font-family:'JetBrains Mono', ui-monospace, monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink-dim);
+  cursor:pointer; transition:color .2s ease, background-color .2s ease; }
+.view-chip svg{ width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linejoin:round; stroke-linecap:round; }
+.view-chip:hover{ color:var(--ink); }
+.view-chip.active{ color:var(--amber); background:rgba(255,179,122,.1); }
+.view-chip:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+@media (max-width:420px){ .view-chip span{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); } .view-chip{ padding:6px 10px; } }
+@media (pointer:coarse){ .view-chip{ min-height:38px; } }
 .fav-chip:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
 .folder-grid{
   display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:32px; perspective:1400px;
@@ -2155,6 +2166,10 @@ html.ka-no-panda #panda-mascot, html.ka-no-panda .panda-bubble, html.ka-no-panda
     <div class="fav-filter">
       <button class="fav-chip active" id="fav-chip-all" type="button">All</button>
       <button class="fav-chip" id="fav-chip-pinned" type="button">Pinned</button>
+      <span class="view-switch" role="group" aria-label="Portfolio view">
+        <button class="view-chip active" id="view-chip-stacks" type="button" aria-pressed="true" title="Stacks: one stack per category"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="6.5" y="4.5" width="11" height="15" rx="2"/><path d="M4 7.5v10M20 7.5v10"/></svg><span>Stacks</span></button>
+        <button class="view-chip" id="view-chip-mosaic" type="button" aria-pressed="false" title="Mosaic: every picture together"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="3.5" width="7" height="10" rx="1"/><rect x="12.5" y="3.5" width="8" height="6" rx="1"/><rect x="3.5" y="15.5" width="7" height="5" rx="1"/><rect x="12.5" y="11.5" width="8" height="9" rx="1"/></svg><span>Mosaic</span></button>
+      </span>
     </div>
     <div class="folder-grid" id="folder-grid"></div>
   </div>
@@ -15387,6 +15402,21 @@ function mountCoverflow(container, posters, opts){
 var folderShelf = document.getElementById("folder-shelf");
 var portfolioCoverflowEl = document.getElementById("portfolio-coverflow");
 var favFilter = "all";
+// Stacks or Mosaic for the Portfolio panel: the visitor's own choice wins, else the owner's default from the portal
+var portfolioViewChoice = null;
+try { var savedView = localStorage.getItem("ka-portfolio-view"); if (savedView === "stacks" || savedView === "mosaic") portfolioViewChoice = savedView; } catch (e) {}
+function portfolioView(){
+  if (portfolioViewChoice) return portfolioViewChoice;
+  var m = ((window.__kaLastPortfolioData || {}).stacks || {}).mosaic;
+  return m && m.view === "mosaic" ? "mosaic" : "stacks";
+}
+function syncViewChips(){
+  var v = portfolioView();
+  [["stacks", "view-chip-stacks"], ["mosaic", "view-chip-mosaic"]].forEach(function(pair){
+    var el = document.getElementById(pair[1]); if (!el) return;
+    el.classList.toggle("active", pair[0] === v); el.setAttribute("aria-pressed", pair[0] === v ? "true" : "false");
+  });
+}
 
 function postersFor(category, favOnly){
   return POSTERS.filter(function(p){
@@ -15453,6 +15483,7 @@ function workStacksProps(id){
     // About > Featured Work shows the featured stacks; the Portfolio shows the rest, so no stack appears twice
     id: id, folders: kaPanelFolders(id, data), images: kaPanelImages(id, data), stacks: data.stacks || { loop: true, covers: {} },
     filter: id === 'work' ? favFilter : 'all',          // the ALL / PINNED chips filter the Portfolio panel only
+    view: id === 'work' ? portfolioView() : 'stacks',   // the Stacks / Mosaic switch belongs to the Portfolio panel
     pinned: pinned, onPin: function(slug, on){ setPinned(slug, on); }   // setPinned fires ka-pins-changed, which re-renders
   };
 }
@@ -15470,8 +15501,18 @@ function renderWorkStacks(){
   });
 }
 function buildFolders(){
+  syncViewChips();
   renderWorkStacks();
 }
+["stacks", "mosaic"].forEach(function(v){
+  var el = document.getElementById("view-chip-" + v); if (!el) return;
+  el.addEventListener("click", function(){
+    if (portfolioView() === v) return;
+    portfolioViewChoice = v;
+    try { localStorage.setItem("ka-portfolio-view", v); } catch (e) {}
+    buildFolders();
+  });
+});
 
 document.getElementById("fav-chip-all").addEventListener("click", function(){
   favFilter = "all";
@@ -17410,6 +17451,7 @@ function applyPortfolioData(data){
       full: img.full || 0,
       src: img.src || null, // creator-uploaded images carry their own direct src (see buildPicture)
       downloadable: img.downloadable !== false, // per-image download permission (creator panel toggle)
+      width: img.width || undefined, height: img.height || undefined, // original size when known (the mosaic lays out from it)
     };
   });
   CATEGORIES = data.folders.slice();

@@ -118,7 +118,8 @@ export function visibleSite(doc){
   const hidden = new Set(doc.images.filter(i => i.hidden === true).map(i => i.slug));
   if (!hidden.size) return doc;
   const covers = Object.fromEntries(Object.entries(doc.stacks?.covers || {}).filter(([, slug]) => !hidden.has(slug)));
-  return { ...doc, images: doc.images.filter(i => !hidden.has(i.slug)), stacks: { ...(doc.stacks || {}), covers } };
+  const mosaic = doc.stacks?.mosaic ? { mosaic: { ...doc.stacks.mosaic, order: (doc.stacks.mosaic.order || []).filter(slug => !hidden.has(slug)) } } : {};
+  return { ...doc, images: doc.images.filter(i => !hidden.has(i.slug)), stacks: { ...(doc.stacks || {}), covers, ...mosaic } };
 }
 export async function portfolio(){
   return json(visibleSite(await loadSiteDocument()), 200, PUBLIC_CACHE);

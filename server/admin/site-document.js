@@ -317,7 +317,7 @@ export function validateSiteDocument(input, current, seed){
       const original = originals.get(slug);
       if (!original) throw bad('Unknown original image: ' + slug);
       const { archived: _a, focusX: _x, focusY: _y, zoom: _z, reference: _r, ...plain } = original;   // the stored flags must not leak back once they are switched off
-      images.push({ ...plain, ...common });
+      images.push({ ...plain, ...common, ...dims });   // the size measured in the portal lets the mosaic lay out before pictures load
     }
   }
   // loop: the default for every stack; loops: a stack's own choice (true or false), kept only for folders that exist
@@ -329,6 +329,15 @@ export function validateSiteDocument(input, current, seed){
   }
   if (input.stacks?.covers && typeof input.stacks.covers === 'object'){
     for (const [folder, slug] of Object.entries(input.stacks.covers)) if (folders.includes(folder) && images.some(i => i.slug === slug && i.cat === folder)) stacks.covers[folder] = slug;
+  }
+  // mosaic: the Portfolio's all-pictures view (portal > Content > Mosaic): the default view, row height, gap and the
+  // order the owner arranged (existing images only, no repeats). Only stored once set, so older documents stay as they were.
+  const mz = input.stacks?.mosaic;
+  if (mz && typeof mz === 'object'){
+    const n = (v, lo, hi, d) => { const x = Number(v); return Number.isFinite(x) ? Math.min(hi, Math.max(lo, Math.round(x))) : d; };
+    const order = [];
+    if (Array.isArray(mz.order)) for (const slug of mz.order) if (typeof slug === 'string' && images.some(i => i.slug === slug) && !order.includes(slug)) order.push(slug);
+    stacks.mosaic = { view: mz.view === 'mosaic' ? 'mosaic' : 'stacks', rowHeight: n(mz.rowHeight, 140, 520, 280), gap: n(mz.gap, 0, 12, 2), order };
   }
   const featuredShow = validateFeaturedShow(input.featuredShow, folders, images);
   // The checkout pass (Studio > Checkout pass): label, logo, fonts and where things sit on the card.

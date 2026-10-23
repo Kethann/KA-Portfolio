@@ -290,3 +290,65 @@
 /* no visible scroll bars (scrolling still works by touch, wheel and keys) */
 *{ scrollbar-width:none; }
 *::-webkit-scrollbar{ width:0; height:0; display:none; }
+
+/* ---- mosaic: every picture in one solid block, each in its own shape, a hairline gap between them ----
+   Tiles are placed by mosaic-layout.ts (absolute, transform only); the block's height is set from the layout. */
+.mz-wrap{scroll-margin-top:88px}
+.mz{position:relative;width:100%;contain:layout;margin-top:6px}
+.mz-cell{position:absolute;left:0;top:0;transition:transform .5s cubic-bezier(.22,.8,.24,1),width .5s cubic-bezier(.22,.8,.24,1),height .5s cubic-bezier(.22,.8,.24,1)}
+.mz-snap .mz-cell{transition:none}
+.mz-tile{position:absolute;inset:0;display:block;width:100%;height:100%;padding:0;margin:0;border:0;border-radius:0;overflow:hidden;cursor:zoom-in;background:#15141a;color:inherit;font:inherit;
+  -webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-appearance:none;appearance:none;touch-action:manipulation;transition:transform .18s ease}
+.mz-img{position:absolute;inset:0;display:block}
+.mz-img.is-loading{background:linear-gradient(110deg,#17151c 30%,#26212c 48%,#17151c 66%) 0 0/220% 100%;animation:stackShimmer 1.5s linear infinite}
+.mz-tile img{display:block;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.001);transition:opacity .38s ease,transform .6s cubic-bezier(.22,.8,.24,1),filter .3s ease;user-select:none;-webkit-user-select:none;-webkit-user-drag:none}
+.mz-tile img.is-in{opacity:1}
+.mz-tile:focus{outline:none}
+.mz-tile:focus-visible{outline:2px solid #ffb37a;outline-offset:-2px;z-index:2}
+.mz-tile::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s ease;
+  background:radial-gradient(circle at var(--gx,50%) var(--gy,40%),rgba(255,236,214,.22),rgba(255,236,214,0) 46%)}
+.mz-cap{position:absolute;inset:auto 0 0 0;z-index:1;display:flex;flex-direction:column;gap:2px;padding:28px 12px 10px;text-align:left;pointer-events:none;
+  background:linear-gradient(to top,#000c,#0000);opacity:0;transform:translate3d(0,6px,0);transition:opacity .25s ease,transform .3s ease}
+.mz-cap strong{font-size:13px;font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mz-cap small{font-family:var(--font-mono,"JetBrains Mono"),ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;color:#d0ccd6;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mz-pin{position:absolute;top:7px;right:7px;z-index:1;width:24px;height:24px;display:grid;place-items:center;border-radius:50%;background:rgba(13,11,18,.62);color:#ffb37a;pointer-events:none}
+.mz-pin svg{width:13px;height:13px;fill:currentColor}
+.mz-tile:focus-visible .mz-cap{opacity:1;transform:none}
+/* mouse: the picture under the cursor lifts and lights up, the others dim a touch so it stands out */
+@media (hover:hover) and (pointer:fine){
+  .mz:hover .mz-tile img.is-in{filter:brightness(.74) saturate(.92)}
+  .mz .mz-tile:hover img.is-in{filter:none;transform:scale(1.035)}
+  .mz-tile:hover::after{opacity:1}
+  .mz-tile:hover .mz-cap{opacity:1;transform:none}
+}
+/* touch: a clear press, and the title of a small tile is never needed to choose it (the viewer shows it) */
+@media (hover:none),(pointer:coarse){
+  .mz-tile:active{transform:scale(.97)}
+  .mz-tile:active img.is-in{filter:brightness(.85)}
+}
+/* category chips above the mosaic: one row that scrolls sideways on narrow screens */
+.mz-bar{display:flex;gap:8px;margin:4px 0 14px;padding:2px 2px 4px;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
+.mz-chip{flex:none;display:inline-flex;align-items:center;gap:7px;min-height:34px;padding:0 14px;border:1px solid #ffffff26;border-radius:999px;background:#ffffff08;color:#c9c5cf;cursor:pointer;scroll-snap-align:start;
+  font-family:var(--font-mono,"JetBrains Mono"),ui-monospace,monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;
+  transition:color .2s ease,border-color .2s ease,background-color .2s ease,transform .25s cubic-bezier(.34,1.56,.64,1);-webkit-tap-highlight-color:transparent}
+.mz-chip span{color:#8d8b96;font-variant-numeric:tabular-nums}
+.mz-chip:hover{color:#f1ece6;border-color:#ffffff4d}
+.mz-chip:active{transform:scale(.95)}
+.mz-chip.is-on{color:#ffb37a;border-color:#ffb37a99;background:#ffb37a17}
+.mz-chip.is-on span{color:#ffcfa6}
+.mz-chip:focus-visible{outline:2px solid #ffb37a;outline-offset:2px}
+@media (pointer:coarse){.mz-chip{min-height:40px}}
+.mz-enter .mz-cell{animation:mzIn .6s cubic-bezier(.2,.9,.25,1) both;animation-delay:calc(var(--i,0) * 35ms)}
+.mz-cell.is-new{animation:mzPop .45s cubic-bezier(.2,.9,.25,1) both}
+@keyframes mzIn{from{opacity:0;translate:0 14px}to{opacity:1;translate:0 0}}
+@keyframes mzPop{from{opacity:0;scale:.9}to{opacity:1;scale:1}}
+.mz-wait{position:absolute;inset:0;border-radius:4px;background:linear-gradient(110deg,#17151c 30%,#26212c 48%,#17151c 66%) 0 0/220% 100%;animation:stackShimmer 1.5s linear infinite}
+.mz-view{display:block}
+.vw-media{touch-action:pan-y pinch-zoom}
+@media (prefers-reduced-motion:reduce){
+  .mz-cell,.mz-tile,.mz-chip{transition:none}
+  .mz-enter .mz-cell,.mz-cell.is-new,.mz-img.is-loading,.mz-wait{animation:none}
+  .mz-tile img{transition:none}
+  .mz .mz-tile:hover img.is-in{transform:none}
+}
+@media (forced-colors:active){.mz-tile:focus-visible{outline:2px solid Highlight}.mz-chip.is-on{border-color:Highlight}}

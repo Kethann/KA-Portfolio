@@ -7,6 +7,7 @@ import { useSyncExternalStore } from 'react';
 import { get, put } from '../api';
 import { PASS_DEFAULTS, type PassSettings } from '../../../src/store/checkout/PassCard';
 import { ABOUT_DEFAULT, ABOUT_LIMITS } from '../../../../shared/about-default.js';
+import type { MosaicSettings } from '../../../src/mosaic-layout';
 
 export type SiteImage = { id: string; slug: string; title: string; cat: string; description: string; technologies: string[]; link: string; downloadable?: boolean; hidden?: boolean; archived?: boolean; focusX?: number; focusY?: number; zoom?: number; src?: string; widths: number[]; full: number; width?: number; height?: number; reference?: { src: string; label: string } };
 // The announcement: a side tab that slides open by itself and tucks away after autoClose seconds (0 = stays open), or the old top banner.
@@ -25,7 +26,7 @@ export type SiteDoc = {
   announcements?: AnnouncementItem[];
   revision: number; details: Record<string, any> & { customFonts: { family: string; url: string }[] }; folders: string[]; images: SiteImage[];
   notice: Announcement; visibility: { navGallery: boolean; navAbout: boolean; navContact?: boolean; navStore?: boolean; navTypography?: boolean; menuTips?: boolean; menuDemix?: boolean; menuUpscaler?: boolean; menuPortfolio?: boolean; menuFullscreen?: boolean; menuSound?: boolean; panda?: boolean; autoFullscreen?: boolean; downloadFormat?: 'png' | 'jpeg'; protectImages?: boolean };
-  stacks: { loop: boolean; loops?: Record<string, boolean>; covers: Record<string, string>; featured?: string[] }; layoutOverrides: Record<string, Record<string, { x: number; y: number; scale: number; width?: number }>>;
+  stacks: { loop: boolean; loops?: Record<string, boolean>; covers: Record<string, string>; featured?: string[]; mosaic?: MosaicSettings }; layoutOverrides: Record<string, Record<string, { x: number; y: number; scale: number; width?: number }>>;
   branding: { enabled: boolean; logoUrl: string }; elementStyles: Record<string, any>; socialLinks: { label: string; url: string; icon: string }[];
   passCard: PassDraft;
   stats: StatsDraft;

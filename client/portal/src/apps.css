@@ -617,3 +617,24 @@
 .agr-steps li.done::before{ background:#4fd08a; border-color:#4fd08a; }
 .agr-steps li.bad::before{ background:#ff8c8c; border-color:#ff8c8c; }
 @container (max-width: 980px){ .agr-editor{ grid-template-columns:1fr; } .agr-preview{ position:static; max-height:none; } }
+
+/* Content > Mosaic: the arranger. The stage is drawn at the real page width and scaled to fit; tiles glide into place. */
+.mzr-box{ width:100%; min-width:0; }
+.mzr-frame{ position:relative; margin:0 auto; overflow:hidden; border-radius:var(--r-sm); background:var(--surface-2); }
+.mzr-stage{ position:absolute; left:0; top:0; transform-origin:0 0; user-select:none; -webkit-user-select:none; }
+.mzr-cell{ position:absolute; left:0; top:0; transition:transform .32s cubic-bezier(.22,.8,.24,1), width .32s cubic-bezier(.22,.8,.24,1), height .32s cubic-bezier(.22,.8,.24,1); }
+.mzr-tile{ position:absolute; inset:0; padding:0; border:0; background:var(--surface-3); overflow:hidden; cursor:grab; touch-action:manipulation; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; transition:transform .28s ease; }
+.mzr-cell.is-holding .mzr-tile{ transform:scale(.94); }
+.mzr-tools .mzr-history{ margin-left:auto; display:inline-flex; gap:2px; }
+.mzr-redo svg{ transform:scaleX(-1); }
+.mzr-sel{ padding:6px 8px; border-radius:var(--r-sm); background:var(--surface-2); }
+.mzr-stage.is-dragging .mzr-tile{ cursor:grabbing; }
+.mzr-tile img{ display:block; width:100%; height:100%; object-fit:cover; pointer-events:none; }
+.mzr-tile:focus-visible, .mzr-tile.is-sel{ outline:3px solid var(--accent); outline-offset:-3px; z-index:2; }
+.mzr-num{ position:absolute; left:6px; top:6px; min-width:22px; padding:2px 6px; border-radius:999px; background:rgba(0,0,0,.62); color:#fff; font-size:12px; font-variant-numeric:tabular-nums; text-align:center; }
+.mzr-cell.is-slot .mzr-tile{ background:transparent; outline:2px dashed var(--accent); outline-offset:-2px; }
+.mzr-cell.is-slot .mzr-tile img, .mzr-cell.is-slot .mzr-num{ visibility:hidden; }
+.mzr-ghost{ position:absolute; left:0; top:0; z-index:10; pointer-events:none; overflow:hidden; border-radius:6px; box-shadow:0 22px 48px rgba(0,0,0,.55), 0 0 0 2px var(--accent); opacity:.94; will-change:transform; }
+.mzr-ghost img{ display:block; width:100%; height:100%; object-fit:cover; }
+@media (prefers-reduced-motion:reduce){ .mzr-cell, .mzr-tile{ transition:none; } }
+@media (pointer:coarse){ .mzr-num{ min-width:26px; font-size:13px; } }

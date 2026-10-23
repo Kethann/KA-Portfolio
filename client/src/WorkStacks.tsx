@@ -2,9 +2,10 @@ import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'rea
 import type {CSSProperties,KeyboardEvent as ReactKeyboardEvent,MouseEvent as ReactMouseEvent,PointerEvent as ReactPointerEvent} from 'react';
 import {imageUrl,type Project} from './types';
 import {sfx} from './lib/sound/sfx';
+import {MOSAIC_DEFAULTS,applyOrder,knownRatio,layoutMosaic,measureRatio,mosaicTarget,rememberRatio,type MosaicSettings,type MosaicTile} from './mosaic-layout';
 
-export type StacksSettings={loop?:boolean;loops?:Record<string,boolean>;covers?:Record<string,string>};
-export type WorkStacksProps={folders:string[];images:Project[];stacks?:StacksSettings;/** 'pinned' shows only pinned images (Portfolio ALL / PINNED chips). */filter?:'all'|'pinned';pinned?:string[];onPin?:(slug:string,on:boolean)=>void;/** Distinguishes panels (Portfolio, About) so each plays its own entrance once. */id?:string};
+export type StacksSettings={loop?:boolean;loops?:Record<string,boolean>;covers?:Record<string,string>;mosaic?:MosaicSettings};
+export type WorkStacksProps={folders:string[];images:Project[];stacks?:StacksSettings;/** 'pinned' shows only pinned images (Portfolio ALL / PINNED chips). */filter?:'all'|'pinned';pinned?:string[];onPin?:(slug:string,on:boolean)=>void;/** Distinguishes panels (Portfolio, About) so each plays its own entrance once. */id?:string;/** 'mosaic' shows every picture packed together instead of one stack per category. */view?:'stacks'|'mosaic'};
 type Stack={name:string;items:Project[];cover:Project};
 
 /** The scatter-to-organize entrance plays once per panel per page load, however often it re-renders or remounts. */
@@ -512,9 +513,16 @@ function Viewer({p,stackName,index,n,atStart,atEnd,onPrev,onNext,onBack,reduced,
     }
     info?.animate([{opacity:0,transform:'translate3d(24px,0,0)'},{opacity:1,transform:'translate3d(0,0,0)'}],{duration:380,delay:110,easing:'cubic-bezier(.2,.9,.25,1)',fill:'backwards'});
   },[]);// eslint-disable-line react-hooks/exhaustive-deps
+  const swipe=useRef<{x:number;y:number;id:number}|null>(null);
+  function swipeStart(e:ReactPointerEvent<HTMLDivElement>){if(e.pointerType!=='mouse'&&e.isPrimary)swipe.current={x:e.clientX,y:e.clientY,id:e.pointerId};}
+  function swipeEnd(e:ReactPointerEvent<HTMLDivElement>){
+    const g=swipe.current;swipe.current=null;if(!g||g.id!==e.pointerId)return;
+    const dx=e.clientX-g.x,dy=e.clientY-g.y;
+    if(Math.abs(dx)>48&&Math.abs(dx)>Math.abs(dy)*1.3){if(dx<0&&!atEnd)onNext();else if(dx>0&&!atStart)onPrev();}
+  }
   const desc=(p.description||'').trim(),tech=(p.technologies||[]).filter(Boolean);
   return <div className="vw" ref={rootRef} tabIndex={-1} role="group" aria-roledescription="image viewer" aria-label={p.title}>
-    <div className="vw-media">
+    <div className="vw-media" onPointerDown={swipeStart} onPointerUp={swipeEnd} onPointerCancel={()=>{swipe.current=null;}}>
       <button type="button" className="vw-nav prev" onClick={onPrev} disabled={atStart||n<2} aria-label="Previous image">‹</button>
       <div className="vw-frame" ref={frameRef} key={p.slug}>
         <img className="lo" src={sized(p,q(1080,2400))} alt={p.title} draggable={false}/>
@@ -773,8 +781,179 @@ function Coverflow({stack,loop,reduced,canHover,onClose,pins,onPin,startSlug}:{s
   </div>;
 }
 
+/* ============================================================ mosaic ===== */
+// Every picture at once, packed into one solid block with a hairline gap. Each keeps its own shape; the rows are
+// chosen so they fill the width (mosaic-layout.ts). The order comes from the portal's arranger. Category chips
+// filter it (the pictures glide into their new places), a tap opens the same full-size viewer as the stacks, and
+// prev / next / swipe walk through what is shown. Arrow keys move between pictures by where they sit.
+function ratioOf(p:Project){return p.width&&p.height?p.width/p.height:knownRatio(p.slug);}
+function useRatios(items:Project[]){
+  const [, bump]=useState(0);
+  const keys=items.map(p=>p.slug).join('|');
+  useEffect(()=>{
+    let alive=true,left=0;
+    items.forEach(p=>{if(p.width&&p.height){rememberRatio(p.slug,p.width/p.height);return;}if(knownRatio(p.slug))return;left++;
+      void measureRatio(p.slug,sized(p,480)).then(()=>{if(alive)bump(v=>v+1);});});
+    // pictures that are slow to answer never hold the mosaic back: after a moment the rest lay out as posters
+    const t=left?window.setTimeout(()=>{if(alive)bump(v=>v+1);},2500):0;
+    return()=>{alive=false;clearTimeout(t);};
+  },[keys]);// eslint-disable-line react-hooks/exhaustive-deps
+  return items.every(p=>!!ratioOf(p));
+}
+/** The element's inner width, kept current; older browsers without ResizeObserver follow window resizes. */
+function useWidth(ref:React.RefObject<HTMLElement>,dep:unknown){
+  const [width,setWidth]=useState(0);
+  useLayoutEffect(()=>{
+    const el=ref.current;if(!el)return;
+    const fit=()=>setWidth(Math.floor(el.clientWidth));fit();
+    if(typeof ResizeObserver==='function'){const ro=new ResizeObserver(fit);ro.observe(el);return()=>ro.disconnect();}
+    window.addEventListener('resize',fit);window.addEventListener('orientationchange',fit);
+    return()=>{window.removeEventListener('resize',fit);window.removeEventListener('orientationchange',fit);};
+  },[dep]);// eslint-disable-line react-hooks/exhaustive-deps
+  return width;
+}
+/** A tile's picture: shimmers in its own frame until it arrives (no :has() needed), then fades in. */
+function MosaicTileImg({p,w,eager}:{p:Project;w:number;eager:boolean}){
+  const [state,setState]=useState<'loading'|'ok'|'failed'>('loading');
+  const ref=useRef<HTMLImageElement>(null);
+  const src=sized(p,q(Math.max(160,w),1600));
+  useLayoutEffect(()=>{const i=ref.current;if(i&&i.complete&&i.naturalWidth)setState('ok');},[src]);
+  return <span className={'mz-img'+(state==='loading'?' is-loading':'')}>
+    {state==='failed'?<span className="img-fallback">{p.title}</span>
+      :<img ref={ref} src={src} alt="" className={state==='ok'?'is-in':''} loading={eager?'eager':'lazy'} decoding="async" draggable={false}
+        onLoad={()=>setState('ok')} onError={()=>setState('failed')}/>}
+  </span>;
+}
+/** Arrow-key neighbour: the closest tile whose centre lies in that direction (rows for left/right, columns for up/down). */
+function nearestTile(tiles:MosaicTile[],from:number,key:string){
+  const a=tiles[from];if(!a)return -1;
+  const ax=a.x+a.w/2,ay=a.y+a.h/2;let best=-1,bd=Infinity;
+  tiles.forEach((t,i)=>{
+    if(i===from)return;
+    const dx=t.x+t.w/2-ax,dy=t.y+t.h/2-ay;
+    const ok=key==='ArrowRight'?dx>1&&Math.abs(dy)<a.h*.6:key==='ArrowLeft'?dx<-1&&Math.abs(dy)<a.h*.6:key==='ArrowDown'?dy>a.h*.4:dy<-a.h*.4;
+    if(!ok)return;
+    const under=ax>=t.x&&ax<t.x+t.w;   // up/down prefer the picture straight above / below the focused one's centre
+    const d=key==='ArrowRight'||key==='ArrowLeft'?Math.abs(dx)+Math.abs(dy)*3:Math.abs(dy)+(under?0:Math.abs(dx)*1.5);
+    if(d<bd){bd=d;best=i;}
+  });
+  // past the end of a row, left/right carry on to the next / previous row like reading order
+  if(best<0&&key==='ArrowRight'&&from+1<tiles.length)best=from+1;
+  if(best<0&&key==='ArrowLeft'&&from>0)best=from-1;
+  return best;
+}
+const mosaicCat=new Map<string,string>();   // the chosen category survives a re-render or remount of the panel
+function Mosaic({id,items,settings,reduced,pins,onPin}:{id:string;items:Project[];settings?:MosaicSettings;reduced:boolean;pins:Set<string>;onPin?:(slug:string,on:boolean)=>void}){
+  const ordered=useMemo(()=>applyOrder(items,settings?.order),[items,settings?.order]);
+  const cats=useMemo(()=>{const m=new Map<string,number>();ordered.forEach(p=>m.set(p.cat,(m.get(p.cat)||0)+1));return [...m];},[ordered]);
+  const [cat,setCatState]=useState(()=>mosaicCat.get(id)||'all');
+  const setCat=(c:string)=>{mosaicCat.set(id,c);setCatState(c);sfx('stack.roll');};
+  const active=cat!=='all'&&cats.some(([c])=>c===cat)?cat:'all';
+  const shown=useMemo(()=>active==='all'?ordered:ordered.filter(p=>p.cat===active),[ordered,active]);
+  const wrapRef=useRef<HTMLDivElement>(null),rootRef=useRef<HTMLDivElement>(null);
+  const [viewing,setViewing]=useState(-1);
+  const origin=useRef<DOMRect|null>(null),openerSlug=useRef(''),savedScroll=useRef(0);
+  const [entered]=useState(()=>reduced||entrancePlayed.has(id+':mosaic'));
+  useEffect(()=>{entrancePlayed.add(id+':mosaic');},[id]);
+  const ready=useRatios(ordered);
+  const [waited,setWaited]=useState(false);
+  useEffect(()=>{const t=window.setTimeout(()=>setWaited(true),2500);return()=>clearTimeout(t);},[]);
+  const width=useWidth(rootRef,viewing<0);
+  const gap=settings?.gap??MOSAIC_DEFAULTS.gap,rowHeight=settings?.rowHeight??MOSAIC_DEFAULTS.rowHeight;
+  const layout=useMemo(()=>layoutMosaic(shown.map(p=>({key:p.slug,ratio:ratioOf(p)||2/3})),width,mosaicTarget(width,rowHeight),gap),[shown,width,rowHeight,gap,ready,waited]);// eslint-disable-line react-hooks/exhaustive-deps
+  const n=shown.length;
+  // a resize re-flows the tiles at once; only a real rearrangement (filter, new order) glides
+  const lastWidth=useRef(width),snap=lastWidth.current!==width;
+  useEffect(()=>{lastWidth.current=width;},[width]);
+  // pictures that join (a category chip, a pin) pop in where they land instead of appearing from nowhere
+  const prevKeys=useRef<Set<string>|null>(null);
+  const fresh=prevKeys.current?new Set(shown.filter(p=>!prevKeys.current!.has(p.slug)).map(p=>p.slug)):new Set<string>();
+  useEffect(()=>{prevKeys.current=new Set(shown.map(p=>p.slug));},[shown]);
+
+  function open(i:number,el:HTMLElement){
+    openerSlug.current=shown[i].slug;origin.current=el.getBoundingClientRect();savedScroll.current=window.scrollY;
+    sfx('gallery.view');setViewing(i);
+  }
+  const close=useCallback(()=>{setViewing(-1);sfx('gallery.back');},[]);
+  // Opening: the viewer takes the mosaic's place, so bring the panel's top into view when the tile was far down.
+  // Closing: back to exactly where the visitor was, with focus on the picture they last viewed.
+  const wasViewing=useRef(false);
+  useLayoutEffect(()=>{
+    const isViewing=viewing>=0;
+    if(isViewing&&!wasViewing.current){
+      const top=wrapRef.current?.getBoundingClientRect().top??0;
+      if(top<0||top>window.innerHeight*.35)window.scrollTo({top:Math.max(0,window.scrollY+top-88),behavior:reduced?'auto':'smooth'});
+    }else if(!isViewing&&wasViewing.current){
+      window.scrollTo({top:savedScroll.current,behavior:'instant'});
+      const el=rootRef.current?.querySelector<HTMLElement>(`[data-slug="${CSS.escape(openerSlug.current)}"]`);
+      if(el)requestAnimationFrame(()=>{if(!el.isConnected)return;el.focus({preventScroll:true});el.scrollIntoView({block:'nearest'});});
+    }
+    wasViewing.current=isViewing;
+  },[viewing>=0]);// eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>{
+    if(viewing<0)return;
+    const onKey=(e:KeyboardEvent)=>{
+      if(e.key==='Escape'){e.preventDefault();close();}
+      else if(e.key==='ArrowRight'){e.preventDefault();setViewing(v=>Math.min(n-1,v+1));}
+      else if(e.key==='ArrowLeft'){e.preventDefault();setViewing(v=>Math.max(0,v-1));}
+    };
+    document.addEventListener('keydown',onKey);return()=>document.removeEventListener('keydown',onKey);
+  },[viewing>=0,n,close]);// eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>{if(viewing>=n)setViewing(n?n-1:-1);},[n,viewing]);
+  useEffect(()=>{if(viewing>=0&&shown[viewing])openerSlug.current=shown[viewing].slug;},[viewing,shown]);
+
+  function gridKey(e:ReactKeyboardEvent<HTMLDivElement>){
+    const t=(e.target as HTMLElement).closest<HTMLElement>('.mz-tile');if(!t)return;
+    const from=layout.tiles.findIndex(x=>x.key===t.dataset.slug);if(from<0)return;
+    let to=-1;
+    if(e.key==='Home')to=0;else if(e.key==='End')to=layout.tiles.length-1;
+    else if(e.key.startsWith('Arrow'))to=nearestTile(layout.tiles,from,e.key);
+    else return;
+    e.preventDefault();
+    const k=layout.tiles[to]?.key;if(!k)return;
+    const el=rootRef.current?.querySelector<HTMLElement>(`[data-slug="${CSS.escape(k)}"]`);
+    if(el){el.focus({preventScroll:true});el.scrollIntoView({block:'nearest',behavior:reduced?'auto':'smooth'});}
+  }
+  // a soft light follows the mouse across the picture under it (custom properties only, no re-render)
+  function sheen(e:ReactPointerEvent<HTMLDivElement>){
+    if(e.pointerType!=='mouse')return;
+    const t=(e.target as HTMLElement).closest<HTMLElement>('.mz-tile');if(!t)return;
+    const r=t.getBoundingClientRect();
+    t.style.setProperty('--gx',((e.clientX-r.left)/r.width*100).toFixed(1)+'%');t.style.setProperty('--gy',((e.clientY-r.top)/r.height*100).toFixed(1)+'%');
+  }
+
+  const p=viewing>=0?shown[viewing]:undefined;
+  const show=ready||waited;
+  return <div className="mz-wrap" ref={wrapRef}>
+    {p?<div className="mz-view">
+      <Viewer key="mz-viewer" p={p} stackName={p.cat} index={viewing} n={n} atStart={viewing<=0} atEnd={viewing>=n-1}
+        onPrev={()=>setViewing(v=>Math.max(0,v-1))} onNext={()=>setViewing(v=>Math.min(n-1,v+1))} onBack={close} reduced={reduced} origin={origin.current}
+        pinned={pins.has(p.slug)} onPin={onPin?()=>onPin(p.slug,!pins.has(p.slug)):undefined}/>
+    </div>:<>
+      {cats.length>1&&<div className="mz-bar" role="toolbar" aria-label="Show a category">
+        <button type="button" className={'mz-chip'+(active==='all'?' is-on':'')} aria-pressed={active==='all'} onClick={()=>setCat('all')}>All <span>{ordered.length}</span></button>
+        {cats.map(([c,count])=><button type="button" key={c} className={'mz-chip'+(active===c?' is-on':'')} aria-pressed={active===c} onClick={()=>setCat(active===c?'all':c)}>{c} <span>{count}</span></button>)}
+      </div>}
+      <span className="sr" role="status" aria-live="polite">{active==='all'?'':`${active}: ${n} ${n===1?'image':'images'}`}</span>
+      <div className={'mz'+(entered?'':' mz-enter')+(snap?' mz-snap':'')} ref={rootRef} role="list" aria-label={`${active==='all'?'All work':active}, ${n} ${n===1?'image':'images'}. Arrow keys move between pictures.`} aria-busy={!show}
+        onKeyDown={gridKey} onPointerMove={sheen} style={{height:show?layout.height:Math.max(320,Math.round(mosaicTarget(width,rowHeight)*2))}}>
+        {show?layout.tiles.map((t,i)=>{
+          const it=shown[t.index];
+          return <div role="listitem" key={t.key} className={'mz-cell'+(fresh.has(t.key)?' is-new':'')} style={{transform:`translate3d(${t.x}px,${t.y}px,0)`,width:t.w,height:t.h,'--i':Math.min(i,24)} as CSSProperties}>
+            <button type="button" className="mz-tile" data-slug={t.key} aria-label={`${it.title}, ${it.cat}. Open full size.`} onClick={e=>open(t.index,e.currentTarget)}>
+              <MosaicTileImg p={it} w={t.w} eager={t.y<900}/>
+              <span className="mz-cap" aria-hidden="true"><strong>{it.title}</strong><small>{it.cat}</small></span>
+              {pins.has(it.slug)&&<span className="mz-pin" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.2l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.5l6-.8z"/></svg></span>}
+            </button>
+          </div>;
+        }):<span className="mz-wait" aria-hidden="true"/>}
+      </div>
+    </>}
+  </div>;
+}
+
 /* ============================================================ panel ===== */
-export function WorkStacks({folders,images,stacks:settings,id='work',filter='all',pinned,onPin}:WorkStacksProps){
+export function WorkStacks({folders,images,stacks:settings,id='work',filter='all',pinned,onPin,view='stacks'}:WorkStacksProps){
   const reduced=useMedia('(prefers-reduced-motion: reduce)'),canHover=useMedia('(hover: hover) and (pointer: fine)');
   const pinSet=useMemo(()=>new Set(pinned||[]),[pinned]);
   const stacks=useMemo<Stack[]>(()=>{
@@ -802,10 +981,16 @@ export function WorkStacks({folders,images,stacks:settings,id='work',filter='all
   },[images]);
   const current=stacks.find(s=>s.name===open);
   const close=useCallback(()=>{sfx('stack.close');setOpen(null);setStartSlug('');const el=opener.current;if(el)requestAnimationFrame(()=>el.isConnected&&el.focus({preventScroll:true}));},[]);
+  // switching between Stacks and Mosaic always lands on the overview, never inside an open stack
+  const lastView=useRef(view);
+  useEffect(()=>{if(lastView.current!==view){lastView.current=view;setOpen(null);setStartSlug('');}},[view]);
+  const mosaicItems=useMemo(()=>stacks.flatMap(s=>s.items),[stacks]);
   if(!stacks.length)return <p className="ws-empty" role="status">{filter==='pinned'?'Nothing pinned yet. Open any image and tap the pin to keep it here.':'No work to show yet.'}</p>;
-  return <section className="work-stacks" aria-label="Work" ref={rootRef}>
+  return <section className={'work-stacks'+(view==='mosaic'&&!current?' is-mosaic':'')} aria-label="Work" ref={rootRef}>
     {current
       ?<Coverflow key={current.name} stack={current} loop={settings?.loops?.[current.name]??(settings?.loop!==false)} reduced={reduced} canHover={canHover} onClose={close} pins={pinSet} onPin={onPin} startSlug={startSlug}/>
-      :<StackGrid id={id} stacks={stacks} reduced={reduced} onOpen={(name,el)=>{opener.current=el;sfx('stack.open');setOpen(name);}}/>}
+      :view==='mosaic'
+        ?<Mosaic id={id} items={mosaicItems} settings={settings?.mosaic} reduced={reduced} pins={pinSet} onPin={onPin}/>
+        :<StackGrid id={id} stacks={stacks} reduced={reduced} onOpen={(name,el)=>{opener.current=el;sfx('stack.open');setOpen(name);}}/>}
   </section>;
 }
