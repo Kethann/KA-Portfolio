@@ -47,7 +47,8 @@ export async function publicConfig(ctx){
     country,
     suggestedCurrency: currencyFor(country),
     store: publicStore(state),
-    contact: { topics: (messages.contactTopics || []).slice(0, 12), replyOnSite: messages.replyOnSite !== false, pushKey: messages.replyOnSite !== false ? pushPublicKey() : '' },
+    // 'Commission / poster design' was the old default topic; lists saved with it show the new wording
+    contact: { topics: (messages.contactTopics || []).map(t => t === 'Commission / poster design' ? 'Poster design' : t).slice(0, 12), replyOnSite: messages.replyOnSite !== false, pushKey: messages.replyOnSite !== false ? pushPublicKey() : '' },
     demoPayments: demoPaymentsEnabled(),
     upscaler: { comingSoon: upscaler.comingSoon, title: upscaler.title, badge: upscaler.badge, text: upscaler.text, notifyEnabled: upscaler.notifyEnabled },
     assistant: { enabled: !!assistant.enabled, greeting: assistant.greeting, suggestions: assistant.suggestions }

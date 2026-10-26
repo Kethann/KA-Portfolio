@@ -35,7 +35,7 @@ export const DEFAULTS = {
     autoReply: { enabled: false, subject: 'Thanks for your message', body: 'Hi {{name}},\n\nThanks for reaching out. I read every message and will reply soon.\n\n{{signature}}' },
     businessHours: { enabled: false, days: [1, 2, 3, 4, 5], start: '10:00', end: '19:00', awayMessage: 'I’m away right now and will reply when I’m back.' },
     spamFilter: true,
-    contactTopics: ['A new project', 'Commission / poster design', 'Store order or download', 'License question', 'Collaboration', 'Just saying hi'],   // the Regarding ticks on the contact form ("Other" is always offered)
+    contactTopics: ['A new project', 'Poster design', 'Store order or download', 'License question', 'Collaboration', 'Just saying hi'],   // the Regarding ticks on the contact form ("Other" is always offered)
     replyOnSite: true                 // replies also pop up on the device the visitor wrote from
   },
   storeAccess: { passes: [] },        // who may still buy while the store is closed: [{ id, kind: 'email'|'device', label, email, createdAt, lastUsedAt, uses }]

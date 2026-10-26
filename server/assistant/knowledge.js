@@ -42,7 +42,7 @@ export async function seedIfEmpty(){
   if (real(legacy.pricing_note)) lines.push(`Pricing for custom work: ${legacy.pricing_note}`);
   const socials = Object.entries(legacy.contact?.socials || {}).map(([k, v]) => `${k}: ${v}`).join(', ');
   if (socials) lines.push(`Find my work on ${socials}.`);
-  lines.push('For commissions or questions, visitors can use the Contact page on this site.');
+  lines.push('For projects or questions, visitors can use the Contact page on this site.');
   const body = lines.join('\n\n');
   const src = await db.one(`insert into kb_sources (kind, title, body) values ('text', 'About me', $1) returning id`, [body]);
   await reindex(db, src.id, body);
@@ -87,7 +87,7 @@ export async function retrieve(question, { includeProducts = true } = {}){
     products = productsRows.map(p => {
       const price = (cur) => { const pr = priceFor(p, cur); return pr.free ? 'free' : pr.available ? `${formatMoney(pr.amount, cur)}${pr.onSale ? ` (sale, normally ${formatMoney(pr.compareAt, cur)})` : ''}` : null; };
       const inr = price('INR'), usd = price('USD');
-      return `- ${p.title} [${p.kind === 'artzz' ? 'Artzz gallery' : 'Artifacts download'}] ${p.sellable ? `price: ${inr || 'n/a'} in India, ${usd || 'n/a'} elsewhere` : 'view only, not for sale'}${p.license_name ? `; license: ${p.license_name}${p.license_summary ? ` (${p.license_summary})` : ''}` : ''}; link: /?product=${p.slug}${p.summary ? `; about: ${p.summary.slice(0, 200)}` : ''}`;
+      return `- ${p.title} [${p.kind === 'artzz' ? 'Artzz gallery' : 'Artifacts project'}] ${p.sellable && p.kind !== 'artifacts' ? `price: ${inr || 'n/a'} in India, ${usd || 'n/a'} elsewhere` : 'view only, not for sale'}${p.license_name ? `; license: ${p.license_name}${p.license_summary ? ` (${p.license_summary})` : ''}` : ''}; link: /?product=${p.slug}${p.summary ? `; about: ${p.summary.slice(0, 200)}` : ''}`;
     });
   }
   const context = [

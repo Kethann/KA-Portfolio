@@ -177,12 +177,14 @@ export function Dock({ pulse, compact }: { pulse: any; compact: boolean }){
     const x = e.clientX;
     cancelAnimationFrame(raf.current);
     raf.current = requestAnimationFrame(() => {
-      for (const el of items.current){
-        if (!el) continue;
-        const r = el.getBoundingClientRect(), d = Math.abs(x - (r.left + r.width / 2)), range = 150;
+      // read every position first, then write: interleaving them forces a layout per icon per frame
+      const els = items.current.filter((el): el is HTMLElement => !!el), range = 150;
+      const mids = els.map(el => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; });
+      els.forEach((el, i) => {
+        const d = Math.abs(x - mids[i]);
         el.style.setProperty('--s', String(1 + 0.55 * Math.max(0, Math.cos(Math.min(d / range, 1) * Math.PI / 2)) ** 2));
-        el.style.setProperty('--lx', String(Math.max(-1, Math.min(1, (x - (r.left + r.width / 2)) / range))));   // glass sheen leans toward the pointer
-      }
+        el.style.setProperty('--lx', String(Math.max(-1, Math.min(1, (x - mids[i]) / range))));   // glass sheen leans toward the pointer
+      });
     });
   };
   const reset = () => { cancelAnimationFrame(raf.current); for (const el of items.current){ el?.style.setProperty('--s', '1'); el?.style.setProperty('--lx', '0'); } };
@@ -207,7 +209,7 @@ export function Dock({ pulse, compact }: { pulse: any; compact: boolean }){
           return (
             <Fragment key={a.id}>{i > 0 && APPS[i - 1].section !== a.section && <span className="dock-sep" role="separator" aria-label={a.section} />}
             <div ref={el => { items.current[i] = el; }} className={'dock-item' + (w ? ' running' : '') + (desk.focused === a.id ? ' front' : '')}>
-              <button type="button" tabIndex={i === tabIdx ? 0 : -1} onClick={() => click(a.id)} onFocus={() => setTabIdx(i)}
+              <button type="button" tabIndex={i === tabIdx ? 0 : -1} onClick={() => click(a.id)} onFocus={() => { setTabIdx(i); a.Component.preload(); }} onPointerEnter={() => a.Component.preload()}
                 aria-label={a.title + (badge ? `, ${badge} new` : '') + (w ? ', open' : '')} data-tip={`${a.title} · ${a.section}`}>
                 <AppTile id={a.id} />
                 {badge > 0 && <span className="dock-badge" aria-hidden="true">{badge > 99 ? '99+' : badge}</span>}
@@ -230,7 +232,7 @@ export function HomeScreen(){
         <h2 className="home-section-title">{s}</h2>
         <div className="home-grid">
           {APPS.filter(a => a.section === s).map(a => (
-            <button key={a.id} type="button" className="home-app" onClick={() => desk.open(a.id)}>
+            <button key={a.id} type="button" className="home-app" onClick={() => desk.open(a.id)} onPointerDown={() => a.Component.preload()}>
               <AppTile id={a.id} size={58} /><span>{a.title.replace('Licenses & Legal', 'Legal')}</span>
             </button>
           ))}

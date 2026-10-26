@@ -26,8 +26,8 @@ const STATUS: Record<Status, [string, 'neutral' | 'info' | 'success' | 'warning'
 const badge = (r: Row) => r.status === 'sent' && r.viewed_at ? <Badge tone="accent">Opened · not signed</Badge> : <Badge tone={STATUS[r.status][1]}>{STATUS[r.status][0]}</Badge>;
 const emptyDraft = (d: AgreementDefaults): Draft => ({ clientName: '', clientEmail: '', title: '', messageId: null, project: cleanProject({}, d) });
 
-export default function Agreements({ route, go }: AppProps){
-  const s = useLoad<{ agreements: Row[] }>('/agreements', { pollMs: 30e3, active: true });
+export default function Agreements({ route, go, active }: AppProps){
+  const s = useLoad<{ agreements: Row[] }>('/agreements', { pollMs: 30e3, active });
   const defs = useLoad<{ value: AgreementDefaults; revision: number }>('/agreements/defaults');
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<'all' | 'open' | 'signed'>('all');
@@ -58,7 +58,7 @@ export default function Agreements({ route, go }: AppProps){
         <div className="app-main">
           {!defs.data ? <SkeletonRows rows={8} /> : sel === 'defaults' ? <DefaultTerms load={defs} /> :
             sel === 'new' ? <Editor key={'new' + (fromMessage || '')} defaults={cleanDefaults(defs.data.value)} messageId={fromMessage} onSaved={(id) => { s.reload(); go(id); }} needsSetup={!defs.data.value.legalName} goDefaults={() => go('defaults')} /> :
-            sel ? <Detail key={sel} id={sel} defaults={cleanDefaults(defs.data.value)} onChanged={s.reload} onGone={() => { s.reload(); go(''); }} goDefaults={() => go('defaults')} /> :
+            sel ? <Detail key={sel} id={sel} active={active} defaults={cleanDefaults(defs.data.value)} onChanged={s.reload} onGone={() => { s.reload(); go(''); }} goDefaults={() => go('defaults')} /> :
             <Intro onNew={() => go('new')} needsSetup={!defs.data.value.legalName} goDefaults={() => go('defaults')} />}
         </div>
       </div>
@@ -198,8 +198,8 @@ function AgreementPreview({ doc }: { doc: ReturnType<typeof buildAgreement> }){
 }
 
 // ---- one agreement ----------------------------------------------------------------------------------------------------
-function Detail({ id, defaults, onChanged, onGone, goDefaults }: { id: string; defaults: AgreementDefaults; onChanged: () => void; onGone: () => void; goDefaults: () => void }){
-  const a = useLoad<{ agreement: Row }>(`/agreements/${id}`, { pollMs: 20e3, active: true });
+function Detail({ id, active, defaults, onChanged, onGone, goDefaults }: { id: string; active: boolean; defaults: AgreementDefaults; onChanged: () => void; onGone: () => void; goDefaults: () => void }){
+  const a = useLoad<{ agreement: Row }>(`/agreements/${id}`, { pollMs: 20e3, active });
   const toast = useToast();
   const confirm = useConfirm();
   const [note, setNote] = useState('');

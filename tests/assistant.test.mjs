@@ -105,7 +105,7 @@ test('knowledge base: sources are chunked and retrieved; injected tags can’t b
   assert.match(p.json.system, /ten working days/);
   assert.equal(p.json.system.split('</knowledge>').length, 2, 'only our own closing tag exists');
   assert.ok(p.json.sources.includes('Turnaround'));
-  assert.match(p.json.system, /Kit A \[Artifacts download\] price: ₹499 in India, \$9\.99 elsewhere/);
+  assert.match(p.json.system, /Kit A \[Artifacts project\] view only, not for sale/, 'Artifacts are never offered for sale');
 });
 
 test('repeated visitor questions are grouped across chats and can be saved as compact FAQ knowledge', async () => {

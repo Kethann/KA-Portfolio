@@ -135,7 +135,7 @@ export async function createProduct(ctx){
   const db = await getDb();
   const slug = await uniqueSlug(db, slugify(title));
   const sort = (await db.one('select coalesce(min(sort), 0) - 1 as s from products where kind = $1', [kind])).s;
-  const row = await db.one(`insert into products (kind, slug, title, status, sort, sellable) values ($1, $2, $3, 'draft', $4, $5) returning id`, [kind, slug, title, sort, kind === 'artifacts']);
+  const row = await db.one(`insert into products (kind, slug, title, status, sort, sellable) values ($1, $2, $3, 'draft', $4, $5) returning id`, [kind, slug, title, sort, false]);
   await audit(ctx, 'product_created', row.id, { title });
   return getProduct({ ...ctx, params: { id: row.id } });
 }
@@ -166,7 +166,7 @@ export async function updateProduct(ctx){
     tags: stringArray(b.tags, { name: 'Tags', maxItems: 20, maxLength: 40 }),
     tech_tags: stringArray(b.techTags, { name: 'Tech tags', maxItems: 20, maxLength: 40 }),
     version: str(b.version, { name: 'Version', max: 30 }),
-    status, sellable: bool(b.sellable), is_free: bool(b.isFree),
+    status, sellable: current.kind === 'artifacts' ? false : bool(b.sellable), is_free: bool(b.isFree),   // Artifacts are a showcase, never sold
     price_inr: money(b.priceInr, 'INR price'), price_usd: money(b.priceUsd, 'USD price'),
     sale_price_inr: money(b.salePriceInr, 'INR sale price'), sale_price_usd: money(b.salePriceUsd, 'USD sale price'),
     sale_starts_at: when(b.saleStartsAt, 'Sale start'), sale_ends_at: when(b.saleEndsAt, 'Sale end'),

@@ -7,7 +7,7 @@ import { methodSummary } from '../server/store/orders.js';
 
 const app = await createTestApp({ KA_DEMO_PAYMENTS: '1' });
 test.after(() => app.close());
-const [p] = (await app.pg.query(`insert into products (kind, slug, title, status, sellable, price_inr, price_usd) values ('artifacts','demo-kit','Demo Kit','published',true,49900,999) returning id`)).rows;
+const [p] = (await app.pg.query(`insert into products (kind, slug, title, status, sellable, price_inr, price_usd) values ('artzz','demo-kit','Demo Kit','published',true,49900,999) returning id`)).rows;
 await app.storage.put('deliverables', 'demo/kit.zip', Buffer.from('Z'));
 await app.pg.query(`insert into product_files (product_id, storage_path, filename, bytes) values ($1, 'demo/kit.zip', 'kit.zip', 1)`, [p.id]);
 let n = 0;

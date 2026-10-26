@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { overlayLayer } from './overlay';
-import { getJson, getCurrency, setCurrency, onCurrency, publicConfig, formatPrice, formatDate, type Currency, type Product, type Media, type Category, type Price, type Review } from './api';
+import { getJson, getCurrency, setCurrency, onCurrency, publicConfig, formatPrice, type Currency, type Product, type Media, type Category, type Price, type Review } from './api';
 import { useFocusTrap, useSwipe } from './hooks';
 
 type Tab = 'artzz' | 'artifacts';
@@ -79,7 +79,7 @@ export function Store({ onBuy, onResend, initialProduct, tabsTarget }: StoreProp
       : !data ? <SkeletonGrid kind={tab} />
       : TABS.map(t => <section key={t.id} id={`kas-panel-${t.id}`} role="tabpanel" aria-labelledby={`kas-tab-${t.id}`} hidden={tab !== t.id} className="kas-panel">
           <Panel kind={t.id} products={byKind[t.id]} categories={data.categories.filter(c => c.kind === t.id)} currency={currency}
-            currencySwitch={<CurrencySwitch value={currency} onChange={(c) => setCurrency(c)} international={intl} />}
+            currencySwitch={t.id === 'artzz' ? <CurrencySwitch value={currency} onChange={(c) => setCurrency(c)} international={intl} /> : null}
             onOpen={(items, index, mediaIndex = 0, opener = null) => setLightbox({ items, index, mediaIndex, opener })} onBuy={onBuy} />
         </section>)}
     <p className="kas-resend">Bought something before? <button type="button" className="kas-link" onClick={(e) => onResend(e.currentTarget)}>Email me my download links</button></p>
@@ -138,6 +138,8 @@ const priceMatches = (p: Product, c: Currency, f: PriceFilter) => {
   return true;
 };
 // what an item costs for sorting: free first, items that can't be bought last
+// Artifacts are a showcase (screenshots, details, live demo): they are never sold, so they show no price or Buy
+const forSale = (p: Product) => p.kind !== 'artifacts';
 const sortPrice = (p: Product, c: Currency) => !p.sellable || !p.prices[c].available ? Infinity : p.prices[c].free ? 0 : p.prices[c].amount;
 
 function Chips({ options, value, onChange, label }: { options: { id: string; name: string; count: number }[]; value: string; onChange(v: string): void; label: string }){
@@ -160,7 +162,7 @@ function Panel({ kind, products, categories, currency, currencySwitch, onOpen, o
   // Counts answer "what would I get if I picked this": price counts within the chosen category and vice versa.
   const inCat = useMemo(() => cat ? products.filter(p => p.category?.slug === cat) : products, [products, cat]);
   const inPrice = useMemo(() => products.filter(p => priceMatches(p, currency, price)), [products, currency, price]);
-  const priceOptions = PRICE_FILTERS.map(f => ({ id: f.id, name: f.label, count: inCat.filter(p => priceMatches(p, currency, f.id)).length }))
+  const priceOptions = kind === 'artifacts' ? [] : PRICE_FILTERS.map(f => ({ id: f.id, name: f.label, count: inCat.filter(p => priceMatches(p, currency, f.id)).length }))
     .filter(f => f.id === 'all' || f.count > 0 || f.id === price);
   const catOptions = [{ id: '', name: 'All', count: inPrice.length },
     ...used.map(c => ({ id: c.slug, name: c.name, count: inPrice.filter(p => p.category?.slug === c.slug).length }))];
@@ -187,7 +189,7 @@ function Panel({ kind, products, categories, currency, currencySwitch, onOpen, o
   if (!products.length) return <div className="kas-state"><p>{kind === 'artzz' ? 'New artwork is on the way.' : 'Projects and tools are on the way.'}</p></div>;
   const grid = (items: Product[], label: string) => kind === 'artzz'
     ? <ul className="kas-art-grid" aria-label={label}>{items.map(p => { const i = flat.indexOf(p); return <ArtTile key={p.id} product={p} currency={currency} onOpen={(el) => onOpen(flat, i, 0, el)} onBuy={onBuy} />; })}</ul>
-    : <ul className="kas-card-grid" aria-label={label}>{items.map(p => { const i = flat.indexOf(p); return <ArtifactCard key={p.id} product={p} currency={currency} onOpen={(m, el) => onOpen(flat, i, m, el)} onBuy={onBuy} />; })}</ul>;
+    : <ul className="kas-card-grid" aria-label={label}>{items.map(p => { const i = flat.indexOf(p); return <ArtifactCard key={p.id} product={p} currency={currency} onOpen={(m, el) => onOpen(flat, i, m, el)} />; })}</ul>;
   const section = kind === 'artzz' ? 'Artzz' : 'Artifacts';
   return <>
     {/* one compact bar: price, project types and categories on the left (one swipeable row on phones), sort and currency on the right */}
@@ -210,8 +212,8 @@ function Panel({ kind, products, categories, currency, currencySwitch, onOpen, o
         <label className="kas-sort"><span className="kas-sr">Sort</span>
           <select value={sort} onChange={e => setSort(e.target.value as Sort)} aria-label="Sort">
             <option value="featured">Featured</option>
-            <option value="price-asc">Price: low to high</option>
-            <option value="price-desc">Price: high to low</option>
+            {kind === 'artzz' && <option value="price-asc">Price: low to high</option>}
+            {kind === 'artzz' && <option value="price-desc">Price: high to low</option>}
             {hasPopular && <option value="popular">Most downloaded</option>}
             {hasRating && <option value="rating">Top rated</option>}
           </select>
@@ -232,6 +234,7 @@ function Panel({ kind, products, categories, currency, currencySwitch, onOpen, o
 
 // Corner ribbon on the artwork: Free, or the sale discount
 function Ribbon({ product, currency }: { product: Product; currency: Currency }){
+  if (!forSale(product)) return null;
   const pr = product.prices[currency];
   if (isFree(product, currency)) return <span className="kas-ribbon is-free">Free</span>;
   if (product.sellable && pr.available && pr.onSale && pr.percentOff > 0) return <span className="kas-ribbon">−{pr.percentOff}%</span>;
@@ -277,7 +280,7 @@ function Social({ product, short }: { product: Product; short?: boolean }){
 
 function BuyButton({ product, currency, onBuy, compact }: { product: Product; currency: Currency; onBuy(p: Product, c: Currency, opener?: HTMLElement | null): void; compact?: boolean }){
   const price = product.prices[currency];
-  if (!product.sellable || !price.available) return null;
+  if (!forSale(product) || !product.sellable || !price.available) return null;
   const label = price.free ? 'Download' : 'Buy';
   return <button type="button" className={`kas-buy ${compact ? 'is-compact' : ''}`} onClick={(e) => onBuy(product, currency, e.currentTarget)}
     aria-label={`${label} ${product.title}${price.free ? ' (free)' : ` for ${formatPrice(price.amount, currency)}`}`}>{label}</button>;
@@ -297,8 +300,7 @@ function ArtTile({ product, currency, onOpen, onBuy }: { product: Product; curre
   </li>;
 }
 
-function ArtifactCard({ product, currency, onOpen, onBuy }: { product: Product; currency: Currency; onOpen(mediaIndex: number, opener: HTMLElement): void; onBuy(p: Product, c: Currency, opener?: HTMLElement | null): void }){
-  const price = product.prices[currency];
+function ArtifactCard({ product, currency, onOpen }: { product: Product; currency: Currency; onOpen(mediaIndex: number, opener: HTMLElement): void }){
   const demo = product.demoUrl || product.previewUrl;
   return <li className="kas-card">
     <button type="button" className="kas-card-shot" onClick={(e) => onOpen(0, e.currentTarget)} aria-label={product.media.length ? `View screenshots of ${product.title}` : `View details of ${product.title}`}>
@@ -316,13 +318,11 @@ function ArtifactCard({ product, currency, onOpen, onBuy }: { product: Product; 
       {product.techTags.length > 0 && <ul className="kas-tags" aria-label="Built with">{product.techTags.map(t => <li key={t}>{t}</li>)}</ul>}
       <dl className="kas-facts">
         {product.license && <><dt>License</dt><dd>{product.license.name}</dd></>}
-        {price.onSale && price.saleEndsAt && <><dt>Sale ends</dt><dd>{formatDate(price.saleEndsAt)}</dd></>}
       </dl>
       <div className="kas-card-foot">
-        <PriceTag price={price} />
         <span className="kas-actions">
-          {demo && <a className="kas-btn is-ghost" href={demo} target="_blank" rel="noopener noreferrer">{product.demoUrl ? 'Live demo' : 'Preview'}<span className="kas-sr"> (opens in a new tab)</span></a>}
-          <BuyButton product={product} currency={currency} onBuy={onBuy} />
+          <button type="button" className="kas-btn is-ghost" onClick={(e) => onOpen(0, e.currentTarget)}>Details</button>
+          {demo && <a className="kas-btn" href={demo} target="_blank" rel="noopener noreferrer">{product.demoUrl ? 'Live demo' : 'Preview'}<span className="kas-sr"> (opens in a new tab)</span></a>}
         </span>
       </div>
     </div>
@@ -391,7 +391,7 @@ function Lightbox({ items, index, mediaIndex, opener, currency, onClose, onMove,
         <Social product={product} />
         {product.rating && <Reviews slug={product.slug} />}
       </div>
-      {product.sellable && product.prices[currency].available && <div className="kas-lb-buy"><PriceTag price={product.prices[currency]} /><BuyButton product={product} currency={currency} onBuy={(p, c) => { onClose(); onBuy(p, c, opener); }} /></div>}
+      {forSale(product) && product.sellable && product.prices[currency].available && <div className="kas-lb-buy"><PriceTag price={product.prices[currency]} /><BuyButton product={product} currency={currency} onBuy={(p, c) => { onClose(); onBuy(p, c, opener); }} /></div>}
     </div>
   </div>;
 }

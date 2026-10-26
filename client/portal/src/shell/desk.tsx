@@ -7,6 +7,9 @@ import { useConfirm } from '../ui';
 
 // Which window a component lives in (set by <Window>), and which windows hold unsaved edits.
 export const WinIdCtx = createContext('');
+// false while the window is minimised: heavy previews (the live site in a frame) unload so a hidden window costs nothing
+export const WinShownCtx = createContext(true);
+export const useWinShown = () => useContext(WinShownCtx);
 const dirtyWins = new Map<string, number>();
 export function useWinDirty(dirty: boolean){
   const id = useContext(WinIdCtx);

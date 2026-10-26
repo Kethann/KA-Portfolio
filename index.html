@@ -17240,7 +17240,7 @@ CONTACT_RULES.name.el.addEventListener("input", function(){
   if (cleaned !== this.value) this.value = cleaned;
 });
 // The Regarding ticks (set in the portal: Settings > Messages & contact form). "Other" opens a box to type in.
-var KA_TOPICS_DEFAULT = ["A new project", "Commission / poster design", "Store order or download", "License question", "Collaboration", "Just saying hi"];
+var KA_TOPICS_DEFAULT = ["A new project", "Poster design", "Store order or download", "License question", "Collaboration", "Just saying hi"];
 function kaTopics(){
   var picked = [], other = false;
   document.querySelectorAll("#topic-grid input:checked").forEach(function(i){ if (i.value === "__other") other = true; else picked.push(i.value); });

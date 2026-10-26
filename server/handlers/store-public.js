@@ -29,7 +29,7 @@ export function productDto(p, now = new Date(), show = { ratings: true, download
     descriptionHtml: p.description ? renderMarkdown(p.description) : '',   // Markdown from the portal, rendered safely here
     category: p.category_slug ? { slug: p.category_slug, name: p.category_name } : null,
     tags: p.tags || [], techTags: p.tech_tags || [], version: p.version || '',
-    sellable: !!p.sellable, free: !!p.is_free, prices,
+    sellable: !!p.sellable && p.kind !== 'artifacts', free: !!p.is_free, prices,
     license: p.license_key ? { key: p.license_key, name: p.license_name, summary: p.license_summary } : null,
     demoUrl: p.demo_url || '', previewUrl: p.preview_url || '',
     media: Array.isArray(p.media) ? p.media : [],

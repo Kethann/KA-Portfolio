@@ -53,6 +53,12 @@
   X-Robots-Tag: noindex, nofollow, noarchive
   Cache-Control: no-store
 
+# Thrive (an Artifacts app at /artifacts/thrive/): its service worker and manifest are rechecked, so an update reaches installed copies at once
+/artifacts/thrive/sw.js
+  Cache-Control: no-cache
+/artifacts/thrive/manifest.webmanifest
+  Cache-Control: no-cache
+
 # UI sounds: tiny, versioned by name; a day of caching, then rechecked
 /sounds/*
   Cache-Control: public, max-age=86400

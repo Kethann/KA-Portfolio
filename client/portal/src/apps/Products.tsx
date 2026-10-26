@@ -115,8 +115,10 @@ function effective(p: Product){
   const usd = on && p.salePriceUsd !== null && p.priceUsd !== null && p.salePriceUsd < p.priceUsd ? p.salePriceUsd : p.priceUsd;
   return { inr, usd, inrSale: inr !== p.priceInr, usdSale: usd !== p.priceUsd };
 }
+// Artifacts are a showcase on the store (screenshots and live demos) and are never sold
+const forSale = (p: Product) => p.sellable && p.kind !== 'artifacts';
 function priceLine(p: Product){
-  if (!p.sellable) return 'Not for sale';
+  if (!forSale(p)) return 'Not for sale';
   if (p.isFree) return 'Free';
   const e = effective(p);
   return [e.inr !== null ? money(e.inr, 'INR') : null, e.usd !== null ? money(e.usd, 'USD') : null].filter(Boolean).join(' · ') || 'No price yet';
@@ -296,6 +298,7 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
             </section>
 
             <section className="card stack" aria-labelledby="pe-sale"><h3 id="pe-sale">Selling</h3>
+              {p.kind === 'artifacts' ? <p className="muted" style={{ margin: 0 }}>Artifacts aren’t sold: the store shows them as a showcase with screenshots, details and the live demo link below.</p> : <>
               <Switch checked={p.sellable} onChange={v => set('sellable', v)} label={p.kind === 'artzz' ? 'Sell this piece as a download' : 'For sale'} />
               {p.sellable && <>
                 <Switch checked={p.isFree} onChange={v => set('isFree', v)} label="Free download (email required)" />
@@ -323,13 +326,14 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
                 </div>}
                 <Switch checked={p.refundAfterDownload} onChange={v => set('refundAfterDownload', v)} label="Allow refunds after the file was downloaded" />
               </>}
+              </>}
               <div className="form-grid">
                 <Field label="Live demo link"><input type="url" value={p.demoUrl} onChange={e => set('demoUrl', e.target.value)} placeholder="https://" /></Field>
                 <Field label="Preview link"><input type="url" value={p.previewUrl} onChange={e => set('previewUrl', e.target.value)} placeholder="https://" /></Field>
               </div>
             </section>
 
-            {p.sellable && (
+            {forSale(p) && (
               <section className="card stack" aria-labelledby="pe-file"><h3 id="pe-file">File buyers download</h3>
                 {p.file ? (
                   <div className="file-row">
@@ -357,7 +361,7 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
                 </div>
               </section>
             )}
-            {p.sellable && <DeliveryEmailCard id={id} />}
+            {forSale(p) && <DeliveryEmailCard id={id} />}
           </div>
 
           <aside className="stack" aria-label="Store preview">
@@ -404,7 +408,7 @@ function Editor({ id, go, active, open }: { id: string; go: (r: string) => void;
 
 // What a published item needs, in the order the owner would fix it.
 function checklist(p: Product){
-  const selling = p.sellable && !p.isFree;
+  const selling = forSale(p) && !p.isFree;
   return [
     { ok: !!p.title.trim(), label: 'Title', fix: 'Add a title.' },
     { ok: !!p.slug.replace(/-/g, ''), label: 'Web address', fix: 'Give it a web address (letters and numbers).' },
@@ -413,16 +417,16 @@ function checklist(p: Product){
       { ok: p.priceInr !== null && p.priceInr >= 100, label: 'Price in India (₹1 or more)', fix: 'Set the India price (₹1 or more), or mark it free.' },
       { ok: p.priceUsd !== null && p.priceUsd >= 100, label: 'Price elsewhere ($1 or more)', fix: 'Set the price for other countries ($1 or more), or mark it free.' },
     ] : []),
-    ...(p.sellable ? [
+    ...(forSale(p) ? [
       { ok: !!p.file, label: 'File for buyers', fix: 'Upload the file buyers will download before publishing it for sale.' },
       { ok: !!p.licenseId, label: 'License', fix: 'Choose a license: it tells buyers what they may do with the file.', soft: true },
     ] : []),
   ];
 }
 function draftProblem(p: Product){
-  if (p.sellable && !p.isFree && ((p.salePriceInr !== null && p.priceInr !== null && p.salePriceInr >= p.priceInr) || (p.salePriceUsd !== null && p.priceUsd !== null && p.salePriceUsd >= p.priceUsd))) return 'The sale price must be lower than the normal price.';
+  if (forSale(p) && !p.isFree && ((p.salePriceInr !== null && p.priceInr !== null && p.salePriceInr >= p.priceInr) || (p.salePriceUsd !== null && p.priceUsd !== null && p.salePriceUsd >= p.priceUsd))) return 'The sale price must be lower than the normal price.';
   if (p.saleStartsAt && p.saleEndsAt && new Date(p.saleEndsAt) <= new Date(p.saleStartsAt)) return 'The sale must end after it starts.';
-  if (p.sellable && !p.isFree && ((p.salePriceInr !== null && p.salePriceInr < 100) || (p.salePriceUsd !== null && p.salePriceUsd < 100))) return 'A sale price must be at least ₹1 / $1.';
+  if (forSale(p) && !p.isFree && ((p.salePriceInr !== null && p.salePriceInr < 100) || (p.salePriceUsd !== null && p.salePriceUsd < 100))) return 'A sale price must be at least ₹1 / $1.';
   return null;
 }
 function publishProblem(p: Product){
@@ -441,7 +445,7 @@ function Readiness({ p }: { p: Product }){
 }
 
 function previewPrice(p: Product){
-  if (!p.sellable) return 'View only';
+  if (!forSale(p)) return 'View only';
   if (p.isFree) return 'Free';
   if (p.priceInr === null && p.priceUsd === null) return 'Set a price';
   const e = effective(p);

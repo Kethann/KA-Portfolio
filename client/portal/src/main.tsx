@@ -12,6 +12,7 @@ import type { Session } from './shell/Auth';
 import { DeskProvider, useDesk } from './shell/desk';
 import { Window } from './shell/Window';
 import { Dock, HomeScreen, useChrome } from './shell/Chrome';
+import { APP } from './apps/registry';
 import { ConfirmProvider, ToastProvider, Spinner } from './ui';
 import { useMedia } from './hooks';
 import logo from './assets/ka-logo.png';
@@ -69,6 +70,15 @@ function DesktopInner({ session, onSignedOut, areaRef }: { session: Session; onS
   const { menubar, overlays, pulse } = useChrome({ email: session.email, onSignedOut });
   const visible = desk.wins.filter(w => !w.min);
   useEffect(() => { document.body.classList.toggle('is-compact', compact); }, [compact]);
+  // once the desktop is idle, fetch the code of the apps used most so they open at once
+  useEffect(() => {
+    const ids = ['messages', 'orders', 'products', 'content', 'settings'];
+    const idle = (fn: () => void) => ('requestIdleCallback' in window ? requestIdleCallback(fn, { timeout: 4000 }) : setTimeout(fn, 2500)) as number;
+    let i = 0, h = 0;
+    const next = () => { if (i < ids.length){ APP[ids[i++]]?.Component.preload(); h = idle(next); } };
+    h = idle(next);
+    return () => { if ('cancelIdleCallback' in window) cancelIdleCallback(h); clearTimeout(h); };
+  }, []);
   return (
     <div className={'desktop' + (compact ? ' compact' : '')}>
       <a className="skip" href="#desk-area" onClick={(e) => { e.preventDefault(); (document.querySelector('.win.focused .win-body') as HTMLElement | null)?.focus(); }}>Skip to the front window</a>

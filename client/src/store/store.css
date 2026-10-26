@@ -135,6 +135,7 @@ button{ font:inherit; color:inherit; }
 .kas-facts dd{ margin:0; color:var(--kas-dim); }
 .kas-card-foot{ margin-top:auto; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding-top:6px; border-top:1px solid var(--kas-line); }
 .kas-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+.kas-card-foot > .kas-actions:only-child{ margin-left:auto; }
 
 /* ---- price + buttons ---- */
 .kas-price{ display:inline-flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
@@ -212,7 +213,7 @@ div.kas-lb-img{ width:min(80vw, 600px); aspect-ratio:4/5; }
   .kas-lb.is-split .kas-lb-stage{ grid-column:1; padding:max(56px, env(safe-area-inset-top)) clamp(20px, 4vw, 64px) 40px; }
   .kas-lb.is-split .kas-lb-caption{ grid-column:2; width:auto; margin:0; height:100%; box-sizing:border-box; border-radius:0; border-width:0 0 0 1px; display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; flex-wrap:nowrap; gap:12px; padding:max(56px, env(safe-area-inset-top)) 28px 24px; overflow:hidden; }
   .kas-lb.is-split .kas-lb-caption > div:first-child{ flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain; }
-  .kas-lb.is-split .kas-lb-caption strong{ font-size:calc(var(--kas-text) * 1.45); display:block; line-height:1.15; }
+  .kas-lb.is-split .kas-lb-caption > div > strong{ font-size:calc(var(--kas-text) * 1.45); display:block; line-height:1.15; }
   .kas-lb.is-split .kas-lb-desc{ max-height:none; overflow:visible; margin-top:12px; }
   .kas-lb.is-split .kas-lb-buy{ flex:none; padding-top:14px; border-top:1px solid var(--kas-line); }
   .kas-lb.is-split .kas-lb-nav.is-next{ right:calc(var(--kas-panel) + 12px); }

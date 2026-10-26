@@ -11,6 +11,7 @@ import type { AppProps } from './registry';
 import { Badge, ErrorState, Field, Segmented, SkeletonRows, Switch, useConfirm, useToast } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
+import { useWinShown } from '../shell/desk';
 import { DateTimeInput, Uploader, useSaveKey } from './common';
 import { SiteSaveBar } from './Content';
 import SettingFinder from './SettingFinder';
@@ -394,6 +395,7 @@ function Preview({ doc, device, setDevice, arrange, onSelect }: { doc: SiteDoc; 
   const [nonce, setNonce] = useState(0);
   const dev = DEVICES[device];
   const introId = introVersion(doc.intro?.version);   // a new version reloads the preview with that intro
+  const shown = useWinShown();   // minimised: the preview unloads (it runs the full site) and reloads on return
   const send = (msg: unknown) => frame.current?.contentWindow?.postMessage(msg, location.origin);
   const selectRef = useRef(onSelect); selectRef.current = onSelect;
   useEffect(() => {
@@ -410,7 +412,7 @@ function Preview({ doc, device, setDevice, arrange, onSelect }: { doc: SiteDoc; 
     addEventListener('message', on);
     return () => removeEventListener('message', on);
   }, []);
-  useEffect(() => setReady(false), [device, introId]);   // a new frame must announce itself again
+  useEffect(() => setReady(false), [device, introId, shown]);   // a new frame must announce itself again
   // stream the draft (debounced)
   useEffect(() => { if (!ready) return; const t = setTimeout(() => send({ type: 'ka-preview-data', data: doc }), 120); return () => clearTimeout(t); }, [doc, ready]);
   useEffect(() => { if (ready) send({ type: 'ka-preview-edit-mode', enabled: arrange }); }, [arrange, ready]);
@@ -428,7 +430,7 @@ function Preview({ doc, device, setDevice, arrange, onSelect }: { doc: SiteDoc; 
       </div>
       <div ref={box} className="preview-stage">
         <div className="device" style={{ width: dev.w * scale, height: dev.h * scale }}>
-          <iframe key={`${device}-${nonce}-${introId}`} ref={frame} src={`/?preview=1&intro=${introId}`} title="Live preview of the homepage" style={{ width: dev.w, height: dev.h, transform: `scale(${scale})` }} />
+          {shown && <iframe key={`${device}-${nonce}-${introId}`} ref={frame} src={`/?preview=1&intro=${introId}`} title="Live preview of the homepage" style={{ width: dev.w, height: dev.h, transform: `scale(${scale})` }} />}
         </div>
       </div>
     </div>

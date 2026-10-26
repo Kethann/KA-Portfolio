@@ -1,12 +1,14 @@
 // One app window: drag by the title bar, resize from any edge, snap to halves/maximise at screen
 // edges, traffic-light controls, and an error boundary so one app failing never takes the desktop down.
 // While dragging, the element is moved directly (no React re-render per frame); the result is committed on release.
-import { Component, Suspense, useCallback, useContext, useLayoutEffect, useRef, useState } from 'react';
+// The app inside is memoised: focusing, moving or resizing a window never re-renders the apps in it or in other windows.
+import { Component, Suspense, memo, useCallback, useContext, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ReactNode, PointerEvent as RPointerEvent } from 'react';
 import { APP } from '../apps/registry';
-import { useDesk, clamp, WinIdCtx } from './desk';
+import { useDesk, clamp, WinIdCtx, WinShownCtx } from './desk';
 import type { Win } from './desk';
+import type { AppDef, AppProps } from '../apps/registry';
 import { Icon } from '../icons';
 import { SkeletonRows } from '../ui';
 
@@ -27,7 +29,8 @@ export function Window({ win, compact }: { win: Win; compact: boolean }){
   const el = useRef<HTMLElement>(null);
   const [snap, setSnap] = useState<Snap>(null);
   const focused = desk.focused === win.id;
-  const go = useCallback((route: string) => desk.setRoute(win.id, route), [desk, win.id]);
+  const { setRoute, open } = desk;
+  const go = useCallback((route: string) => setRoute(win.id, route), [setRoute, win.id]);
 
   const startDrag = (e: RPointerEvent) => {
     if (compact || e.button !== 0 || (e.target as HTMLElement).closest('button,input,a,select,[data-nodrag]')) return;
@@ -40,6 +43,7 @@ export function Window({ win, compact }: { win: Win; compact: boolean }){
       const dx = ev.clientX - start.px, dy = ev.clientY - start.py;
       if (!moved && Math.hypot(dx, dy) < 4) return;
       if (!moved && win.max){ node.style.width = win.w + 'px'; node.style.height = win.h + 'px'; }
+      if (!moved) node.classList.add('dragging');
       moved = true;
       x = clamp(start.x + dx, -win.w + 120, a.width - 120);
       y = clamp(start.y + dy, 0, a.height - 40);
@@ -51,6 +55,7 @@ export function Window({ win, compact }: { win: Win; compact: boolean }){
     const up = () => {
       removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
       setSnap(null);
+      node.classList.remove('dragging');
       if (!moved) return;
       if (s === 'max'){ desk.setGeom(win.id, { x: win.x, y: win.y }); desk.toggleMax(win.id); }
       else if (s) desk.tile(win.id, s);
@@ -67,6 +72,7 @@ export function Window({ win, compact }: { win: Win; compact: boolean }){
     const s = { px: e.clientX, py: e.clientY, x: win.x, y: win.y, w: win.w, h: win.h };
     let g = { ...s };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    node.classList.add('dragging');
     const move = (ev: PointerEvent) => {
       const dx = ev.clientX - s.px, dy = ev.clientY - s.py;
       g = { ...s };
@@ -76,7 +82,7 @@ export function Window({ win, compact }: { win: Win; compact: boolean }){
       if (edge.includes('n')){ g.h = clamp(s.h - dy, MIN_H, s.y + s.h); g.y = s.y + s.h - g.h; }
       node.style.transform = `translate3d(${g.x}px,${g.y}px,0)`; node.style.width = g.w + 'px'; node.style.height = g.h + 'px';
     };
-    const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); desk.setGeom(win.id, g); };
+    const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); node.classList.remove('dragging'); desk.setGeom(win.id, g); };
     addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
   };
 
@@ -102,17 +108,23 @@ export function Window({ win, compact }: { win: Win; compact: boolean }){
           <div className="win-bar-end" id={`win-tools-${win.id}`} />
         </header>
         <div className="win-body">
-          <WinIdCtx.Provider value={win.id}><Boundary name={app.title}>
-            <Suspense fallback={<div className="pad"><SkeletonRows rows={8} /></div>}>
-              <app.Component route={win.route} go={go} active={focused && !win.min} open={desk.open} />
-            </Suspense>
-          </Boundary></WinIdCtx.Provider>
+          <WinIdCtx.Provider value={win.id}><WinShownCtx.Provider value={!win.min}>
+            <AppBody app={app} route={win.route} go={go} active={focused && !win.min} open={open} />
+          </WinShownCtx.Provider></WinIdCtx.Provider>
         </div>
         {!full && ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'].map(edge => <div key={edge} className={`rz rz-${edge}`} onPointerDown={(e) => startResize(e, edge)} aria-hidden="true" />)}
       </section>
     </>
   );
 }
+
+const AppBody = memo(function AppBody({ app, ...props }: AppProps & { app: AppDef }){
+  return <Boundary name={app.title}>
+    <Suspense fallback={<div className="pad"><SkeletonRows rows={8} /></div>}>
+      <app.Component {...props} />
+    </Suspense>
+  </Boundary>;
+});
 
 class Boundary extends Component<{ name: string; children: ReactNode }, { error: Error | null }>{
   state = { error: null as Error | null };

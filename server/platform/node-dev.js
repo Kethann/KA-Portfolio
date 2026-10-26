@@ -152,6 +152,14 @@ export async function createDevServer({ port = Number(env('PORT', 9878)), host =
           if (file && await sendFile(res, file, cache)) return;
         }
       }
+      // Artifacts apps hosted on the site (e.g. /artifacts/thrive/): plain static folders, served like Pages does
+      // (a folder serves its index.html; without the trailing slash it redirects, so relative paths resolve inside it)
+      if (path.startsWith('/artifacts/')){
+        const base = resolve(root, 'dist/artifacts'), rel = path.slice('/artifacts/'.length);
+        const file = inside(base, rel.endsWith('/') ? rel + 'index.html' : rel);
+        if (file && await sendFile(res, file, 'no-cache')) return;
+        if (file && !extname(rel) && await stat(resolve(file, 'index.html')).catch(() => null)){ res.writeHead(301, { Location: path + '/' }); return res.end(); }
+      }
       if (path === '/creator' || path === '/creator/'){
         res.writeHead(301, { Location: '/portal/' }); return res.end();
       }

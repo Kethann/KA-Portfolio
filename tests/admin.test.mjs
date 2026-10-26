@@ -177,7 +177,10 @@ test('catalog: drafts stay private; publishing rules; stale edits refused; own m
 });
 
 test('catalog: a for-sale item needs prices and a file; sold items archive instead of deleting', async () => {
-  let p = (await admin('POST', '/api/admin/products', { kind: 'artifacts', title: 'Brush Pack' })).json.product;
+  let p = (await admin('POST', '/api/admin/products', { kind: 'artzz', title: 'Brush Pack' })).json.product;
+  // Artzz items need an image before they publish (Artifacts can't be sold, so the for-sale item here is Artzz)
+  const img = await admin('POST', '/api/admin/uploads', { kind: 'image', contentType: 'image/webp', bytes: 1000, filename: 'brush.webp' });
+  p = (await admin('POST', `/api/admin/products/${p.id}/media`, { url: img.json.publicUrl, alt: 'Brush pack' })).json.product;
   const noFile = await admin('PUT', `/api/admin/products/${p.id}`, { ...p, status: 'published', sellable: true, priceInr: 49900, priceUsd: 999, updatedAt: p.updatedAt });
   assert.equal(noFile.status, 400); assert.match(noFile.json.error, /file/);
   const up = await admin('POST', '/api/admin/uploads', { kind: 'deliverable', contentType: 'application/zip', bytes: 5, filename: 'brush pack.zip' });
@@ -239,7 +242,7 @@ async function buy(productId, email, currency = 'INR'){
 
 // ---- sales ---------------------------------------------------------------------------------------
 test('sales: overview per currency, order detail, resend, invoice, CSV', async () => {
-  const [p] = (await app.pg.query(`insert into products (kind, slug, title, status, sellable, price_inr, price_usd) values ('artifacts','kit-bold','Kit <b>bold</b>','published',true,20000,500) returning id`)).rows;
+  const [p] = (await app.pg.query(`insert into products (kind, slug, title, status, sellable, price_inr, price_usd) values ('artzz','kit-bold','Kit <b>bold</b>','published',true,20000,500) returning id`)).rows;
   await app.storage.put('deliverables', 'demo/k.zip', Buffer.from('Z'));
   await app.pg.query(`insert into product_files (product_id, storage_path, filename, bytes) values ($1, 'demo/k.zip', 'k.zip', 1)`, [p.id]);
   await buy(p.id, 'inr@example.com', 'INR');

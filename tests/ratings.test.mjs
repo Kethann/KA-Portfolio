@@ -9,7 +9,7 @@ const app = await createTestApp({ PUBLIC_SITE_URL: 'http://shop.test' });
 test.after(() => app.close());
 const q = async (sql, p) => (await app.pg.query(sql, p)).rows;
 
-const [prod] = await q(`insert into products (kind, slug, title, status, sellable, is_free) values ('artifacts','free-brushes','Free Brushes','published',1,1) returning id`);
+const [prod] = await q(`insert into products (kind, slug, title, status, sellable, is_free) values ('artzz','free-brushes','Free Brushes','published',1,1) returning id`);
 await q(`insert into product_files (product_id, storage_path, filename, bytes) values ($1,'files/aaaaaaaaaaaaaaaa/b.zip','b.zip',5)`, [prod.id]);
 async function freeOrder(email){
   const r = await app.call('POST', '/api/checkout/order', { body: { productId: prod.id, currency: 'INR', email, licenseHolder: 'Test Buyer' }, headers: { origin: 'http://shop.test' } });

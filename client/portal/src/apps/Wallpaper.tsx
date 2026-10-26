@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Field, Segmented, useToast } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
+import { useWinShown } from '../shell/desk';
 import { bytes } from '../format';
 
 type Size = { id: string; label: string; w: number; h: number; group: string };
@@ -139,6 +140,7 @@ export default function Wallpaper(){
     }
   };
   const busy = state.phase === 'loading' || state.phase === 'waiting' || state.phase === 'recording';
+  const shown = useWinShown();   // minimised (and not recording): the preview unloads, it runs the full site
   const groups = [...new Set(SIZES.map(s => s.group))];
   return (
     <div className="app">
@@ -179,7 +181,7 @@ export default function Wallpaper(){
         </aside>
         <div className="wall-stage" ref={stage}>
           <div className="wall-screen" style={{ width: box.w, height: box.h }}>
-            <iframe ref={frame} title="Intro preview" src={src} style={{ width: css.w, height: css.h, transform: `scale(${box.w / css.w})` }} />
+            {(shown || busy) && <iframe ref={frame} title="Intro preview" src={src} style={{ width: css.w, height: css.h, transform: `scale(${box.w / css.w})` }} />}
             {busy && <div className="wall-progress"><span>{state.msg}</span><i style={{ width: `${Math.round(state.p * 100)}%` }} /></div>}
             {state.phase === 'error' && <div className="wall-progress is-error"><span>{state.msg}</span></div>}
           </div>

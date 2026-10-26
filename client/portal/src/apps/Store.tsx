@@ -7,6 +7,7 @@ import { useLoad } from '../hooks';
 import { Badge, Segmented } from '../ui';
 import { Icon } from '../icons';
 import { WinTools } from '../shell/Window';
+import { useWinShown } from '../shell/desk';
 import StoreStatusPanel from './StoreStatus';
 import { StoreSettings, Categories } from './Settings';
 
@@ -15,10 +16,10 @@ const TABS: [Tab, string][] = [['status', 'Open / closed & access'], ['payments'
 const DEVICES = { desktop: { w: 1280, h: 860, label: 'Desktop' }, mobile: { w: 390, h: 844, label: 'Phone' } } as const;
 type Device = keyof typeof DEVICES;
 
-export default function Store({ route, go }: AppProps){
+export default function Store({ route, go, active }: AppProps){
   const tab: Tab = TABS.some(t => t[0] === route) ? route as Tab : 'status';
-  // the open/closed state, checked every few seconds so the preview follows a change made here or anywhere else
-  const st = useLoad<{ status: { open: boolean } }>('/store/access', { pollMs: 5000, active: true });
+  // the open/closed state, checked every few seconds (while this window is in front) so the preview follows a change made here or anywhere else
+  const st = useLoad<{ status: { open: boolean } }>('/store/access', { pollMs: 5000, active });
   const open = st.data?.status.open;
   return (
     <div className="app">
@@ -43,6 +44,7 @@ function StorePreview({ open }: { open: boolean | undefined }){
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.5);
   const dev = DEVICES[device];
+  const shown = useWinShown();   // minimised: the live page unloads (it runs the full site) and reloads on return
   useEffect(() => {
     const el = box.current; if (!el) return;
     const ro = new ResizeObserver(() => setScale(Math.min(1, (el.clientWidth - 24) / dev.w, (el.clientHeight - 24) / dev.h)));
@@ -61,7 +63,7 @@ function StorePreview({ open }: { open: boolean | undefined }){
       </div>
       <div ref={box} className="preview-stage">
         <div className="device" style={{ width: dev.w * scale, height: dev.h * scale }}>
-          {open !== undefined && <iframe key={`${device}-${open}-${nonce}`} src="/?page=store&preview=1" title="The Store page as visitors see it"
+          {open !== undefined && shown && <iframe key={`${device}-${open}-${nonce}`} src="/?page=store&preview=1" title="The Store page as visitors see it"
             style={{ width: dev.w, height: dev.h, transform: `scale(${scale})` }} />}
         </div>
       </div>

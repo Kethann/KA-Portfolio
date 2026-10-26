@@ -13,9 +13,9 @@ let ipSeq = 40;
 const ip = () => `198.19.0.${++ipSeq % 250}`;
 
 const [lic] = (await app.pg.query(`insert into licenses (key, name, summary, body_md) values ('personal','Personal','Own use','No resale.') returning id`)).rows;
-const [cat] = (await app.pg.query(`insert into categories (kind, name, slug) values ('artifacts','Kits','kits') returning id`)).rows;
+const [cat] = (await app.pg.query(`insert into categories (kind, name, slug) values ('artzz','Kits','kits') returning id`)).rows;
 async function freeProduct(slug, over = {}){
-  const p = { kind: 'artifacts', slug, title: slug, status: 'published', sellable: true, is_free: 1, license_id: lic.id, category_id: cat.id, max_downloads: 3, link_ttl_hours: 48, ...over };
+  const p = { kind: 'artzz', slug, title: slug, status: 'published', sellable: true, is_free: 1, license_id: lic.id, category_id: cat.id, max_downloads: 3, link_ttl_hours: 48, ...over };
   const cols = Object.keys(p);
   const [r] = (await app.pg.query(`insert into products (${cols}) values (${cols.map((_, i) => '$' + (i + 1))}) returning id`, Object.values(p))).rows;
   return r.id;

@@ -28,15 +28,27 @@ export async function api<T = any>(method: string, path: string, body?: unknown,
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (method !== 'GET' && csrf) headers['X-CSRF-Token'] = csrf;
   const payload = body === undefined ? undefined : JSON.stringify(body);   // small writes may finish even if the tab closes right after
-  let res: Response;
+  // A stalled connection ends with an error (and the usual Try again) instead of a window that loads forever.
+  // File downloads (raw) can take long and are left alone.
+  const ctrl = new AbortController();
+  let timedOut = false;
+  const timer = opts.raw ? undefined : setTimeout(() => { timedOut = true; ctrl.abort(); }, method === 'GET' ? 30e3 : 90e3);
+  const outer = () => ctrl.abort();
+  if (opts.signal?.aborted) ctrl.abort(); else opts.signal?.addEventListener('abort', outer, { once: true });
+  const slow = () => new ApiError('The server is taking too long to answer. Try again in a moment.', 0, 'timeout');
+  let res: Response, text: string;
   try {
-    res = await fetch('/api/admin' + path, { method, headers, body: payload, credentials: 'same-origin', signal: opts.signal, cache: 'no-store', keepalive: method !== 'GET' && !!payload && payload.length < 30000 });
-  } catch (err){
-    if ((err as Error).name === 'AbortError') throw err;
-    throw new ApiError(navigator.onLine ? 'Couldn’t reach the server. Try again in a moment.' : 'You’re offline. Check your connection.', 0, 'network');
-  }
-  if (opts.raw && res.ok) return res as unknown as T;
-  const text = await res.text();
+    try {
+      res = await fetch('/api/admin' + path, { method, headers, body: payload, credentials: 'same-origin', signal: ctrl.signal, cache: 'no-store', keepalive: method !== 'GET' && !!payload && payload.length < 30000 });
+    } catch (err){
+      if (timedOut) throw slow();
+      if ((err as Error).name === 'AbortError') throw err;
+      throw new ApiError(navigator.onLine ? 'Couldn’t reach the server. Try again in a moment.' : 'You’re offline. Check your connection.', 0, 'network');
+    }
+    if (opts.raw && res.ok) return res as unknown as T;
+    try { text = await res.text(); }
+    catch (err){ if (timedOut) throw slow(); throw err; }
+  } finally { clearTimeout(timer); opts.signal?.removeEventListener('abort', outer); }
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON (e.g. a proxy error page) */ }
   if (!res.ok){

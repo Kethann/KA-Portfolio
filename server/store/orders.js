@@ -60,7 +60,8 @@ export async function loadSellableProduct(db, { productId, slug }){
   const p = productId
     ? await db.maybeOne(`select * from products where id = $1`, [String(productId)])
     : await db.maybeOne(`select * from products where slug = $1`, [String(slug || '')]);
-  if (!p || p.status !== 'published' || !p.sellable) throw new HttpError(404, 'This item isn’t available.');
+  // Artifacts are a showcase (screenshots and live demos) and are never sold
+  if (!p || p.status !== 'published' || !p.sellable || p.kind === 'artifacts') throw new HttpError(404, 'This item isn’t available.');
   return p;
 }
 
