@@ -21,8 +21,8 @@ export default defineConfig({
     rollupOptions:{
       // The crystal homepage imports mount() at runtime, outside Vite's HTML graph.
       preserveEntrySignatures:'strict',
-      input:{portal:local('./client/portal/index.html'),gallery:local('./client/src/gallery-entry.tsx'),poster:local('./client/src/poster-background.ts'),panda:local('./client/src/panda.ts'),studio:local('./client/src/studio/studio-entry.ts'),store:local('./client/src/store/store-entry.tsx'),'skill-logos':local('./client/src/skill-logos-entry.ts'),sound:local('./client/src/lib/sound/sound-entry.ts')},
-      output:{entryFileNames:chunk=>['gallery','poster','panda','studio','store','skill-logos','sound'].includes(chunk.name)?'assets/'+chunk.name+'.js':'assets/[name]-[hash].js'}
+      input:{portal:local('./client/portal/index.html'),gallery:local('./client/src/gallery-entry.tsx'),poster:local('./client/src/poster-background.ts'),panda:local('./client/src/panda.ts'),studio:local('./client/src/studio/studio-entry.ts'),store:local('./client/src/store/store-entry.tsx'),'skill-logos':local('./client/src/skill-logos-entry.ts'),sound:local('./client/src/lib/sound/sound-entry.ts'),'intro-v4':local('./client/src/intro-v4-entry.ts')},
+      output:{entryFileNames:chunk=>['gallery','poster','panda','studio','store','skill-logos','sound','intro-v4'].includes(chunk.name)?'assets/'+chunk.name+'.js':'assets/[name]-[hash].js'}
     }
   },
   server:{host:'127.0.0.1',fs:{strict:true,allow:[local('./client'),local('./node_modules')],deny:['.env','.env.*','*.{crt,pem}','**/.git/**','**/server/data/**']},proxy:{'/api':localApi,'/images':localApi,'/uploads':localApi,'/creator':localApi,'/assets':localApi}}

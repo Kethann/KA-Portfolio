@@ -1,0 +1,23 @@
+// Every beat of the intro, in seconds. Nothing else in the code hardcodes a time.
+export const T = {
+  ambientIn: 0,
+  formStart: 0.25,
+  formSpread: 1.5,
+  bigEnter: 0.9,
+  bigLanded: 2.3,
+  flipStart: 2.85,
+  glint: 3.1,
+  flipEnd: 3.35,
+  leapStart: 3.47,
+  atEdge: 4.05,
+  rollDone: 5.85,
+  loopApex: 6.4,
+  docked: 7.0,
+  settled: 7.5,
+  morphEnd: 8.1,
+  sheenStart: 8.2,
+  sheenEnd: 9.3,
+  fadeStart: 9.2,
+  end: 10.0,
+  skipTo: 8.1,
+} as const;
