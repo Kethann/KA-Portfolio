@@ -14847,32 +14847,6 @@ window.addEventListener('ka-portfolio-updated', (e) => {
 // kick off asset loading
 })();
 </script>
-<!-- KA logo intro, VERSION 4 ("Ruby glint"). Off unless chosen in the portal (Studio > Intro). Its engine is the
-     built module ./dist/assets/intro-v4.js (source: client/src/intro-v4/); this block only loads it, and if it
-     cannot start, shows the finished logo and still releases the page (veil off, 'ka-sequence-complete'). -->
-<script data-intro="v4" type="text/plain">
-(function(){
-"use strict";
-var stage = document.getElementById('stage'), veil = document.getElementById('boot-veil');
-var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-function fallback(error){
-  console.warn('Intro Version 4 could not start; showing the finished logo instead.', error);
-  if (stage && !stage.querySelector('.ka-v4-static')){
-    var img = new Image();
-    img.className = 'ka-v4-static';
-    img.src = '/images/crystal-cutout.webp';
-    img.alt = '';
-    img.style.cssText = 'position:absolute;inset:0;margin:auto;height:46vh;max-width:56vw;object-fit:contain;';
-    stage.appendChild(img);
-  }
-  if (veil){ veil.style.opacity = '0'; veil.style.pointerEvents = 'none'; }
-  window.dispatchEvent(new CustomEvent('ka-sequence-complete'));
-}
-import('./dist/assets/intro-v4.js').then(function(m){
-  return m.mountIntroV4({ stage: stage, veil: veil, spacer: document.querySelector('.hero-spacer'), replay: document.getElementById('replay'), reducedMotion: reduced });
-}).catch(fallback);
-})();
-</script>
 
 <script>
 (function(){

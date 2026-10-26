@@ -34,13 +34,6 @@ export const INTRO_VERSIONS = [
     locked: false,
     description: 'Loki / Doctor Strange magic in real 3D: multiversal threads in their natural colours coil in from deep space and stitch the logo inside a layered 3D spell circle; the core drinks their energy and everything turns green: liquid emerald magic, 3D sparks, and the logo revealed green on a green-tinted world. Skill bubbles work here too.',
   },
-  {
-    id: 'v4',
-    name: 'Ruby glint',
-    label: 'Version 4',
-    locked: false,
-    description: 'Ruby sparkles fly in and draw the KA in stars; a big faceted ruby star lands, flashes, then rolls across like a wheel, revealing the crystal logo behind it in a shower of glitter, loops up and docks as a glint on the tip of the K. No skill bubbles.',
-  },
 ];
 export const INTRO_IDS = INTRO_VERSIONS.map(v => v.id);
 export const DEFAULT_INTRO = 'v1';
