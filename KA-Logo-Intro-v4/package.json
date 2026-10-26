@@ -1,0 +1,24 @@
+{
+  "name": "ka-logo-intro-v4",
+  "private": true,
+  "version": "4.0.0",
+  "type": "module",
+  "description": "KA logo intro v4: crystal glint formation, rolling ruby sparkle, shader wipe reveal.",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build && node scripts/build-standalone.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.185.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.4.3"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
