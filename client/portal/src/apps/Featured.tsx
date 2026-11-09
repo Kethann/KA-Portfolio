@@ -18,8 +18,10 @@ const ratioOf = (r: string, first?: SiteImage, w = 4, h = 5) => {
 export default function Featured(){
   const { doc } = useSite();
   if (!doc) return null;
-  const show: FeaturedShow = doc.featuredShow || featuredDefaults(doc);
-  const set = (fn: (s: FeaturedShow) => FeaturedShow) => updateSite(d => ({ ...d, featuredShow: fn(d.featuredShow || featuredDefaults(d)) }));
+  const base: FeaturedShow = doc.featuredShow || featuredDefaults(doc);
+  // a saved showcase with no rows is rebuilt from the featured stacks, the same as on the site
+  const show: FeaturedShow = base.rows.length ? base : { ...base, rows: featuredDefaults(doc).rows };
+  const set = (fn: (s: FeaturedShow) => FeaturedShow) => updateSite(d => ({ ...d, featuredShow: fn(d.featuredShow && d.featuredShow.rows.length ? d.featuredShow : { ...(d.featuredShow || featuredDefaults(d)), rows: featuredDefaults(d).rows }) }));
   const setRow = (i: number, patch: Partial<FeaturedRow>) => set(s => ({ ...s, rows: s.rows.map((r, k) => k === i ? { ...r, ...patch } : r) }));
   const move = (i: number, by: -1 | 1) => set(s => { const rows = s.rows.slice(); const j = i + by; if (j < 0 || j >= rows.length) return s; [rows[i], rows[j]] = [rows[j], rows[i]]; return { ...s, rows }; });
   const unused = doc.folders.find(f => !show.rows.some(r => r.folder === f)) || doc.folders[0];
